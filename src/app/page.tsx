@@ -306,6 +306,47 @@ export default function CashFlowPro() {
     setAssumptions(prev => prev.filter(a => a.id !== id))
   }
 
+  // Export transactions to CSV
+  const exportTransactions = () => {
+    if (transactions.length === 0) return
+    
+    const headers = ['date', 'category', 'description', 'amount', 'type', 'project']
+    const csvContent = [
+      headers.join(','),
+      ...transactions.map(t => [
+        t.date,
+        t.category,
+        `"${t.description.replace(/"/g, '""')}"`,
+        t.amount,
+        t.type,
+        t.project || ''
+      ].join(','))
+    ].join('\n')
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `cashflow_export_${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(link.href)
+  }
+
+  // Download CSV template
+  const downloadTemplate = () => {
+    const template = `date,category,description,amount,type,project
+2024-01-15,revenue,Client Payment,50000,actual,Project Alpha
+2024-01-01,opex,Payroll,-35000,actual,
+2024-01-01,opex,Rent,-5000,budget,
+2024-01-20,non_operational,Equipment Purchase,-10000,actual,`
+    
+    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = 'cashflow_template.csv'
+    link.click()
+    URL.revokeObjectURL(link.href)
+  }
+
   // Calculate monthly data
   const monthlyData = useMemo((): MonthlyData[] => {
     const today = new Date()
@@ -795,7 +836,16 @@ export default function CashFlowPro() {
         </div>
 
         <div className="mt-6 p-4 bg-terminal-bg rounded-lg">
-          <p className="text-sm text-zinc-400 mb-2">Expected CSV format:</p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-zinc-400">Expected CSV format:</p>
+            <button
+              onClick={downloadTemplate}
+              className="flex items-center gap-2 px-3 py-1 text-xs bg-accent-primary/10 text-accent-primary rounded hover:bg-accent-primary/20 transition-colors"
+            >
+              <Download className="w-3 h-3" />
+              Download Template
+            </button>
+          </div>
           <code className="text-xs text-accent-primary font-mono block">
             date, category, description, amount, type, project
           </code>
@@ -831,7 +881,10 @@ export default function CashFlowPro() {
             <h3 className="text-lg font-display font-semibold text-white">
               Imported Transactions ({transactions.length})
             </h3>
-            <button className="flex items-center gap-2 px-3 py-1.5 text-sm bg-terminal-bg border border-terminal-border rounded-lg hover:border-accent-primary transition-colors">
+            <button 
+              onClick={exportTransactions}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-terminal-bg border border-terminal-border rounded-lg hover:border-accent-primary transition-colors"
+            >
               <Download className="w-4 h-4" />
               Export
             </button>
