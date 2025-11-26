@@ -154,10 +154,37 @@ export default function CashFlowPro() {
   const [customEndDate, setCustomEndDate] = useState<string>(new Date().toISOString().slice(0, 7))
   const [showDatePicker, setShowDatePicker] = useState(false)
   
+  // Project Filter State
+  const [selectedProject, setSelectedProject] = useState<string>('all')
+  
+  // Get unique projects from transactions and assumptions
+  const projectList = useMemo(() => {
+    const projectsFromTransactions = transactions
+      .map(t => t.project)
+      .filter((p): p is string => !!p)
+    const projectsFromAssumptions = assumptions
+      .map(a => a.project)
+      .filter((p): p is string => !!p)
+    const allProjects = Array.from(new Set([...projectsFromTransactions, ...projectsFromAssumptions]))
+    return allProjects.sort()
+  }, [transactions, assumptions])
+  
   // Get active date range
   const activeDateRange = useMemo(() => {
     return getDateRangeFromPreset(dateRangePreset, customStartDate, customEndDate)
   }, [dateRangePreset, customStartDate, customEndDate])
+  
+  // Filter transactions by selected project
+  const filteredTransactions = useMemo(() => {
+    if (selectedProject === 'all') return transactions
+    return transactions.filter(t => t.project === selectedProject)
+  }, [transactions, selectedProject])
+  
+  // Filter assumptions by selected project
+  const filteredAssumptions = useMemo(() => {
+    if (selectedProject === 'all') return assumptions
+    return assumptions.filter(a => a.project === selectedProject || !a.project)
+  }, [assumptions, selectedProject])
 
   // Sample data for demo
   const loadSampleData = () => {
@@ -351,7 +378,7 @@ export default function CashFlowPro() {
   const monthlyData = useMemo((): MonthlyData[] => {
     const today = new Date()
     const startDate = new Date(Math.min(
-      ...transactions.map(t => new Date(t.date).getTime()),
+      ...filteredTransactions.map(t => new Date(t.date).getTime()),
       today.getTime() - 365 * 24 * 60 * 60 * 1000
     ))
     
@@ -359,12 +386,12 @@ export default function CashFlowPro() {
     endDate.setFullYear(endDate.getFullYear() + projectionYears)
     
     const months = getMonthsBetween(startDate, endDate)
-    let runningActual = beginningBalance
-    let runningBudget = beginningBalance
-    let runningProjected = beginningBalance
+    let runningActual = selectedProject === 'all' ? beginningBalance : 0
+    let runningBudget = selectedProject === 'all' ? beginningBalance : 0
+    let runningProjected = selectedProject === 'all' ? beginningBalance : 0
 
     return months.map(month => {
-      const monthTransactions = transactions.filter(t => t.date.startsWith(month))
+      const monthTransactions = filteredTransactions.filter(t => t.date.startsWith(month))
       const isPast = month <= cutoffDate
       
       // Calculate actuals
@@ -399,7 +426,7 @@ export default function CashFlowPro() {
       let projNonOp = 0
 
       if (!isPast) {
-        assumptions.forEach(a => {
+        filteredAssumptions.forEach(a => {
           if (month >= a.startDate && (!a.endDate || month <= a.endDate)) {
             const amount = a.frequency === 'one-time' && month !== a.startDate ? 0 :
                           a.frequency === 'quarterly' && (parseInt(month.slice(5)) - parseInt(a.startDate.slice(5))) % 3 !== 0 ? 0 :
@@ -458,7 +485,7 @@ export default function CashFlowPro() {
         dataType: isPast ? 'actual' : 'projected'
       }
     })
-  }, [transactions, assumptions, beginningBalance, projectionYears, cutoffDate])
+  }, [filteredTransactions, filteredAssumptions, beginningBalance, projectionYears, cutoffDate, selectedProject])
 
   // Filtered monthly data based on date range selection
   const filteredMonthlyData = useMemo(() => {
@@ -504,6 +531,34 @@ export default function CashFlowPro() {
     }))
   }, [filteredMonthlyData])
 
+  // Project comparison data
+  const projectComparisonData = useMemo(() => {
+    if (projectList.length === 0) return []
+    
+    return projectList.map(project => {
+      const projectTransactions = transactions.filter(t => t.project === project)
+      const revenue = projectTransactions
+        .filter(t => t.category === 'revenue' && t.type === 'actual')
+        .reduce((sum, t) => sum + t.amount, 0)
+      const expenses = projectTransactions
+        .filter(t => (t.category === 'opex' || t.category === 'non_operational') && t.type === 'actual')
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+      const netCash = revenue - expenses
+      const budgetRevenue = projectTransactions
+        .filter(t => t.category === 'revenue' && t.type === 'budget')
+        .reduce((sum, t) => sum + t.amount, 0)
+      
+      return {
+        name: project,
+        revenue,
+        expenses,
+        netCash,
+        budgetRevenue,
+        variance: revenue - budgetRevenue
+      }
+    }).sort((a, b) => b.revenue - a.revenue)
+  }, [transactions, projectList])
+
   // Date range presets
   const datePresets: { key: DateRangePreset; label: string }[] = [
     { key: 'thisYear', label: 'This Year' },
@@ -515,6 +570,9 @@ export default function CashFlowPro() {
     { key: 'all', label: 'All Data' },
     { key: 'custom', label: 'Custom' },
   ]
+
+  // Project colors for charts
+  const projectColors = ['#00ff88', '#00d4ff', '#ffaa00', '#ff4466', '#a855f7', '#ec4899', '#14b8a6', '#f97316']
 
   // Render functions
   const renderDashboard = () => (
@@ -574,6 +632,52 @@ export default function CashFlowPro() {
           )}
         </div>
       </div>
+
+      {/* Project Filter */}
+      {projectList.length > 0 && (
+        <div className="bg-terminal-surface border border-terminal-border rounded-xl p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 mr-2">
+              <Building2 className="w-4 h-4 text-accent-secondary" />
+              <span className="text-sm text-zinc-400 font-medium">Project:</span>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setSelectedProject('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  selectedProject === 'all'
+                    ? 'bg-accent-secondary text-terminal-bg'
+                    : 'bg-terminal-bg border border-terminal-border text-zinc-400 hover:border-accent-secondary hover:text-white'
+                }`}
+              >
+                All Projects
+              </button>
+              {projectList.map(project => (
+                <button
+                  key={project}
+                  onClick={() => setSelectedProject(project)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    selectedProject === project
+                      ? 'bg-accent-secondary text-terminal-bg'
+                      : 'bg-terminal-bg border border-terminal-border text-zinc-400 hover:border-accent-secondary hover:text-white'
+                  }`}
+                >
+                  {project}
+                </button>
+              ))}
+            </div>
+            
+            {selectedProject !== 'all' && (
+              <div className="ml-auto">
+                <span className="text-xs px-2 py-1 rounded bg-accent-secondary/10 text-accent-secondary">
+                  Viewing: {selectedProject}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -708,6 +812,84 @@ export default function CashFlowPro() {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* Project Comparison Section */}
+      {projectList.length > 0 && selectedProject === 'all' && (
+        <div className="bg-terminal-surface border border-terminal-border rounded-xl p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-display font-semibold text-white">Project Comparison</h3>
+            <div className="text-xs text-zinc-500">{projectList.length} projects</div>
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Project Revenue Chart */}
+            <div>
+              <h4 className="text-sm text-zinc-400 mb-4">Revenue by Project</h4>
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={projectComparisonData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
+                  <XAxis type="number" stroke="#71717a" fontSize={11} tickFormatter={formatCompact} />
+                  <YAxis type="category" dataKey="name" stroke="#71717a" fontSize={11} width={100} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="revenue" name="Revenue" fill="#00ff88" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            
+            {/* Project Net Cash Chart */}
+            <div>
+              <h4 className="text-sm text-zinc-400 mb-4">Net Cash by Project</h4>
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={projectComparisonData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
+                  <XAxis type="number" stroke="#71717a" fontSize={11} tickFormatter={formatCompact} />
+                  <YAxis type="category" dataKey="name" stroke="#71717a" fontSize={11} width={100} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <ReferenceLine x={0} stroke="#3a3a4a" />
+                  <Bar 
+                    dataKey="netCash" 
+                    name="Net Cash" 
+                    fill="#00d4ff"
+                    radius={[0, 4, 4, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          
+          {/* Project Summary Table */}
+          <div className="mt-6 overflow-x-auto">
+            <table className="data-table w-full">
+              <thead>
+                <tr>
+                  <th className="text-left text-zinc-400">Project</th>
+                  <th className="text-right text-zinc-400">Revenue</th>
+                  <th className="text-right text-zinc-400">Expenses</th>
+                  <th className="text-right text-zinc-400">Net Cash</th>
+                  <th className="text-right text-zinc-400">Budget</th>
+                  <th className="text-right text-zinc-400">Variance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {projectComparisonData.map(p => (
+                  <tr key={p.name} className="cursor-pointer" onClick={() => setSelectedProject(p.name)}>
+                    <td className="font-medium">{p.name}</td>
+                    <td className="text-right font-mono text-sm text-accent-primary">{formatCurrency(p.revenue)}</td>
+                    <td className="text-right font-mono text-sm text-accent-danger">{formatCurrency(-p.expenses)}</td>
+                    <td className={`text-right font-mono text-sm ${p.netCash >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                      {formatCurrency(p.netCash)}
+                    </td>
+                    <td className="text-right font-mono text-sm text-accent-warning">{formatCurrency(p.budgetRevenue)}</td>
+                    <td className={`text-right font-mono text-sm ${p.variance >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                      {p.variance >= 0 ? '+' : ''}{formatCurrency(p.variance)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Actual vs Projected Table */}
       <div className="bg-terminal-surface border border-terminal-border rounded-xl p-6">
