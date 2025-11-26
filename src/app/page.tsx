@@ -101,6 +101,41 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   )
 }
 
+// Date Range Types
+type DateRangePreset = 'thisYear' | 'lastYear' | 'last12' | 'last6' | 'last3' | 'ytd' | 'all' | 'custom'
+
+const getDateRangeFromPreset = (preset: DateRangePreset, customStart?: string, customEnd?: string): { start: string; end: string } => {
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth()
+  
+  switch (preset) {
+    case 'thisYear':
+      return { start: `${currentYear}-01`, end: `${currentYear}-12` }
+    case 'lastYear':
+      return { start: `${currentYear - 1}-01`, end: `${currentYear - 1}-12` }
+    case 'last12':
+      const start12 = new Date(now)
+      start12.setMonth(start12.getMonth() - 11)
+      return { start: start12.toISOString().slice(0, 7), end: now.toISOString().slice(0, 7) }
+    case 'last6':
+      const start6 = new Date(now)
+      start6.setMonth(start6.getMonth() - 5)
+      return { start: start6.toISOString().slice(0, 7), end: now.toISOString().slice(0, 7) }
+    case 'last3':
+      const start3 = new Date(now)
+      start3.setMonth(start3.getMonth() - 2)
+      return { start: start3.toISOString().slice(0, 7), end: now.toISOString().slice(0, 7) }
+    case 'ytd':
+      return { start: `${currentYear}-01`, end: now.toISOString().slice(0, 7) }
+    case 'custom':
+      return { start: customStart || `${currentYear}-01`, end: customEnd || now.toISOString().slice(0, 7) }
+    case 'all':
+    default:
+      return { start: '2020-01', end: `${currentYear + 3}-12` }
+  }
+}
+
 // Main Component
 export default function CashFlowPro() {
   // State
@@ -112,6 +147,17 @@ export default function CashFlowPro() {
   const [comparisonView, setComparisonView] = useState<'mom' | 'yoy' | 'qoq' | 'project'>('mom')
   const [cutoffDate, setCutoffDate] = useState<string>(new Date().toISOString().slice(0, 7))
   const [isDragging, setIsDragging] = useState(false)
+  
+  // Date Range Filter State
+  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('thisYear')
+  const [customStartDate, setCustomStartDate] = useState<string>(`${new Date().getFullYear()}-01`)
+  const [customEndDate, setCustomEndDate] = useState<string>(new Date().toISOString().slice(0, 7))
+  const [showDatePicker, setShowDatePicker] = useState(false)
+  
+  // Get active date range
+  const activeDateRange = useMemo(() => {
+    return getDateRangeFromPreset(dateRangePreset, customStartDate, customEndDate)
+  }, [dateRangePreset, customStartDate, customEndDate])
 
   // Sample data for demo
   const loadSampleData = () => {
@@ -373,15 +419,20 @@ export default function CashFlowPro() {
     })
   }, [transactions, assumptions, beginningBalance, projectionYears, cutoffDate])
 
-  // KPI Calculations
+  // Filtered monthly data based on date range selection
+  const filteredMonthlyData = useMemo(() => {
+    return monthlyData.filter(d => d.month >= activeDateRange.start && d.month <= activeDateRange.end)
+  }, [monthlyData, activeDateRange])
+
+  // KPI Calculations (using filtered data)
   const kpis = useMemo(() => {
-    const actualData = monthlyData.filter(d => d.dataType === 'actual')
-    const projectedData = monthlyData.filter(d => d.dataType === 'projected')
+    const actualData = filteredMonthlyData.filter(d => d.dataType === 'actual')
+    const projectedData = filteredMonthlyData.filter(d => d.dataType === 'projected')
     
     const totalActualRevenue = actualData.reduce((sum, d) => sum + d.revenue.actual, 0)
     const totalActualOpex = actualData.reduce((sum, d) => sum + d.opex.actual, 0)
     const totalProjectedRevenue = projectedData.reduce((sum, d) => sum + d.revenue.projected, 0)
-    const totalBudgetRevenue = monthlyData.reduce((sum, d) => sum + d.revenue.budget, 0)
+    const totalBudgetRevenue = filteredMonthlyData.reduce((sum, d) => sum + d.revenue.budget, 0)
     
     const currentBalance = monthlyData[monthlyData.length - 1]?.runningBalance.projected || beginningBalance
     const budgetVariance = totalActualRevenue - totalBudgetRevenue
@@ -395,11 +446,11 @@ export default function CashFlowPro() {
       avgMonthlyRevenue: totalActualRevenue / (actualData.length || 1),
       avgMonthlyOpex: totalActualOpex / (actualData.length || 1)
     }
-  }, [monthlyData, beginningBalance])
+  }, [filteredMonthlyData, beginningBalance])
 
   // Chart data transformations
   const chartData = useMemo(() => {
-    return monthlyData.map(d => ({
+    return filteredMonthlyData.map(d => ({
       name: d.monthLabel,
       month: d.month,
       actual: d.netCash.actual || null,
@@ -410,11 +461,79 @@ export default function CashFlowPro() {
       opex: d.opex.actual || d.opex.projected,
       dataType: d.dataType
     }))
-  }, [monthlyData])
+  }, [filteredMonthlyData])
+
+  // Date range presets
+  const datePresets: { key: DateRangePreset; label: string }[] = [
+    { key: 'thisYear', label: 'This Year' },
+    { key: 'lastYear', label: 'Last Year' },
+    { key: 'last12', label: 'Last 12 Mo' },
+    { key: 'last6', label: 'Last 6 Mo' },
+    { key: 'last3', label: 'Last 3 Mo' },
+    { key: 'ytd', label: 'YTD' },
+    { key: 'all', label: 'All Data' },
+    { key: 'custom', label: 'Custom' },
+  ]
 
   // Render functions
   const renderDashboard = () => (
     <div className="space-y-6 animate-fade-in">
+      {/* Date Range Selector */}
+      <div className="bg-terminal-surface border border-terminal-border rounded-xl p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 mr-2">
+            <Calendar className="w-4 h-4 text-accent-primary" />
+            <span className="text-sm text-zinc-400 font-medium">Period:</span>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-2">
+            {datePresets.map(preset => (
+              <button
+                key={preset.key}
+                onClick={() => {
+                  setDateRangePreset(preset.key)
+                  if (preset.key !== 'custom') setShowDatePicker(false)
+                  else setShowDatePicker(true)
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  dateRangePreset === preset.key
+                    ? 'bg-accent-primary text-terminal-bg'
+                    : 'bg-terminal-bg border border-terminal-border text-zinc-400 hover:border-accent-primary hover:text-white'
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          
+          {/* Custom Date Range Inputs */}
+          {dateRangePreset === 'custom' && (
+            <div className="flex items-center gap-2 ml-auto">
+              <input
+                type="month"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="bg-terminal-bg border border-terminal-border rounded-lg py-1.5 px-3 text-sm text-white font-mono focus:outline-none focus:border-accent-primary"
+              />
+              <span className="text-zinc-500">to</span>
+              <input
+                type="month"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="bg-terminal-bg border border-terminal-border rounded-lg py-1.5 px-3 text-sm text-white font-mono focus:outline-none focus:border-accent-primary"
+              />
+            </div>
+          )}
+          
+          {/* Active Range Display */}
+          {dateRangePreset !== 'custom' && (
+            <div className="ml-auto text-xs text-zinc-500 font-mono">
+              {activeDateRange.start} → {activeDateRange.end}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-terminal-surface border border-terminal-border rounded-xl p-5 card-hover">
@@ -577,7 +696,7 @@ export default function CashFlowPro() {
               </tr>
             </thead>
             <tbody>
-              {monthlyData.slice(-12).map(d => (
+              {filteredMonthlyData.map(d => (
                 <tr key={d.month}>
                   <td className="font-mono text-sm">{d.monthLabel}</td>
                   <td className="text-right">
