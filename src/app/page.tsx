@@ -301,6 +301,16 @@ export default function CashFlowPro() {
   const [balanceAlertThreshold, setBalanceAlertThreshold] = useState<number>(0)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [showProjectModal, setShowProjectModal] = useState(false)
+  const [showPdfExport, setShowPdfExport] = useState(false)
+  const [pdfSections, setPdfSections] = useState({
+    kpis: true,
+    cashFlowChart: true,
+    balanceChart: true,
+    expenseBreakdown: true,
+    comparison: true,
+    projectMargins: true,
+    transactions: false
+  })
   const [activeScenario, setActiveScenario] = useState<string>('base')
   
   // Filter state
@@ -506,8 +516,32 @@ export default function CashFlowPro() {
   }, [transactions])
 
   const exportToPDF = useCallback(() => {
-    window.print()
+    setShowPdfExport(true)
   }, [])
+
+  const handlePdfExport = useCallback(() => {
+    // Add print class to hide non-selected sections
+    const style = document.createElement('style')
+    style.id = 'pdf-export-style'
+    style.textContent = `
+      @media print {
+        .pdf-section { display: none !important; }
+        ${pdfSections.kpis ? '.pdf-kpis { display: block !important; }' : ''}
+        ${pdfSections.cashFlowChart ? '.pdf-cashflow { display: block !important; }' : ''}
+        ${pdfSections.balanceChart ? '.pdf-balance { display: block !important; }' : ''}
+        ${pdfSections.expenseBreakdown ? '.pdf-expenses { display: block !important; }' : ''}
+        ${pdfSections.comparison ? '.pdf-comparison { display: block !important; }' : ''}
+        ${pdfSections.projectMargins ? '.pdf-margins { display: block !important; }' : ''}
+        ${pdfSections.transactions ? '.pdf-transactions { display: block !important; }' : ''}
+      }
+    `
+    document.head.appendChild(style)
+    setShowPdfExport(false)
+    setTimeout(() => {
+      window.print()
+      document.getElementById('pdf-export-style')?.remove()
+    }, 100)
+  }, [pdfSections])
 
   const deleteTransaction = useCallback((id: string) => {
     setTransactions(prev => prev.filter(t => t.id !== id))
@@ -910,12 +944,21 @@ export default function CashFlowPro() {
   ]
 
   const themeClasses = theme === 'light' 
-    ? 'bg-gray-50 text-gray-900' 
+    ? 'bg-gray-100 text-gray-900' 
     : 'bg-terminal-bg text-zinc-100'
 
   const cardClasses = theme === 'light'
-    ? 'bg-white border-gray-200'
+    ? 'bg-white border-gray-200 shadow-sm'
     : 'bg-terminal-surface border-terminal-border'
+
+  const inputClasses = theme === 'light'
+    ? 'bg-white border-gray-300 text-gray-900'
+    : 'bg-terminal-bg border-terminal-border text-zinc-100'
+
+  const tableHeaderBg = theme === 'light' ? 'bg-gray-50' : 'bg-terminal-surface'
+  const tableBorder = theme === 'light' ? 'border-gray-200' : 'border-terminal-border'
+  const textMuted = theme === 'light' ? 'text-gray-500' : 'text-zinc-400'
+  const textSubtle = theme === 'light' ? 'text-gray-400' : 'text-zinc-500'
 
   return (
     <div className={`min-h-screen font-body transition-colors ${themeClasses}`}>
@@ -1184,6 +1227,81 @@ export default function CashFlowPro() {
         )}
       </AnimatePresence>
 
+      {/* PDF Export Modal */}
+      <AnimatePresence>
+        {showPdfExport && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowPdfExport(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-md rounded-xl p-6 border ${cardClasses}`}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Export PDF Report</h3>
+                <button onClick={() => setShowPdfExport(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <p className={`text-sm mb-4 ${textMuted}`}>Select sections to include in the executive report:</p>
+              
+              <div className="space-y-3 mb-6">
+                {[
+                  { key: 'kpis', label: 'KPI Summary', desc: 'Balance, Revenue, Expenses, Margin' },
+                  { key: 'cashFlowChart', label: 'Cash Flow Trend', desc: 'Revenue vs expenses chart' },
+                  { key: 'balanceChart', label: 'Running Balance', desc: 'Balance projection chart' },
+                  { key: 'expenseBreakdown', label: 'Expense Breakdown', desc: 'OpEx, Overhead, Investment split' },
+                  { key: 'comparison', label: 'Comparison Analysis', desc: 'MoM/QoQ comparison' },
+                  { key: 'projectMargins', label: 'Project Margins', desc: 'Margin by project' },
+                  { key: 'transactions', label: 'Transaction List', desc: 'Detailed transactions (large)' },
+                ].map(section => (
+                  <label key={section.key} className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-all ${
+                    theme === 'light' ? 'hover:bg-gray-50' : 'hover:bg-terminal-bg'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={pdfSections[section.key as keyof typeof pdfSections]}
+                      onChange={(e) => setPdfSections(prev => ({ ...prev, [section.key]: e.target.checked }))}
+                      className="mt-1 w-4 h-4 rounded accent-accent-primary"
+                    />
+                    <div>
+                      <div className="font-medium">{section.label}</div>
+                      <div className={`text-xs ${textSubtle}`}>{section.desc}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowPdfExport(false)}
+                  className={`flex-1 py-2 rounded-lg font-medium border ${
+                    theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePdfExport}
+                  className="flex-1 py-2 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90 flex items-center justify-center gap-2"
+                >
+                  <FileText className="w-4 h-4" />
+                  Export PDF
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
         <AnimatePresence mode="wait">
           {/* Dashboard Tab */}
@@ -1198,11 +1316,11 @@ export default function CashFlowPro() {
               {/* Filters */}
               <div className={`flex flex-wrap items-center gap-2 sm:gap-4 p-3 sm:p-4 rounded-xl border ${cardClasses}`}>
                 <div className="flex items-center gap-2">
-                  <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-400" />
+                  <Building2 className={`w-4 h-4 sm:w-5 sm:h-5 ${textMuted}`} />
                   <select
                     value={selectedProject}
                     onChange={(e) => setSelectedProject(e.target.value)}
-                    className="bg-terminal-bg border border-terminal-border rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm"
+                    className={`rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm border ${inputClasses}`}
                   >
                     <option value="all">All Projects</option>
                     {projectList.map(p => (
@@ -1211,14 +1329,16 @@ export default function CashFlowPro() {
                   </select>
                   <button
                     onClick={() => setShowProjectModal(true)}
-                    className="p-1.5 border border-terminal-border rounded-lg hover:bg-terminal-bg"
+                    className={`p-1.5 border rounded-lg ${
+                      theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                    }`}
                     title="Manage Projects"
                   >
                     <FolderPlus className="w-4 h-4" />
                   </button>
                 </div>
                 
-                <div className="hidden sm:block w-px h-6 bg-terminal-border" />
+                <div className={`hidden sm:block w-px h-6 ${theme === 'light' ? 'bg-gray-300' : 'bg-terminal-border'}`} />
                 
                 <div className="flex gap-1 sm:gap-2 flex-wrap">
                   {datePresets.map(preset => (
@@ -1231,7 +1351,9 @@ export default function CashFlowPro() {
                       className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
                         dateRangePreset === preset.key
                           ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/30'
-                          : 'bg-terminal-bg text-zinc-400 hover:text-zinc-200 border border-terminal-border'
+                          : theme === 'light' 
+                            ? 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200' 
+                            : 'bg-terminal-bg text-zinc-400 hover:text-zinc-200 border border-terminal-border'
                       }`}
                     >
                       {preset.label}
@@ -1243,7 +1365,7 @@ export default function CashFlowPro() {
               {/* KPI Cards */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <div className={`rounded-xl p-4 sm:p-5 border ${cardClasses}`}>
-                  <div className="flex items-center gap-2 text-zinc-400 text-xs sm:text-sm mb-2">
+                  <div className={`flex items-center gap-2 text-xs sm:text-sm mb-2 ${textMuted}`}>
                     <DollarSign className="w-4 h-4" />
                     Current Balance
                   </div>
@@ -1255,12 +1377,12 @@ export default function CashFlowPro() {
                       {formatPercent(kpis.netChange)} vs {kpis.priorPeriodLabel}
                     </div>
                   ) : (
-                    <div className="text-xs mt-1 text-zinc-500">Projected</div>
+                    <div className={`text-xs mt-1 ${textSubtle}`}>Projected</div>
                   )}
                 </div>
                 
                 <div className={`rounded-xl p-4 sm:p-5 border ${cardClasses}`}>
-                  <div className="flex items-center gap-2 text-zinc-400 text-xs sm:text-sm mb-2">
+                  <div className={`flex items-center gap-2 text-xs sm:text-sm mb-2 ${textMuted}`}>
                     <TrendingUp className="w-4 h-4" />
                     Revenue
                   </div>
@@ -1272,32 +1394,32 @@ export default function CashFlowPro() {
                       {formatPercent(kpis.revenueBudgetVariance)} vs budget
                     </div>
                   ) : (
-                    <div className="text-xs mt-1 text-zinc-500">Total</div>
+                    <div className={`text-xs mt-1 ${textSubtle}`}>Total</div>
                   )}
                 </div>
                 
                 <div className={`rounded-xl p-4 sm:p-5 border ${cardClasses}`}>
-                  <div className="flex items-center gap-2 text-zinc-400 text-xs sm:text-sm mb-2">
+                  <div className={`flex items-center gap-2 text-xs sm:text-sm mb-2 ${textMuted}`}>
                     <TrendingDown className="w-4 h-4" />
                     Total Expenses
                   </div>
                   <div className="text-xl sm:text-2xl font-mono font-semibold text-accent-danger">
                     {formatCurrency(kpis.totalExpenses)}
                   </div>
-                  <div className="text-xs mt-1 text-zinc-500">
+                  <div className={`text-xs mt-1 ${textSubtle}`}>
                     OpEx + Overhead + InvEx
                   </div>
                 </div>
                 
                 <div className={`rounded-xl p-4 sm:p-5 border ${cardClasses}`}>
-                  <div className="flex items-center gap-2 text-zinc-400 text-xs sm:text-sm mb-2">
+                  <div className={`flex items-center gap-2 text-xs sm:text-sm mb-2 ${textMuted}`}>
                     <Calendar className="w-4 h-4" />
                     Gross Margin
                   </div>
                   <div className={`text-xl sm:text-2xl font-mono font-semibold ${kpis.grossMargin >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
                     {kpis.grossMargin.toFixed(1)}%
                   </div>
-                  <div className="text-xs mt-1 text-zinc-500">
+                  <div className={`text-xs mt-1 ${textSubtle}`}>
                     Net / Revenue
                   </div>
                 </div>
@@ -1309,11 +1431,11 @@ export default function CashFlowPro() {
                   <h3 className="text-base sm:text-lg font-semibold mb-4">Cash Flow Trend</h3>
                   <ResponsiveContainer width="100%" height={280}>
                     <ComposedChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
-                      <XAxis dataKey="name" stroke="#71717a" fontSize={11} />
-                      <YAxis stroke="#71717a" fontSize={11} tickFormatter={(v) => `$${v/1000}k`} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#1e1e2e'} />
+                      <XAxis dataKey="name" stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} />
+                      <YAxis stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} tickFormatter={(v) => `$${v/1000}k`} />
                       <Tooltip 
-                        contentStyle={{ backgroundColor: '#12121a', border: '1px solid #1e1e2e', borderRadius: '8px', fontSize: '12px' }}
+                        contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#12121a', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#1e1e2e'}`, borderRadius: '8px', fontSize: '12px' }}
                         formatter={(value: number, name: string) => [formatCurrency(value), name]}
                       />
                       <Legend wrapperStyle={{ fontSize: '12px' }} />
@@ -1336,11 +1458,11 @@ export default function CashFlowPro() {
                           <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
-                      <XAxis dataKey="name" stroke="#71717a" fontSize={11} />
-                      <YAxis stroke="#71717a" fontSize={11} tickFormatter={(v) => `$${v/1000}k`} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#1e1e2e'} />
+                      <XAxis dataKey="name" stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} />
+                      <YAxis stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} tickFormatter={(v) => `$${v/1000}k`} />
                       <Tooltip 
-                        contentStyle={{ backgroundColor: '#12121a', border: '1px solid #1e1e2e', borderRadius: '8px', fontSize: '12px' }}
+                        contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#12121a', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#1e1e2e'}`, borderRadius: '8px', fontSize: '12px' }}
                         formatter={(value: number) => formatCurrency(value)}
                       />
                       {balanceAlertThreshold > 0 && (
@@ -1373,7 +1495,7 @@ export default function CashFlowPro() {
                           ))}
                         </Pie>
                         <Tooltip 
-                          contentStyle={{ backgroundColor: '#12121a', border: '1px solid #1e1e2e', borderRadius: '8px', fontSize: '12px' }}
+                          contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#12121a', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#1e1e2e'}`, borderRadius: '8px', fontSize: '12px' }}
                           formatter={(value: number) => formatCurrency(value)}
                         />
                       </PieChart>
@@ -1383,7 +1505,7 @@ export default function CashFlowPro() {
                         <div key={e.name} className="flex items-center justify-between text-sm">
                           <div className="flex items-center gap-2">
                             <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: e.color }} />
-                            <span className="text-zinc-400">{e.name}</span>
+                            <span className={textMuted}>{e.name}</span>
                           </div>
                           <span className="font-mono">{e.percent}%</span>
                         </div>
@@ -1395,34 +1517,34 @@ export default function CashFlowPro() {
                     <div className={`rounded-xl p-4 border ${cardClasses}`}>
                       <div className="flex items-center gap-2 mb-2">
                         <div className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" />
-                        <span className="text-zinc-400 text-sm">OpEx</span>
+                        <span className={`text-sm ${textMuted}`}>OpEx</span>
                       </div>
                       <div className="text-lg sm:text-xl font-mono font-semibold text-[#ef4444]">
                         {formatCurrency(kpis.totalOpex)}
                       </div>
-                      <p className="text-xs text-zinc-500 mt-1">Project costs</p>
+                      <p className={`text-xs mt-1 ${textSubtle}`}>Project costs</p>
                     </div>
                     
                     <div className={`rounded-xl p-4 border ${cardClasses}`}>
                       <div className="flex items-center gap-2 mb-2">
                         <div className="w-2.5 h-2.5 rounded-full bg-[#f59e0b]" />
-                        <span className="text-zinc-400 text-sm">Overhead</span>
+                        <span className={`text-sm ${textMuted}`}>Overhead</span>
                       </div>
                       <div className="text-lg sm:text-xl font-mono font-semibold text-[#f59e0b]">
                         {formatCurrency(kpis.totalOverhead)}
                       </div>
-                      <p className="text-xs text-zinc-500 mt-1">Company-wide</p>
+                      <p className={`text-xs mt-1 ${textSubtle}`}>Company-wide</p>
                     </div>
                     
                     <div className={`rounded-xl p-4 border ${cardClasses}`}>
                       <div className="flex items-center gap-2 mb-2">
                         <div className="w-2.5 h-2.5 rounded-full bg-[#6366f1]" />
-                        <span className="text-zinc-400 text-sm">Investment</span>
+                        <span className={`text-sm ${textMuted}`}>Investment</span>
                       </div>
                       <div className="text-lg sm:text-xl font-mono font-semibold text-[#6366f1]">
                         {formatCurrency(kpis.totalInvestment)}
                       </div>
-                      <p className="text-xs text-zinc-500 mt-1">Capital spend</p>
+                      <p className={`text-xs mt-1 ${textSubtle}`}>Capital spend</p>
                     </div>
                   </div>
                 </div>
@@ -1434,8 +1556,8 @@ export default function CashFlowPro() {
                   <h3 className="text-base sm:text-lg font-semibold mb-4">Project Margins</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {projectMarginData.slice(0, 4).map(p => (
-                      <div key={p.name} className="bg-terminal-bg rounded-lg p-3">
-                        <div className="text-zinc-400 text-sm truncate">{p.name}</div>
+                      <div key={p.name} className={`rounded-lg p-3 ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                        <div className={`text-sm truncate ${textMuted}`}>{p.name}</div>
                         <div className={`text-lg font-mono ${p.margin >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
                           {p.margin.toFixed(1)}%
                         </div>
@@ -1448,6 +1570,76 @@ export default function CashFlowPro() {
                 </div>
               )}
 
+              {/* Comparison Analysis */}
+              <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <h3 className="text-base sm:text-lg font-semibold">Comparison Analysis</h3>
+                  <div className="flex gap-2">
+                    {(['mom', 'yoy', 'qoq', 'project'] as const).map(view => (
+                      <button
+                        key={view}
+                        onClick={() => setComparisonView(view)}
+                        className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                          comparisonView === view
+                            ? 'bg-accent-primary text-white'
+                            : theme === 'light' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-terminal-bg text-zinc-400 hover:text-zinc-200'
+                        }`}
+                      >
+                        {view === 'mom' ? 'Month/Month' : view === 'yoy' ? 'Year/Year' : view === 'qoq' ? 'Quarter/Quarter' : 'By Project'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={comparisonData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#1e1e2e'} />
+                    <XAxis dataKey="name" stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} />
+                    <YAxis stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} tickFormatter={(v) => `$${v/1000}k`} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#12121a', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#1e1e2e'}`, borderRadius: '8px', fontSize: '12px' }}
+                      formatter={(value: number) => formatCurrency(value)}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '12px' }} />
+                    <Bar dataKey="revenue" name="Revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="opex" name="OpEx" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+                
+                {/* QoQ Table */}
+                {comparisonView === 'qoq' && qoqData.length > 0 && (
+                  <div className="mt-6 overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className={`border-b ${theme === 'light' ? 'border-gray-200 text-gray-500' : 'border-terminal-border text-zinc-400'}`}>
+                          <th className="pb-2 text-left font-medium">Quarter</th>
+                          <th className="pb-2 text-right font-medium">Revenue</th>
+                          <th className="pb-2 text-right font-medium">Rev Δ</th>
+                          <th className="pb-2 text-right font-medium">OpEx</th>
+                          <th className="pb-2 text-right font-medium">Net Cash</th>
+                          <th className="pb-2 text-right font-medium">Net Δ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {qoqData.map((q, idx) => (
+                          <tr key={q.name} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
+                            <td className="py-2 font-medium">{q.name}</td>
+                            <td className="py-2 text-right font-mono text-accent-primary">{formatCurrency(q.revenue)}</td>
+                            <td className={`py-2 text-right font-mono ${parseFloat(q.revenueChange) >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                              {idx === 0 ? '-' : `${q.revenueChange}%`}
+                            </td>
+                            <td className="py-2 text-right font-mono text-accent-danger">{formatCurrency(q.opex)}</td>
+                            <td className={`py-2 text-right font-mono ${q.net >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>{formatCurrency(q.net)}</td>
+                            <td className={`py-2 text-right font-mono ${parseFloat(q.netChange) >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                              {idx === 0 ? '-' : `${q.netChange}%`}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
               {/* Transactions */}
               {transactions.length > 0 && (
                 <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
@@ -1457,7 +1649,7 @@ export default function CashFlowPro() {
                       <select
                         value={transactionMonthFilter}
                         onChange={(e) => setTransactionMonthFilter(e.target.value)}
-                        className="bg-terminal-bg border border-terminal-border rounded-lg px-2 py-1 text-xs sm:text-sm"
+                        className={`rounded-lg px-2 py-1 text-xs sm:text-sm border ${inputClasses}`}
                       >
                         <option value="all">All Months</option>
                         {transactionMonths.map(m => (
@@ -1466,11 +1658,15 @@ export default function CashFlowPro() {
                       </select>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={exportToCSV} className="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm bg-terminal-bg border border-terminal-border">
+                      <button onClick={exportToCSV} className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm border ${
+                        theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-terminal-bg border-terminal-border'
+                      }`}>
                         <Download className="w-3 h-3 sm:w-4 sm:h-4" />
                         <span className="hidden sm:inline">CSV</span>
                       </button>
-                      <button onClick={exportToPDF} className="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm bg-terminal-bg border border-terminal-border">
+                      <button onClick={exportToPDF} className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm border ${
+                        theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-terminal-bg border-terminal-border'
+                      }`}>
                         <FileText className="w-3 h-3 sm:w-4 sm:h-4" />
                         <span className="hidden sm:inline">PDF</span>
                       </button>
@@ -1479,8 +1675,8 @@ export default function CashFlowPro() {
                   
                   <div className="overflow-x-auto max-h-80 overflow-y-auto">
                     <table className="w-full text-sm">
-                      <thead className="sticky top-0 bg-terminal-surface">
-                        <tr className="border-b border-terminal-border text-left text-zinc-400">
+                      <thead className={`sticky top-0 ${tableHeaderBg}`}>
+                        <tr className={`border-b ${tableBorder} text-left ${textMuted}`}>
                           <th className="pb-2 font-medium">Date</th>
                           <th className="pb-2 font-medium">Category</th>
                           <th className="pb-2 font-medium hidden sm:table-cell">Description</th>
@@ -1491,7 +1687,7 @@ export default function CashFlowPro() {
                       </thead>
                       <tbody>
                         {filteredTransactions.slice(0, 50).map(t => (
-                          <tr key={t.id} className="border-b border-terminal-border/50">
+                          <tr key={t.id} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
                             <td className="py-2 text-xs sm:text-sm">{t.date.slice(5)}</td>
                             <td className="py-2">
                               <span className={`px-1.5 py-0.5 rounded text-xs ${
@@ -1507,7 +1703,7 @@ export default function CashFlowPro() {
                             <td className={`py-2 text-right font-mono text-xs sm:text-sm ${t.amount >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
                               {formatCurrency(t.amount)}
                             </td>
-                            <td className="py-2 text-xs text-zinc-400 hidden md:table-cell">{t.project || '-'}</td>
+                            <td className={`py-2 text-xs hidden md:table-cell ${textMuted}`}>{t.project || '-'}</td>
                             <td className="py-2 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <button onClick={() => startEdit(t)} className="p-1 text-zinc-400 hover:text-accent-primary">
