@@ -18,7 +18,7 @@ import {
 interface Transaction {
   id: string
   date: string
-  category: 'revenue' | 'opex' | 'non_operational'
+  category: 'revenue' | 'opex' | 'overhead' | 'investment'
   description: string
   amount: number
   type: 'actual' | 'budget'
@@ -28,7 +28,7 @@ interface Transaction {
 interface Assumption {
   id: string
   name: string
-  category: 'revenue' | 'opex' | 'non_operational'
+  category: 'revenue' | 'opex' | 'overhead' | 'investment'
   amount: number
   frequency: 'monthly' | 'quarterly' | 'annually' | 'one-time'
   startDate: string
@@ -41,7 +41,8 @@ interface MonthlyData {
   monthLabel: string
   revenue: { actual: number; budget: number; projected: number }
   opex: { actual: number; budget: number; projected: number }
-  nonOperational: { actual: number; budget: number; projected: number }
+  overhead: { actual: number; budget: number; projected: number }
+  investment: { actual: number; budget: number; projected: number }
   netCash: { actual: number; budget: number; projected: number }
   runningBalance: { actual: number; budget: number; projected: number }
   dataType: 'actual' | 'projected' | 'mixed'
@@ -111,13 +112,14 @@ const generateSampleData = (): Transaction[] => {
   const currentMonth = now.getMonth()
   const currentYear = now.getFullYear()
   
-  const projects = ['Project Alpha', 'Project Beta', 'Product Line', 'Services', 'Company Overhead']
+  const projects = ['Project Alpha', 'Project Beta', 'Product Line', 'Services']
   
   for (let i = 11; i >= 0; i--) {
     const date = new Date(currentYear, currentMonth - i, 15)
     const monthStr = date.toISOString().slice(0, 10)
     const isActual = i >= 2
     
+    // Revenue
     transactions.push({
       id: generateId(),
       date: monthStr,
@@ -148,43 +150,13 @@ const generateSampleData = (): Transaction[] => {
       project: projects[3]
     })
     
-    transactions.push({
-      id: generateId(),
-      date: monthStr,
-      category: 'revenue',
-      description: 'Revenue Budget',
-      amount: 85000,
-      type: 'budget'
-    })
-    
-    // Company Overhead expenses (not tied to projects)
-    transactions.push({
-      id: generateId(),
-      date: monthStr,
-      category: 'opex',
-      description: 'Payroll - Admin',
-      amount: -(18000 + Math.random() * 2000),
-      type: isActual ? 'actual' : 'budget',
-      project: 'Company Overhead'
-    })
-    
-    transactions.push({
-      id: generateId(),
-      date: monthStr,
-      category: 'opex',
-      description: 'Office & Utilities',
-      amount: -(5000 + Math.random() * 1000),
-      type: isActual ? 'actual' : 'budget',
-      project: 'Company Overhead'
-    })
-    
-    // Project-specific labor/travel
+    // OpEx - Project-specific costs (labor, travel)
     transactions.push({
       id: generateId(),
       date: monthStr,
       category: 'opex',
       description: 'Project Labor',
-      amount: -(10000 + Math.random() * 2000),
+      amount: -(15000 + Math.random() * 3000),
       type: isActual ? 'actual' : 'budget',
       project: projects[Math.floor(Math.random() * 4)]
     })
@@ -199,24 +171,55 @@ const generateSampleData = (): Transaction[] => {
       project: projects[Math.floor(Math.random() * 4)]
     })
     
+    // Overhead - Company-wide costs
     transactions.push({
       id: generateId(),
       date: monthStr,
-      category: 'opex',
-      description: 'OpEx Budget',
-      amount: -45000,
-      type: 'budget'
+      category: 'overhead',
+      description: 'Admin Payroll',
+      amount: -(12000 + Math.random() * 2000),
+      type: isActual ? 'actual' : 'budget'
     })
     
+    transactions.push({
+      id: generateId(),
+      date: monthStr,
+      category: 'overhead',
+      description: 'Office & Utilities',
+      amount: -(5000 + Math.random() * 1000),
+      type: isActual ? 'actual' : 'budget'
+    })
+    
+    transactions.push({
+      id: generateId(),
+      date: monthStr,
+      category: 'overhead',
+      description: 'Insurance & Legal',
+      amount: -(3000 + Math.random() * 500),
+      type: isActual ? 'actual' : 'budget'
+    })
+    
+    // Investment - Capital/Strategic
     if (i % 3 === 0) {
       transactions.push({
         id: generateId(),
         date: monthStr,
-        category: 'non_operational',
+        category: 'investment',
         description: 'Equipment Purchase',
         amount: -(15000 + Math.random() * 10000),
         type: isActual ? 'actual' : 'budget',
         project: projects[1]
+      })
+    }
+    
+    if (i % 4 === 0) {
+      transactions.push({
+        id: generateId(),
+        date: monthStr,
+        category: 'investment',
+        description: 'R&D Initiative',
+        amount: -(8000 + Math.random() * 5000),
+        type: isActual ? 'actual' : 'budget'
       })
     }
   }
@@ -310,7 +313,7 @@ export default function CashFlowPro() {
   }, [dateRangePreset, customStartDate, customEndDate])
 
   const projectList = useMemo(() => {
-    const projects = new Set<string>(['Company Overhead'])
+    const projects = new Set<string>()
     transactions.forEach(t => {
       if (t.project) projects.add(t.project)
     })
@@ -455,29 +458,39 @@ export default function CashFlowPro() {
       
       const monthTransactions = filteredTransactions.filter(t => t.date.slice(0, 7) === monthStr)
       
+      // Actuals
       const actualRevenue = monthTransactions
         .filter(t => t.category === 'revenue' && t.type === 'actual')
         .reduce((sum, t) => sum + t.amount, 0)
       const actualOpex = monthTransactions
         .filter(t => t.category === 'opex' && t.type === 'actual')
         .reduce((sum, t) => sum + t.amount, 0)
-      const actualNonOp = monthTransactions
-        .filter(t => t.category === 'non_operational' && t.type === 'actual')
+      const actualOverhead = monthTransactions
+        .filter(t => t.category === 'overhead' && t.type === 'actual')
+        .reduce((sum, t) => sum + t.amount, 0)
+      const actualInvestment = monthTransactions
+        .filter(t => t.category === 'investment' && t.type === 'actual')
         .reduce((sum, t) => sum + t.amount, 0)
       
+      // Budget
       const budgetRevenue = monthTransactions
         .filter(t => t.category === 'revenue' && t.type === 'budget')
         .reduce((sum, t) => sum + t.amount, 0)
       const budgetOpex = monthTransactions
         .filter(t => t.category === 'opex' && t.type === 'budget')
         .reduce((sum, t) => sum + t.amount, 0)
-      const budgetNonOp = monthTransactions
-        .filter(t => t.category === 'non_operational' && t.type === 'budget')
+      const budgetOverhead = monthTransactions
+        .filter(t => t.category === 'overhead' && t.type === 'budget')
+        .reduce((sum, t) => sum + t.amount, 0)
+      const budgetInvestment = monthTransactions
+        .filter(t => t.category === 'investment' && t.type === 'budget')
         .reduce((sum, t) => sum + t.amount, 0)
       
+      // Projected from assumptions
       let projectedRevenue = 0
       let projectedOpex = 0
-      let projectedNonOp = 0
+      let projectedOverhead = 0
+      let projectedInvestment = 0
       
       assumptions.forEach(a => {
         if (selectedProject !== 'all' && a.project !== selectedProject) return
@@ -493,17 +506,19 @@ export default function CashFlowPro() {
           
           if (a.category === 'revenue') projectedRevenue += amount
           else if (a.category === 'opex') projectedOpex += amount
-          else projectedNonOp += amount
+          else if (a.category === 'overhead') projectedOverhead += amount
+          else if (a.category === 'investment') projectedInvestment += amount
         }
       })
       
       const finalRevenue = isActualMonth && actualRevenue ? actualRevenue : (projectedRevenue || budgetRevenue)
       const finalOpex = isActualMonth && actualOpex ? actualOpex : (projectedOpex || budgetOpex)
-      const finalNonOp = isActualMonth && actualNonOp ? actualNonOp : (projectedNonOp || budgetNonOp)
+      const finalOverhead = isActualMonth && actualOverhead ? actualOverhead : (projectedOverhead || budgetOverhead)
+      const finalInvestment = isActualMonth && actualInvestment ? actualInvestment : (projectedInvestment || budgetInvestment)
       
-      const actualNet = actualRevenue + actualOpex + actualNonOp
-      const budgetNet = budgetRevenue + budgetOpex + budgetNonOp
-      const projectedNet = finalRevenue + finalOpex + finalNonOp
+      const actualNet = actualRevenue + actualOpex + actualOverhead + actualInvestment
+      const budgetNet = budgetRevenue + budgetOpex + budgetOverhead + budgetInvestment
+      const projectedNet = finalRevenue + finalOpex + finalOverhead + finalInvestment
       
       runningActual += isActualMonth ? actualNet : 0
       runningBudget += budgetNet
@@ -514,7 +529,8 @@ export default function CashFlowPro() {
         monthLabel: getMonthLabel(monthStr),
         revenue: { actual: actualRevenue, budget: budgetRevenue, projected: finalRevenue },
         opex: { actual: actualOpex, budget: budgetOpex, projected: finalOpex },
-        nonOperational: { actual: actualNonOp, budget: budgetNonOp, projected: finalNonOp },
+        overhead: { actual: actualOverhead, budget: budgetOverhead, projected: finalOverhead },
+        investment: { actual: actualInvestment, budget: budgetInvestment, projected: finalInvestment },
         netCash: { actual: actualNet, budget: budgetNet, projected: projectedNet },
         runningBalance: { actual: runningActual, budget: runningBudget, projected: runningProjected },
         dataType: isActualMonth ? 'actual' : 'projected'
@@ -1105,7 +1121,8 @@ export default function CashFlowPro() {
                                   <select value={editForm.category || 'revenue'} onChange={(e) => setEditForm(prev => ({ ...prev, category: e.target.value as Transaction['category'] }))} className="bg-terminal-bg border border-terminal-border rounded px-2 py-1 text-sm">
                                     <option value="revenue">Revenue</option>
                                     <option value="opex">OpEx</option>
-                                    <option value="non_operational">Non-Op</option>
+                                    <option value="overhead">Overhead</option>
+                                    <option value="investment">InvEx</option>
                                   </select>
                                 </td>
                                 <td className="py-2">
@@ -1134,8 +1151,13 @@ export default function CashFlowPro() {
                               <>
                                 <td className="py-3 text-sm">{t.date}</td>
                                 <td className="py-3">
-                                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${t.category === 'revenue' ? 'bg-accent-primary/10 text-accent-primary' : t.category === 'opex' ? 'bg-accent-danger/10 text-accent-danger' : 'bg-accent-warning/10 text-accent-warning'}`}>
-                                    {t.category}
+                                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                    t.category === 'revenue' ? 'bg-accent-primary/10 text-accent-primary' : 
+                                    t.category === 'opex' ? 'bg-accent-danger/10 text-accent-danger' : 
+                                    t.category === 'overhead' ? 'bg-accent-warning/10 text-accent-warning' :
+                                    'bg-accent-secondary/10 text-accent-secondary'
+                                  }`}>
+                                    {t.category === 'investment' ? 'InvEx' : t.category}
                                   </span>
                                 </td>
                                 <td className="text-sm">{t.description}</td>
@@ -1210,9 +1232,11 @@ export default function CashFlowPro() {
                 <div className="bg-terminal-bg rounded-lg p-4 font-mono text-sm overflow-x-auto">
                   <div className="text-zinc-400">date,category,description,amount,type,project</div>
                   <div className="text-accent-primary">2024-01-15,revenue,Consulting Fee,50000,actual,Project Alpha</div>
-                  <div className="text-accent-danger">2024-01-01,opex,Payroll,-35000,actual,</div>
-                  <div className="text-accent-warning">2024-02-15,revenue,Q1 Target,55000,budget,</div>
+                  <div className="text-accent-danger">2024-01-01,opex,Project Labor,-15000,actual,Project Alpha</div>
+                  <div className="text-accent-warning">2024-01-01,overhead,Office Rent,-5000,actual,</div>
+                  <div className="text-accent-secondary">2024-02-15,investment,Equipment,-20000,actual,Project Beta</div>
                 </div>
+                <p className="text-zinc-500 text-xs mt-2">Categories: revenue, opex, overhead, investment</p>
               </div>
 
               <div className="flex gap-4">
@@ -1250,7 +1274,8 @@ export default function CashFlowPro() {
                     <select value={newAssumption.category || 'revenue'} onChange={(e) => setNewAssumption(prev => ({ ...prev, category: e.target.value as Assumption['category'] }))} className="w-full px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg focus:outline-none focus:border-accent-primary">
                       <option value="revenue">Revenue</option>
                       <option value="opex">OpEx</option>
-                      <option value="non_operational">Non-Operational</option>
+                      <option value="overhead">Overhead</option>
+                      <option value="investment">Investment</option>
                     </select>
                   </div>
                   <div>
@@ -1300,7 +1325,12 @@ export default function CashFlowPro() {
                     {assumptions.map(a => (
                       <div key={a.id} className="flex items-center justify-between p-4 bg-terminal-bg rounded-lg">
                         <div className="flex items-center gap-4">
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${a.category === 'revenue' ? 'bg-accent-primary/10 text-accent-primary' : a.category === 'opex' ? 'bg-accent-danger/10 text-accent-danger' : 'bg-accent-warning/10 text-accent-warning'}`}>{a.category}</span>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            a.category === 'revenue' ? 'bg-accent-primary/10 text-accent-primary' : 
+                            a.category === 'opex' ? 'bg-accent-danger/10 text-accent-danger' : 
+                            a.category === 'overhead' ? 'bg-accent-warning/10 text-accent-warning' :
+                            'bg-accent-secondary/10 text-accent-secondary'
+                          }`}>{a.category === 'investment' ? 'InvEx' : a.category}</span>
                           <span className="font-medium">{a.name}</span>
                           <span className="text-zinc-400 text-sm">{a.frequency}</span>
                           {a.project && <span className="text-zinc-500 text-sm">• {a.project}</span>}
@@ -1366,7 +1396,8 @@ export default function CashFlowPro() {
                         <th className="pb-3 font-medium">Month</th>
                         <th className="pb-3 font-medium text-right">Revenue</th>
                         <th className="pb-3 font-medium text-right">OpEx</th>
-                        <th className="pb-3 font-medium text-right">Non-Op</th>
+                        <th className="pb-3 font-medium text-right">Overhead</th>
+                        <th className="pb-3 font-medium text-right">InvEx</th>
                         <th className="pb-3 font-medium text-right">Net Cash</th>
                         <th className="pb-3 font-medium text-right">Balance</th>
                         <th className="pb-3 font-medium text-center">Status</th>
@@ -1378,7 +1409,8 @@ export default function CashFlowPro() {
                           <td className="py-3 text-sm font-medium">{d.monthLabel}</td>
                           <td className="py-3 text-right font-mono text-sm text-accent-primary">{formatCurrency(d.revenue.projected)}</td>
                           <td className="py-3 text-right font-mono text-sm text-accent-danger">{formatCurrency(d.opex.projected)}</td>
-                          <td className="py-3 text-right font-mono text-sm text-accent-warning">{formatCurrency(d.nonOperational.projected)}</td>
+                          <td className="py-3 text-right font-mono text-sm text-accent-warning">{formatCurrency(d.overhead.projected)}</td>
+                          <td className="py-3 text-right font-mono text-sm text-accent-secondary">{formatCurrency(d.investment.projected)}</td>
                           <td className={`py-3 text-right font-mono text-sm ${d.netCash.projected >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>{formatCurrency(d.netCash.projected)}</td>
                           <td className={`py-3 text-right font-mono text-sm ${d.runningBalance.projected >= 0 ? 'text-accent-secondary' : 'text-accent-danger'}`}>{formatCurrency(d.runningBalance.projected)}</td>
                           <td className="py-3 text-center">
