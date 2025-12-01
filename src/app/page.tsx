@@ -111,7 +111,7 @@ const generateSampleData = (): Transaction[] => {
   const currentMonth = now.getMonth()
   const currentYear = now.getFullYear()
   
-  const projects = ['Project Alpha', 'Project Beta', 'Product Line', 'Services']
+  const projects = ['Project Alpha', 'Project Beta', 'Product Line', 'Services', 'Company Overhead']
   
   for (let i = 11; i >= 0; i--) {
     const date = new Date(currentYear, currentMonth - i, 15)
@@ -157,13 +157,15 @@ const generateSampleData = (): Transaction[] => {
       type: 'budget'
     })
     
+    // Company Overhead expenses (not tied to projects)
     transactions.push({
       id: generateId(),
       date: monthStr,
       category: 'opex',
-      description: 'Payroll',
-      amount: -(28000 + Math.random() * 2000),
-      type: isActual ? 'actual' : 'budget'
+      description: 'Payroll - Admin',
+      amount: -(18000 + Math.random() * 2000),
+      type: isActual ? 'actual' : 'budget',
+      project: 'Company Overhead'
     })
     
     transactions.push({
@@ -172,15 +174,27 @@ const generateSampleData = (): Transaction[] => {
       category: 'opex',
       description: 'Office & Utilities',
       amount: -(5000 + Math.random() * 1000),
-      type: isActual ? 'actual' : 'budget'
+      type: isActual ? 'actual' : 'budget',
+      project: 'Company Overhead'
+    })
+    
+    // Project-specific labor/travel
+    transactions.push({
+      id: generateId(),
+      date: monthStr,
+      category: 'opex',
+      description: 'Project Labor',
+      amount: -(10000 + Math.random() * 2000),
+      type: isActual ? 'actual' : 'budget',
+      project: projects[Math.floor(Math.random() * 4)]
     })
     
     transactions.push({
       id: generateId(),
       date: monthStr,
       category: 'opex',
-      description: 'Marketing',
-      amount: -(8000 + Math.random() * 3000),
+      description: 'Travel Expenses',
+      amount: -(3000 + Math.random() * 2000),
       type: isActual ? 'actual' : 'budget',
       project: projects[Math.floor(Math.random() * 4)]
     })
@@ -239,6 +253,7 @@ export default function CashFlowPro() {
   
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<Transaction>>({})
+  const [transactionMonthFilter, setTransactionMonthFilter] = useState<string>('all')
 
   const [newAssumption, setNewAssumption] = useState<Partial<Assumption>>({
     name: '',
@@ -295,11 +310,19 @@ export default function CashFlowPro() {
   }, [dateRangePreset, customStartDate, customEndDate])
 
   const projectList = useMemo(() => {
-    const projects = new Set<string>()
+    const projects = new Set<string>(['Company Overhead'])
     transactions.forEach(t => {
       if (t.project) projects.add(t.project)
     })
     return Array.from(projects).sort()
+  }, [transactions])
+
+  const transactionMonths = useMemo(() => {
+    const months = new Set<string>()
+    transactions.forEach(t => {
+      months.add(t.date.slice(0, 7))
+    })
+    return Array.from(months).sort().reverse()
   }, [transactions])
 
   const loadSampleData = useCallback(() => {
@@ -404,9 +427,15 @@ export default function CashFlowPro() {
   }, [])
 
   const filteredTransactions = useMemo(() => {
-    if (selectedProject === 'all') return transactions
-    return transactions.filter(t => t.project === selectedProject)
-  }, [transactions, selectedProject])
+    let result = transactions
+    if (selectedProject !== 'all') {
+      result = result.filter(t => t.project === selectedProject)
+    }
+    if (transactionMonthFilter !== 'all') {
+      result = result.filter(t => t.date.slice(0, 7) === transactionMonthFilter)
+    }
+    return result
+  }, [transactions, selectedProject, transactionMonthFilter])
 
   const monthlyData = useMemo((): MonthlyData[] => {
     const now = new Date()
@@ -515,6 +544,19 @@ export default function CashFlowPro() {
     const firstHalf = actualData.slice(0, midpoint)
     const secondHalf = actualData.slice(midpoint)
     
+    // Get period labels for comparison
+    const firstPeriodStart = firstHalf[0]?.monthLabel || ''
+    const firstPeriodEnd = firstHalf[firstHalf.length - 1]?.monthLabel || ''
+    const secondPeriodStart = secondHalf[0]?.monthLabel || ''
+    const secondPeriodEnd = secondHalf[secondHalf.length - 1]?.monthLabel || ''
+    
+    const priorPeriodLabel = firstPeriodStart && firstPeriodEnd 
+      ? (firstPeriodStart === firstPeriodEnd ? firstPeriodStart : `${firstPeriodStart}-${firstPeriodEnd}`)
+      : 'prior'
+    const currentPeriodLabel = secondPeriodStart && secondPeriodEnd
+      ? (secondPeriodStart === secondPeriodEnd ? secondPeriodStart : `${secondPeriodStart}-${secondPeriodEnd}`)
+      : 'current'
+    
     const firstHalfRevenue = firstHalf.reduce((sum, d) => sum + d.revenue.actual, 0)
     const secondHalfRevenue = secondHalf.reduce((sum, d) => sum + d.revenue.actual, 0)
     const revenueChange = firstHalfRevenue ? ((secondHalfRevenue - firstHalfRevenue) / firstHalfRevenue) * 100 : 0
@@ -539,7 +581,9 @@ export default function CashFlowPro() {
       revenueChange,
       opexChange,
       netChange,
-      variancePercent
+      variancePercent,
+      priorPeriodLabel,
+      currentPeriodLabel
     }
   }, [filteredMonthlyData, beginningBalance])
 
@@ -741,7 +785,7 @@ export default function CashFlowPro() {
                     {formatCurrency(kpis.currentBalance)}
                   </div>
                   <div className={`text-xs mt-1 ${kpis.netChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                    {formatPercent(kpis.netChange)} vs prior period
+                    {formatPercent(kpis.netChange)} vs {kpis.priorPeriodLabel}
                   </div>
                 </div>
                 
@@ -754,7 +798,7 @@ export default function CashFlowPro() {
                     {formatCurrency(kpis.totalActualRevenue)}
                   </div>
                   <div className={`text-xs mt-1 ${kpis.revenueChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                    {formatPercent(kpis.revenueChange)} vs prior period
+                    {formatPercent(kpis.revenueChange)} vs {kpis.priorPeriodLabel}
                   </div>
                 </div>
                 
@@ -767,7 +811,7 @@ export default function CashFlowPro() {
                     {formatCurrency(kpis.totalActualOpex)}
                   </div>
                   <div className={`text-xs mt-1 ${kpis.opexChange <= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                    {formatPercent(kpis.opexChange)} vs prior period
+                    {formatPercent(kpis.opexChange)} vs {kpis.priorPeriodLabel}
                   </div>
                 </div>
                 
@@ -875,9 +919,10 @@ export default function CashFlowPro() {
                         <tr className="border-b border-terminal-border text-zinc-400">
                           <th className="text-left pb-2">Quarter</th>
                           <th className="text-right pb-2">Revenue</th>
-                          <th className="text-right pb-2">Change</th>
+                          <th className="text-right pb-2">Rev Δ</th>
+                          <th className="text-right pb-2">OpEx</th>
                           <th className="text-right pb-2">Net Cash</th>
-                          <th className="text-right pb-2">Change</th>
+                          <th className="text-right pb-2">Net Δ</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -888,6 +933,7 @@ export default function CashFlowPro() {
                             <td className={`text-right font-mono ${parseFloat(d.revenueChange) >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
                               {d.revenueChange}%
                             </td>
+                            <td className="text-right font-mono text-accent-danger">{formatCurrency(d.opex)}</td>
                             <td className={`text-right font-mono ${d.net >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
                               {formatCurrency(d.net)}
                             </td>
@@ -906,9 +952,22 @@ export default function CashFlowPro() {
               {transactions.length > 0 && (
                 <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold">
-                      Transactions {selectedProject !== 'all' && `- ${selectedProject}`}
-                    </h3>
+                    <div className="flex items-center gap-4">
+                      <h3 className="text-lg font-semibold">Transactions</h3>
+                      <select
+                        value={transactionMonthFilter}
+                        onChange={(e) => setTransactionMonthFilter(e.target.value)}
+                        className="bg-terminal-bg border border-terminal-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-accent-primary"
+                      >
+                        <option value="all">All Months</option>
+                        {transactionMonths.map(m => (
+                          <option key={m} value={m}>{getMonthLabel(m)}</option>
+                        ))}
+                      </select>
+                      {selectedProject !== 'all' && (
+                        <span className="text-zinc-400 text-sm">• {selectedProject}</span>
+                      )}
+                    </div>
                     <div className="flex gap-2">
                       <button onClick={exportToCSV} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-terminal-bg text-zinc-400 hover:text-zinc-200 border border-terminal-border">
                         <Download className="w-4 h-4" />
@@ -920,9 +979,9 @@ export default function CashFlowPro() {
                       </button>
                     </div>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto max-h-96 overflow-y-auto">
                     <table className="w-full">
-                      <thead>
+                      <thead className="sticky top-0 bg-terminal-surface">
                         <tr className="border-b border-terminal-border text-left text-zinc-400 text-sm">
                           <th className="pb-3 font-medium">Date</th>
                           <th className="pb-3 font-medium">Category</th>
@@ -934,7 +993,7 @@ export default function CashFlowPro() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredTransactions.slice(0, 20).map(t => (
+                        {filteredTransactions.map(t => (
                           <tr key={t.id} className="border-b border-terminal-border/50 hover:bg-terminal-bg/50">
                             {editingId === t.id ? (
                               <>
@@ -997,9 +1056,11 @@ export default function CashFlowPro() {
                       </tbody>
                     </table>
                   </div>
-                  {filteredTransactions.length > 20 && (
-                    <p className="text-zinc-500 text-sm mt-4 text-center">Showing 20 of {filteredTransactions.length} transactions</p>
-                  )}
+                  <p className="text-zinc-500 text-sm mt-4 text-center">
+                    {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''}
+                    {transactionMonthFilter !== 'all' && ` in ${getMonthLabel(transactionMonthFilter)}`}
+                    {selectedProject !== 'all' && ` for ${selectedProject}`}
+                  </p>
                 </div>
               )}
             </motion.div>
