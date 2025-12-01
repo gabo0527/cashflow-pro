@@ -15,10 +15,10 @@ module.exports = {
           'muted': '#3a3a4a',
         },
         'accent': {
-          'primary': '#00ff88',
-          'secondary': '#00d4ff',
-          'warning': '#ffaa00',
-          'danger': '#ff4466',
+          'primary': '#10b981',
+          'secondary': '#6366f1',
+          'warning': '#f59e0b',
+          'danger': '#ef4444',
         }
       },
       fontFamily: {
@@ -32,8 +32,8 @@ module.exports = {
       },
       keyframes: {
         glow: {
-          '0%': { boxShadow: '0 0 5px rgba(0, 255, 136, 0.3)' },
-          '100%': { boxShadow: '0 0 20px rgba(0, 255, 136, 0.6)' },
+          '0%': { boxShadow: '0 0 5px rgba(16, 185, 129, 0.3)' },
+          '100%': { boxShadow: '0 0 20px rgba(16, 185, 129, 0.6)' },
         }
       }
     },
