@@ -395,29 +395,35 @@ export default function CashFlowPro() {
   // Load from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedTransactions = localStorage.getItem(STORAGE_KEYS.transactions)
-      const savedAssumptions = localStorage.getItem(STORAGE_KEYS.assumptions)
-      const savedBalance = localStorage.getItem(STORAGE_KEYS.beginningBalance)
-      const savedCutoff = localStorage.getItem(STORAGE_KEYS.cutoffDate)
-      const savedProjects = localStorage.getItem(STORAGE_KEYS.projects)
-      const savedTheme = localStorage.getItem(STORAGE_KEYS.theme)
-      const savedAlert = localStorage.getItem(STORAGE_KEYS.balanceAlert)
-      const savedScenarios = localStorage.getItem(STORAGE_KEYS.scenarios)
-      const savedRecurring = localStorage.getItem(STORAGE_KEYS.recurringRules)
-      const savedBranding = localStorage.getItem(STORAGE_KEYS.branding)
-      const savedChartFilters = localStorage.getItem(STORAGE_KEYS.chartFilters)
-      
-      if (savedTransactions) setTransactions(JSON.parse(savedTransactions))
-      if (savedAssumptions) setAssumptions(JSON.parse(savedAssumptions))
-      if (savedBalance) setBeginningBalance(parseFloat(savedBalance))
-      if (savedCutoff) setCutoffDate(savedCutoff)
-      if (savedProjects) setProjects(JSON.parse(savedProjects))
-      if (savedTheme) setTheme(savedTheme as 'dark' | 'light')
-      if (savedAlert) setBalanceAlertThreshold(parseFloat(savedAlert))
-      if (savedScenarios) setScenarios(JSON.parse(savedScenarios))
-      if (savedRecurring) setRecurringRules(JSON.parse(savedRecurring))
-      if (savedBranding) setBranding(JSON.parse(savedBranding))
-      if (savedChartFilters) setChartFilters(JSON.parse(savedChartFilters))
+      try {
+        const savedTransactions = localStorage.getItem(STORAGE_KEYS.transactions)
+        const savedAssumptions = localStorage.getItem(STORAGE_KEYS.assumptions)
+        const savedBalance = localStorage.getItem(STORAGE_KEYS.beginningBalance)
+        const savedCutoff = localStorage.getItem(STORAGE_KEYS.cutoffDate)
+        const savedProjects = localStorage.getItem(STORAGE_KEYS.projects)
+        const savedTheme = localStorage.getItem(STORAGE_KEYS.theme)
+        const savedAlert = localStorage.getItem(STORAGE_KEYS.balanceAlert)
+        const savedScenarios = localStorage.getItem(STORAGE_KEYS.scenarios)
+        const savedRecurring = localStorage.getItem(STORAGE_KEYS.recurringRules)
+        const savedBranding = localStorage.getItem(STORAGE_KEYS.branding)
+        const savedChartFilters = localStorage.getItem(STORAGE_KEYS.chartFilters)
+        
+        if (savedTransactions) setTransactions(JSON.parse(savedTransactions))
+        if (savedAssumptions) setAssumptions(JSON.parse(savedAssumptions))
+        if (savedBalance) setBeginningBalance(parseFloat(savedBalance) || 0)
+        if (savedCutoff) setCutoffDate(savedCutoff)
+        if (savedProjects) setProjects(JSON.parse(savedProjects))
+        if (savedTheme) setTheme(savedTheme as 'dark' | 'light')
+        if (savedAlert) setBalanceAlertThreshold(parseFloat(savedAlert) || 0)
+        if (savedScenarios) setScenarios(JSON.parse(savedScenarios))
+        if (savedRecurring) setRecurringRules(JSON.parse(savedRecurring))
+        if (savedBranding) setBranding(JSON.parse(savedBranding))
+        if (savedChartFilters) setChartFilters(JSON.parse(savedChartFilters))
+      } catch (error) {
+        console.error('Error loading data from localStorage:', error)
+        // Clear corrupted data
+        Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key))
+      }
       
       setIsLoaded(true)
     }
@@ -1130,10 +1136,14 @@ export default function CashFlowPro() {
     const avgMonthlyExpenses = totalExpenses / monthsOfData
     const avgMonthlyBurn = avgMonthlyExpenses - avgMonthlyRevenue
     
-    // Current balance from chart data
-    const currentBalance = chartData.length > 0 
-      ? chartData[chartData.length - 1].balance 
-      : beginningBalance
+    // Current balance from chart data - with safe access
+    let currentBalance = beginningBalance
+    if (chartData && chartData.length > 0) {
+      const lastEntry = chartData[chartData.length - 1]
+      if (lastEntry && typeof lastEntry.balance === 'number') {
+        currentBalance = lastEntry.balance
+      }
+    }
     
     // Runway in months (only if burning cash)
     const runwayMonths = avgMonthlyBurn > 0 
@@ -1145,8 +1155,8 @@ export default function CashFlowPro() {
       avgMonthlyRevenue,
       avgMonthlyExpenses,
       avgMonthlyBurn,
-      runwayMonths,
-      status: runwayMonths === Infinity ? 'profitable' : runwayMonths < 3 ? 'critical' : runwayMonths < 6 ? 'warning' : 'healthy'
+      runwayMonths: isFinite(runwayMonths) ? runwayMonths : Infinity,
+      status: runwayMonths === Infinity || !isFinite(runwayMonths) ? 'profitable' : runwayMonths < 3 ? 'critical' : runwayMonths < 6 ? 'warning' : 'healthy'
     }
   }, [transactions, chartData, beginningBalance])
 
@@ -1160,18 +1170,18 @@ export default function CashFlowPro() {
     const prevMonth = chartData[chartData.length - 2]
     
     // Revenue trend
-    if (prevMonth && currentMonth) {
+    if (prevMonth && currentMonth && typeof currentMonth.revenue === 'number' && typeof prevMonth.revenue === 'number') {
       const revenueChange = prevMonth.revenue > 0 
         ? ((currentMonth.revenue - prevMonth.revenue) / prevMonth.revenue) * 100 
         : 0
       
-      if (revenueChange > 15) {
+      if (isFinite(revenueChange) && revenueChange > 15) {
         result.push({
           type: 'positive',
           title: 'Revenue Up',
           message: `Revenue increased ${revenueChange.toFixed(0)}% vs last month`
         })
-      } else if (revenueChange < -15) {
+      } else if (isFinite(revenueChange) && revenueChange < -15) {
         result.push({
           type: 'warning',
           title: 'Revenue Down',
@@ -1182,7 +1192,7 @@ export default function CashFlowPro() {
     
     // Expense anomaly (compare to 3-month average)
     if (chartData.length >= 3) {
-      const last3Expenses = chartData.slice(-3).map(d => d.opex + d.overhead + d.investment)
+      const last3Expenses = chartData.slice(-3).map(d => (d.opex || 0) + (d.overhead || 0) + (d.investment || 0))
       const avgExpenses = last3Expenses.slice(0, -1).reduce((a, b) => a + b, 0) / 2
       const currentExpenses = last3Expenses[last3Expenses.length - 1]
       
@@ -1202,13 +1212,13 @@ export default function CashFlowPro() {
     }
     
     // Runway warning
-    if (runwayData.status === 'critical') {
+    if (runwayData.status === 'critical' && isFinite(runwayData.runwayMonths)) {
       result.push({
         type: 'critical',
         title: 'Low Runway',
         message: `Only ${runwayData.runwayMonths.toFixed(1)} months of cash remaining`
       })
-    } else if (runwayData.status === 'warning') {
+    } else if (runwayData.status === 'warning' && isFinite(runwayData.runwayMonths)) {
       result.push({
         type: 'warning',
         title: 'Monitor Runway',
@@ -1956,7 +1966,7 @@ export default function CashFlowPro() {
                     runwayData.status === 'warning' ? 'text-accent-warning' : textSubtle
                   }`}>
                     {runwayData.status === 'profitable' 
-                      ? <><CheckCircle className="w-3 h-3" /> Cash Positive</>
+                      ? <span className="flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Cash Positive</span>
                       : `${runwayData.runwayMonths.toFixed(1)} months runway`}
                   </div>
                 </div>
