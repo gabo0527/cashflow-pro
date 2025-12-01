@@ -234,12 +234,12 @@ export default function CashFlowPro() {
 
   // CSV Import handler
   const handleFileUpload = useCallback((file: File) => {
-    Papa.parse(file, {
+    Papa.parse<Record<string, string>>(file, {
       header: true,
       complete: (results) => {
         const imported: Transaction[] = results.data
-          .filter((row: Record<string, string>) => row.date && row.amount)
-          .map((row: Record<string, string>) => ({
+          .filter((row) => row.date && row.amount)
+          .map((row) => ({
             id: generateId(),
             date: row.date,
             category: (row.category as Transaction['category']) || 'revenue',
