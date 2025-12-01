@@ -568,6 +568,33 @@ export default function CashFlowPro() {
     { key: 'custom', label: 'Custom' },
   ]
 
+  const qoqData = useMemo(() => {
+    const quarterData: Record<string, { revenue: number; opex: number; net: number }> = {}
+    filteredMonthlyData.forEach(d => {
+      const [year, month] = d.month.split('-')
+      const quarter = `Q${Math.ceil(parseInt(month) / 3)} ${year}`
+      if (!quarterData[quarter]) quarterData[quarter] = { revenue: 0, opex: 0, net: 0 }
+      quarterData[quarter].revenue += d.revenue.actual || d.revenue.projected
+      quarterData[quarter].opex += Math.abs(d.opex.actual || d.opex.projected)
+      quarterData[quarter].net += d.netCash.actual || d.netCash.projected
+    })
+    
+    const quarters = Object.entries(quarterData)
+    return quarters.map(([name, d], idx) => {
+      const prev = quarters[idx - 1]?.[1]
+      const revenueChange = prev?.revenue ? ((d.revenue - prev.revenue) / prev.revenue) * 100 : 0
+      const netChange = prev?.net ? ((d.net - prev.net) / Math.abs(prev.net)) * 100 : 0
+      return { 
+        name, 
+        revenue: d.revenue,
+        opex: d.opex,
+        net: d.net,
+        revenueChange: revenueChange.toFixed(1),
+        netChange: netChange.toFixed(1)
+      }
+    })
+  }, [filteredMonthlyData])
+
   const comparisonData = useMemo(() => {
     if (comparisonView === 'project') {
       const projectData: Record<string, { revenue: number; opex: number; net: number }> = {}
@@ -581,38 +608,18 @@ export default function CashFlowPro() {
       
       return Object.entries(projectData).map(([name, d]) => ({ 
         name, 
-        ...d,
+        revenue: d.revenue,
+        opex: d.opex,
         margin: d.revenue ? ((d.net / d.revenue) * 100).toFixed(1) : '0'
       }))
     }
     
     if (comparisonView === 'qoq') {
-      const quarterData: Record<string, { revenue: number; opex: number; net: number }> = {}
-      filteredMonthlyData.forEach(d => {
-        const [year, month] = d.month.split('-')
-        const quarter = `Q${Math.ceil(parseInt(month) / 3)} ${year}`
-        if (!quarterData[quarter]) quarterData[quarter] = { revenue: 0, opex: 0, net: 0 }
-        quarterData[quarter].revenue += d.revenue.actual || d.revenue.projected
-        quarterData[quarter].opex += Math.abs(d.opex.actual || d.opex.projected)
-        quarterData[quarter].net += d.netCash.actual || d.netCash.projected
-      })
-      
-      const quarters = Object.entries(quarterData)
-      return quarters.map(([name, d], idx) => {
-        const prev = quarters[idx - 1]?.[1]
-        const revenueChange = prev?.revenue ? ((d.revenue - prev.revenue) / prev.revenue) * 100 : 0
-        const netChange = prev?.net ? ((d.net - prev.net) / Math.abs(prev.net)) * 100 : 0
-        return { 
-          name, 
-          ...d, 
-          revenueChange: revenueChange.toFixed(1),
-          netChange: netChange.toFixed(1)
-        }
-      })
+      return qoqData
     }
     
     return chartData
-  }, [comparisonView, filteredTransactions, filteredMonthlyData, chartData])
+  }, [comparisonView, filteredTransactions, qoqData, chartData])
 
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: PieChart },
@@ -861,7 +868,7 @@ export default function CashFlowPro() {
                   </BarChart>
                 </ResponsiveContainer>
                 
-                {comparisonView === 'qoq' && comparisonData.length > 0 && (
+                {comparisonView === 'qoq' && qoqData.length > 0 && (
                   <div className="mt-4 overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
@@ -874,28 +881,21 @@ export default function CashFlowPro() {
                         </tr>
                       </thead>
                       <tbody>
-                        {comparisonData.map((d) => {
-                          const name = String(d.name || '')
-                          const revenue = Number(d.revenue) || 0
-                          const net = Number(d.net) || 0
-                          const revChange = String(d.revenueChange || '0')
-                          const netChg = String(d.netChange || '0')
-                          return (
-                            <tr key={name} className="border-b border-terminal-border/50">
-                              <td className="py-2 font-medium">{name}</td>
-                              <td className="text-right font-mono text-accent-primary">{formatCurrency(revenue)}</td>
-                              <td className={`text-right font-mono ${parseFloat(revChange) >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                                {revChange}%
-                              </td>
-                              <td className={`text-right font-mono ${net >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                                {formatCurrency(net)}
-                              </td>
-                              <td className={`text-right font-mono ${parseFloat(netChg) >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                                {netChg}%
-                              </td>
-                            </tr>
-                          )
-                        })}
+                        {qoqData.map((d) => (
+                          <tr key={d.name} className="border-b border-terminal-border/50">
+                            <td className="py-2 font-medium">{d.name}</td>
+                            <td className="text-right font-mono text-accent-primary">{formatCurrency(d.revenue)}</td>
+                            <td className={`text-right font-mono ${parseFloat(d.revenueChange) >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                              {d.revenueChange}%
+                            </td>
+                            <td className={`text-right font-mono ${d.net >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                              {formatCurrency(d.net)}
+                            </td>
+                            <td className={`text-right font-mono ${parseFloat(d.netChange) >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                              {d.netChange}%
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
