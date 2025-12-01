@@ -2048,7 +2048,7 @@ export default function CashFlowPro() {
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
                       theme === 'dark' 
                         ? 'border-accent-primary bg-accent-primary/10 text-accent-primary' 
-                        : theme === 'light' ? 'border-gray-300 text-gray-600 hover:bg-gray-50' : 'border-terminal-border'
+                        : 'border-gray-300 text-gray-600 hover:bg-gray-50'
                     }`}
                   >
                     <Moon className="w-4 h-4" />
@@ -2059,7 +2059,7 @@ export default function CashFlowPro() {
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
                       theme === 'light' 
                         ? 'border-accent-primary bg-accent-primary/10 text-accent-primary' 
-                        : theme === 'light' ? 'border-gray-300 text-gray-600 hover:bg-gray-50' : 'border-terminal-border'
+                        : 'border-terminal-border text-zinc-400 hover:bg-terminal-bg'
                     }`}
                   >
                     <Sun className="w-4 h-4" />
