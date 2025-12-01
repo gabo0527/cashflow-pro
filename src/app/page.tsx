@@ -874,21 +874,28 @@ export default function CashFlowPro() {
                         </tr>
                       </thead>
                       <tbody>
-                        {comparisonData.map((d: Record<string, unknown>) => (
-                          <tr key={d.name as string} className="border-b border-terminal-border/50">
-                            <td className="py-2 font-medium">{d.name as string}</td>
-                            <td className="text-right font-mono text-accent-primary">{formatCurrency(d.revenue as number)}</td>
-                            <td className={`text-right font-mono ${parseFloat(d.revenueChange as string) >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                              {d.revenueChange}%
-                            </td>
-                            <td className={`text-right font-mono ${(d.net as number) >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                              {formatCurrency(d.net as number)}
-                            </td>
-                            <td className={`text-right font-mono ${parseFloat(d.netChange as string) >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                              {d.netChange}%
-                            </td>
-                          </tr>
-                        ))}
+                        {comparisonData.map((d) => {
+                          const name = String(d.name || '')
+                          const revenue = Number(d.revenue) || 0
+                          const net = Number(d.net) || 0
+                          const revChange = String(d.revenueChange || '0')
+                          const netChg = String(d.netChange || '0')
+                          return (
+                            <tr key={name} className="border-b border-terminal-border/50">
+                              <td className="py-2 font-medium">{name}</td>
+                              <td className="text-right font-mono text-accent-primary">{formatCurrency(revenue)}</td>
+                              <td className={`text-right font-mono ${parseFloat(revChange) >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                {revChange}%
+                              </td>
+                              <td className={`text-right font-mono ${net >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                {formatCurrency(net)}
+                              </td>
+                              <td className={`text-right font-mono ${parseFloat(netChg) >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                {netChg}%
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
