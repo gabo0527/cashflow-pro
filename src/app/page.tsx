@@ -425,11 +425,15 @@ export default function CashFlowPro() {
 
   const projectList = useMemo(() => {
     const fromProjects = projects.map(p => p.name)
-    const fromTransactions = new Set<string>()
+    const fromTransactions: string[] = []
     transactions.forEach(t => {
-      if (t.project) fromTransactions.add(t.project)
+      if (t.project && !fromTransactions.includes(t.project)) {
+        fromTransactions.push(t.project)
+      }
     })
-    return [...new Set([...fromProjects, ...fromTransactions])].sort()
+    const combined = [...fromProjects, ...fromTransactions]
+    const unique = Array.from(new Set(combined))
+    return unique.sort()
   }, [transactions, projects])
 
   const transactionMonths = useMemo(() => {
