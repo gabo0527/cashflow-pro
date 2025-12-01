@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { 
   LineChart, Line, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Upload, TrendingUp, TrendingDown, DollarSign, Calendar,
   PieChart, Settings, Database, Zap, Plus, Trash2, Download,
-  ChevronDown, Filter, RefreshCw
+  Filter, RefreshCw, Edit2, X, Check, Building2
 } from 'lucide-react'
 
 // Types
@@ -91,6 +91,11 @@ const formatCurrency = (value: number): string => {
   }).format(value)
 }
 
+const formatPercent = (value: number): string => {
+  const sign = value >= 0 ? '+' : ''
+  return `${sign}${value.toFixed(1)}%`
+}
+
 const generateId = (): string => Math.random().toString(36).substr(2, 9)
 
 const getMonthLabel = (monthStr: string): string => {
@@ -106,13 +111,13 @@ const generateSampleData = (): Transaction[] => {
   const currentMonth = now.getMonth()
   const currentYear = now.getFullYear()
   
-  // Generate 12 months of historical data
+  const projects = ['Project Alpha', 'Project Beta', 'Product Line', 'Services']
+  
   for (let i = 11; i >= 0; i--) {
     const date = new Date(currentYear, currentMonth - i, 15)
     const monthStr = date.toISOString().slice(0, 10)
-    const isActual = i >= 2 // Last 10 months are actual, 2 most recent are projected
+    const isActual = i >= 2
     
-    // Revenue
     transactions.push({
       id: generateId(),
       date: monthStr,
@@ -120,7 +125,7 @@ const generateSampleData = (): Transaction[] => {
       description: 'Consulting Services',
       amount: 45000 + Math.random() * 15000,
       type: isActual ? 'actual' : 'budget',
-      project: 'Project Alpha'
+      project: projects[0]
     })
     
     transactions.push({
@@ -130,20 +135,28 @@ const generateSampleData = (): Transaction[] => {
       description: 'Product Sales',
       amount: 25000 + Math.random() * 10000,
       type: isActual ? 'actual' : 'budget',
-      project: 'Product Line'
+      project: projects[2]
     })
     
-    // Budget for revenue
+    transactions.push({
+      id: generateId(),
+      date: monthStr,
+      category: 'revenue',
+      description: 'Service Contracts',
+      amount: 15000 + Math.random() * 5000,
+      type: isActual ? 'actual' : 'budget',
+      project: projects[3]
+    })
+    
     transactions.push({
       id: generateId(),
       date: monthStr,
       category: 'revenue',
       description: 'Revenue Budget',
-      amount: 75000,
+      amount: 85000,
       type: 'budget'
     })
     
-    // OpEx
     transactions.push({
       id: generateId(),
       date: monthStr,
@@ -168,20 +181,19 @@ const generateSampleData = (): Transaction[] => {
       category: 'opex',
       description: 'Marketing',
       amount: -(8000 + Math.random() * 3000),
-      type: isActual ? 'actual' : 'budget'
+      type: isActual ? 'actual' : 'budget',
+      project: projects[Math.floor(Math.random() * 4)]
     })
     
-    // Budget for OpEx
     transactions.push({
       id: generateId(),
       date: monthStr,
       category: 'opex',
       description: 'OpEx Budget',
-      amount: -42000,
+      amount: -45000,
       type: 'budget'
     })
     
-    // Non-operational (occasional)
     if (i % 3 === 0) {
       transactions.push({
         id: generateId(),
@@ -189,7 +201,8 @@ const generateSampleData = (): Transaction[] => {
         category: 'non_operational',
         description: 'Equipment Purchase',
         amount: -(15000 + Math.random() * 10000),
-        type: isActual ? 'actual' : 'budget'
+        type: isActual ? 'actual' : 'budget',
+        project: projects[1]
       })
     }
   }
@@ -197,9 +210,16 @@ const generateSampleData = (): Transaction[] => {
   return transactions
 }
 
+// Local Storage Keys
+const STORAGE_KEYS = {
+  transactions: 'cashflow_transactions',
+  assumptions: 'cashflow_assumptions',
+  beginningBalance: 'cashflow_beginning_balance',
+  cutoffDate: 'cashflow_cutoff_date'
+}
+
 // Main Component
 export default function CashFlowPro() {
-  // State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'data' | 'assumptions' | 'projections' | 'integrations'>('dashboard')
   const [beginningBalance, setBeginningBalance] = useState<number>(50000)
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -208,31 +228,90 @@ export default function CashFlowPro() {
   const [comparisonView, setComparisonView] = useState<'mom' | 'yoy' | 'qoq' | 'project'>('mom')
   const [cutoffDate, setCutoffDate] = useState<string>(new Date().toISOString().slice(0, 7))
   const [isDragging, setIsDragging] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(false)
   
-  // Date Range Filter State
   const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('thisYear')
   const [customStartDate, setCustomStartDate] = useState<string>(`${new Date().getFullYear()}-01`)
   const [customEndDate, setCustomEndDate] = useState<string>(new Date().toISOString().slice(0, 7))
   const [showDatePicker, setShowDatePicker] = useState(false)
   
-  // Get active date range
+  const [selectedProject, setSelectedProject] = useState<string>('all')
+  
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<Partial<Transaction>>({})
+
+  const [newAssumption, setNewAssumption] = useState<Partial<Assumption>>({
+    name: '',
+    category: 'revenue',
+    frequency: 'monthly',
+    amount: 0,
+    startDate: new Date().toISOString().slice(0, 7)
+  })
+
+  // Load data from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedTransactions = localStorage.getItem(STORAGE_KEYS.transactions)
+      const savedAssumptions = localStorage.getItem(STORAGE_KEYS.assumptions)
+      const savedBalance = localStorage.getItem(STORAGE_KEYS.beginningBalance)
+      const savedCutoff = localStorage.getItem(STORAGE_KEYS.cutoffDate)
+      
+      if (savedTransactions) setTransactions(JSON.parse(savedTransactions))
+      if (savedAssumptions) setAssumptions(JSON.parse(savedAssumptions))
+      if (savedBalance) setBeginningBalance(parseFloat(savedBalance))
+      if (savedCutoff) setCutoffDate(savedCutoff)
+      
+      setIsLoaded(true)
+    }
+  }, [])
+
+  // Save to localStorage
+  useEffect(() => {
+    if (isLoaded && typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.transactions, JSON.stringify(transactions))
+    }
+  }, [transactions, isLoaded])
+
+  useEffect(() => {
+    if (isLoaded && typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.assumptions, JSON.stringify(assumptions))
+    }
+  }, [assumptions, isLoaded])
+
+  useEffect(() => {
+    if (isLoaded && typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.beginningBalance, beginningBalance.toString())
+    }
+  }, [beginningBalance, isLoaded])
+
+  useEffect(() => {
+    if (isLoaded && typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.cutoffDate, cutoffDate)
+    }
+  }, [cutoffDate, isLoaded])
+  
   const activeDateRange = useMemo(() => {
     return getDateRangeFromPreset(dateRangePreset, customStartDate, customEndDate)
   }, [dateRangePreset, customStartDate, customEndDate])
 
-  // New assumption form state
-  const [newAssumption, setNewAssumption] = useState<Partial<Assumption>>({
-    category: 'revenue',
-    frequency: 'monthly',
-    amount: 0
-  })
+  const projectList = useMemo(() => {
+    const projects = new Set<string>()
+    transactions.forEach(t => {
+      if (t.project) projects.add(t.project)
+    })
+    return Array.from(projects).sort()
+  }, [transactions])
 
-  // Load sample data
   const loadSampleData = useCallback(() => {
     setTransactions(generateSampleData())
   }, [])
 
-  // CSV Import handler
+  const clearAllData = useCallback(() => {
+    if (confirm('Are you sure you want to delete all transactions? This cannot be undone.')) {
+      setTransactions([])
+    }
+  }, [])
+
   const handleFileUpload = useCallback((file: File) => {
     Papa.parse<Record<string, string>>(file, {
       header: true,
@@ -253,7 +332,6 @@ export default function CashFlowPro() {
     })
   }, [])
 
-  // Export transactions to CSV
   const exportToCSV = useCallback(() => {
     const csv = Papa.unparse(transactions)
     const blob = new Blob([csv], { type: 'text/csv' })
@@ -265,27 +343,71 @@ export default function CashFlowPro() {
     URL.revokeObjectURL(url)
   }, [transactions])
 
-  // Add assumption
+  const deleteTransaction = useCallback((id: string) => {
+    setTransactions(prev => prev.filter(t => t.id !== id))
+  }, [])
+
+  const startEdit = useCallback((transaction: Transaction) => {
+    setEditingId(transaction.id)
+    setEditForm({
+      category: transaction.category,
+      type: transaction.type,
+      project: transaction.project || '',
+      description: transaction.description,
+      amount: transaction.amount,
+      date: transaction.date
+    })
+  }, [])
+
+  const saveEdit = useCallback(() => {
+    if (editingId) {
+      setTransactions(prev => prev.map(t => 
+        t.id === editingId 
+          ? { ...t, ...editForm }
+          : t
+      ))
+      setEditingId(null)
+      setEditForm({})
+    }
+  }, [editingId, editForm])
+
+  const cancelEdit = useCallback(() => {
+    setEditingId(null)
+    setEditForm({})
+  }, [])
+
   const addAssumption = useCallback(() => {
-    if (newAssumption.name && newAssumption.amount && newAssumption.startDate) {
-      setAssumptions(prev => [...prev, {
-        ...newAssumption,
-        id: generateId()
-      } as Assumption])
+    if (newAssumption.name && newAssumption.amount !== undefined && newAssumption.startDate) {
+      const assumption: Assumption = {
+        id: generateId(),
+        name: newAssumption.name,
+        category: newAssumption.category || 'revenue',
+        amount: newAssumption.amount,
+        frequency: newAssumption.frequency || 'monthly',
+        startDate: newAssumption.startDate,
+        endDate: newAssumption.endDate,
+        project: newAssumption.project
+      }
+      setAssumptions(prev => [...prev, assumption])
       setNewAssumption({
+        name: '',
         category: 'revenue',
         frequency: 'monthly',
-        amount: 0
+        amount: 0,
+        startDate: new Date().toISOString().slice(0, 7)
       })
     }
   }, [newAssumption])
 
-  // Delete assumption
   const deleteAssumption = useCallback((id: string) => {
     setAssumptions(prev => prev.filter(a => a.id !== id))
   }, [])
 
-  // Process monthly data
+  const filteredTransactions = useMemo(() => {
+    if (selectedProject === 'all') return transactions
+    return transactions.filter(t => t.project === selectedProject)
+  }, [transactions, selectedProject])
+
   const monthlyData = useMemo((): MonthlyData[] => {
     const now = new Date()
     const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1)
@@ -302,10 +424,8 @@ export default function CashFlowPro() {
       const cutoff = new Date(cutoffDate + '-01')
       const isActualMonth = current <= cutoff
       
-      // Filter transactions for this month
-      const monthTransactions = transactions.filter(t => t.date.slice(0, 7) === monthStr)
+      const monthTransactions = filteredTransactions.filter(t => t.date.slice(0, 7) === monthStr)
       
-      // Calculate actuals
       const actualRevenue = monthTransactions
         .filter(t => t.category === 'revenue' && t.type === 'actual')
         .reduce((sum, t) => sum + t.amount, 0)
@@ -316,7 +436,6 @@ export default function CashFlowPro() {
         .filter(t => t.category === 'non_operational' && t.type === 'actual')
         .reduce((sum, t) => sum + t.amount, 0)
       
-      // Calculate budget
       const budgetRevenue = monthTransactions
         .filter(t => t.category === 'revenue' && t.type === 'budget')
         .reduce((sum, t) => sum + t.amount, 0)
@@ -327,12 +446,13 @@ export default function CashFlowPro() {
         .filter(t => t.category === 'non_operational' && t.type === 'budget')
         .reduce((sum, t) => sum + t.amount, 0)
       
-      // Calculate projections from assumptions
       let projectedRevenue = 0
       let projectedOpex = 0
       let projectedNonOp = 0
       
       assumptions.forEach(a => {
+        if (selectedProject !== 'all' && a.project !== selectedProject) return
+        
         const aStart = new Date(a.startDate + '-01')
         const aEnd = a.endDate ? new Date(a.endDate + '-01') : endDate
         
@@ -348,7 +468,6 @@ export default function CashFlowPro() {
         }
       })
       
-      // Use actuals if available, otherwise use projections
       const finalRevenue = isActualMonth && actualRevenue ? actualRevenue : (projectedRevenue || budgetRevenue)
       const finalOpex = isActualMonth && actualOpex ? actualOpex : (projectedOpex || budgetOpex)
       const finalNonOp = isActualMonth && actualNonOp ? actualNonOp : (projectedNonOp || budgetNonOp)
@@ -376,39 +495,56 @@ export default function CashFlowPro() {
     }
     
     return months
-  }, [transactions, assumptions, beginningBalance, projectionYears, cutoffDate])
+  }, [filteredTransactions, assumptions, beginningBalance, projectionYears, cutoffDate, selectedProject])
 
-  // Filtered monthly data based on date range
   const filteredMonthlyData = useMemo(() => {
     return monthlyData.filter(d => {
       return d.month >= activeDateRange.start && d.month <= activeDateRange.end
     })
   }, [monthlyData, activeDateRange])
 
-  // KPI calculations
   const kpis = useMemo(() => {
     const actualData = filteredMonthlyData.filter(d => d.dataType === 'actual')
     const totalActualRevenue = actualData.reduce((sum, d) => sum + d.revenue.actual, 0)
     const totalActualOpex = actualData.reduce((sum, d) => sum + Math.abs(d.opex.actual), 0)
     const totalBudgetRevenue = actualData.reduce((sum, d) => sum + d.revenue.budget, 0)
-    const totalProjectedRevenue = filteredMonthlyData.reduce((sum, d) => sum + d.revenue.projected, 0)
     const currentBalance = filteredMonthlyData[filteredMonthlyData.length - 1]?.runningBalance.projected || beginningBalance
     const budgetVariance = totalActualRevenue - totalBudgetRevenue
+    
+    const midpoint = Math.floor(actualData.length / 2)
+    const firstHalf = actualData.slice(0, midpoint)
+    const secondHalf = actualData.slice(midpoint)
+    
+    const firstHalfRevenue = firstHalf.reduce((sum, d) => sum + d.revenue.actual, 0)
+    const secondHalfRevenue = secondHalf.reduce((sum, d) => sum + d.revenue.actual, 0)
+    const revenueChange = firstHalfRevenue ? ((secondHalfRevenue - firstHalfRevenue) / firstHalfRevenue) * 100 : 0
+    
+    const firstHalfOpex = firstHalf.reduce((sum, d) => sum + Math.abs(d.opex.actual), 0)
+    const secondHalfOpex = secondHalf.reduce((sum, d) => sum + Math.abs(d.opex.actual), 0)
+    const opexChange = firstHalfOpex ? ((secondHalfOpex - firstHalfOpex) / firstHalfOpex) * 100 : 0
+    
+    const firstHalfNet = firstHalf.reduce((sum, d) => sum + d.netCash.actual, 0)
+    const secondHalfNet = secondHalf.reduce((sum, d) => sum + d.netCash.actual, 0)
+    const netChange = firstHalfNet ? ((secondHalfNet - firstHalfNet) / Math.abs(firstHalfNet)) * 100 : 0
+    
+    const variancePercent = totalBudgetRevenue ? (budgetVariance / totalBudgetRevenue) * 100 : 0
     
     return {
       totalActualRevenue,
       totalActualOpex,
-      totalProjectedRevenue,
       currentBalance,
       budgetVariance,
       avgMonthlyRevenue: totalActualRevenue / (actualData.length || 1),
-      avgMonthlyOpex: totalActualOpex / (actualData.length || 1)
+      avgMonthlyOpex: totalActualOpex / (actualData.length || 1),
+      revenueChange,
+      opexChange,
+      netChange,
+      variancePercent
     }
   }, [filteredMonthlyData, beginningBalance])
 
-  // Chart data transformations
   const chartData = useMemo(() => {
-    return filteredMonthlyData.map(d => ({
+    return filteredMonthlyData.map((d) => ({
       name: d.monthLabel,
       month: d.month,
       actual: d.netCash.actual || null,
@@ -421,7 +557,6 @@ export default function CashFlowPro() {
     }))
   }, [filteredMonthlyData])
 
-  // Date range presets
   const datePresets: { key: DateRangePreset; label: string }[] = [
     { key: 'thisYear', label: 'This Year' },
     { key: 'lastYear', label: 'Last Year' },
@@ -433,23 +568,52 @@ export default function CashFlowPro() {
     { key: 'custom', label: 'Custom' },
   ]
 
-  // Comparison data
   const comparisonData = useMemo(() => {
     if (comparisonView === 'project') {
       const projectData: Record<string, { revenue: number; opex: number; net: number }> = {}
-      transactions.forEach(t => {
+      filteredTransactions.forEach(t => {
         const proj = t.project || 'Unassigned'
         if (!projectData[proj]) projectData[proj] = { revenue: 0, opex: 0, net: 0 }
         if (t.category === 'revenue') projectData[proj].revenue += t.amount
         else if (t.category === 'opex') projectData[proj].opex += Math.abs(t.amount)
         projectData[proj].net += t.amount
       })
-      return Object.entries(projectData).map(([name, data]) => ({ name, ...data }))
+      
+      return Object.entries(projectData).map(([name, d]) => ({ 
+        name, 
+        ...d,
+        margin: d.revenue ? ((d.net / d.revenue) * 100).toFixed(1) : '0'
+      }))
     }
+    
+    if (comparisonView === 'qoq') {
+      const quarterData: Record<string, { revenue: number; opex: number; net: number }> = {}
+      filteredMonthlyData.forEach(d => {
+        const [year, month] = d.month.split('-')
+        const quarter = `Q${Math.ceil(parseInt(month) / 3)} ${year}`
+        if (!quarterData[quarter]) quarterData[quarter] = { revenue: 0, opex: 0, net: 0 }
+        quarterData[quarter].revenue += d.revenue.actual || d.revenue.projected
+        quarterData[quarter].opex += Math.abs(d.opex.actual || d.opex.projected)
+        quarterData[quarter].net += d.netCash.actual || d.netCash.projected
+      })
+      
+      const quarters = Object.entries(quarterData)
+      return quarters.map(([name, d], idx) => {
+        const prev = quarters[idx - 1]?.[1]
+        const revenueChange = prev?.revenue ? ((d.revenue - prev.revenue) / prev.revenue) * 100 : 0
+        const netChange = prev?.net ? ((d.net - prev.net) / Math.abs(prev.net)) * 100 : 0
+        return { 
+          name, 
+          ...d, 
+          revenueChange: revenueChange.toFixed(1),
+          netChange: netChange.toFixed(1)
+        }
+      })
+    }
+    
     return chartData
-  }, [comparisonView, transactions, chartData])
+  }, [comparisonView, filteredTransactions, filteredMonthlyData, chartData])
 
-  // Tab navigation
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: PieChart },
     { id: 'data', label: 'Data Import', icon: Database },
@@ -460,7 +624,6 @@ export default function CashFlowPro() {
 
   return (
     <div className="min-h-screen bg-terminal-bg text-zinc-100 font-body">
-      {/* Header */}
       <header className="border-b border-terminal-border bg-terminal-surface/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
@@ -474,7 +637,6 @@ export default function CashFlowPro() {
               </div>
             </div>
             
-            {/* Tab Navigation */}
             <nav className="flex gap-1">
               {tabs.map(tab => (
                 <button
@@ -497,7 +659,6 @@ export default function CashFlowPro() {
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         <AnimatePresence mode="wait">
-          {/* Dashboard Tab */}
           {activeTab === 'dashboard' && (
             <motion.div
               key="dashboard"
@@ -506,8 +667,24 @@ export default function CashFlowPro() {
               exit={{ opacity: 0, y: -20 }}
               className="space-y-6"
             >
-              {/* Date Range Filter */}
+              {/* Filters */}
               <div className="flex items-center gap-4 p-4 bg-terminal-surface rounded-xl border border-terminal-border">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-zinc-400" />
+                  <select
+                    value={selectedProject}
+                    onChange={(e) => setSelectedProject(e.target.value)}
+                    className="bg-terminal-bg border border-terminal-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-accent-primary"
+                  >
+                    <option value="all">All Projects</option>
+                    {projectList.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="w-px h-6 bg-terminal-border" />
+                
                 <Filter className="w-5 h-5 text-zinc-400" />
                 <div className="flex gap-2 flex-wrap">
                   {datePresets.map(preset => (
@@ -515,8 +692,7 @@ export default function CashFlowPro() {
                       key={preset.key}
                       onClick={() => {
                         setDateRangePreset(preset.key)
-                        if (preset.key === 'custom') setShowDatePicker(true)
-                        else setShowDatePicker(false)
+                        setShowDatePicker(preset.key === 'custom')
                       }}
                       className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                         dateRangePreset === preset.key
@@ -551,14 +727,27 @@ export default function CashFlowPro() {
               <div className="grid grid-cols-4 gap-4">
                 <div className="bg-terminal-surface rounded-xl p-5 border border-terminal-border">
                   <div className="flex items-center gap-2 text-zinc-400 text-sm mb-2">
+                    <DollarSign className="w-4 h-4" />
+                    Current Balance
+                  </div>
+                  <div className="text-2xl font-mono font-semibold text-accent-secondary">
+                    {formatCurrency(kpis.currentBalance)}
+                  </div>
+                  <div className={`text-xs mt-1 ${kpis.netChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                    {formatPercent(kpis.netChange)} vs prior period
+                  </div>
+                </div>
+                
+                <div className="bg-terminal-surface rounded-xl p-5 border border-terminal-border">
+                  <div className="flex items-center gap-2 text-zinc-400 text-sm mb-2">
                     <TrendingUp className="w-4 h-4" />
                     Total Revenue
                   </div>
                   <div className="text-2xl font-mono font-semibold text-accent-primary">
                     {formatCurrency(kpis.totalActualRevenue)}
                   </div>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    Avg {formatCurrency(kpis.avgMonthlyRevenue)}/mo
+                  <div className={`text-xs mt-1 ${kpis.revenueChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                    {formatPercent(kpis.revenueChange)} vs prior period
                   </div>
                 </div>
                 
@@ -570,21 +759,8 @@ export default function CashFlowPro() {
                   <div className="text-2xl font-mono font-semibold text-accent-danger">
                     {formatCurrency(kpis.totalActualOpex)}
                   </div>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    Avg {formatCurrency(kpis.avgMonthlyOpex)}/mo
-                  </div>
-                </div>
-                
-                <div className="bg-terminal-surface rounded-xl p-5 border border-terminal-border">
-                  <div className="flex items-center gap-2 text-zinc-400 text-sm mb-2">
-                    <DollarSign className="w-4 h-4" />
-                    Current Balance
-                  </div>
-                  <div className="text-2xl font-mono font-semibold text-accent-secondary">
-                    {formatCurrency(kpis.currentBalance)}
-                  </div>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    Projected end of period
+                  <div className={`text-xs mt-1 ${kpis.opexChange <= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                    {formatPercent(kpis.opexChange)} vs prior period
                   </div>
                 </div>
                 
@@ -596,15 +772,14 @@ export default function CashFlowPro() {
                   <div className={`text-2xl font-mono font-semibold ${kpis.budgetVariance >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
                     {kpis.budgetVariance >= 0 ? '+' : ''}{formatCurrency(kpis.budgetVariance)}
                   </div>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    vs budget target
+                  <div className={`text-xs mt-1 ${kpis.variancePercent >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                    {formatPercent(kpis.variancePercent)} of budget
                   </div>
                 </div>
               </div>
 
               {/* Charts */}
               <div className="grid grid-cols-2 gap-6">
-                {/* Cash Flow Chart */}
                 <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
                   <h3 className="text-lg font-semibold mb-4">Cash Flow Trend</h3>
                   <ResponsiveContainer width="100%" height={300}>
@@ -613,11 +788,7 @@ export default function CashFlowPro() {
                       <XAxis dataKey="name" stroke="#71717a" fontSize={12} />
                       <YAxis stroke="#71717a" fontSize={12} tickFormatter={(v) => `$${v/1000}k`} />
                       <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: '#12121a', 
-                          border: '1px solid #1e1e2e',
-                          borderRadius: '8px'
-                        }}
+                        contentStyle={{ backgroundColor: '#12121a', border: '1px solid #1e1e2e', borderRadius: '8px' }}
                         formatter={(value: number) => formatCurrency(value)}
                       />
                       <Legend />
@@ -628,7 +799,6 @@ export default function CashFlowPro() {
                   </ResponsiveContainer>
                 </div>
 
-                {/* Running Balance Chart */}
                 <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
                   <h3 className="text-lg font-semibold mb-4">Running Cash Balance</h3>
                   <ResponsiveContainer width="100%" height={300}>
@@ -643,11 +813,7 @@ export default function CashFlowPro() {
                       <XAxis dataKey="name" stroke="#71717a" fontSize={12} />
                       <YAxis stroke="#71717a" fontSize={12} tickFormatter={(v) => `$${v/1000}k`} />
                       <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: '#12121a', 
-                          border: '1px solid #1e1e2e',
-                          borderRadius: '8px'
-                        }}
+                        contentStyle={{ backgroundColor: '#12121a', border: '1px solid #1e1e2e', borderRadius: '8px' }}
                         formatter={(value: number) => formatCurrency(value)}
                       />
                       <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" />
@@ -657,7 +823,7 @@ export default function CashFlowPro() {
                 </div>
               </div>
 
-              {/* Comparison View */}
+              {/* Comparison */}
               <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Comparison Analysis</h3>
@@ -683,32 +849,69 @@ export default function CashFlowPro() {
                     <XAxis dataKey="name" stroke="#71717a" fontSize={12} />
                     <YAxis stroke="#71717a" fontSize={12} tickFormatter={(v) => `$${v/1000}k`} />
                     <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#12121a', 
-                        border: '1px solid #1e1e2e',
-                        borderRadius: '8px'
+                      contentStyle={{ backgroundColor: '#12121a', border: '1px solid #1e1e2e', borderRadius: '8px' }}
+                      formatter={(value: number, name: string) => {
+                        if (name === 'revenueChange' || name === 'netChange') return `${value}%`
+                        return formatCurrency(value)
                       }}
-                      formatter={(value: number) => formatCurrency(value)}
                     />
                     <Legend />
                     <Bar dataKey="revenue" name="Revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="opex" name="OpEx" fill="#ef4444" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
+                
+                {comparisonView === 'qoq' && comparisonData.length > 0 && (
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-terminal-border text-zinc-400">
+                          <th className="text-left pb-2">Quarter</th>
+                          <th className="text-right pb-2">Revenue</th>
+                          <th className="text-right pb-2">Change</th>
+                          <th className="text-right pb-2">Net Cash</th>
+                          <th className="text-right pb-2">Change</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {comparisonData.map((d: Record<string, unknown>) => (
+                          <tr key={d.name as string} className="border-b border-terminal-border/50">
+                            <td className="py-2 font-medium">{d.name as string}</td>
+                            <td className="text-right font-mono text-accent-primary">{formatCurrency(d.revenue as number)}</td>
+                            <td className={`text-right font-mono ${parseFloat(d.revenueChange as string) >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                              {d.revenueChange}%
+                            </td>
+                            <td className={`text-right font-mono ${(d.net as number) >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                              {formatCurrency(d.net as number)}
+                            </td>
+                            <td className={`text-right font-mono ${parseFloat(d.netChange as string) >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                              {d.netChange}%
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
               {/* Transaction Table */}
               {transactions.length > 0 && (
                 <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold">Recent Transactions</h3>
-                    <button
-                      onClick={exportToCSV}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-terminal-bg text-zinc-400 hover:text-zinc-200 border border-terminal-border"
-                    >
-                      <Download className="w-4 h-4" />
-                      Export CSV
-                    </button>
+                    <h3 className="text-lg font-semibold">
+                      Transactions {selectedProject !== 'all' && `- ${selectedProject}`}
+                    </h3>
+                    <div className="flex gap-2">
+                      <button onClick={exportToCSV} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-terminal-bg text-zinc-400 hover:text-zinc-200 border border-terminal-border">
+                        <Download className="w-4 h-4" />
+                        Export
+                      </button>
+                      <button onClick={clearAllData} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-accent-danger/10 text-accent-danger hover:bg-accent-danger/20 border border-accent-danger/30">
+                        <Trash2 className="w-4 h-4" />
+                        Clear All
+                      </button>
+                    </div>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full">
@@ -720,124 +923,119 @@ export default function CashFlowPro() {
                           <th className="pb-3 font-medium text-right">Amount</th>
                           <th className="pb-3 font-medium text-center">Type</th>
                           <th className="pb-3 font-medium">Project</th>
+                          <th className="pb-3 font-medium text-center">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {transactions.slice(0, 10).map(t => (
+                        {filteredTransactions.slice(0, 20).map(t => (
                           <tr key={t.id} className="border-b border-terminal-border/50 hover:bg-terminal-bg/50">
-                            <td className="py-3 text-sm">{t.date}</td>
-                            <td className="py-3">
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                t.category === 'revenue' ? 'bg-accent-primary/10 text-accent-primary' :
-                                t.category === 'opex' ? 'bg-accent-danger/10 text-accent-danger' :
-                                'bg-accent-warning/10 text-accent-warning'
-                              }`}>
-                                {t.category}
-                              </span>
-                            </td>
-                            <td className="text-sm">{t.description}</td>
-                            <td className={`text-right font-mono text-sm ${
-                              t.amount >= 0 ? 'text-accent-primary' : 'text-accent-danger'
-                            }`}>
-                              {formatCurrency(t.amount)}
-                            </td>
-                            <td className="text-center">
-                              <span className={`px-2 py-0.5 rounded text-xs ${
-                                t.type === 'actual' ? 'bg-zinc-700 text-zinc-300' : 'bg-accent-warning/10 text-accent-warning'
-                              }`}>
-                                {t.type}
-                              </span>
-                            </td>
-                            <td className="text-sm text-zinc-400">{t.project || '-'}</td>
+                            {editingId === t.id ? (
+                              <>
+                                <td className="py-2">
+                                  <input type="date" value={editForm.date || ''} onChange={(e) => setEditForm(prev => ({ ...prev, date: e.target.value }))} className="bg-terminal-bg border border-terminal-border rounded px-2 py-1 text-sm w-32" />
+                                </td>
+                                <td className="py-2">
+                                  <select value={editForm.category || 'revenue'} onChange={(e) => setEditForm(prev => ({ ...prev, category: e.target.value as Transaction['category'] }))} className="bg-terminal-bg border border-terminal-border rounded px-2 py-1 text-sm">
+                                    <option value="revenue">Revenue</option>
+                                    <option value="opex">OpEx</option>
+                                    <option value="non_operational">Non-Op</option>
+                                  </select>
+                                </td>
+                                <td className="py-2">
+                                  <input type="text" value={editForm.description || ''} onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))} className="bg-terminal-bg border border-terminal-border rounded px-2 py-1 text-sm w-full" />
+                                </td>
+                                <td className="py-2">
+                                  <input type="number" value={editForm.amount || 0} onChange={(e) => setEditForm(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))} className="bg-terminal-bg border border-terminal-border rounded px-2 py-1 text-sm w-24 text-right" />
+                                </td>
+                                <td className="py-2 text-center">
+                                  <select value={editForm.type || 'actual'} onChange={(e) => setEditForm(prev => ({ ...prev, type: e.target.value as 'actual' | 'budget' }))} className="bg-terminal-bg border border-terminal-border rounded px-2 py-1 text-sm">
+                                    <option value="actual">Actual</option>
+                                    <option value="budget">Budget</option>
+                                  </select>
+                                </td>
+                                <td className="py-2">
+                                  <input type="text" value={editForm.project || ''} onChange={(e) => setEditForm(prev => ({ ...prev, project: e.target.value }))} className="bg-terminal-bg border border-terminal-border rounded px-2 py-1 text-sm w-28" placeholder="Project" />
+                                </td>
+                                <td className="py-2 text-center">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <button onClick={saveEdit} className="p-1 text-accent-primary hover:bg-accent-primary/10 rounded"><Check className="w-4 h-4" /></button>
+                                    <button onClick={cancelEdit} className="p-1 text-zinc-400 hover:bg-terminal-bg rounded"><X className="w-4 h-4" /></button>
+                                  </div>
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="py-3 text-sm">{t.date}</td>
+                                <td className="py-3">
+                                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${t.category === 'revenue' ? 'bg-accent-primary/10 text-accent-primary' : t.category === 'opex' ? 'bg-accent-danger/10 text-accent-danger' : 'bg-accent-warning/10 text-accent-warning'}`}>
+                                    {t.category}
+                                  </span>
+                                </td>
+                                <td className="text-sm">{t.description}</td>
+                                <td className={`text-right font-mono text-sm ${t.amount >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>{formatCurrency(t.amount)}</td>
+                                <td className="text-center">
+                                  <span className={`px-2 py-0.5 rounded text-xs ${t.type === 'actual' ? 'bg-zinc-700 text-zinc-300' : 'bg-accent-warning/10 text-accent-warning'}`}>{t.type}</span>
+                                </td>
+                                <td className="text-sm text-zinc-400">{t.project || '-'}</td>
+                                <td className="text-center">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <button onClick={() => startEdit(t)} className="p-1 text-zinc-400 hover:text-accent-primary hover:bg-accent-primary/10 rounded"><Edit2 className="w-4 h-4" /></button>
+                                    <button onClick={() => deleteTransaction(t.id)} className="p-1 text-zinc-400 hover:text-accent-danger hover:bg-accent-danger/10 rounded"><Trash2 className="w-4 h-4" /></button>
+                                  </div>
+                                </td>
+                              </>
+                            )}
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
+                  {filteredTransactions.length > 20 && (
+                    <p className="text-zinc-500 text-sm mt-4 text-center">Showing 20 of {filteredTransactions.length} transactions</p>
+                  )}
                 </div>
               )}
             </motion.div>
           )}
 
-          {/* Data Import Tab */}
           {activeTab === 'data' && (
-            <motion.div
-              key="data"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-6"
-            >
-              {/* Beginning Balance */}
+            <motion.div key="data" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
               <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
                 <h3 className="text-lg font-semibold mb-4">Beginning Balance</h3>
                 <div className="flex items-center gap-4">
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
-                    <input
-                      type="number"
-                      value={beginningBalance}
-                      onChange={(e) => setBeginningBalance(parseFloat(e.target.value) || 0)}
-                      className="pl-10 pr-4 py-3 bg-terminal-bg border border-terminal-border rounded-lg text-xl font-mono w-64 focus:outline-none focus:border-accent-primary"
-                    />
+                    <input type="number" value={beginningBalance} onChange={(e) => setBeginningBalance(parseFloat(e.target.value) || 0)} className="pl-10 pr-4 py-3 bg-terminal-bg border border-terminal-border rounded-lg text-xl font-mono w-64 focus:outline-none focus:border-accent-primary" />
                   </div>
-                  <p className="text-zinc-400 text-sm">Starting cash position for projections</p>
+                  <p className="text-zinc-400 text-sm">Starting cash position (auto-saved)</p>
                 </div>
               </div>
 
-              {/* Cutoff Date */}
               <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
                 <h3 className="text-lg font-semibold mb-4">Actuals Cutoff Date</h3>
                 <div className="flex items-center gap-4">
-                  <input
-                    type="month"
-                    value={cutoffDate}
-                    onChange={(e) => setCutoffDate(e.target.value)}
-                    className="px-4 py-3 bg-terminal-bg border border-terminal-border rounded-lg font-mono focus:outline-none focus:border-accent-primary"
-                  />
-                  <p className="text-zinc-400 text-sm">Data after this date will be marked as projected</p>
+                  <input type="month" value={cutoffDate} onChange={(e) => setCutoffDate(e.target.value)} className="px-4 py-3 bg-terminal-bg border border-terminal-border rounded-lg font-mono focus:outline-none focus:border-accent-primary" />
+                  <p className="text-zinc-400 text-sm">Data after this date marked as projected (auto-saved)</p>
                 </div>
               </div>
 
-              {/* File Upload */}
-              <div 
-                className={`bg-terminal-surface rounded-xl p-8 border-2 border-dashed transition-all ${
-                  isDragging ? 'border-accent-primary bg-accent-primary/5' : 'border-terminal-border'
-                }`}
+              <div className={`bg-terminal-surface rounded-xl p-8 border-2 border-dashed transition-all ${isDragging ? 'border-accent-primary bg-accent-primary/5' : 'border-terminal-border'}`}
                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
                 onDragLeave={() => setIsDragging(false)}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  setIsDragging(false)
-                  const file = e.dataTransfer.files[0]
-                  if (file) handleFileUpload(file)
-                }}
+                onDrop={(e) => { e.preventDefault(); setIsDragging(false); const file = e.dataTransfer.files[0]; if (file) handleFileUpload(file) }}
               >
                 <div className="text-center">
                   <Upload className="w-12 h-12 text-zinc-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Import Transactions</h3>
-                  <p className="text-zinc-400 mb-4">Drag & drop a CSV file or click to browse</p>
-                  <input
-                    type="file"
-                    accept=".csv"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) handleFileUpload(file)
-                    }}
-                    className="hidden"
-                    id="file-upload"
-                  />
-                  <label
-                    htmlFor="file-upload"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-accent-primary/10 text-accent-primary rounded-lg cursor-pointer hover:bg-accent-primary/20 transition-all"
-                  >
+                  <p className="text-zinc-400 mb-4">Drag & drop CSV or click to browse</p>
+                  <input type="file" accept=".csv" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleFileUpload(file) }} className="hidden" id="file-upload" />
+                  <label htmlFor="file-upload" className="inline-flex items-center gap-2 px-6 py-3 bg-accent-primary/10 text-accent-primary rounded-lg cursor-pointer hover:bg-accent-primary/20 transition-all">
                     <Upload className="w-5 h-5" />
                     Choose File
                   </label>
                 </div>
               </div>
 
-              {/* CSV Format Guide */}
               <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
                 <h3 className="text-lg font-semibold mb-4">CSV Format</h3>
                 <div className="bg-terminal-bg rounded-lg p-4 font-mono text-sm overflow-x-auto">
@@ -848,172 +1046,121 @@ export default function CashFlowPro() {
                 </div>
               </div>
 
-              {/* Quick Actions */}
               <div className="flex gap-4">
-                <button
-                  onClick={loadSampleData}
-                  className="flex items-center gap-2 px-6 py-3 bg-accent-secondary/10 text-accent-secondary rounded-lg hover:bg-accent-secondary/20 transition-all"
-                >
+                <button onClick={loadSampleData} className="flex items-center gap-2 px-6 py-3 bg-accent-secondary/10 text-accent-secondary rounded-lg hover:bg-accent-secondary/20 transition-all">
                   <RefreshCw className="w-5 h-5" />
                   Load Sample Data
                 </button>
-                <button
-                  onClick={exportToCSV}
-                  disabled={transactions.length === 0}
-                  className="flex items-center gap-2 px-6 py-3 bg-terminal-bg text-zinc-400 rounded-lg hover:text-zinc-200 transition-all disabled:opacity-50"
-                >
+                <button onClick={exportToCSV} disabled={transactions.length === 0} className="flex items-center gap-2 px-6 py-3 bg-terminal-bg text-zinc-400 rounded-lg hover:text-zinc-200 transition-all disabled:opacity-50">
                   <Download className="w-5 h-5" />
                   Export Transactions
                 </button>
+                <button onClick={clearAllData} disabled={transactions.length === 0} className="flex items-center gap-2 px-6 py-3 bg-accent-danger/10 text-accent-danger rounded-lg hover:bg-accent-danger/20 transition-all disabled:opacity-50">
+                  <Trash2 className="w-5 h-5" />
+                  Clear All Data
+                </button>
+              </div>
+              
+              <div className="bg-accent-primary/5 border border-accent-primary/20 rounded-xl p-4">
+                <p className="text-accent-primary text-sm"><strong>Auto-Save Enabled:</strong> All data saved to browser. Close and return anytime.</p>
               </div>
             </motion.div>
           )}
 
-          {/* Assumptions Tab */}
           {activeTab === 'assumptions' && (
-            <motion.div
-              key="assumptions"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-6"
-            >
-              {/* Add Assumption Form */}
+            <motion.div key="assumptions" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
               <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
                 <h3 className="text-lg font-semibold mb-4">Add New Assumption</h3>
-                <div className="grid grid-cols-6 gap-4">
-                  <input
-                    type="text"
-                    placeholder="Name"
-                    value={newAssumption.name || ''}
-                    onChange={(e) => setNewAssumption(prev => ({ ...prev, name: e.target.value }))}
-                    className="col-span-2 px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg focus:outline-none focus:border-accent-primary"
-                  />
-                  <select
-                    value={newAssumption.category}
-                    onChange={(e) => setNewAssumption(prev => ({ ...prev, category: e.target.value as Assumption['category'] }))}
-                    className="px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg focus:outline-none focus:border-accent-primary"
-                  >
-                    <option value="revenue">Revenue</option>
-                    <option value="opex">OpEx</option>
-                    <option value="non_operational">Non-Operational</option>
-                  </select>
-                  <input
-                    type="number"
-                    placeholder="Amount"
-                    value={newAssumption.amount || ''}
-                    onChange={(e) => setNewAssumption(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
-                    className="px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg focus:outline-none focus:border-accent-primary"
-                  />
-                  <select
-                    value={newAssumption.frequency}
-                    onChange={(e) => setNewAssumption(prev => ({ ...prev, frequency: e.target.value as Assumption['frequency'] }))}
-                    className="px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg focus:outline-none focus:border-accent-primary"
-                  >
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                    <option value="annually">Annually</option>
-                    <option value="one-time">One-time</option>
-                  </select>
-                  <input
-                    type="month"
-                    placeholder="Start Date"
-                    value={newAssumption.startDate || ''}
-                    onChange={(e) => setNewAssumption(prev => ({ ...prev, startDate: e.target.value }))}
-                    className="px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg focus:outline-none focus:border-accent-primary"
-                  />
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="block text-zinc-400 text-sm mb-1">Name *</label>
+                    <input type="text" placeholder="e.g., New Client Revenue" value={newAssumption.name || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, name: e.target.value }))} className="w-full px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg focus:outline-none focus:border-accent-primary" />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 text-sm mb-1">Category *</label>
+                    <select value={newAssumption.category || 'revenue'} onChange={(e) => setNewAssumption(prev => ({ ...prev, category: e.target.value as Assumption['category'] }))} className="w-full px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg focus:outline-none focus:border-accent-primary">
+                      <option value="revenue">Revenue</option>
+                      <option value="opex">OpEx</option>
+                      <option value="non_operational">Non-Operational</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 text-sm mb-1">Amount *</label>
+                    <input type="number" placeholder="e.g., 10000 or -5000" value={newAssumption.amount || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))} className="w-full px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg focus:outline-none focus:border-accent-primary" />
+                  </div>
                 </div>
-                <div className="grid grid-cols-6 gap-4 mt-4">
-                  <input
-                    type="month"
-                    placeholder="End Date (optional)"
-                    value={newAssumption.endDate || ''}
-                    onChange={(e) => setNewAssumption(prev => ({ ...prev, endDate: e.target.value }))}
-                    className="px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg focus:outline-none focus:border-accent-primary"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Project (optional)"
-                    value={newAssumption.project || ''}
-                    onChange={(e) => setNewAssumption(prev => ({ ...prev, project: e.target.value }))}
-                    className="px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg focus:outline-none focus:border-accent-primary"
-                  />
-                  <button
-                    onClick={addAssumption}
-                    className="col-span-4 flex items-center justify-center gap-2 px-6 py-2 bg-accent-primary text-terminal-bg rounded-lg font-medium hover:bg-accent-primary/90 transition-all"
-                  >
-                    <Plus className="w-5 h-5" />
-                    Add Assumption
-                  </button>
+                <div className="grid grid-cols-4 gap-4 mb-4">
+                  <div>
+                    <label className="block text-zinc-400 text-sm mb-1">Frequency *</label>
+                    <select value={newAssumption.frequency || 'monthly'} onChange={(e) => setNewAssumption(prev => ({ ...prev, frequency: e.target.value as Assumption['frequency'] }))} className="w-full px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg focus:outline-none focus:border-accent-primary">
+                      <option value="monthly">Monthly</option>
+                      <option value="quarterly">Quarterly</option>
+                      <option value="annually">Annually</option>
+                      <option value="one-time">One-time</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 text-sm mb-1">Start Date *</label>
+                    <input type="month" value={newAssumption.startDate || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, startDate: e.target.value }))} className="w-full px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg focus:outline-none focus:border-accent-primary" />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 text-sm mb-1">End Date</label>
+                    <input type="month" value={newAssumption.endDate || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, endDate: e.target.value }))} className="w-full px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg focus:outline-none focus:border-accent-primary" placeholder="Optional" />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 text-sm mb-1">Project</label>
+                    <input type="text" value={newAssumption.project || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, project: e.target.value }))} className="w-full px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg focus:outline-none focus:border-accent-primary" placeholder="Optional" />
+                  </div>
                 </div>
+                <button onClick={addAssumption} disabled={!newAssumption.name || !newAssumption.startDate} className="flex items-center justify-center gap-2 px-6 py-3 bg-accent-primary text-terminal-bg rounded-lg font-medium hover:bg-accent-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                  <Plus className="w-5 h-5" />
+                  Add Assumption
+                </button>
               </div>
 
-              {/* Assumptions List */}
               <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
-                <h3 className="text-lg font-semibold mb-4">Current Assumptions</h3>
+                <h3 className="text-lg font-semibold mb-4">Current Assumptions ({assumptions.length})</h3>
                 {assumptions.length === 0 ? (
-                  <p className="text-zinc-400 text-center py-8">No assumptions added yet. Add your first assumption above.</p>
+                  <div className="text-center py-8">
+                    <Settings className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
+                    <p className="text-zinc-400">No assumptions added yet.</p>
+                    <p className="text-zinc-500 text-sm">Add assumptions above to project future cash flows.</p>
+                  </div>
                 ) : (
                   <div className="space-y-3">
                     {assumptions.map(a => (
                       <div key={a.id} className="flex items-center justify-between p-4 bg-terminal-bg rounded-lg">
                         <div className="flex items-center gap-4">
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                            a.category === 'revenue' ? 'bg-accent-primary/10 text-accent-primary' :
-                            a.category === 'opex' ? 'bg-accent-danger/10 text-accent-danger' :
-                            'bg-accent-warning/10 text-accent-warning'
-                          }`}>
-                            {a.category}
-                          </span>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${a.category === 'revenue' ? 'bg-accent-primary/10 text-accent-primary' : a.category === 'opex' ? 'bg-accent-danger/10 text-accent-danger' : 'bg-accent-warning/10 text-accent-warning'}`}>{a.category}</span>
                           <span className="font-medium">{a.name}</span>
-                          <span className="text-zinc-400">{a.frequency}</span>
+                          <span className="text-zinc-400 text-sm">{a.frequency}</span>
+                          {a.project && <span className="text-zinc-500 text-sm">• {a.project}</span>}
                         </div>
                         <div className="flex items-center gap-4">
-                          <span className={`font-mono ${a.amount >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                            {formatCurrency(a.amount)}
-                          </span>
-                          <span className="text-zinc-400 text-sm">
-                            {a.startDate} → {a.endDate || 'ongoing'}
-                          </span>
-                          <button
-                            onClick={() => deleteAssumption(a.id)}
-                            className="p-2 text-zinc-400 hover:text-accent-danger transition-all"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <span className={`font-mono ${a.amount >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>{formatCurrency(a.amount)}</span>
+                          <span className="text-zinc-400 text-sm">{a.startDate} → {a.endDate || 'ongoing'}</span>
+                          <button onClick={() => deleteAssumption(a.id)} className="p-2 text-zinc-400 hover:text-accent-danger transition-all"><Trash2 className="w-4 h-4" /></button>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
+              
+              <div className="bg-accent-primary/5 border border-accent-primary/20 rounded-xl p-4">
+                <p className="text-accent-primary text-sm"><strong>Auto-Save Enabled:</strong> Assumptions automatically saved to browser.</p>
+              </div>
             </motion.div>
           )}
 
-          {/* Projections Tab */}
           {activeTab === 'projections' && (
-            <motion.div
-              key="projections"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-6"
-            >
-              {/* Projection Controls */}
+            <motion.div key="projections" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
               <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Projection Horizon</h3>
                   <div className="flex gap-2">
                     {([1, 2, 3] as const).map(years => (
-                      <button
-                        key={years}
-                        onClick={() => setProjectionYears(years)}
-                        className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                          projectionYears === years
-                            ? 'bg-accent-primary text-terminal-bg'
-                            : 'bg-terminal-bg text-zinc-400 hover:text-zinc-200'
-                        }`}
-                      >
+                      <button key={years} onClick={() => setProjectionYears(years)} className={`px-4 py-2 rounded-lg font-medium transition-all ${projectionYears === years ? 'bg-accent-primary text-terminal-bg' : 'bg-terminal-bg text-zinc-400 hover:text-zinc-200'}`}>
                         {years} Year{years > 1 ? 's' : ''}
                       </button>
                     ))}
@@ -1021,7 +1168,6 @@ export default function CashFlowPro() {
                 </div>
               </div>
 
-              {/* Projection Chart */}
               <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
                 <h3 className="text-lg font-semibold mb-4">{projectionYears}-Year Cash Flow Projection</h3>
                 <ResponsiveContainer width="100%" height={400}>
@@ -1035,28 +1181,13 @@ export default function CashFlowPro() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
                     <XAxis dataKey="monthLabel" stroke="#71717a" fontSize={12} />
                     <YAxis stroke="#71717a" fontSize={12} tickFormatter={(v) => `$${v/1000}k`} />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#12121a', 
-                        border: '1px solid #1e1e2e',
-                        borderRadius: '8px'
-                      }}
-                      formatter={(value: number) => formatCurrency(value)}
-                    />
+                    <Tooltip contentStyle={{ backgroundColor: '#12121a', border: '1px solid #1e1e2e', borderRadius: '8px' }} formatter={(value: number) => formatCurrency(value)} />
                     <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" />
-                    <Area 
-                      type="monotone" 
-                      dataKey={(d: MonthlyData) => d.runningBalance.projected} 
-                      name="Projected Balance"
-                      stroke="#10b981" 
-                      fill="url(#projGradient)" 
-                      strokeWidth={2} 
-                    />
+                    <Area type="monotone" dataKey={(d: MonthlyData) => d.runningBalance.projected} name="Projected Balance" stroke="#10b981" fill="url(#projGradient)" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
 
-              {/* Monthly Breakdown Table */}
               <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
                 <h3 className="text-lg font-semibold mb-4">Monthly Breakdown</h3>
                 <div className="overflow-x-auto">
@@ -1076,27 +1207,13 @@ export default function CashFlowPro() {
                       {monthlyData.map(d => (
                         <tr key={d.month} className="border-b border-terminal-border/50">
                           <td className="py-3 text-sm font-medium">{d.monthLabel}</td>
-                          <td className="py-3 text-right font-mono text-sm text-accent-primary">
-                            {formatCurrency(d.revenue.projected)}
-                          </td>
-                          <td className="py-3 text-right font-mono text-sm text-accent-danger">
-                            {formatCurrency(d.opex.projected)}
-                          </td>
-                          <td className="py-3 text-right font-mono text-sm text-accent-warning">
-                            {formatCurrency(d.nonOperational.projected)}
-                          </td>
-                          <td className={`py-3 text-right font-mono text-sm ${d.netCash.projected >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                            {formatCurrency(d.netCash.projected)}
-                          </td>
-                          <td className={`py-3 text-right font-mono text-sm ${d.runningBalance.projected >= 0 ? 'text-accent-secondary' : 'text-accent-danger'}`}>
-                            {formatCurrency(d.runningBalance.projected)}
-                          </td>
+                          <td className="py-3 text-right font-mono text-sm text-accent-primary">{formatCurrency(d.revenue.projected)}</td>
+                          <td className="py-3 text-right font-mono text-sm text-accent-danger">{formatCurrency(d.opex.projected)}</td>
+                          <td className="py-3 text-right font-mono text-sm text-accent-warning">{formatCurrency(d.nonOperational.projected)}</td>
+                          <td className={`py-3 text-right font-mono text-sm ${d.netCash.projected >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>{formatCurrency(d.netCash.projected)}</td>
+                          <td className={`py-3 text-right font-mono text-sm ${d.runningBalance.projected >= 0 ? 'text-accent-secondary' : 'text-accent-danger'}`}>{formatCurrency(d.runningBalance.projected)}</td>
                           <td className="py-3 text-center">
-                            <span className={`px-2 py-0.5 rounded text-xs ${
-                              d.dataType === 'actual' ? 'bg-accent-primary/10 text-accent-primary' : 'bg-accent-warning/10 text-accent-warning'
-                            }`}>
-                              {d.dataType}
-                            </span>
+                            <span className={`px-2 py-0.5 rounded text-xs ${d.dataType === 'actual' ? 'bg-accent-primary/10 text-accent-primary' : 'bg-accent-warning/10 text-accent-warning'}`}>{d.dataType}</span>
                           </td>
                         </tr>
                       ))}
@@ -1107,17 +1224,9 @@ export default function CashFlowPro() {
             </motion.div>
           )}
 
-          {/* Integrations Tab */}
           {activeTab === 'integrations' && (
-            <motion.div
-              key="integrations"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-6"
-            >
+            <motion.div key="integrations" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
               <div className="grid grid-cols-3 gap-6">
-                {/* Plaid */}
                 <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
@@ -1128,13 +1237,10 @@ export default function CashFlowPro() {
                       <p className="text-xs text-zinc-400">Bank Connections</p>
                     </div>
                   </div>
-                  <p className="text-sm text-zinc-400 mb-4">Connect your bank accounts to automatically import transactions.</p>
-                  <button className="w-full py-2 rounded-lg bg-terminal-bg text-zinc-400 border border-terminal-border hover:border-accent-primary hover:text-accent-primary transition-all">
-                    Coming Soon
-                  </button>
+                  <p className="text-sm text-zinc-400 mb-4">Connect bank accounts to auto-import transactions.</p>
+                  <button className="w-full py-2 rounded-lg bg-terminal-bg text-zinc-400 border border-terminal-border hover:border-accent-primary hover:text-accent-primary transition-all">Coming Soon</button>
                 </div>
 
-                {/* QuickBooks */}
                 <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
@@ -1145,13 +1251,10 @@ export default function CashFlowPro() {
                       <p className="text-xs text-zinc-400">Accounting Software</p>
                     </div>
                   </div>
-                  <p className="text-sm text-zinc-400 mb-4">Sync your QuickBooks data for real-time financial tracking.</p>
-                  <button className="w-full py-2 rounded-lg bg-terminal-bg text-zinc-400 border border-terminal-border hover:border-accent-primary hover:text-accent-primary transition-all">
-                    Coming Soon
-                  </button>
+                  <p className="text-sm text-zinc-400 mb-4">Sync QuickBooks for real-time tracking.</p>
+                  <button className="w-full py-2 rounded-lg bg-terminal-bg text-zinc-400 border border-terminal-border hover:border-accent-primary hover:text-accent-primary transition-all">Coming Soon</button>
                 </div>
 
-                {/* Xero */}
                 <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-cyan-500 to-cyan-600 flex items-center justify-center">
@@ -1162,30 +1265,22 @@ export default function CashFlowPro() {
                       <p className="text-xs text-zinc-400">Cloud Accounting</p>
                     </div>
                   </div>
-                  <p className="text-sm text-zinc-400 mb-4">Import your Xero data to enhance cash flow projections.</p>
-                  <button className="w-full py-2 rounded-lg bg-terminal-bg text-zinc-400 border border-terminal-border hover:border-accent-primary hover:text-accent-primary transition-all">
-                    Coming Soon
-                  </button>
+                  <p className="text-sm text-zinc-400 mb-4">Import Xero data for projections.</p>
+                  <button className="w-full py-2 rounded-lg bg-terminal-bg text-zinc-400 border border-terminal-border hover:border-accent-primary hover:text-accent-primary transition-all">Coming Soon</button>
                 </div>
               </div>
 
-              {/* API Info */}
               <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
                 <h3 className="text-lg font-semibold mb-4">API Integration Status</h3>
-                <p className="text-zinc-400">
-                  API integrations are currently in development. When ready, you&apos;ll be able to connect your bank accounts and accounting software to automatically sync transactions and improve projection accuracy.
-                </p>
+                <p className="text-zinc-400">API integrations in development. Connect bank accounts and accounting software soon.</p>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-terminal-border mt-12 py-6">
-        <div className="max-w-7xl mx-auto px-6 text-center text-zinc-500 text-sm">
-          CashFlow Pro • Financial Intelligence Platform
-        </div>
+        <div className="max-w-7xl mx-auto px-6 text-center text-zinc-500 text-sm">CashFlow Pro • Financial Intelligence Platform</div>
       </footer>
     </div>
   )
