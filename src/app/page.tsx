@@ -12,7 +12,8 @@ import {
   Upload, TrendingUp, TrendingDown, DollarSign, Calendar,
   PieChart as PieChartIcon, Settings, Database, Zap, Plus, Trash2, Download,
   Filter, RefreshCw, Edit2, X, Check, Building2, Moon, Sun, AlertTriangle,
-  FolderPlus, Copy, FileText, Bell, Repeat, Lock, Users
+  FolderPlus, Copy, FileText, Bell, Repeat, Lock, Users, Image, Palette,
+  Shield, Eye, EyeOff, HardDrive, CloudOff, ExternalLink
 } from 'lucide-react'
 
 // Types
@@ -277,7 +278,25 @@ const STORAGE_KEYS = {
   scenarios: 'cashflow_scenarios',
   recurringRules: 'cashflow_recurring',
   theme: 'cashflow_theme',
-  balanceAlert: 'cashflow_balance_alert'
+  balanceAlert: 'cashflow_balance_alert',
+  branding: 'cashflow_branding',
+  chartFilters: 'cashflow_chart_filters'
+}
+
+// Branding interface
+interface BrandingSettings {
+  companyName: string
+  companyLogo: string | null
+  brandColor: string
+}
+
+// Chart filter interface
+interface ChartFilters {
+  revenue: boolean
+  opex: boolean
+  overhead: boolean
+  investment: boolean
+  net: boolean
 }
 
 // Main Component
@@ -312,6 +331,26 @@ export default function CashFlowPro() {
     transactions: false
   })
   const [activeScenario, setActiveScenario] = useState<string>('base')
+  
+  // Branding state
+  const [branding, setBranding] = useState<BrandingSettings>({
+    companyName: 'CashFlow Pro',
+    companyLogo: null,
+    brandColor: '#10b981'
+  })
+  
+  // Chart filter state
+  const [chartFilters, setChartFilters] = useState<ChartFilters>({
+    revenue: true,
+    opex: true,
+    overhead: true,
+    investment: true,
+    net: true
+  })
+  
+  // Legal modals
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false)
+  const [showTermsModal, setShowTermsModal] = useState(false)
   
   // Filter state
   const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('thisYear')
@@ -358,6 +397,8 @@ export default function CashFlowPro() {
       const savedAlert = localStorage.getItem(STORAGE_KEYS.balanceAlert)
       const savedScenarios = localStorage.getItem(STORAGE_KEYS.scenarios)
       const savedRecurring = localStorage.getItem(STORAGE_KEYS.recurringRules)
+      const savedBranding = localStorage.getItem(STORAGE_KEYS.branding)
+      const savedChartFilters = localStorage.getItem(STORAGE_KEYS.chartFilters)
       
       if (savedTransactions) setTransactions(JSON.parse(savedTransactions))
       if (savedAssumptions) setAssumptions(JSON.parse(savedAssumptions))
@@ -368,6 +409,8 @@ export default function CashFlowPro() {
       if (savedAlert) setBalanceAlertThreshold(parseFloat(savedAlert))
       if (savedScenarios) setScenarios(JSON.parse(savedScenarios))
       if (savedRecurring) setRecurringRules(JSON.parse(savedRecurring))
+      if (savedBranding) setBranding(JSON.parse(savedBranding))
+      if (savedChartFilters) setChartFilters(JSON.parse(savedChartFilters))
       
       setIsLoaded(true)
     }
@@ -428,6 +471,18 @@ export default function CashFlowPro() {
       localStorage.setItem(STORAGE_KEYS.recurringRules, JSON.stringify(recurringRules))
     }
   }, [recurringRules, isLoaded])
+
+  useEffect(() => {
+    if (isLoaded && typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.branding, JSON.stringify(branding))
+    }
+  }, [branding, isLoaded])
+
+  useEffect(() => {
+    if (isLoaded && typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.chartFilters, JSON.stringify(chartFilters))
+    }
+  }, [chartFilters, isLoaded])
   
   const activeDateRange = useMemo(() => {
     return getDateRangeFromPreset(dateRangePreset, customStartDate, customEndDate)
@@ -967,11 +1022,22 @@ export default function CashFlowPro() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-accent-primary to-accent-secondary flex items-center justify-center">
-                <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-              </div>
+              {branding.companyLogo ? (
+                <img 
+                  src={branding.companyLogo} 
+                  alt={branding.companyName} 
+                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg object-contain"
+                />
+              ) : (
+                <div 
+                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center"
+                  style={{ background: `linear-gradient(135deg, ${branding.brandColor}, ${branding.brandColor}dd)` }}
+                >
+                  <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                </div>
+              )}
               <div>
-                <h1 className="text-lg sm:text-xl font-display font-bold tracking-tight">CashFlow Pro</h1>
+                <h1 className="text-lg sm:text-xl font-display font-bold tracking-tight">{branding.companyName}</h1>
                 <p className={`text-xs hidden sm:block ${textMuted}`}>Financial Intelligence Platform</p>
               </div>
             </div>
@@ -1311,6 +1377,180 @@ export default function CashFlowPro() {
         )}
       </AnimatePresence>
 
+      {/* Privacy Policy Modal */}
+      <AnimatePresence>
+        {showPrivacyModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto"
+            onClick={() => setShowPrivacyModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-2xl rounded-xl p-6 border my-8 ${cardClasses}`}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold flex items-center gap-2">
+                  <Shield className="w-6 h-6" />
+                  Privacy Policy
+                </h3>
+                <button onClick={() => setShowPrivacyModal(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className={`prose prose-sm max-w-none ${theme === 'light' ? 'prose-gray' : 'prose-invert'}`}>
+                <p className={textMuted}>Last updated: {new Date().toLocaleDateString()}</p>
+                
+                <h4 className="font-semibold mt-4">1. Data Collection</h4>
+                <p className={textMuted}>
+                  {branding.companyName} does not collect, store, or transmit any of your financial data to external servers. 
+                  All data you enter is stored exclusively in your web browser's local storage on your device.
+                </p>
+                
+                <h4 className="font-semibold mt-4">2. Data Storage</h4>
+                <p className={textMuted}>
+                  Your data is stored locally using your browser's localStorage feature. This means:
+                </p>
+                <ul className={`list-disc pl-5 ${textMuted}`}>
+                  <li>Data never leaves your device</li>
+                  <li>Data is not accessible to us or any third party</li>
+                  <li>Data persists until you clear your browser data</li>
+                  <li>Data is not synced across devices or browsers</li>
+                </ul>
+                
+                <h4 className="font-semibold mt-4">3. Data Security</h4>
+                <p className={textMuted}>
+                  Since all data remains on your device, security depends on your device and browser security. 
+                  We recommend keeping your device secure and regularly exporting your data as a backup.
+                </p>
+                
+                <h4 className="font-semibold mt-4">4. Third-Party Services</h4>
+                <p className={textMuted}>
+                  This application does not integrate with any third-party analytics, tracking, or data collection services.
+                </p>
+                
+                <h4 className="font-semibold mt-4">5. Your Rights</h4>
+                <p className={textMuted}>
+                  You have complete control over your data. You can export, modify, or delete your data at any time 
+                  through the application interface or by clearing your browser's local storage.
+                </p>
+                
+                <h4 className="font-semibold mt-4">6. Contact</h4>
+                <p className={textMuted}>
+                  For questions about this privacy policy, please contact your system administrator.
+                </p>
+              </div>
+              
+              <div className="mt-6 pt-4 border-t border-terminal-border">
+                <button
+                  onClick={() => setShowPrivacyModal(false)}
+                  className="w-full py-2 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Terms of Service Modal */}
+      <AnimatePresence>
+        {showTermsModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto"
+            onClick={() => setShowTermsModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-2xl rounded-xl p-6 border my-8 ${cardClasses}`}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold flex items-center gap-2">
+                  <FileText className="w-6 h-6" />
+                  Terms of Service
+                </h3>
+                <button onClick={() => setShowTermsModal(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className={`prose prose-sm max-w-none ${theme === 'light' ? 'prose-gray' : 'prose-invert'}`}>
+                <p className={textMuted}>Last updated: {new Date().toLocaleDateString()}</p>
+                
+                <h4 className="font-semibold mt-4">1. Acceptance of Terms</h4>
+                <p className={textMuted}>
+                  By using {branding.companyName}, you agree to these Terms of Service. If you do not agree, 
+                  please do not use the application.
+                </p>
+                
+                <h4 className="font-semibold mt-4">2. Description of Service</h4>
+                <p className={textMuted}>
+                  {branding.companyName} is a cash flow forecasting and financial planning tool. The application 
+                  provides tools for tracking transactions, projecting cash flow, and analyzing financial data.
+                </p>
+                
+                <h4 className="font-semibold mt-4">3. User Responsibilities</h4>
+                <p className={textMuted}>You are responsible for:</p>
+                <ul className={`list-disc pl-5 ${textMuted}`}>
+                  <li>The accuracy of data you enter</li>
+                  <li>Maintaining backups of your data (via export)</li>
+                  <li>Securing your device and browser</li>
+                  <li>Any decisions made based on the application's output</li>
+                </ul>
+                
+                <h4 className="font-semibold mt-4">4. Disclaimer of Warranties</h4>
+                <p className={textMuted}>
+                  This application is provided "as is" without warranties of any kind. We do not guarantee 
+                  the accuracy of calculations, projections, or any financial advice. This tool is for 
+                  informational purposes only and should not replace professional financial advice.
+                </p>
+                
+                <h4 className="font-semibold mt-4">5. Limitation of Liability</h4>
+                <p className={textMuted}>
+                  We are not liable for any damages arising from the use of this application, including 
+                  but not limited to financial losses, data loss, or business interruption.
+                </p>
+                
+                <h4 className="font-semibold mt-4">6. Data Loss</h4>
+                <p className={textMuted}>
+                  Since data is stored in your browser's local storage, clearing browser data or using 
+                  incognito/private browsing will result in data loss. We are not responsible for any 
+                  data loss. Regular exports are recommended.
+                </p>
+                
+                <h4 className="font-semibold mt-4">7. Modifications</h4>
+                <p className={textMuted}>
+                  We reserve the right to modify these terms at any time. Continued use of the application 
+                  constitutes acceptance of modified terms.
+                </p>
+              </div>
+              
+              <div className="mt-6 pt-4 border-t border-terminal-border">
+                <button
+                  onClick={() => setShowTermsModal(false)}
+                  className="w-full py-2 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
         <AnimatePresence mode="wait">
           {/* Dashboard Tab */}
@@ -1438,7 +1678,33 @@ export default function CashFlowPro() {
               {/* Charts */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
-                  <h3 className="text-base sm:text-lg font-semibold mb-4">Cash Flow Trend</h3>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                    <h3 className="text-base sm:text-lg font-semibold">Cash Flow Trend</h3>
+                    <div className="flex flex-wrap gap-1">
+                      {[
+                        { key: 'revenue', label: 'Rev', color: '#10b981' },
+                        { key: 'opex', label: 'OpEx', color: '#ef4444' },
+                        { key: 'overhead', label: 'OH', color: '#f59e0b' },
+                        { key: 'investment', label: 'Inv', color: '#6366f1' },
+                        { key: 'net', label: 'Net', color: '#22d3ee' },
+                      ].map(f => (
+                        <button
+                          key={f.key}
+                          onClick={() => setChartFilters(prev => ({ ...prev, [f.key]: !prev[f.key as keyof ChartFilters] }))}
+                          className={`px-2 py-1 rounded text-xs font-medium transition-all border ${
+                            chartFilters[f.key as keyof ChartFilters]
+                              ? 'border-transparent text-white'
+                              : theme === 'light' ? 'border-gray-300 text-gray-400 bg-transparent' : 'border-terminal-border text-zinc-500 bg-transparent'
+                          }`}
+                          style={{ 
+                            backgroundColor: chartFilters[f.key as keyof ChartFilters] ? f.color : 'transparent'
+                          }}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <ResponsiveContainer width="100%" height={280}>
                     <ComposedChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#1e1e2e'} />
@@ -1449,11 +1715,11 @@ export default function CashFlowPro() {
                         formatter={(value: number, name: string) => [formatCurrency(value), name]}
                       />
                       <Legend wrapperStyle={{ fontSize: '12px' }} />
-                      <Bar dataKey="revenue" name="Revenue" fill="#10b981" radius={[2, 2, 0, 0]} />
-                      <Bar dataKey="opex" name="OpEx" fill="#ef4444" radius={[2, 2, 0, 0]} />
-                      <Bar dataKey="overhead" name="Overhead" fill="#f59e0b" radius={[2, 2, 0, 0]} />
-                      <Bar dataKey="investment" name="InvEx" fill="#6366f1" radius={[2, 2, 0, 0]} />
-                      <Line type="monotone" dataKey="netCash" name="Net" stroke="#22d3ee" strokeWidth={2} dot={false} />
+                      {chartFilters.revenue && <Bar dataKey="revenue" name="Revenue" fill="#10b981" radius={[2, 2, 0, 0]} />}
+                      {chartFilters.opex && <Bar dataKey="opex" name="OpEx" fill="#ef4444" radius={[2, 2, 0, 0]} />}
+                      {chartFilters.overhead && <Bar dataKey="overhead" name="Overhead" fill="#f59e0b" radius={[2, 2, 0, 0]} />}
+                      {chartFilters.investment && <Bar dataKey="investment" name="InvEx" fill="#6366f1" radius={[2, 2, 0, 0]} />}
+                      {chartFilters.net && <Line type="monotone" dataKey="netCash" name="Net" stroke="#22d3ee" strokeWidth={2} dot={false} />}
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
@@ -2013,6 +2279,103 @@ export default function CashFlowPro() {
           {/* Settings Tab */}
           {activeTab === 'settings' && (
             <motion.div key="settings" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
+              
+              {/* White-Label Branding */}
+              <div className={`rounded-xl p-6 border ${cardClasses}`}>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Palette className="w-5 h-5" />
+                  Branding
+                </h3>
+                <p className={`text-sm mb-4 ${textMuted}`}>Customize the look to match your company</p>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className={`block text-sm mb-2 ${textMuted}`}>Company Name</label>
+                    <input
+                      type="text"
+                      value={branding.companyName}
+                      onChange={(e) => setBranding(prev => ({ ...prev, companyName: e.target.value }))}
+                      className={`w-full max-w-md px-4 py-2 rounded-lg border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
+                      placeholder="Your Company Name"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className={`block text-sm mb-2 ${textMuted}`}>Brand Color</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={branding.brandColor}
+                        onChange={(e) => setBranding(prev => ({ ...prev, brandColor: e.target.value }))}
+                        className="w-12 h-10 rounded-lg cursor-pointer border-0"
+                      />
+                      <input
+                        type="text"
+                        value={branding.brandColor}
+                        onChange={(e) => setBranding(prev => ({ ...prev, brandColor: e.target.value }))}
+                        className={`w-32 px-3 py-2 rounded-lg border font-mono text-sm ${inputClasses}`}
+                        style={{ colorScheme: theme }}
+                      />
+                      <button
+                        onClick={() => setBranding(prev => ({ ...prev, brandColor: '#10b981' }))}
+                        className={`px-3 py-2 text-sm rounded-lg border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className={`block text-sm mb-2 ${textMuted}`}>Company Logo</label>
+                    <div className="flex items-center gap-4">
+                      {branding.companyLogo ? (
+                        <div className="relative">
+                          <img src={branding.companyLogo} alt="Logo" className="w-16 h-16 rounded-lg object-contain border border-dashed" />
+                          <button
+                            onClick={() => setBranding(prev => ({ ...prev, companyLogo: null }))}
+                            className="absolute -top-2 -right-2 w-5 h-5 bg-accent-danger text-white rounded-full flex items-center justify-center"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className={`w-16 h-16 rounded-lg border-2 border-dashed flex items-center justify-center ${theme === 'light' ? 'border-gray-300' : 'border-terminal-border'}`}>
+                          <Image className={`w-6 h-6 ${textMuted}`} />
+                        </div>
+                      )}
+                      <div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              const reader = new FileReader()
+                              reader.onload = (ev) => {
+                                setBranding(prev => ({ ...prev, companyLogo: ev.target?.result as string }))
+                              }
+                              reader.readAsDataURL(file)
+                            }
+                          }}
+                          className="hidden"
+                          id="logo-upload"
+                        />
+                        <label
+                          htmlFor="logo-upload"
+                          className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                        >
+                          <Upload className="w-4 h-4" />
+                          Upload Logo
+                        </label>
+                        <p className={`text-xs mt-1 ${textSubtle}`}>PNG, JPG up to 500KB</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Balance Alert */}
               <div className={`rounded-xl p-6 border ${cardClasses}`}>
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <Bell className="w-5 h-5" />
@@ -2027,7 +2390,7 @@ export default function CashFlowPro() {
                       value={balanceAlertThreshold}
                       onChange={(e) => setBalanceAlertThreshold(parseFloat(e.target.value) || 0)}
                       className={`pl-10 pr-4 py-3 rounded-lg font-mono w-full border ${inputClasses}`}
-                      style={{ colorScheme: theme === 'light' ? 'light' : 'dark' }}
+                      style={{ colorScheme: theme }}
                       placeholder="0 = disabled"
                     />
                   </div>
@@ -2037,6 +2400,7 @@ export default function CashFlowPro() {
                 </div>
               </div>
 
+              {/* Appearance */}
               <div className={`rounded-xl p-6 border ${cardClasses}`}>
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   {theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
@@ -2068,6 +2432,60 @@ export default function CashFlowPro() {
                 </div>
               </div>
 
+              {/* Your Data */}
+              <div className={`rounded-xl p-6 border ${cardClasses}`}>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <HardDrive className="w-5 h-5" />
+                  Your Data
+                </h3>
+                
+                <div className={`p-4 rounded-lg mb-4 ${theme === 'light' ? 'bg-green-50 border border-green-200' : 'bg-accent-primary/10 border border-accent-primary/20'}`}>
+                  <div className="flex items-start gap-3">
+                    <CloudOff className="w-5 h-5 text-accent-primary mt-0.5" />
+                    <div>
+                      <p className={`font-medium ${theme === 'light' ? 'text-green-800' : 'text-accent-primary'}`}>100% Private & Local</p>
+                      <p className={`text-sm mt-1 ${theme === 'light' ? 'text-green-700' : 'text-accent-primary/80'}`}>
+                        Your financial data never leaves your device. All data is stored in your browser's local storage. 
+                        We have no servers, no accounts, and no access to your information.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                    <div className="flex items-center gap-3">
+                      <Database className="w-5 h-5" />
+                      <div>
+                        <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-zinc-200'}`}>Storage Location</p>
+                        <p className={`text-sm ${textMuted}`}>Browser localStorage (this device only)</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                    <div className="flex items-center gap-3">
+                      <Shield className="w-5 h-5" />
+                      <div>
+                        <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-zinc-200'}`}>Data Ownership</p>
+                        <p className={`text-sm ${textMuted}`}>You own 100% of your data. Export anytime.</p>
+                      </div>
+                    </div>
+                    <button onClick={exportToCSV} className={`px-3 py-1.5 text-sm rounded-lg border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-100' : 'border-terminal-border hover:bg-terminal-bg'}`}>
+                      Export
+                    </button>
+                  </div>
+                </div>
+                
+                <div className={`mt-4 p-3 rounded-lg ${theme === 'light' ? 'bg-amber-50 border border-amber-200' : 'bg-accent-warning/10 border border-accent-warning/20'}`}>
+                  <p className={`text-sm ${theme === 'light' ? 'text-amber-800' : 'text-accent-warning'}`}>
+                    <strong>Important:</strong> Clearing your browser data or using a different browser/device will reset your data. 
+                    We recommend exporting regularly as a backup.
+                  </p>
+                </div>
+              </div>
+
+              {/* Security & Data (Coming Soon) */}
               <div className={`rounded-xl p-6 border ${cardClasses}`}>
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <Lock className="w-5 h-5" />
@@ -2105,18 +2523,44 @@ export default function CashFlowPro() {
                     <span className="text-xs bg-accent-warning/10 text-accent-warning px-2 py-1 rounded">Planned</span>
                   </div>
                 </div>
-                <p className={`text-xs mt-4 ${textSubtle}`}>
-                  Currently data is stored in your browser (localStorage). For production use with team access, we recommend implementing Supabase or a similar backend.
-                </p>
               </div>
+
+              {/* Legal */}
+              <div className={`rounded-xl p-6 border ${cardClasses}`}>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Legal
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={() => setShowPrivacyModal(true)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                  >
+                    <Shield className="w-4 h-4" />
+                    Privacy Policy
+                  </button>
+                  <button
+                    onClick={() => setShowTermsModal(true)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                  >
+                    <FileText className="w-4 h-4" />
+                    Terms of Service
+                  </button>
+                </div>
+              </div>
+
             </motion.div>
           )}
         </AnimatePresence>
       </main>
 
       <footer className={`border-t mt-12 py-4 print:hidden ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
-        <div className={`max-w-7xl mx-auto px-6 text-center text-xs ${textMuted}`}>
-          CashFlow Pro v8 • Data stored locally in browser
+        <div className={`max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs ${textMuted}`}>
+          <span>{branding.companyName} • Data stored locally in browser</span>
+          <div className="flex items-center gap-4">
+            <button onClick={() => setShowPrivacyModal(true)} className="hover:underline">Privacy</button>
+            <button onClick={() => setShowTermsModal(true)} className="hover:underline">Terms</button>
+          </div>
         </div>
       </footer>
 
