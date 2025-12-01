@@ -532,12 +532,9 @@ export default function CashFlowPro() {
       return normalized
     }
     
-    // If no project and it's opex/investment, suggest overhead (but don't force)
-    if (!normalized.project && normalized.category !== 'revenue' && normalized.category !== 'overhead' && normalized.category !== 'unassigned') {
-      // Keep opex/investment only if they have a project
-      if (normalized.category === 'opex' || normalized.category === 'investment') {
-        normalized.category = 'overhead'
-      }
+    // If no project and it's opex/investment, convert to overhead
+    if (!normalized.project && (normalized.category === 'opex' || normalized.category === 'investment')) {
+      normalized.category = 'overhead'
     }
     
     return normalized
