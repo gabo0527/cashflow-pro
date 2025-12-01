@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import { 
   LineChart, Line, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  ComposedChart, ReferenceLine
+  ComposedChart, ReferenceLine, Cell
 } from 'recharts'
 import Papa from 'papaparse'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -534,23 +534,38 @@ export default function CashFlowPro() {
 
   const kpis = useMemo(() => {
     const actualData = filteredMonthlyData.filter(d => d.dataType === 'actual')
+    const hasActualData = actualData.length > 0
+    
+    // Total from all data (actual + projected)
+    const totalRevenue = filteredMonthlyData.reduce((sum, d) => sum + (d.revenue.actual || d.revenue.projected), 0)
+    const totalOpex = filteredMonthlyData.reduce((sum, d) => sum + Math.abs(d.opex.actual || d.opex.projected), 0)
+    
+    // Actuals only
     const totalActualRevenue = actualData.reduce((sum, d) => sum + d.revenue.actual, 0)
     const totalActualOpex = actualData.reduce((sum, d) => sum + Math.abs(d.opex.actual), 0)
     const totalBudgetRevenue = actualData.reduce((sum, d) => sum + d.revenue.budget, 0)
-    const currentBalance = filteredMonthlyData[filteredMonthlyData.length - 1]?.runningBalance.projected || beginningBalance
-    const budgetVariance = totalActualRevenue - totalBudgetRevenue
     
+    const currentBalance = filteredMonthlyData[filteredMonthlyData.length - 1]?.runningBalance.projected || beginningBalance
+    
+    // Gross Margin
+    const grossMargin = totalRevenue > 0 ? ((totalRevenue - totalOpex) / totalRevenue) * 100 : 0
+    
+    // Budget variance (only for actuals)
+    const revenueBudgetVariance = totalBudgetRevenue > 0 
+      ? ((totalActualRevenue - totalBudgetRevenue) / totalBudgetRevenue) * 100 
+      : 0
+    
+    // Period comparisons (only when we have actual data)
     const midpoint = Math.floor(actualData.length / 2)
     const firstHalf = actualData.slice(0, midpoint)
     const secondHalf = actualData.slice(midpoint)
     
-    // Get period labels for comparison
     const firstPeriodStart = firstHalf[0]?.monthLabel || ''
     const firstPeriodEnd = firstHalf[firstHalf.length - 1]?.monthLabel || ''
     const secondPeriodStart = secondHalf[0]?.monthLabel || ''
     const secondPeriodEnd = secondHalf[secondHalf.length - 1]?.monthLabel || ''
     
-    const priorPeriodLabel = firstPeriodStart && firstPeriodEnd 
+    const priorPeriodLabel = firstPeriodStart && firstPeriodEnd && firstHalf.length > 0
       ? (firstPeriodStart === firstPeriodEnd ? firstPeriodStart : `${firstPeriodStart}-${firstPeriodEnd}`)
       : 'prior'
     const currentPeriodLabel = secondPeriodStart && secondPeriodEnd
@@ -569,21 +584,21 @@ export default function CashFlowPro() {
     const secondHalfNet = secondHalf.reduce((sum, d) => sum + d.netCash.actual, 0)
     const netChange = firstHalfNet ? ((secondHalfNet - firstHalfNet) / Math.abs(firstHalfNet)) * 100 : 0
     
-    const variancePercent = totalBudgetRevenue ? (budgetVariance / totalBudgetRevenue) * 100 : 0
-    
     return {
+      totalRevenue,
+      totalOpex,
       totalActualRevenue,
       totalActualOpex,
+      totalBudgetRevenue,
       currentBalance,
-      budgetVariance,
-      avgMonthlyRevenue: totalActualRevenue / (actualData.length || 1),
-      avgMonthlyOpex: totalActualOpex / (actualData.length || 1),
+      grossMargin,
+      revenueBudgetVariance,
       revenueChange,
       opexChange,
       netChange,
-      variancePercent,
       priorPeriodLabel,
-      currentPeriodLabel
+      currentPeriodLabel,
+      hasActualData
     }
   }, [filteredMonthlyData, beginningBalance])
 
@@ -591,15 +606,39 @@ export default function CashFlowPro() {
     return filteredMonthlyData.map((d) => ({
       name: d.monthLabel,
       month: d.month,
-      actual: d.netCash.actual || null,
+      actual: d.dataType === 'actual' ? d.netCash.actual : null,
       budget: d.netCash.budget || null,
-      projected: d.netCash.projected || null,
+      projected: d.netCash.projected,
       balance: d.runningBalance.projected,
       revenue: d.revenue.actual || d.revenue.projected,
-      opex: d.opex.actual || d.opex.projected,
+      opex: Math.abs(d.opex.actual || d.opex.projected),
       dataType: d.dataType
     }))
   }, [filteredMonthlyData])
+
+  // Gross Margin by Project
+  const projectMarginData = useMemo(() => {
+    const projectData: Record<string, { revenue: number; opex: number }> = {}
+    
+    // From transactions
+    transactions.forEach(t => {
+      const proj = t.project || 'Unassigned'
+      if (!projectData[proj]) projectData[proj] = { revenue: 0, opex: 0 }
+      if (t.category === 'revenue') projectData[proj].revenue += t.amount
+      else if (t.category === 'opex') projectData[proj].opex += Math.abs(t.amount)
+    })
+    
+    // Calculate margins
+    return Object.entries(projectData)
+      .map(([name, d]) => ({
+        name,
+        revenue: d.revenue,
+        opex: d.opex,
+        margin: d.revenue > 0 ? ((d.revenue - d.opex) / d.revenue) * 100 : 0
+      }))
+      .filter(d => d.revenue > 0 || d.opex > 0)
+      .sort((a, b) => b.margin - a.margin)
+  }, [transactions])
 
   const datePresets: { key: DateRangePreset; label: string }[] = [
     { key: 'thisYear', label: 'This Year' },
@@ -613,26 +652,27 @@ export default function CashFlowPro() {
   ]
 
   const qoqData = useMemo(() => {
-    const quarterData: Record<string, { revenue: number; opex: number; net: number }> = {}
+    const quarterData: Record<string, { revenue: number; opex: number }> = {}
     filteredMonthlyData.forEach(d => {
       const [year, month] = d.month.split('-')
       const quarter = `Q${Math.ceil(parseInt(month) / 3)} ${year}`
-      if (!quarterData[quarter]) quarterData[quarter] = { revenue: 0, opex: 0, net: 0 }
+      if (!quarterData[quarter]) quarterData[quarter] = { revenue: 0, opex: 0 }
       quarterData[quarter].revenue += d.revenue.actual || d.revenue.projected
       quarterData[quarter].opex += Math.abs(d.opex.actual || d.opex.projected)
-      quarterData[quarter].net += d.netCash.actual || d.netCash.projected
     })
     
     const quarters = Object.entries(quarterData)
     return quarters.map(([name, d], idx) => {
       const prev = quarters[idx - 1]?.[1]
+      const net = d.revenue - d.opex
+      const prevNet = prev ? prev.revenue - prev.opex : 0
       const revenueChange = prev?.revenue ? ((d.revenue - prev.revenue) / prev.revenue) * 100 : 0
-      const netChange = prev?.net ? ((d.net - prev.net) / Math.abs(prev.net)) * 100 : 0
+      const netChange = prevNet ? ((net - prevNet) / Math.abs(prevNet)) * 100 : 0
       return { 
         name, 
         revenue: d.revenue,
         opex: d.opex,
-        net: d.net,
+        net,
         revenueChange: revenueChange.toFixed(1),
         netChange: netChange.toFixed(1)
       }
@@ -784,9 +824,13 @@ export default function CashFlowPro() {
                   <div className="text-2xl font-mono font-semibold text-accent-secondary">
                     {formatCurrency(kpis.currentBalance)}
                   </div>
-                  <div className={`text-xs mt-1 ${kpis.netChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                    {formatPercent(kpis.netChange)} vs {kpis.priorPeriodLabel}
-                  </div>
+                  {kpis.hasActualData && kpis.priorPeriodLabel !== 'prior' ? (
+                    <div className={`text-xs mt-1 ${kpis.netChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                      {formatPercent(kpis.netChange)} vs {kpis.priorPeriodLabel}
+                    </div>
+                  ) : (
+                    <div className="text-xs mt-1 text-zinc-500">Projected balance</div>
+                  )}
                 </div>
                 
                 <div className="bg-terminal-surface rounded-xl p-5 border border-terminal-border">
@@ -795,11 +839,19 @@ export default function CashFlowPro() {
                     Total Revenue
                   </div>
                   <div className="text-2xl font-mono font-semibold text-accent-primary">
-                    {formatCurrency(kpis.totalActualRevenue)}
+                    {formatCurrency(kpis.totalRevenue)}
                   </div>
-                  <div className={`text-xs mt-1 ${kpis.revenueChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                    {formatPercent(kpis.revenueChange)} vs {kpis.priorPeriodLabel}
-                  </div>
+                  {kpis.hasActualData && kpis.totalBudgetRevenue > 0 ? (
+                    <div className={`text-xs mt-1 ${kpis.revenueBudgetVariance >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                      {formatPercent(kpis.revenueBudgetVariance)} vs budget
+                    </div>
+                  ) : kpis.hasActualData && kpis.priorPeriodLabel !== 'prior' ? (
+                    <div className={`text-xs mt-1 ${kpis.revenueChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                      {formatPercent(kpis.revenueChange)} vs {kpis.priorPeriodLabel}
+                    </div>
+                  ) : (
+                    <div className="text-xs mt-1 text-zinc-500">Actual + projected</div>
+                  )}
                 </div>
                 
                 <div className="bg-terminal-surface rounded-xl p-5 border border-terminal-border">
@@ -808,23 +860,27 @@ export default function CashFlowPro() {
                     Total OpEx
                   </div>
                   <div className="text-2xl font-mono font-semibold text-accent-danger">
-                    {formatCurrency(kpis.totalActualOpex)}
+                    {formatCurrency(kpis.totalOpex)}
                   </div>
-                  <div className={`text-xs mt-1 ${kpis.opexChange <= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                    {formatPercent(kpis.opexChange)} vs {kpis.priorPeriodLabel}
-                  </div>
+                  {kpis.hasActualData && kpis.priorPeriodLabel !== 'prior' ? (
+                    <div className={`text-xs mt-1 ${kpis.opexChange <= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                      {formatPercent(kpis.opexChange)} vs {kpis.priorPeriodLabel}
+                    </div>
+                  ) : (
+                    <div className="text-xs mt-1 text-zinc-500">Actual + projected</div>
+                  )}
                 </div>
                 
                 <div className="bg-terminal-surface rounded-xl p-5 border border-terminal-border">
                   <div className="flex items-center gap-2 text-zinc-400 text-sm mb-2">
                     <Calendar className="w-4 h-4" />
-                    Budget Variance
+                    Gross Margin
                   </div>
-                  <div className={`text-2xl font-mono font-semibold ${kpis.budgetVariance >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                    {kpis.budgetVariance >= 0 ? '+' : ''}{formatCurrency(kpis.budgetVariance)}
+                  <div className={`text-2xl font-mono font-semibold ${kpis.grossMargin >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                    {kpis.grossMargin.toFixed(1)}%
                   </div>
-                  <div className={`text-xs mt-1 ${kpis.variancePercent >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                    {formatPercent(kpis.variancePercent)} of budget
+                  <div className="text-xs mt-1 text-zinc-500">
+                    (Revenue - OpEx) / Revenue
                   </div>
                 </div>
               </div>
@@ -843,9 +899,9 @@ export default function CashFlowPro() {
                         formatter={(value: number) => formatCurrency(value)}
                       />
                       <Legend />
-                      <Bar dataKey="actual" name="Actual" fill="#10b981" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="budget" name="Budget" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                      <Line type="monotone" dataKey="projected" name="Projected" stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 5" />
+                      <Bar dataKey="revenue" name="Revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="opex" name="OpEx" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                      <Line type="monotone" dataKey="projected" name="Net Cash" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b' }} />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
@@ -873,6 +929,51 @@ export default function CashFlowPro() {
                   </ResponsiveContainer>
                 </div>
               </div>
+
+              {/* Gross Margin by Project */}
+              {projectMarginData.length > 0 && (
+                <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
+                  <h3 className="text-lg font-semibold mb-4">Gross Margin by Project</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={projectMarginData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
+                      <XAxis type="number" stroke="#71717a" fontSize={12} tickFormatter={(v) => `${v}%`} domain={[-100, 100]} />
+                      <YAxis type="category" dataKey="name" stroke="#71717a" fontSize={12} width={120} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#12121a', border: '1px solid #1e1e2e', borderRadius: '8px' }}
+                        formatter={(value: number, name: string) => {
+                          if (name === 'margin') return [`${value.toFixed(1)}%`, 'Gross Margin']
+                          return [formatCurrency(value), name]
+                        }}
+                      />
+                      <ReferenceLine x={0} stroke="#71717a" />
+                      <Bar 
+                        dataKey="margin" 
+                        name="Gross Margin"
+                        radius={[0, 4, 4, 0]}
+                        fill="#10b981"
+                      >
+                        {projectMarginData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.margin >= 0 ? '#10b981' : '#ef4444'} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    {projectMarginData.slice(0, 4).map(p => (
+                      <div key={p.name} className="bg-terminal-bg rounded-lg p-3">
+                        <div className="text-zinc-400 truncate">{p.name}</div>
+                        <div className={`text-lg font-mono ${p.margin >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                          {p.margin.toFixed(1)}%
+                        </div>
+                        <div className="text-xs text-zinc-500">
+                          Rev: {formatCurrency(p.revenue)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Comparison */}
               <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
