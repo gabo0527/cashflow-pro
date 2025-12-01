@@ -21,7 +21,7 @@ import {
 interface Transaction {
   id: string
   date: string
-  category: 'revenue' | 'opex' | 'overhead' | 'investment'
+  category: 'revenue' | 'opex' | 'overhead' | 'investment' | 'unassigned'
   description: string
   amount: number
   type: 'actual' | 'budget'
@@ -362,6 +362,7 @@ export default function CashFlowPro() {
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [transactionMonthFilter, setTransactionMonthFilter] = useState<string>('all')
+  const [transactionCategoryFilter, setTransactionCategoryFilter] = useState<string>('all')
   
   // View mode
   const [timeView, setTimeView] = useState<'monthly' | 'weekly'>('monthly')
@@ -526,8 +527,13 @@ export default function CashFlowPro() {
   const normalizeTransaction = useCallback((t: Partial<Transaction>): Transaction => {
     const normalized = { ...t } as Transaction
     
-    // If no project and it's an expense, set to overhead
-    if (!normalized.project && normalized.category !== 'revenue' && normalized.category !== 'overhead') {
+    // Don't auto-convert unassigned - let users categorize manually
+    if (normalized.category === 'unassigned') {
+      return normalized
+    }
+    
+    // If no project and it's opex/investment, suggest overhead (but don't force)
+    if (!normalized.project && normalized.category !== 'revenue' && normalized.category !== 'overhead' && normalized.category !== 'unassigned') {
       // Keep opex/investment only if they have a project
       if (normalized.category === 'opex' || normalized.category === 'investment') {
         normalized.category = 'overhead'
@@ -552,6 +558,59 @@ export default function CashFlowPro() {
   const handleFileUpload = useCallback((file: File) => {
     const fileExtension = file.name.split('.').pop()?.toLowerCase()
     
+    // Helper to normalize date formats
+    const normalizeDate = (dateStr: string): string | null => {
+      if (!dateStr) return null
+      const cleaned = dateStr.trim()
+      
+      // Try YYYY-MM-DD format
+      if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
+        return cleaned
+      }
+      
+      // Try YY-MM-DD or YY-M-D format (e.g., 25-10-1 -> 2025-10-01)
+      const yyMatch = cleaned.match(/^(\d{2})-(\d{1,2})-(\d{1,2})$/)
+      if (yyMatch) {
+        const [, year, month, day] = yyMatch
+        const fullYear = parseInt(year) > 50 ? `19${year}` : `20${year}`
+        return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+      }
+      
+      // Try MM/DD/YYYY or M/D/YYYY format
+      const slashMatch = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+      if (slashMatch) {
+        const [, month, day, year] = slashMatch
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+      }
+      
+      // Try MM/DD/YY or M/D/YY format
+      const slashYYMatch = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/)
+      if (slashYYMatch) {
+        const [, month, day, year] = slashYYMatch
+        const fullYear = parseInt(year) > 50 ? `19${year}` : `20${year}`
+        return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+      }
+      
+      // Try MM-DD-YYYY format
+      const dashMatch = cleaned.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
+      if (dashMatch) {
+        const [, month, day, year] = dashMatch
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+      }
+      
+      // Try parsing as Date object
+      try {
+        const parsed = new Date(cleaned)
+        if (!isNaN(parsed.getTime())) {
+          return parsed.toISOString().slice(0, 10)
+        }
+      } catch {
+        // ignore
+      }
+      
+      return null
+    }
+    
     if (fileExtension === 'csv') {
       // CSV Import
       Papa.parse<Record<string, string>>(file, {
@@ -562,9 +621,18 @@ export default function CashFlowPro() {
           const imported: Transaction[] = results.data
             .filter((row) => row.date && (row.amount || row.amount === '0'))
             .map((row) => {
-              // Normalize category names
-              let category: Transaction['category'] = 'revenue'
+              // Normalize date
+              const normalizedDate = normalizeDate(row.date)
+              if (!normalizedDate) return null
+              
+              // Parse amount first to help determine category
+              const amount = parseFloat(String(row.amount).replace(/[,$"]/g, ''))
+              if (isNaN(amount)) return null
+              
+              // Normalize category names - default to unassigned for empty/unknown
+              let category: Transaction['category'] = 'unassigned'
               const rawCategory = (row.category || '').toLowerCase().trim()
+              
               if (rawCategory.includes('revenue') || rawCategory.includes('income') || rawCategory.includes('sales')) {
                 category = 'revenue'
               } else if (rawCategory.includes('opex') || rawCategory.includes('operating') || rawCategory.includes('direct')) {
@@ -573,20 +641,29 @@ export default function CashFlowPro() {
                 category = 'overhead'
               } else if (rawCategory.includes('invest') || rawCategory.includes('capex') || rawCategory.includes('capital')) {
                 category = 'investment'
+              } else if (rawCategory === '') {
+                // Empty category - check if amount is positive for revenue hint
+                if (amount > 0) {
+                  category = 'unassigned' // User should categorize
+                } else {
+                  category = 'unassigned' // User should categorize
+                }
               }
               
               const t: Transaction = {
                 id: generateId(),
-                date: row.date?.trim(),
+                date: normalizedDate,
                 category,
                 description: row.description?.trim() || '',
-                amount: parseFloat(String(row.amount).replace(/[,$]/g, '')) || 0,
+                amount,
                 type: (row.type?.toLowerCase().trim() === 'budget' ? 'budget' : 'actual') as 'actual' | 'budget',
                 project: row.project?.trim() || undefined,
                 notes: row.notes?.trim() || undefined
               }
               return normalizeTransaction(t)
             })
+            .filter((t): t is Transaction => t !== null)
+            
           if (imported.length > 0) {
             setTransactions(prev => [...prev, ...imported])
             alert(`Successfully imported ${imported.length} transactions`)
@@ -775,15 +852,26 @@ export default function CashFlowPro() {
   }, [assumptions, addScenario])
 
   const filteredTransactions = useMemo(() => {
-    let result = transactions
+    // Filter out invalid transactions first
+    let result = transactions.filter(t => 
+      t && 
+      typeof t.date === 'string' && 
+      t.date.length >= 7 &&
+      typeof t.amount === 'number' &&
+      !isNaN(t.amount)
+    )
+    
     if (selectedProject !== 'all') {
       result = result.filter(t => t.project === selectedProject)
     }
     if (transactionMonthFilter !== 'all') {
       result = result.filter(t => t.date.slice(0, 7) === transactionMonthFilter)
     }
+    if (transactionCategoryFilter !== 'all') {
+      result = result.filter(t => t.category === transactionCategoryFilter)
+    }
     return result
-  }, [transactions, selectedProject, transactionMonthFilter])
+  }, [transactions, selectedProject, transactionMonthFilter, transactionCategoryFilter])
 
   // Filter assumptions by scenario
   const activeAssumptions = useMemo(() => {
@@ -806,7 +894,13 @@ export default function CashFlowPro() {
       const cutoff = new Date(cutoffDate + '-01')
       const isActualMonth = current <= cutoff
       
-      const monthTransactions = filteredTransactions.filter(t => t.date.slice(0, 7) === monthStr)
+      const monthTransactions = filteredTransactions.filter(t => {
+        try {
+          return t.date && t.date.slice(0, 7) === monthStr
+        } catch {
+          return false
+        }
+      })
       
       // Actuals
       const actualRevenue = monthTransactions.filter(t => t.category === 'revenue' && t.type === 'actual').reduce((sum, t) => sum + t.amount, 0)
@@ -1081,19 +1175,27 @@ export default function CashFlowPro() {
     const weeks: Record<string, { revenue: number; opex: number; overhead: number; investment: number; netCash: number }> = {}
     
     filteredTransactions.forEach(t => {
-      const date = new Date(t.date)
-      const weekStart = new Date(date)
-      weekStart.setDate(date.getDate() - date.getDay()) // Start of week (Sunday)
-      const weekKey = weekStart.toISOString().slice(0, 10)
-      
-      if (!weeks[weekKey]) {
-        weeks[weekKey] = { revenue: 0, opex: 0, overhead: 0, investment: 0, netCash: 0 }
+      try {
+        if (!t.date) return
+        const date = new Date(t.date)
+        if (isNaN(date.getTime())) return
+        
+        const weekStart = new Date(date)
+        weekStart.setDate(date.getDate() - date.getDay()) // Start of week (Sunday)
+        const weekKey = weekStart.toISOString().slice(0, 10)
+        
+        if (!weeks[weekKey]) {
+          weeks[weekKey] = { revenue: 0, opex: 0, overhead: 0, investment: 0, netCash: 0 }
+        }
+        
+        const amount = typeof t.amount === 'number' ? t.amount : 0
+        if (t.category === 'revenue') weeks[weekKey].revenue += amount
+        else if (t.category === 'opex') weeks[weekKey].opex += Math.abs(amount)
+        else if (t.category === 'overhead') weeks[weekKey].overhead += Math.abs(amount)
+        else if (t.category === 'investment') weeks[weekKey].investment += Math.abs(amount)
+      } catch {
+        // Skip invalid transactions
       }
-      
-      if (t.category === 'revenue') weeks[weekKey].revenue += t.amount
-      else if (t.category === 'opex') weeks[weekKey].opex += Math.abs(t.amount)
-      else if (t.category === 'overhead') weeks[weekKey].overhead += Math.abs(t.amount)
-      else if (t.category === 'investment') weeks[weekKey].investment += Math.abs(t.amount)
     })
     
     // Calculate net cash and format
@@ -1116,16 +1218,23 @@ export default function CashFlowPro() {
     const threeMonthsAgo = new Date()
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
     
-    const recentTransactions = transactions.filter(t => 
-      t.type === 'actual' && new Date(t.date) >= threeMonthsAgo
-    )
+    const recentTransactions = transactions.filter(t => {
+      try {
+        if (!t.date || t.type !== 'actual') return false
+        const txDate = new Date(t.date)
+        return !isNaN(txDate.getTime()) && txDate >= threeMonthsAgo
+      } catch {
+        return false
+      }
+    })
     
     let totalRevenue = 0
     let totalExpenses = 0
     
     recentTransactions.forEach(t => {
-      if (t.category === 'revenue') totalRevenue += t.amount
-      else totalExpenses += Math.abs(t.amount)
+      const amount = typeof t.amount === 'number' && !isNaN(t.amount) ? t.amount : 0
+      if (t.category === 'revenue') totalRevenue += amount
+      else totalExpenses += Math.abs(amount)
     })
     
     const monthsOfData = Math.max(1, Math.min(3, 
@@ -1248,8 +1357,18 @@ export default function CashFlowPro() {
       }
     }
     
+    // Unassigned transactions warning
+    const unassignedCount = transactions.filter(t => t.category === 'unassigned').length
+    if (unassignedCount > 0) {
+      result.unshift({
+        type: 'warning',
+        title: 'Uncategorized',
+        message: `${unassignedCount} transaction${unassignedCount > 1 ? 's' : ''} need${unassignedCount === 1 ? 's' : ''} categorization`
+      })
+    }
+    
     return result.slice(0, 3) // Max 3 insights
-  }, [chartData, runwayData])
+  }, [chartData, runwayData, transactions])
 
   const datePresets: { key: DateRangePreset; label: string }[] = [
     { key: 'thisYear', label: 'This Year' },
@@ -1508,6 +1627,147 @@ export default function CashFlowPro() {
                     }`}
                   >
                     <FolderPlus className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Transaction Modal */}
+      <AnimatePresence>
+        {editingId && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={cancelEdit}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-md rounded-xl p-6 shadow-xl ${
+                theme === 'light' ? 'bg-white' : 'bg-terminal-surface border border-terminal-border'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Edit Transaction</h3>
+                <button onClick={cancelEdit} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-sm mb-1 ${textMuted}`}>Date</label>
+                    <input
+                      type="date"
+                      value={editForm.date || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, date: e.target.value }))}
+                      className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm mb-1 ${textMuted}`}>Amount</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editForm.amount || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
+                      className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className={`block text-sm mb-1 ${textMuted}`}>Description</label>
+                  <input
+                    type="text"
+                    value={editForm.description || ''}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                    className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                    style={{ colorScheme: theme }}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-sm mb-1 ${textMuted}`}>Category</label>
+                    <select
+                      value={editForm.category || 'unassigned'}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, category: e.target.value as Transaction['category'] }))}
+                      className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
+                    >
+                      <option value="revenue">Revenue</option>
+                      <option value="opex">OpEx</option>
+                      <option value="overhead">Overhead</option>
+                      <option value="investment">Investment</option>
+                      <option value="unassigned">Unassigned</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={`block text-sm mb-1 ${textMuted}`}>Type</label>
+                    <select
+                      value={editForm.type || 'actual'}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, type: e.target.value as 'actual' | 'budget' }))}
+                      className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
+                    >
+                      <option value="actual">Actual</option>
+                      <option value="budget">Budget</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className={`block text-sm mb-1 ${textMuted}`}>Project</label>
+                  <select
+                    value={editForm.project || ''}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, project: e.target.value || undefined }))}
+                    className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                    style={{ colorScheme: theme }}
+                  >
+                    <option value="">None (Overhead)</option>
+                    {projectList.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className={`block text-sm mb-1 ${textMuted}`}>Notes (optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Annual renewal"
+                    value={editForm.notes || ''}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
+                    className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                    style={{ colorScheme: theme }}
+                  />
+                </div>
+                
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={saveEdit}
+                    className="flex-1 py-2 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90"
+                  >
+                    Save Changes
+                  </button>
+                  <button
+                    onClick={cancelEdit}
+                    className={`px-4 py-2 border rounded-lg ${
+                      theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                    }`}
+                  >
+                    Cancel
                   </button>
                 </div>
               </div>
@@ -2342,7 +2602,7 @@ export default function CashFlowPro() {
               {transactions.length > 0 && (
                 <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-base sm:text-lg font-semibold">Transactions</h3>
                       <select
                         value={transactionMonthFilter}
@@ -2354,6 +2614,19 @@ export default function CashFlowPro() {
                         {transactionMonths.map(m => (
                           <option key={m} value={m}>{getMonthLabel(m)}</option>
                         ))}
+                      </select>
+                      <select
+                        value={transactionCategoryFilter}
+                        onChange={(e) => setTransactionCategoryFilter(e.target.value)}
+                        className={`rounded-lg px-2 py-1 text-xs sm:text-sm border ${inputClasses}`}
+                        style={{ colorScheme: theme }}
+                      >
+                        <option value="all">All Categories</option>
+                        <option value="revenue">Revenue</option>
+                        <option value="opex">OpEx</option>
+                        <option value="overhead">Overhead</option>
+                        <option value="investment">Investment</option>
+                        <option value="unassigned">⚠️ Unassigned</option>
                       </select>
                     </div>
                     <div className="flex gap-2">
@@ -2393,6 +2666,7 @@ export default function CashFlowPro() {
                                 t.category === 'revenue' ? 'bg-accent-primary/10 text-accent-primary' : 
                                 t.category === 'opex' ? 'bg-accent-danger/10 text-accent-danger' : 
                                 t.category === 'overhead' ? 'bg-accent-warning/10 text-accent-warning' :
+                                t.category === 'unassigned' ? 'bg-purple-500/10 text-purple-500' :
                                 'bg-accent-secondary/10 text-accent-secondary'
                               }`}>
                                 {t.category === 'investment' ? 'InvEx' : t.category}
