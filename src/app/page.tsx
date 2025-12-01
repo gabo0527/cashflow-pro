@@ -544,26 +544,123 @@ export default function CashFlowPro() {
   }, [])
 
   const handleFileUpload = useCallback((file: File) => {
-    Papa.parse<Record<string, string>>(file, {
-      header: true,
-      complete: (results) => {
-        const imported: Transaction[] = results.data
-          .filter((row) => row.date && row.amount)
-          .map((row) => {
-            const t: Transaction = {
-              id: generateId(),
-              date: row.date,
-              category: (row.category as Transaction['category']) || 'revenue',
-              description: row.description || '',
-              amount: parseFloat(row.amount) || 0,
-              type: (row.type as 'actual' | 'budget') || 'actual',
-              project: row.project || undefined
-            }
-            return normalizeTransaction(t)
-          })
-        setTransactions(prev => [...prev, ...imported])
+    const fileExtension = file.name.split('.').pop()?.toLowerCase()
+    
+    if (fileExtension === 'csv') {
+      // CSV Import
+      Papa.parse<Record<string, string>>(file, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header) => header.trim().toLowerCase().replace(/\s+/g, '_'),
+        complete: (results) => {
+          const imported: Transaction[] = results.data
+            .filter((row) => row.date && (row.amount || row.amount === '0'))
+            .map((row) => {
+              // Normalize category names
+              let category: Transaction['category'] = 'revenue'
+              const rawCategory = (row.category || '').toLowerCase().trim()
+              if (rawCategory.includes('revenue') || rawCategory.includes('income') || rawCategory.includes('sales')) {
+                category = 'revenue'
+              } else if (rawCategory.includes('opex') || rawCategory.includes('operating') || rawCategory.includes('direct')) {
+                category = 'opex'
+              } else if (rawCategory.includes('overhead') || rawCategory.includes('admin') || rawCategory.includes('non_operational') || rawCategory.includes('g&a')) {
+                category = 'overhead'
+              } else if (rawCategory.includes('invest') || rawCategory.includes('capex') || rawCategory.includes('capital')) {
+                category = 'investment'
+              }
+              
+              const t: Transaction = {
+                id: generateId(),
+                date: row.date?.trim(),
+                category,
+                description: row.description?.trim() || '',
+                amount: parseFloat(String(row.amount).replace(/[,$]/g, '')) || 0,
+                type: (row.type?.toLowerCase().trim() === 'budget' ? 'budget' : 'actual') as 'actual' | 'budget',
+                project: row.project?.trim() || undefined,
+                notes: row.notes?.trim() || undefined
+              }
+              return normalizeTransaction(t)
+            })
+          if (imported.length > 0) {
+            setTransactions(prev => [...prev, ...imported])
+            alert(`Successfully imported ${imported.length} transactions`)
+          } else {
+            alert('No valid transactions found. Check column headers: date, category, description, amount, type, project')
+          }
+        },
+        error: (error) => {
+          alert(`Error parsing CSV: ${error.message}`)
+        }
+      })
+    } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+      // Excel Import using SheetJS
+      const reader = new FileReader()
+      reader.onload = async (e) => {
+        try {
+          const XLSX = await import('xlsx')
+          const data = new Uint8Array(e.target?.result as ArrayBuffer)
+          const workbook = XLSX.read(data, { type: 'array' })
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
+          const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet)
+          
+          const imported: Transaction[] = jsonData
+            .filter((row) => row.date || row.Date || row.DATE)
+            .map((row) => {
+              // Handle various column name formats
+              const date = String(row.date || row.Date || row.DATE || '').trim()
+              const rawCategory = String(row.category || row.Category || row.CATEGORY || '').toLowerCase()
+              const description = String(row.description || row.Description || row.DESCRIPTION || '').trim()
+              const rawAmount = row.amount || row.Amount || row.AMOUNT || 0
+              const rawType = String(row.type || row.Type || row.TYPE || 'actual').toLowerCase()
+              const project = String(row.project || row.Project || row.PROJECT || '').trim()
+              const notes = String(row.notes || row.Notes || row.NOTES || '').trim()
+              
+              // Normalize category
+              let category: Transaction['category'] = 'revenue'
+              if (rawCategory.includes('revenue') || rawCategory.includes('income') || rawCategory.includes('sales')) {
+                category = 'revenue'
+              } else if (rawCategory.includes('opex') || rawCategory.includes('operating') || rawCategory.includes('direct')) {
+                category = 'opex'
+              } else if (rawCategory.includes('overhead') || rawCategory.includes('admin') || rawCategory.includes('non_operational') || rawCategory.includes('g&a')) {
+                category = 'overhead'
+              } else if (rawCategory.includes('invest') || rawCategory.includes('capex') || rawCategory.includes('capital')) {
+                category = 'investment'
+              }
+              
+              // Parse date - handle Excel date serial numbers
+              let parsedDate = date
+              if (typeof row.date === 'number' || typeof row.Date === 'number' || typeof row.DATE === 'number') {
+                const excelDate = new Date((Number(row.date || row.Date || row.DATE) - 25569) * 86400 * 1000)
+                parsedDate = excelDate.toISOString().slice(0, 10)
+              }
+              
+              const t: Transaction = {
+                id: generateId(),
+                date: parsedDate,
+                category,
+                description,
+                amount: typeof rawAmount === 'number' ? rawAmount : parseFloat(String(rawAmount).replace(/[,$]/g, '')) || 0,
+                type: rawType === 'budget' ? 'budget' : 'actual',
+                project: project || undefined,
+                notes: notes || undefined
+              }
+              return normalizeTransaction(t)
+            })
+          
+          if (imported.length > 0) {
+            setTransactions(prev => [...prev, ...imported])
+            alert(`Successfully imported ${imported.length} transactions from Excel`)
+          } else {
+            alert('No valid transactions found. Check column headers: date, category, description, amount, type, project')
+          }
+        } catch (error) {
+          alert(`Error parsing Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        }
       }
-    })
+      reader.readAsArrayBuffer(file)
+    } else {
+      alert('Unsupported file format. Please use CSV (.csv) or Excel (.xlsx, .xls)')
+    }
   }, [normalizeTransaction])
 
   const exportToCSV = useCallback(() => {
@@ -2450,9 +2547,9 @@ export default function CashFlowPro() {
               >
                 <div className="text-center">
                   <Upload className={`w-12 h-12 mx-auto mb-4 ${textMuted}`} />
-                  <h3 className="text-lg font-semibold mb-2">Import CSV</h3>
-                  <p className={`mb-4 ${textMuted}`}>Drag & drop or click</p>
-                  <input type="file" accept=".csv" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleFileUpload(file) }} className="hidden" id="file-upload" />
+                  <h3 className="text-lg font-semibold mb-2">Import Data</h3>
+                  <p className={`mb-4 ${textMuted}`}>CSV or Excel • Drag & drop or click</p>
+                  <input type="file" accept=".csv,.xlsx,.xls" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleFileUpload(file) }} className="hidden" id="file-upload" />
                   <label htmlFor="file-upload" className="inline-flex items-center gap-2 px-6 py-3 bg-accent-primary/10 text-accent-primary rounded-lg cursor-pointer hover:bg-accent-primary/20">
                     <Upload className="w-5 h-5" />
                     Choose File
@@ -2461,15 +2558,19 @@ export default function CashFlowPro() {
               </div>
 
               <div className={`rounded-xl p-6 border ${cardClasses}`}>
-                <h3 className="text-lg font-semibold mb-4">CSV Format</h3>
+                <h3 className="text-lg font-semibold mb-4">Required Format</h3>
                 <div className={`rounded-lg p-4 font-mono text-xs sm:text-sm overflow-x-auto ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
-                  <div className={textMuted}>date,category,description,amount,type,project</div>
-                  <div className="text-accent-primary">2024-01-15,revenue,Consulting,50000,actual,Project Alpha</div>
-                  <div className="text-accent-danger">2024-01-01,opex,Labor,-15000,actual,Project Alpha</div>
-                  <div className="text-accent-warning">2024-01-01,overhead,Rent,-5000,actual,</div>
-                  <div className="text-accent-secondary">2024-02-15,investment,Equipment,-20000,actual,</div>
+                  <div className={textMuted}>date,category,description,amount,type,project,notes</div>
+                  <div className="text-accent-primary">2024-01-15,revenue,Consulting,50000,actual,Project Alpha,Q1 retainer</div>
+                  <div className="text-accent-danger">2024-01-01,opex,Labor,-15000,actual,Project Alpha,</div>
+                  <div className="text-accent-warning">2024-01-01,overhead,Rent,-5000,actual,,Monthly rent</div>
+                  <div className="text-accent-secondary">2024-02-15,investment,Equipment,-20000,actual,,Annual purchase</div>
                 </div>
-                <p className={`text-xs mt-2 ${textSubtle}`}>Categories: revenue, opex, overhead, investment. No project = overhead</p>
+                <div className={`text-xs mt-3 space-y-1 ${textSubtle}`}>
+                  <p><strong>Categories:</strong> revenue, opex, overhead, investment</p>
+                  <p><strong>Type:</strong> actual or budget</p>
+                  <p><strong>Notes:</strong> optional context (e.g., "Annual renewal")</p>
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-4">
