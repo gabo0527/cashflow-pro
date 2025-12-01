@@ -964,6 +964,56 @@ export default function CashFlowPro() {
     })
   }, [filteredMonthlyData])
 
+  // Year-over-Year data - compare same month across years
+  const yoyData = useMemo(() => {
+    const monthsByYear: Record<string, Record<string, { revenue: number; opex: number }>> = {}
+    
+    filteredMonthlyData.forEach(d => {
+      const [year, month] = d.month.split('-')
+      if (!monthsByYear[year]) monthsByYear[year] = {}
+      monthsByYear[year][month] = {
+        revenue: d.revenue.actual || d.revenue.projected,
+        opex: Math.abs(d.opex.actual || d.opex.projected)
+      }
+    })
+    
+    const years = Object.keys(monthsByYear).sort()
+    if (years.length < 2) return chartData // Fall back to MoM if less than 2 years
+    
+    // Create comparison data showing current vs previous year
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    const result: { name: string; [key: string]: string | number }[] = []
+    
+    for (let m = 1; m <= 12; m++) {
+      const monthKey = m.toString().padStart(2, '0')
+      const entry: { name: string; [key: string]: string | number } = { name: monthNames[m - 1] }
+      
+      years.forEach(year => {
+        const data = monthsByYear[year]?.[monthKey]
+        if (data) {
+          entry[`rev${year}`] = data.revenue
+          entry[`opex${year}`] = data.opex
+        }
+      })
+      
+      // Only add if we have data for at least one year
+      if (Object.keys(entry).length > 1) {
+        result.push(entry)
+      }
+    }
+    
+    return result
+  }, [filteredMonthlyData, chartData])
+
+  // Get years for YoY legend
+  const yoyYears = useMemo(() => {
+    const years = new Set<string>()
+    filteredMonthlyData.forEach(d => {
+      years.add(d.month.split('-')[0])
+    })
+    return Array.from(years).sort()
+  }, [filteredMonthlyData])
+
   const comparisonData = useMemo(() => {
     if (comparisonView === 'project') {
       const projectData: Record<string, { revenue: number; opex: number }> = {}
@@ -976,8 +1026,9 @@ export default function CashFlowPro() {
       return Object.entries(projectData).map(([name, d]) => ({ name, revenue: d.revenue, opex: d.opex }))
     }
     if (comparisonView === 'qoq') return qoqData
-    return chartData
-  }, [comparisonView, filteredTransactions, qoqData, chartData])
+    if (comparisonView === 'yoy') return yoyData
+    return chartData // MoM
+  }, [comparisonView, filteredTransactions, qoqData, yoyData, chartData])
 
   const datePresets: { key: DateRangePreset; label: string }[] = [
     { key: 'thisYear', label: 'This Year' },
@@ -1849,37 +1900,77 @@ export default function CashFlowPro() {
               {/* Comparison Analysis */}
               <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                  <h3 className="text-base sm:text-lg font-semibold">Comparison Analysis</h3>
-                  <div className="flex gap-2">
-                    {(['mom', 'yoy', 'qoq', 'project'] as const).map(view => (
+                  <div>
+                    <h3 className="text-base sm:text-lg font-semibold">Comparison Analysis</h3>
+                    {selectedProject !== 'all' && (
+                      <p className={`text-xs mt-1 ${textMuted}`}>Filtered by: {selectedProject}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-1 sm:gap-2">
+                    {([
+                      { key: 'mom', label: 'MoM' },
+                      { key: 'yoy', label: 'YoY' },
+                      { key: 'qoq', label: 'QoQ' },
+                      { key: 'project', label: 'By Project' }
+                    ] as const).map(view => (
                       <button
-                        key={view}
-                        onClick={() => setComparisonView(view)}
-                        className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
-                          comparisonView === view
+                        key={view.key}
+                        onClick={() => setComparisonView(view.key)}
+                        className={`px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                          comparisonView === view.key
                             ? 'bg-accent-primary text-white'
                             : theme === 'light' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-terminal-bg text-zinc-400 hover:text-zinc-200'
                         }`}
                       >
-                        {view === 'mom' ? 'Month/Month' : view === 'yoy' ? 'Year/Year' : view === 'qoq' ? 'Quarter/Quarter' : 'By Project'}
+                        {view.label}
                       </button>
                     ))}
                   </div>
                 </div>
+                
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={comparisonData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#1e1e2e'} />
-                    <XAxis dataKey="name" stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} />
-                    <YAxis stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} tickFormatter={(v) => `$${v/1000}k`} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#12121a', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#1e1e2e'}`, borderRadius: '8px', fontSize: '12px' }}
-                      formatter={(value: number) => formatCurrency(value)}
-                    />
-                    <Legend wrapperStyle={{ fontSize: '12px' }} />
-                    <Bar dataKey="revenue" name="Revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="opex" name="OpEx" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                  </BarChart>
+                  {comparisonView === 'yoy' && yoyYears.length >= 2 ? (
+                    <BarChart data={comparisonData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#1e1e2e'} />
+                      <XAxis dataKey="name" stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} />
+                      <YAxis stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} tickFormatter={(v) => `$${v/1000}k`} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#12121a', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#1e1e2e'}`, borderRadius: '8px', fontSize: '12px' }}
+                        formatter={(value: number) => formatCurrency(value)}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '12px' }} />
+                      {yoyYears.map((year, idx) => (
+                        <Bar 
+                          key={`rev${year}`}
+                          dataKey={`rev${year}`} 
+                          name={`Rev ${year}`} 
+                          fill={idx === 0 ? '#6ee7b7' : '#10b981'} 
+                          radius={[4, 4, 0, 0]} 
+                        />
+                      ))}
+                    </BarChart>
+                  ) : (
+                    <BarChart data={comparisonData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#1e1e2e'} />
+                      <XAxis dataKey="name" stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} />
+                      <YAxis stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} tickFormatter={(v) => `$${v/1000}k`} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#12121a', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#1e1e2e'}`, borderRadius: '8px', fontSize: '12px' }}
+                        formatter={(value: number) => formatCurrency(value)}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '12px' }} />
+                      <Bar dataKey="revenue" name="Revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="opex" name="OpEx" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  )}
                 </ResponsiveContainer>
+                
+                {/* YoY Note */}
+                {comparisonView === 'yoy' && yoyYears.length < 2 && (
+                  <p className={`text-center text-sm mt-4 ${textMuted}`}>
+                    Need data from at least 2 years for YoY comparison. Showing MoM view.
+                  </p>
+                )}
                 
                 {/* QoQ Table */}
                 {comparisonView === 'qoq' && qoqData.length > 0 && (
