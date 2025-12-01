@@ -1896,7 +1896,7 @@ export default function CashFlowPro() {
 
               {/* KPI Cards + Runway */}
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-                {/* Runway Card - Highlighted */}
+                {/* Monthly Cash Flow Card */}
                 <div className={`rounded-xl p-4 sm:p-5 border-2 ${
                   runwayData.status === 'critical' 
                     ? 'border-accent-danger bg-accent-danger/5' 
@@ -1907,26 +1907,26 @@ export default function CashFlowPro() {
                     : `border-accent-secondary/50 ${theme === 'light' ? 'bg-white' : 'bg-terminal-surface'}`
                 } col-span-2 lg:col-span-1`}>
                   <div className={`flex items-center gap-2 text-xs sm:text-sm mb-2 ${textMuted}`}>
-                    <Gauge className="w-4 h-4" />
-                    Runway
+                    <TrendingUp className="w-4 h-4" />
+                    Monthly Cash Flow
                   </div>
                   <div className={`text-xl sm:text-2xl font-mono font-bold ${
+                    runwayData.status === 'profitable' ? 'text-accent-primary' :
                     runwayData.status === 'critical' ? 'text-accent-danger' :
-                    runwayData.status === 'warning' ? 'text-accent-warning' :
-                    runwayData.status === 'profitable' ? 'text-accent-primary' : 'text-accent-secondary'
+                    runwayData.status === 'warning' ? 'text-accent-warning' : 'text-accent-secondary'
                   }`}>
                     {runwayData.status === 'profitable' 
-                      ? '∞' 
-                      : `${runwayData.runwayMonths.toFixed(1)}mo`}
+                      ? `+${formatCurrency(Math.abs(runwayData.avgMonthlyBurn))}`
+                      : `-${formatCurrency(Math.abs(runwayData.avgMonthlyBurn))}`}
                   </div>
-                  <div className={`text-xs mt-1 ${
+                  <div className={`text-xs mt-1 flex items-center gap-1 ${
+                    runwayData.status === 'profitable' ? 'text-accent-primary' :
                     runwayData.status === 'critical' ? 'text-accent-danger' :
-                    runwayData.status === 'warning' ? 'text-accent-warning' :
-                    runwayData.status === 'profitable' ? 'text-accent-primary' : textSubtle
+                    runwayData.status === 'warning' ? 'text-accent-warning' : textSubtle
                   }`}>
                     {runwayData.status === 'profitable' 
-                      ? `+${formatCurrency(Math.abs(runwayData.avgMonthlyBurn))}/mo`
-                      : `${formatCurrency(runwayData.avgMonthlyBurn)}/mo burn`}
+                      ? <><CheckCircle className="w-3 h-3" /> Cash Positive</>
+                      : `${runwayData.runwayMonths.toFixed(1)} months runway`}
                   </div>
                 </div>
 
