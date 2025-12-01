@@ -592,74 +592,8 @@ export default function CashFlowPro() {
           alert(`Error parsing CSV: ${error.message}`)
         }
       })
-    } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-      // Excel Import using SheetJS
-      const reader = new FileReader()
-      reader.onload = async (e) => {
-        try {
-          const XLSX = await import('xlsx')
-          const data = new Uint8Array(e.target?.result as ArrayBuffer)
-          const workbook = XLSX.read(data, { type: 'array' })
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-          const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet)
-          
-          const imported: Transaction[] = jsonData
-            .filter((row) => row.date || row.Date || row.DATE)
-            .map((row) => {
-              // Handle various column name formats
-              const date = String(row.date || row.Date || row.DATE || '').trim()
-              const rawCategory = String(row.category || row.Category || row.CATEGORY || '').toLowerCase()
-              const description = String(row.description || row.Description || row.DESCRIPTION || '').trim()
-              const rawAmount = row.amount || row.Amount || row.AMOUNT || 0
-              const rawType = String(row.type || row.Type || row.TYPE || 'actual').toLowerCase()
-              const project = String(row.project || row.Project || row.PROJECT || '').trim()
-              const notes = String(row.notes || row.Notes || row.NOTES || '').trim()
-              
-              // Normalize category
-              let category: Transaction['category'] = 'revenue'
-              if (rawCategory.includes('revenue') || rawCategory.includes('income') || rawCategory.includes('sales')) {
-                category = 'revenue'
-              } else if (rawCategory.includes('opex') || rawCategory.includes('operating') || rawCategory.includes('direct')) {
-                category = 'opex'
-              } else if (rawCategory.includes('overhead') || rawCategory.includes('admin') || rawCategory.includes('non_operational') || rawCategory.includes('g&a')) {
-                category = 'overhead'
-              } else if (rawCategory.includes('invest') || rawCategory.includes('capex') || rawCategory.includes('capital')) {
-                category = 'investment'
-              }
-              
-              // Parse date - handle Excel date serial numbers
-              let parsedDate = date
-              if (typeof row.date === 'number' || typeof row.Date === 'number' || typeof row.DATE === 'number') {
-                const excelDate = new Date((Number(row.date || row.Date || row.DATE) - 25569) * 86400 * 1000)
-                parsedDate = excelDate.toISOString().slice(0, 10)
-              }
-              
-              const t: Transaction = {
-                id: generateId(),
-                date: parsedDate,
-                category,
-                description,
-                amount: typeof rawAmount === 'number' ? rawAmount : parseFloat(String(rawAmount).replace(/[,$]/g, '')) || 0,
-                type: rawType === 'budget' ? 'budget' : 'actual',
-                project: project || undefined,
-                notes: notes || undefined
-              }
-              return normalizeTransaction(t)
-            })
-          
-          if (imported.length > 0) {
-            setTransactions(prev => [...prev, ...imported])
-            alert(`Successfully imported ${imported.length} transactions from Excel`)
-          } else {
-            alert('No valid transactions found. Check column headers: date, category, description, amount, type, project')
-          }
-        } catch (error) {
-          alert(`Error parsing Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`)
-        }
-      }
-      reader.readAsArrayBuffer(file)
     } else {
-      alert('Unsupported file format. Please use CSV (.csv) or Excel (.xlsx, .xls)')
+      alert('Please use CSV format. Export from Excel/Sheets using "Save As > CSV"')
     }
   }, [normalizeTransaction])
 
@@ -2548,8 +2482,8 @@ export default function CashFlowPro() {
                 <div className="text-center">
                   <Upload className={`w-12 h-12 mx-auto mb-4 ${textMuted}`} />
                   <h3 className="text-lg font-semibold mb-2">Import Data</h3>
-                  <p className={`mb-4 ${textMuted}`}>CSV or Excel • Drag & drop or click</p>
-                  <input type="file" accept=".csv,.xlsx,.xls" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleFileUpload(file) }} className="hidden" id="file-upload" />
+                  <p className={`mb-4 ${textMuted}`}>CSV format • Drag & drop or click</p>
+                  <input type="file" accept=".csv" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleFileUpload(file) }} className="hidden" id="file-upload" />
                   <label htmlFor="file-upload" className="inline-flex items-center gap-2 px-6 py-3 bg-accent-primary/10 text-accent-primary rounded-lg cursor-pointer hover:bg-accent-primary/20">
                     <Upload className="w-5 h-5" />
                     Choose File
