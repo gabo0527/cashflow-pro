@@ -961,7 +961,7 @@ export default function CashFlowPro() {
   const textSubtle = theme === 'light' ? 'text-gray-400' : 'text-zinc-500'
 
   return (
-    <div className={`min-h-screen font-body transition-colors ${themeClasses}`}>
+    <div className={`min-h-screen font-body transition-colors ${themeClasses}`} style={{ colorScheme: theme }}>
       {/* Header */}
       <header className={`border-b sticky top-0 z-50 backdrop-blur-sm ${theme === 'light' ? 'bg-white/80 border-gray-200' : 'bg-terminal-surface/80 border-terminal-border'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
@@ -972,7 +972,7 @@ export default function CashFlowPro() {
               </div>
               <div>
                 <h1 className="text-lg sm:text-xl font-display font-bold tracking-tight">CashFlow Pro</h1>
-                <p className="text-xs text-zinc-500 hidden sm:block">Financial Intelligence Platform</p>
+                <p className={`text-xs hidden sm:block ${textMuted}`}>Financial Intelligence Platform</p>
               </div>
             </div>
             
@@ -1027,7 +1027,7 @@ export default function CashFlowPro() {
                 className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
                   activeTab === tab.id 
                     ? 'bg-accent-primary/10 text-accent-primary' 
-                    : 'text-zinc-400'
+                    : theme === 'light' ? 'text-gray-500 hover:text-gray-700' : 'text-zinc-400'
                 }`}
               >
                 <tab.icon className="w-3 h-3" />
@@ -1057,7 +1057,7 @@ export default function CashFlowPro() {
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Quick Add Transaction</h3>
-                <button onClick={() => setShowQuickAdd(false)} className="p-1 hover:bg-zinc-700 rounded">
+                <button onClick={() => setShowQuickAdd(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -1065,20 +1065,22 @@ export default function CashFlowPro() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm text-zinc-400 mb-1">Date</label>
+                    <label className={`block text-sm mb-1 ${textMuted}`}>Date</label>
                     <input
                       type="date"
                       value={quickAddForm.date || ''}
                       onChange={(e) => setQuickAddForm(prev => ({ ...prev, date: e.target.value }))}
-                      className="w-full px-3 py-2 bg-terminal-bg border border-terminal-border rounded-lg text-sm"
+                      className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-zinc-400 mb-1">Type</label>
+                    <label className={`block text-sm mb-1 ${textMuted}`}>Type</label>
                     <select
                       value={quickAddForm.type || 'actual'}
                       onChange={(e) => setQuickAddForm(prev => ({ ...prev, type: e.target.value as 'actual' | 'budget' }))}
-                      className="w-full px-3 py-2 bg-terminal-bg border border-terminal-border rounded-lg text-sm"
+                      className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
                     >
                       <option value="actual">Actual</option>
                       <option value="budget">Budget</option>
@@ -1087,11 +1089,12 @@ export default function CashFlowPro() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">Category</label>
+                  <label className={`block text-sm mb-1 ${textMuted}`}>Category</label>
                   <select
                     value={quickAddForm.category || 'revenue'}
                     onChange={(e) => setQuickAddForm(prev => ({ ...prev, category: e.target.value as Transaction['category'] }))}
-                    className="w-full px-3 py-2 bg-terminal-bg border border-terminal-border rounded-lg text-sm"
+                    className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                    style={{ colorScheme: theme }}
                   >
                     <option value="revenue">Revenue</option>
                     <option value="opex">OpEx (requires project)</option>
@@ -1101,33 +1104,36 @@ export default function CashFlowPro() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">Description</label>
+                  <label className={`block text-sm mb-1 ${textMuted}`}>Description</label>
                   <input
                     type="text"
                     placeholder="e.g., Consulting fee"
                     value={quickAddForm.description || ''}
                     onChange={(e) => setQuickAddForm(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full px-3 py-2 bg-terminal-bg border border-terminal-border rounded-lg text-sm"
+                    className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                    style={{ colorScheme: theme }}
                   />
                 </div>
                 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm text-zinc-400 mb-1">Amount</label>
+                    <label className={`block text-sm mb-1 ${textMuted}`}>Amount</label>
                     <input
                       type="number"
                       placeholder="50000 or -5000"
                       value={quickAddForm.amount || ''}
                       onChange={(e) => setQuickAddForm(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-3 py-2 bg-terminal-bg border border-terminal-border rounded-lg text-sm"
+                      className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-zinc-400 mb-1">Project</label>
+                    <label className={`block text-sm mb-1 ${textMuted}`}>Project</label>
                     <select
                       value={quickAddForm.project || ''}
                       onChange={(e) => setQuickAddForm(prev => ({ ...prev, project: e.target.value || undefined }))}
-                      className="w-full px-3 py-2 bg-terminal-bg border border-terminal-border rounded-lg text-sm"
+                      className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
                     >
                       <option value="">None (Overhead)</option>
                       {projectList.map(p => (
@@ -1141,13 +1147,15 @@ export default function CashFlowPro() {
                   <button
                     onClick={handleQuickAdd}
                     disabled={!quickAddForm.description || !quickAddForm.amount}
-                    className="flex-1 py-2 bg-accent-primary text-white rounded-lg font-medium disabled:opacity-50"
+                    className="flex-1 py-2 bg-accent-primary text-white rounded-lg font-medium disabled:opacity-50 hover:bg-accent-primary/90"
                   >
                     Add Transaction
                   </button>
                   <button
                     onClick={() => setShowProjectModal(true)}
-                    className="px-3 py-2 border border-terminal-border rounded-lg hover:bg-terminal-bg"
+                    className={`px-3 py-2 border rounded-lg ${
+                      theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                    }`}
                   >
                     <FolderPlus className="w-5 h-5" />
                   </button>
@@ -1177,7 +1185,7 @@ export default function CashFlowPro() {
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Manage Projects</h3>
-                <button onClick={() => setShowProjectModal(false)} className="p-1 hover:bg-zinc-700 rounded">
+                <button onClick={() => setShowProjectModal(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -1189,13 +1197,14 @@ export default function CashFlowPro() {
                     placeholder="New project name"
                     value={newProjectName}
                     onChange={(e) => setNewProjectName(e.target.value)}
-                    className="flex-1 px-3 py-2 bg-terminal-bg border border-terminal-border rounded-lg text-sm"
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                    style={{ colorScheme: theme }}
                     onKeyDown={(e) => e.key === 'Enter' && addProject()}
                   />
                   <button
                     onClick={addProject}
                     disabled={!newProjectName.trim()}
-                    className="px-4 py-2 bg-accent-primary text-white rounded-lg font-medium disabled:opacity-50"
+                    className="px-4 py-2 bg-accent-primary text-white rounded-lg font-medium disabled:opacity-50 hover:bg-accent-primary/90"
                   >
                     Add
                   </button>
@@ -1203,17 +1212,17 @@ export default function CashFlowPro() {
                 
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {projects.length === 0 ? (
-                    <p className="text-zinc-500 text-sm text-center py-4">No projects yet</p>
+                    <p className={`text-sm text-center py-4 ${textMuted}`}>No projects yet</p>
                   ) : (
                     projects.map(p => (
-                      <div key={p.id} className="flex items-center justify-between p-3 bg-terminal-bg rounded-lg">
+                      <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
                         <div className="flex items-center gap-3">
                           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
                           <span>{p.name}</span>
                         </div>
                         <button
                           onClick={() => deleteProject(p.id)}
-                          className="p-1 text-zinc-400 hover:text-accent-danger"
+                          className={`p-1 hover:text-accent-danger ${textMuted}`}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1321,6 +1330,7 @@ export default function CashFlowPro() {
                     value={selectedProject}
                     onChange={(e) => setSelectedProject(e.target.value)}
                     className={`rounded-lg px-2 sm:px-3 py-1.5 text-xs sm:text-sm border ${inputClasses}`}
+                    style={{ colorScheme: theme }}
                   >
                     <option value="all">All Projects</option>
                     {projectList.map(p => (
@@ -1650,6 +1660,7 @@ export default function CashFlowPro() {
                         value={transactionMonthFilter}
                         onChange={(e) => setTransactionMonthFilter(e.target.value)}
                         className={`rounded-lg px-2 py-1 text-xs sm:text-sm border ${inputClasses}`}
+                        style={{ colorScheme: theme }}
                       >
                         <option value="all">All Months</option>
                         {transactionMonths.map(m => (
@@ -1719,7 +1730,7 @@ export default function CashFlowPro() {
                       </tbody>
                     </table>
                   </div>
-                  <p className="text-zinc-500 text-xs mt-3 text-center">
+                  <p className={`text-xs mt-3 text-center ${textMuted}`}>
                     {filteredTransactions.length} transactions
                   </p>
                 </div>
@@ -1734,12 +1745,13 @@ export default function CashFlowPro() {
                 <div className={`rounded-xl p-6 border ${cardClasses}`}>
                   <h3 className="text-lg font-semibold mb-4">Beginning Balance</h3>
                   <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
+                    <DollarSign className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${textMuted}`} />
                     <input
                       type="number"
                       value={beginningBalance}
                       onChange={(e) => setBeginningBalance(parseFloat(e.target.value) || 0)}
-                      className="pl-10 pr-4 py-3 bg-terminal-bg border border-terminal-border rounded-lg text-xl font-mono w-full"
+                      className={`pl-10 pr-4 py-3 rounded-lg text-xl font-mono w-full border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
                     />
                   </div>
                 </div>
@@ -1750,23 +1762,28 @@ export default function CashFlowPro() {
                     type="month"
                     value={cutoffDate}
                     onChange={(e) => setCutoffDate(e.target.value)}
-                    className="px-4 py-3 bg-terminal-bg border border-terminal-border rounded-lg font-mono w-full"
+                    className={`px-4 py-3 rounded-lg font-mono w-full border ${inputClasses}`}
+                    style={{ colorScheme: theme }}
                   />
                 </div>
               </div>
 
               <div 
-                className={`rounded-xl p-8 border-2 border-dashed transition-all ${isDragging ? 'border-accent-primary bg-accent-primary/5' : 'border-terminal-border'}`}
+                className={`rounded-xl p-8 border-2 border-dashed transition-all ${
+                  isDragging 
+                    ? 'border-accent-primary bg-accent-primary/5' 
+                    : theme === 'light' ? 'border-gray-300' : 'border-terminal-border'
+                }`}
                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={(e) => { e.preventDefault(); setIsDragging(false); const file = e.dataTransfer.files[0]; if (file) handleFileUpload(file) }}
               >
                 <div className="text-center">
-                  <Upload className="w-12 h-12 text-zinc-400 mx-auto mb-4" />
+                  <Upload className={`w-12 h-12 mx-auto mb-4 ${textMuted}`} />
                   <h3 className="text-lg font-semibold mb-2">Import CSV</h3>
-                  <p className="text-zinc-400 mb-4">Drag & drop or click</p>
+                  <p className={`mb-4 ${textMuted}`}>Drag & drop or click</p>
                   <input type="file" accept=".csv" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleFileUpload(file) }} className="hidden" id="file-upload" />
-                  <label htmlFor="file-upload" className="inline-flex items-center gap-2 px-6 py-3 bg-accent-primary/10 text-accent-primary rounded-lg cursor-pointer">
+                  <label htmlFor="file-upload" className="inline-flex items-center gap-2 px-6 py-3 bg-accent-primary/10 text-accent-primary rounded-lg cursor-pointer hover:bg-accent-primary/20">
                     <Upload className="w-5 h-5" />
                     Choose File
                   </label>
@@ -1775,26 +1792,28 @@ export default function CashFlowPro() {
 
               <div className={`rounded-xl p-6 border ${cardClasses}`}>
                 <h3 className="text-lg font-semibold mb-4">CSV Format</h3>
-                <div className="bg-terminal-bg rounded-lg p-4 font-mono text-xs sm:text-sm overflow-x-auto">
-                  <div className="text-zinc-400">date,category,description,amount,type,project</div>
+                <div className={`rounded-lg p-4 font-mono text-xs sm:text-sm overflow-x-auto ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                  <div className={textMuted}>date,category,description,amount,type,project</div>
                   <div className="text-accent-primary">2024-01-15,revenue,Consulting,50000,actual,Project Alpha</div>
                   <div className="text-accent-danger">2024-01-01,opex,Labor,-15000,actual,Project Alpha</div>
                   <div className="text-accent-warning">2024-01-01,overhead,Rent,-5000,actual,</div>
                   <div className="text-accent-secondary">2024-02-15,investment,Equipment,-20000,actual,</div>
                 </div>
-                <p className="text-zinc-500 text-xs mt-2">Categories: revenue, opex, overhead, investment. No project = overhead</p>
+                <p className={`text-xs mt-2 ${textSubtle}`}>Categories: revenue, opex, overhead, investment. No project = overhead</p>
               </div>
 
               <div className="flex flex-wrap gap-4">
-                <button onClick={loadSampleData} className="flex items-center gap-2 px-6 py-3 bg-accent-secondary/10 text-accent-secondary rounded-lg">
+                <button onClick={loadSampleData} className="flex items-center gap-2 px-6 py-3 bg-accent-secondary/10 text-accent-secondary rounded-lg hover:bg-accent-secondary/20">
                   <RefreshCw className="w-5 h-5" />
                   Load Sample
                 </button>
-                <button onClick={exportToCSV} disabled={!transactions.length} className="flex items-center gap-2 px-6 py-3 bg-terminal-bg border border-terminal-border rounded-lg disabled:opacity-50">
+                <button onClick={exportToCSV} disabled={!transactions.length} className={`flex items-center gap-2 px-6 py-3 rounded-lg border disabled:opacity-50 ${
+                  theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-terminal-bg border-terminal-border'
+                }`}>
                   <Download className="w-5 h-5" />
                   Export CSV
                 </button>
-                <button onClick={clearAllData} disabled={!transactions.length} className="flex items-center gap-2 px-6 py-3 bg-accent-danger/10 text-accent-danger rounded-lg disabled:opacity-50">
+                <button onClick={clearAllData} disabled={!transactions.length} className="flex items-center gap-2 px-6 py-3 bg-accent-danger/10 text-accent-danger rounded-lg disabled:opacity-50 hover:bg-accent-danger/20">
                   <Trash2 className="w-5 h-5" />
                   Clear All
                 </button>
@@ -1807,13 +1826,14 @@ export default function CashFlowPro() {
             <motion.div key="assumptions" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
               {/* Scenario Selector */}
               <div className={`rounded-xl p-4 border ${cardClasses}`}>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-3">
                   <div className="flex items-center gap-3">
                     <h3 className="font-semibold">Scenario:</h3>
                     <select
                       value={activeScenario}
                       onChange={(e) => setActiveScenario(e.target.value)}
-                      className="bg-terminal-bg border border-terminal-border rounded-lg px-3 py-1.5 text-sm"
+                      className={`rounded-lg px-3 py-1.5 text-sm border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
                     >
                       {scenarios.map(s => (
                         <option key={s.id} value={s.id}>{s.name}</option>
@@ -1826,7 +1846,9 @@ export default function CashFlowPro() {
                         const name = prompt('New scenario name:')
                         if (name) addScenario(name)
                       }}
-                      className="flex items-center gap-1 px-3 py-1.5 text-sm border border-terminal-border rounded-lg hover:bg-terminal-bg"
+                      className={`flex items-center gap-1 px-3 py-1.5 text-sm border rounded-lg ${
+                        theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                      }`}
                     >
                       <Plus className="w-4 h-4" />
                       New
@@ -1836,7 +1858,9 @@ export default function CashFlowPro() {
                         const name = prompt('Duplicate as:')
                         if (name) duplicateScenario(activeScenario, name)
                       }}
-                      className="flex items-center gap-1 px-3 py-1.5 text-sm border border-terminal-border rounded-lg hover:bg-terminal-bg"
+                      className={`flex items-center gap-1 px-3 py-1.5 text-sm border rounded-lg ${
+                        theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                      }`}
                     >
                       <Copy className="w-4 h-4" />
                       Duplicate
@@ -1848,32 +1872,32 @@ export default function CashFlowPro() {
               <div className={`rounded-xl p-6 border ${cardClasses}`}>
                 <h3 className="text-lg font-semibold mb-4">Add Assumption</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                  <input type="text" placeholder="Name" value={newAssumption.name || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, name: e.target.value }))} className="px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg" />
-                  <select value={newAssumption.category || 'revenue'} onChange={(e) => setNewAssumption(prev => ({ ...prev, category: e.target.value as Assumption['category'] }))} className="px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg">
+                  <input type="text" placeholder="Name" value={newAssumption.name || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, name: e.target.value }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }} />
+                  <select value={newAssumption.category || 'revenue'} onChange={(e) => setNewAssumption(prev => ({ ...prev, category: e.target.value as Assumption['category'] }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }}>
                     <option value="revenue">Revenue</option>
                     <option value="opex">OpEx</option>
                     <option value="overhead">Overhead</option>
                     <option value="investment">Investment</option>
                   </select>
-                  <input type="number" placeholder="Amount" value={newAssumption.amount || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))} className="px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg" />
+                  <input type="number" placeholder="Amount" value={newAssumption.amount || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }} />
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-                  <select value={newAssumption.frequency || 'monthly'} onChange={(e) => setNewAssumption(prev => ({ ...prev, frequency: e.target.value as Assumption['frequency'] }))} className="px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg">
+                  <select value={newAssumption.frequency || 'monthly'} onChange={(e) => setNewAssumption(prev => ({ ...prev, frequency: e.target.value as Assumption['frequency'] }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }}>
                     <option value="monthly">Monthly</option>
                     <option value="quarterly">Quarterly</option>
                     <option value="annually">Annually</option>
                     <option value="one-time">One-time</option>
                   </select>
-                  <input type="month" value={newAssumption.startDate || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, startDate: e.target.value }))} className="px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg" />
-                  <input type="month" placeholder="End (optional)" value={newAssumption.endDate || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, endDate: e.target.value }))} className="px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg" />
-                  <select value={newAssumption.project || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, project: e.target.value || undefined }))} className="px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg">
+                  <input type="month" value={newAssumption.startDate || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, startDate: e.target.value }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }} />
+                  <input type="month" placeholder="End (optional)" value={newAssumption.endDate || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, endDate: e.target.value }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }} />
+                  <select value={newAssumption.project || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, project: e.target.value || undefined }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }}>
                     <option value="">No Project</option>
                     {projectList.map(p => (
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
                 </div>
-                <button onClick={addAssumption} disabled={!newAssumption.name || !newAssumption.startDate} className="px-6 py-2 bg-accent-primary text-white rounded-lg disabled:opacity-50">
+                <button onClick={addAssumption} disabled={!newAssumption.name || !newAssumption.startDate} className="px-6 py-2 bg-accent-primary text-white rounded-lg disabled:opacity-50 hover:bg-accent-primary/90">
                   Add Assumption
                 </button>
               </div>
@@ -1881,12 +1905,12 @@ export default function CashFlowPro() {
               <div className={`rounded-xl p-6 border ${cardClasses}`}>
                 <h3 className="text-lg font-semibold mb-4">Assumptions ({activeAssumptions.length})</h3>
                 {activeAssumptions.length === 0 ? (
-                  <p className="text-zinc-500 text-center py-8">No assumptions. Add one above.</p>
+                  <p className={`text-center py-8 ${textMuted}`}>No assumptions. Add one above.</p>
                 ) : (
                   <div className="space-y-2">
                     {activeAssumptions.map(a => (
-                      <div key={a.id} className="flex items-center justify-between p-3 bg-terminal-bg rounded-lg">
-                        <div className="flex items-center gap-3">
+                      <div key={a.id} className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                        <div className="flex items-center gap-3 flex-wrap">
                           <span className={`px-2 py-0.5 rounded text-xs ${
                             a.category === 'revenue' ? 'bg-accent-primary/10 text-accent-primary' : 
                             a.category === 'opex' ? 'bg-accent-danger/10 text-accent-danger' : 
@@ -1894,13 +1918,13 @@ export default function CashFlowPro() {
                             'bg-accent-secondary/10 text-accent-secondary'
                           }`}>{a.category}</span>
                           <span className="font-medium">{a.name}</span>
-                          <span className="text-zinc-400 text-sm">{a.frequency}</span>
+                          <span className={`text-sm ${textMuted}`}>{a.frequency}</span>
                         </div>
                         <div className="flex items-center gap-4">
                           <span className={`font-mono ${a.amount >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
                             {formatCurrency(a.amount)}
                           </span>
-                          <button onClick={() => deleteAssumption(a.id)} className="text-zinc-400 hover:text-accent-danger">
+                          <button onClick={() => deleteAssumption(a.id)} className={`hover:text-accent-danger ${textMuted}`}>
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -1920,7 +1944,11 @@ export default function CashFlowPro() {
                   <h3 className="text-lg font-semibold">Projection Horizon</h3>
                   <div className="flex gap-2">
                     {([1, 2, 3] as const).map(years => (
-                      <button key={years} onClick={() => setProjectionYears(years)} className={`px-4 py-2 rounded-lg font-medium ${projectionYears === years ? 'bg-accent-primary text-white' : 'bg-terminal-bg'}`}>
+                      <button key={years} onClick={() => setProjectionYears(years)} className={`px-4 py-2 rounded-lg font-medium ${
+                        projectionYears === years 
+                          ? 'bg-accent-primary text-white' 
+                          : theme === 'light' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-terminal-bg'
+                      }`}>
                         {years}Y
                       </button>
                     ))}
@@ -1938,10 +1966,10 @@ export default function CashFlowPro() {
                         <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
-                    <XAxis dataKey="monthLabel" stroke="#71717a" fontSize={11} />
-                    <YAxis stroke="#71717a" fontSize={11} tickFormatter={(v) => `$${v/1000}k`} />
-                    <Tooltip contentStyle={{ backgroundColor: '#12121a', border: '1px solid #1e1e2e', borderRadius: '8px' }} formatter={(value: number) => formatCurrency(value)} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#1e1e2e'} />
+                    <XAxis dataKey="monthLabel" stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} />
+                    <YAxis stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} tickFormatter={(v) => `$${v/1000}k`} />
+                    <Tooltip contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#12121a', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#1e1e2e'}`, borderRadius: '8px' }} formatter={(value: number) => formatCurrency(value)} />
                     <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" />
                     <Area type="monotone" dataKey={(d: MonthlyData) => d.runningBalance.projected} stroke="#10b981" fill="url(#projGradient)" strokeWidth={2} />
                   </AreaChart>
@@ -1953,7 +1981,7 @@ export default function CashFlowPro() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-terminal-border text-zinc-400">
+                      <tr className={`border-b ${tableBorder} ${textMuted}`}>
                         <th className="pb-2 text-left">Month</th>
                         <th className="pb-2 text-right">Revenue</th>
                         <th className="pb-2 text-right">OpEx</th>
@@ -1965,7 +1993,7 @@ export default function CashFlowPro() {
                     </thead>
                     <tbody>
                       {monthlyData.slice(0, 24).map(d => (
-                        <tr key={d.month} className="border-b border-terminal-border/50">
+                        <tr key={d.month} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
                           <td className="py-2 font-medium">{d.monthLabel}</td>
                           <td className="py-2 text-right font-mono text-accent-primary">{formatCurrency(d.revenue.projected)}</td>
                           <td className="py-2 text-right font-mono text-accent-danger">{formatCurrency(d.opex.projected)}</td>
@@ -1990,15 +2018,16 @@ export default function CashFlowPro() {
                   <Bell className="w-5 h-5" />
                   Balance Alert
                 </h3>
-                <p className="text-zinc-400 text-sm mb-4">Get warned when projected balance falls below threshold</p>
+                <p className={`text-sm mb-4 ${textMuted}`}>Get warned when projected balance falls below threshold</p>
                 <div className="flex items-center gap-4">
                   <div className="relative flex-1 max-w-xs">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
+                    <DollarSign className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${textMuted}`} />
                     <input
                       type="number"
                       value={balanceAlertThreshold}
                       onChange={(e) => setBalanceAlertThreshold(parseFloat(e.target.value) || 0)}
-                      className="pl-10 pr-4 py-3 bg-terminal-bg border border-terminal-border rounded-lg font-mono w-full"
+                      className={`pl-10 pr-4 py-3 rounded-lg font-mono w-full border ${inputClasses}`}
+                      style={{ colorScheme: theme === 'light' ? 'light' : 'dark' }}
                       placeholder="0 = disabled"
                     />
                   </div>
@@ -2016,14 +2045,22 @@ export default function CashFlowPro() {
                 <div className="flex gap-3">
                   <button
                     onClick={() => setTheme('dark')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${theme === 'dark' ? 'border-accent-primary bg-accent-primary/10' : 'border-terminal-border'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
+                      theme === 'dark' 
+                        ? 'border-accent-primary bg-accent-primary/10 text-accent-primary' 
+                        : theme === 'light' ? 'border-gray-300 text-gray-600 hover:bg-gray-50' : 'border-terminal-border'
+                    }`}
                   >
                     <Moon className="w-4 h-4" />
                     Dark
                   </button>
                   <button
                     onClick={() => setTheme('light')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${theme === 'light' ? 'border-accent-primary bg-accent-primary/10' : 'border-terminal-border'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
+                      theme === 'light' 
+                        ? 'border-accent-primary bg-accent-primary/10 text-accent-primary' 
+                        : theme === 'light' ? 'border-gray-300 text-gray-600 hover:bg-gray-50' : 'border-terminal-border'
+                    }`}
                   >
                     <Sun className="w-4 h-4" />
                     Light
@@ -2036,39 +2073,39 @@ export default function CashFlowPro() {
                   <Lock className="w-5 h-5" />
                   Security & Data (Coming Soon)
                 </h3>
-                <div className="space-y-4 text-zinc-400">
-                  <div className="flex items-center justify-between p-3 bg-terminal-bg rounded-lg">
+                <div className={`space-y-4 ${textMuted}`}>
+                  <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
                     <div className="flex items-center gap-3">
                       <Users className="w-5 h-5" />
                       <div>
-                        <p className="font-medium text-zinc-200">User Authentication</p>
+                        <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-zinc-200'}`}>User Authentication</p>
                         <p className="text-sm">Secure login with SSO</p>
                       </div>
                     </div>
                     <span className="text-xs bg-accent-warning/10 text-accent-warning px-2 py-1 rounded">Planned</span>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-terminal-bg rounded-lg">
+                  <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
                     <div className="flex items-center gap-3">
                       <Database className="w-5 h-5" />
                       <div>
-                        <p className="font-medium text-zinc-200">Cloud Database</p>
+                        <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-zinc-200'}`}>Cloud Database</p>
                         <p className="text-sm">Encrypted data storage</p>
                       </div>
                     </div>
                     <span className="text-xs bg-accent-warning/10 text-accent-warning px-2 py-1 rounded">Planned</span>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-terminal-bg rounded-lg">
+                  <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
                     <div className="flex items-center gap-3">
                       <Lock className="w-5 h-5" />
                       <div>
-                        <p className="font-medium text-zinc-200">Role-Based Access</p>
+                        <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-zinc-200'}`}>Role-Based Access</p>
                         <p className="text-sm">Admin, Editor, Viewer roles</p>
                       </div>
                     </div>
                     <span className="text-xs bg-accent-warning/10 text-accent-warning px-2 py-1 rounded">Planned</span>
                   </div>
                 </div>
-                <p className="text-xs text-zinc-500 mt-4">
+                <p className={`text-xs mt-4 ${textSubtle}`}>
                   Currently data is stored in your browser (localStorage). For production use with team access, we recommend implementing Supabase or a similar backend.
                 </p>
               </div>
@@ -2077,8 +2114,8 @@ export default function CashFlowPro() {
         </AnimatePresence>
       </main>
 
-      <footer className="border-t border-terminal-border mt-12 py-4 print:hidden">
-        <div className="max-w-7xl mx-auto px-6 text-center text-zinc-500 text-xs">
+      <footer className={`border-t mt-12 py-4 print:hidden ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
+        <div className={`max-w-7xl mx-auto px-6 text-center text-xs ${textMuted}`}>
           CashFlow Pro v8 • Data stored locally in browser
         </div>
       </footer>
