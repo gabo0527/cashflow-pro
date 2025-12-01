@@ -13,7 +13,8 @@ import {
   PieChart as PieChartIcon, Settings, Database, Zap, Plus, Trash2, Download,
   Filter, RefreshCw, Edit2, X, Check, Building2, Moon, Sun, AlertTriangle,
   FolderPlus, Copy, FileText, Bell, Repeat, Lock, Users, Image, Palette,
-  Shield, Eye, EyeOff, HardDrive, CloudOff, ExternalLink
+  Shield, Eye, EyeOff, HardDrive, CloudOff, ExternalLink, Clock, Target,
+  Sparkles, AlertCircle, CheckCircle, Info, MessageSquare, Gauge
 } from 'lucide-react'
 
 // Types
@@ -27,6 +28,8 @@ interface Transaction {
   project?: string
   recurring?: boolean
   recurringId?: string
+  notes?: string
+  expectedPaymentDate?: string // For AR/AP timing
 }
 
 interface Assumption {
@@ -360,6 +363,10 @@ export default function CashFlowPro() {
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [transactionMonthFilter, setTransactionMonthFilter] = useState<string>('all')
   
+  // View mode
+  const [timeView, setTimeView] = useState<'monthly' | 'weekly'>('monthly')
+  const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set())
+  
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<Transaction>>({})
@@ -641,7 +648,8 @@ export default function CashFlowPro() {
         description: quickAddForm.description,
         amount: quickAddForm.amount,
         type: quickAddForm.type || 'actual',
-        project: quickAddForm.project
+        project: quickAddForm.project,
+        notes: quickAddForm.notes
       })
       setTransactions(prev => [...prev, newTx])
       setQuickAddForm({
@@ -649,7 +657,8 @@ export default function CashFlowPro() {
         category: 'revenue',
         type: 'actual',
         amount: 0,
-        description: ''
+        description: '',
+        notes: ''
       })
       setShowQuickAdd(false)
     }
@@ -1030,6 +1039,177 @@ export default function CashFlowPro() {
     return chartData // MoM
   }, [comparisonView, filteredTransactions, qoqData, yoyData, chartData])
 
+  // Weekly data for charts
+  const weeklyData = useMemo(() => {
+    const weeks: Record<string, { revenue: number; opex: number; overhead: number; investment: number; netCash: number }> = {}
+    
+    filteredTransactions.forEach(t => {
+      const date = new Date(t.date)
+      const weekStart = new Date(date)
+      weekStart.setDate(date.getDate() - date.getDay()) // Start of week (Sunday)
+      const weekKey = weekStart.toISOString().slice(0, 10)
+      
+      if (!weeks[weekKey]) {
+        weeks[weekKey] = { revenue: 0, opex: 0, overhead: 0, investment: 0, netCash: 0 }
+      }
+      
+      if (t.category === 'revenue') weeks[weekKey].revenue += t.amount
+      else if (t.category === 'opex') weeks[weekKey].opex += Math.abs(t.amount)
+      else if (t.category === 'overhead') weeks[weekKey].overhead += Math.abs(t.amount)
+      else if (t.category === 'investment') weeks[weekKey].investment += Math.abs(t.amount)
+    })
+    
+    // Calculate net cash and format
+    return Object.entries(weeks)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([week, data]) => {
+        const date = new Date(week)
+        const weekLabel = `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+        return {
+          name: weekLabel,
+          ...data,
+          netCash: data.revenue - data.opex - data.overhead - data.investment
+        }
+      })
+  }, [filteredTransactions])
+
+  // Runway calculation
+  const runwayData = useMemo(() => {
+    // Get last 3 months of actual data for average burn
+    const threeMonthsAgo = new Date()
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+    
+    const recentTransactions = transactions.filter(t => 
+      t.type === 'actual' && new Date(t.date) >= threeMonthsAgo
+    )
+    
+    let totalRevenue = 0
+    let totalExpenses = 0
+    
+    recentTransactions.forEach(t => {
+      if (t.category === 'revenue') totalRevenue += t.amount
+      else totalExpenses += Math.abs(t.amount)
+    })
+    
+    const monthsOfData = Math.max(1, Math.min(3, 
+      (Date.now() - threeMonthsAgo.getTime()) / (30 * 24 * 60 * 60 * 1000)
+    ))
+    
+    const avgMonthlyRevenue = totalRevenue / monthsOfData
+    const avgMonthlyExpenses = totalExpenses / monthsOfData
+    const avgMonthlyBurn = avgMonthlyExpenses - avgMonthlyRevenue
+    
+    // Current balance from chart data
+    const currentBalance = chartData.length > 0 
+      ? chartData[chartData.length - 1].balance 
+      : beginningBalance
+    
+    // Runway in months (only if burning cash)
+    const runwayMonths = avgMonthlyBurn > 0 
+      ? currentBalance / avgMonthlyBurn 
+      : Infinity
+    
+    return {
+      currentBalance,
+      avgMonthlyRevenue,
+      avgMonthlyExpenses,
+      avgMonthlyBurn,
+      runwayMonths,
+      status: runwayMonths === Infinity ? 'profitable' : runwayMonths < 3 ? 'critical' : runwayMonths < 6 ? 'warning' : 'healthy'
+    }
+  }, [transactions, chartData, beginningBalance])
+
+  // Auto-generated insights
+  const insights = useMemo(() => {
+    const result: { type: 'positive' | 'warning' | 'critical' | 'info'; title: string; message: string }[] = []
+    
+    if (chartData.length < 2) return result
+    
+    const currentMonth = chartData[chartData.length - 1]
+    const prevMonth = chartData[chartData.length - 2]
+    
+    // Revenue trend
+    if (prevMonth && currentMonth) {
+      const revenueChange = prevMonth.revenue > 0 
+        ? ((currentMonth.revenue - prevMonth.revenue) / prevMonth.revenue) * 100 
+        : 0
+      
+      if (revenueChange > 15) {
+        result.push({
+          type: 'positive',
+          title: 'Revenue Up',
+          message: `Revenue increased ${revenueChange.toFixed(0)}% vs last month`
+        })
+      } else if (revenueChange < -15) {
+        result.push({
+          type: 'warning',
+          title: 'Revenue Down',
+          message: `Revenue decreased ${Math.abs(revenueChange).toFixed(0)}% vs last month`
+        })
+      }
+    }
+    
+    // Expense anomaly (compare to 3-month average)
+    if (chartData.length >= 3) {
+      const last3Expenses = chartData.slice(-3).map(d => d.opex + d.overhead + d.investment)
+      const avgExpenses = last3Expenses.slice(0, -1).reduce((a, b) => a + b, 0) / 2
+      const currentExpenses = last3Expenses[last3Expenses.length - 1]
+      
+      if (avgExpenses > 0 && currentExpenses > avgExpenses * 1.3) {
+        result.push({
+          type: 'warning',
+          title: 'Higher Expenses',
+          message: `Expenses ${((currentExpenses / avgExpenses - 1) * 100).toFixed(0)}% above recent average`
+        })
+      } else if (avgExpenses > 0 && currentExpenses < avgExpenses * 0.7) {
+        result.push({
+          type: 'positive',
+          title: 'Lower Expenses',
+          message: `Expenses ${((1 - currentExpenses / avgExpenses) * 100).toFixed(0)}% below recent average`
+        })
+      }
+    }
+    
+    // Runway warning
+    if (runwayData.status === 'critical') {
+      result.push({
+        type: 'critical',
+        title: 'Low Runway',
+        message: `Only ${runwayData.runwayMonths.toFixed(1)} months of cash remaining`
+      })
+    } else if (runwayData.status === 'warning') {
+      result.push({
+        type: 'warning',
+        title: 'Monitor Runway',
+        message: `${runwayData.runwayMonths.toFixed(1)} months of runway at current burn`
+      })
+    }
+    
+    // Positive cash flow
+    if (runwayData.status === 'profitable' && runwayData.avgMonthlyBurn < 0) {
+      result.push({
+        type: 'positive',
+        title: 'Cash Positive',
+        message: `Generating ${formatCurrency(Math.abs(runwayData.avgMonthlyBurn))}/mo net cash`
+      })
+    }
+    
+    // Best month check
+    if (chartData.length >= 6) {
+      const recentRevenues = chartData.slice(-6).map(d => d.revenue)
+      const maxRevenue = Math.max(...recentRevenues.slice(0, -1))
+      if (currentMonth && currentMonth.revenue > maxRevenue && currentMonth.revenue > 0) {
+        result.push({
+          type: 'positive',
+          title: 'Best Month',
+          message: 'Highest revenue in the past 6 months!'
+        })
+      }
+    }
+    
+    return result.slice(0, 3) // Max 3 insights
+  }, [chartData, runwayData])
+
   const datePresets: { key: DateRangePreset; label: string }[] = [
     { key: 'thisYear', label: 'This Year' },
     { key: 'lastYear', label: 'Last Year' },
@@ -1258,6 +1438,18 @@ export default function CashFlowPro() {
                       ))}
                     </select>
                   </div>
+                </div>
+                
+                <div>
+                  <label className={`block text-sm mb-1 ${textMuted}`}>Notes (optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Annual renewal, One-time bonus"
+                    value={quickAddForm.notes || ''}
+                    onChange={(e) => setQuickAddForm(prev => ({ ...prev, notes: e.target.value }))}
+                    className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                    style={{ colorScheme: theme }}
+                  />
                 </div>
                 
                 <div className="flex gap-2 pt-2">
@@ -1663,8 +1855,81 @@ export default function CashFlowPro() {
                 </div>
               </div>
 
-              {/* KPI Cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              {/* Insights Cards */}
+              {insights.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {insights.map((insight, idx) => (
+                    <div 
+                      key={idx}
+                      className={`rounded-xl p-4 border flex items-start gap-3 ${
+                        insight.type === 'positive' 
+                          ? theme === 'light' ? 'bg-green-50 border-green-200' : 'bg-accent-primary/10 border-accent-primary/30'
+                          : insight.type === 'warning'
+                          ? theme === 'light' ? 'bg-amber-50 border-amber-200' : 'bg-accent-warning/10 border-accent-warning/30'
+                          : insight.type === 'critical'
+                          ? theme === 'light' ? 'bg-red-50 border-red-200' : 'bg-accent-danger/10 border-accent-danger/30'
+                          : cardClasses
+                      }`}
+                    >
+                      <div className={`p-2 rounded-lg ${
+                        insight.type === 'positive' ? 'bg-accent-primary/20' :
+                        insight.type === 'warning' ? 'bg-accent-warning/20' :
+                        insight.type === 'critical' ? 'bg-accent-danger/20' : 'bg-accent-secondary/20'
+                      }`}>
+                        {insight.type === 'positive' ? <TrendingUp className="w-4 h-4 text-accent-primary" /> :
+                         insight.type === 'warning' ? <AlertTriangle className="w-4 h-4 text-accent-warning" /> :
+                         insight.type === 'critical' ? <AlertCircle className="w-4 h-4 text-accent-danger" /> :
+                         <Info className="w-4 h-4 text-accent-secondary" />}
+                      </div>
+                      <div>
+                        <div className={`font-semibold text-sm ${
+                          insight.type === 'positive' ? 'text-accent-primary' :
+                          insight.type === 'warning' ? 'text-accent-warning' :
+                          insight.type === 'critical' ? 'text-accent-danger' : ''
+                        }`}>{insight.title}</div>
+                        <div className={`text-xs mt-0.5 ${textMuted}`}>{insight.message}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* KPI Cards + Runway */}
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+                {/* Runway Card - Highlighted */}
+                <div className={`rounded-xl p-4 sm:p-5 border-2 ${
+                  runwayData.status === 'critical' 
+                    ? 'border-accent-danger bg-accent-danger/5' 
+                    : runwayData.status === 'warning'
+                    ? 'border-accent-warning bg-accent-warning/5'
+                    : runwayData.status === 'profitable'
+                    ? 'border-accent-primary bg-accent-primary/5'
+                    : `border-accent-secondary/50 ${theme === 'light' ? 'bg-white' : 'bg-terminal-surface'}`
+                } col-span-2 lg:col-span-1`}>
+                  <div className={`flex items-center gap-2 text-xs sm:text-sm mb-2 ${textMuted}`}>
+                    <Gauge className="w-4 h-4" />
+                    Runway
+                  </div>
+                  <div className={`text-xl sm:text-2xl font-mono font-bold ${
+                    runwayData.status === 'critical' ? 'text-accent-danger' :
+                    runwayData.status === 'warning' ? 'text-accent-warning' :
+                    runwayData.status === 'profitable' ? 'text-accent-primary' : 'text-accent-secondary'
+                  }`}>
+                    {runwayData.status === 'profitable' 
+                      ? '∞' 
+                      : `${runwayData.runwayMonths.toFixed(1)}mo`}
+                  </div>
+                  <div className={`text-xs mt-1 ${
+                    runwayData.status === 'critical' ? 'text-accent-danger' :
+                    runwayData.status === 'warning' ? 'text-accent-warning' :
+                    runwayData.status === 'profitable' ? 'text-accent-primary' : textSubtle
+                  }`}>
+                    {runwayData.status === 'profitable' 
+                      ? `+${formatCurrency(Math.abs(runwayData.avgMonthlyBurn))}/mo`
+                      : `${formatCurrency(runwayData.avgMonthlyBurn)}/mo burn`}
+                  </div>
+                </div>
+
                 <div className={`rounded-xl p-4 sm:p-5 border ${cardClasses}`}>
                   <div className={`flex items-center gap-2 text-xs sm:text-sm mb-2 ${textMuted}`}>
                     <DollarSign className="w-4 h-4" />
@@ -1730,7 +1995,32 @@ export default function CashFlowPro() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                    <h3 className="text-base sm:text-lg font-semibold">Cash Flow Trend</h3>
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-base sm:text-lg font-semibold">Cash Flow Trend</h3>
+                      {/* Weekly/Monthly Toggle */}
+                      <div className={`flex rounded-lg overflow-hidden border ${theme === 'light' ? 'border-gray-300' : 'border-terminal-border'}`}>
+                        <button
+                          onClick={() => setTimeView('monthly')}
+                          className={`px-2 py-1 text-xs font-medium transition-all ${
+                            timeView === 'monthly'
+                              ? 'bg-accent-primary text-white'
+                              : theme === 'light' ? 'bg-gray-50 text-gray-600' : 'bg-terminal-bg text-zinc-400'
+                          }`}
+                        >
+                          Monthly
+                        </button>
+                        <button
+                          onClick={() => setTimeView('weekly')}
+                          className={`px-2 py-1 text-xs font-medium transition-all ${
+                            timeView === 'weekly'
+                              ? 'bg-accent-primary text-white'
+                              : theme === 'light' ? 'bg-gray-50 text-gray-600' : 'bg-terminal-bg text-zinc-400'
+                          }`}
+                        >
+                          Weekly
+                        </button>
+                      </div>
+                    </div>
                     <div className="flex flex-wrap gap-1">
                       {[
                         { key: 'revenue', label: 'Rev', color: '#10b981' },
@@ -1757,7 +2047,7 @@ export default function CashFlowPro() {
                     </div>
                   </div>
                   <ResponsiveContainer width="100%" height={280}>
-                    <ComposedChart data={chartData}>
+                    <ComposedChart data={timeView === 'weekly' ? weeklyData : chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#1e1e2e'} />
                       <XAxis dataKey="name" stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} />
                       <YAxis stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} tickFormatter={(v) => `$${v/1000}k`} />
@@ -2067,7 +2357,30 @@ export default function CashFlowPro() {
                                 {t.category === 'investment' ? 'InvEx' : t.category}
                               </span>
                             </td>
-                            <td className="py-2 text-xs sm:text-sm hidden sm:table-cell truncate max-w-32">{t.description}</td>
+                            <td className="py-2 text-xs sm:text-sm hidden sm:table-cell">
+                                              <div className="flex items-center gap-1 max-w-40">
+                                                <span className="truncate">{t.description}</span>
+                                                {t.notes && (
+                                                  <button 
+                                                    onClick={() => setExpandedNotes(prev => {
+                                                      const next = new Set(prev)
+                                                      if (next.has(t.id)) next.delete(t.id)
+                                                      else next.add(t.id)
+                                                      return next
+                                                    })}
+                                                    className="p-0.5 text-accent-secondary hover:text-accent-primary"
+                                                    title={t.notes}
+                                                  >
+                                                    <MessageSquare className="w-3 h-3" />
+                                                  </button>
+                                                )}
+                                              </div>
+                                              {t.notes && expandedNotes.has(t.id) && (
+                                                <div className={`text-xs mt-1 p-1.5 rounded ${theme === 'light' ? 'bg-gray-100 text-gray-600' : 'bg-terminal-bg text-zinc-400'}`}>
+                                                  {t.notes}
+                                                </div>
+                                              )}
+                                            </td>
                             <td className={`py-2 text-right font-mono text-xs sm:text-sm ${t.amount >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
                               {formatCurrency(t.amount)}
                             </td>
