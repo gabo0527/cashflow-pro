@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import { 
   LineChart, Line, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  ComposedChart, ReferenceLine, Cell
+  ComposedChart, ReferenceLine, Cell, PieChart, Pie
 } from 'recharts'
 import Papa from 'papaparse'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -622,12 +622,12 @@ export default function CashFlowPro() {
     return filteredMonthlyData.map((d) => ({
       name: d.monthLabel,
       month: d.month,
-      actual: d.dataType === 'actual' ? d.netCash.actual : null,
-      budget: d.netCash.budget || null,
-      projected: d.netCash.projected,
-      balance: d.runningBalance.projected,
       revenue: d.revenue.actual || d.revenue.projected,
       opex: Math.abs(d.opex.actual || d.opex.projected),
+      overhead: Math.abs(d.overhead.actual || d.overhead.projected),
+      investment: Math.abs(d.investment.actual || d.investment.projected),
+      netCash: d.netCash.projected,
+      balance: d.runningBalance.projected,
       dataType: d.dataType
     }))
   }, [filteredMonthlyData])
@@ -655,6 +655,25 @@ export default function CashFlowPro() {
       .filter(d => d.revenue > 0 || d.opex > 0)
       .sort((a, b) => b.margin - a.margin)
   }, [transactions])
+
+  // Expense breakdown by category
+  const expenseBreakdown = useMemo(() => {
+    const totals = { opex: 0, overhead: 0, investment: 0 }
+    
+    filteredMonthlyData.forEach(d => {
+      totals.opex += Math.abs(d.opex.actual || d.opex.projected)
+      totals.overhead += Math.abs(d.overhead.actual || d.overhead.projected)
+      totals.investment += Math.abs(d.investment.actual || d.investment.projected)
+    })
+    
+    const total = totals.opex + totals.overhead + totals.investment
+    
+    return [
+      { name: 'OpEx', value: totals.opex, color: '#ef4444', percent: total ? (totals.opex / total * 100).toFixed(1) : '0' },
+      { name: 'Overhead', value: totals.overhead, color: '#f59e0b', percent: total ? (totals.overhead / total * 100).toFixed(1) : '0' },
+      { name: 'Investment', value: totals.investment, color: '#6366f1', percent: total ? (totals.investment / total * 100).toFixed(1) : '0' }
+    ].filter(d => d.value > 0)
+  }, [filteredMonthlyData])
 
   const datePresets: { key: DateRangePreset; label: string }[] = [
     { key: 'thisYear', label: 'This Year' },
@@ -912,12 +931,14 @@ export default function CashFlowPro() {
                       <YAxis stroke="#71717a" fontSize={12} tickFormatter={(v) => `$${v/1000}k`} />
                       <Tooltip 
                         contentStyle={{ backgroundColor: '#12121a', border: '1px solid #1e1e2e', borderRadius: '8px' }}
-                        formatter={(value: number) => formatCurrency(value)}
+                        formatter={(value: number, name: string) => [formatCurrency(value), name]}
                       />
                       <Legend />
                       <Bar dataKey="revenue" name="Revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="opex" name="OpEx" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                      <Line type="monotone" dataKey="projected" name="Net Cash" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b' }} />
+                      <Bar dataKey="overhead" name="Overhead" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="investment" name="InvEx" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                      <Line type="monotone" dataKey="netCash" name="Net Cash" stroke="#22d3ee" strokeWidth={2} dot={{ fill: '#22d3ee' }} />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
@@ -945,6 +966,84 @@ export default function CashFlowPro() {
                   </ResponsiveContainer>
                 </div>
               </div>
+
+              {/* Expense Breakdown */}
+              {expenseBreakdown.length > 0 && (
+                <div className="grid grid-cols-3 gap-6">
+                  <div className="bg-terminal-surface rounded-xl p-6 border border-terminal-border">
+                    <h3 className="text-lg font-semibold mb-4">Expense Breakdown</h3>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
+                        <Pie
+                          data={expenseBreakdown}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={80}
+                          dataKey="value"
+                          label={({ name, percent }) => `${name}: ${percent}%`}
+                          labelLine={false}
+                        >
+                          {expenseBreakdown.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#12121a', border: '1px solid #1e1e2e', borderRadius: '8px' }}
+                          formatter={(value: number) => formatCurrency(value)}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="mt-4 space-y-2">
+                      {expenseBreakdown.map(e => (
+                        <div key={e.name} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: e.color }} />
+                            <span className="text-sm text-zinc-400">{e.name}</span>
+                          </div>
+                          <span className="font-mono text-sm">{formatCurrency(e.value)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Category Summary Cards */}
+                  <div className="col-span-2 grid grid-cols-3 gap-4">
+                    <div className="bg-terminal-surface rounded-xl p-5 border border-terminal-border">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-3 h-3 rounded-full bg-[#ef4444]" />
+                        <span className="text-zinc-400 text-sm">OpEx</span>
+                      </div>
+                      <div className="text-xl font-mono font-semibold text-[#ef4444]">
+                        {formatCurrency(expenseBreakdown.find(e => e.name === 'OpEx')?.value || 0)}
+                      </div>
+                      <p className="text-xs text-zinc-500 mt-1">Project labor, travel, direct costs</p>
+                    </div>
+                    
+                    <div className="bg-terminal-surface rounded-xl p-5 border border-terminal-border">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-3 h-3 rounded-full bg-[#f59e0b]" />
+                        <span className="text-zinc-400 text-sm">Overhead</span>
+                      </div>
+                      <div className="text-xl font-mono font-semibold text-[#f59e0b]">
+                        {formatCurrency(expenseBreakdown.find(e => e.name === 'Overhead')?.value || 0)}
+                      </div>
+                      <p className="text-xs text-zinc-500 mt-1">Admin, office, utilities, insurance</p>
+                    </div>
+                    
+                    <div className="bg-terminal-surface rounded-xl p-5 border border-terminal-border">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-3 h-3 rounded-full bg-[#6366f1]" />
+                        <span className="text-zinc-400 text-sm">Investment</span>
+                      </div>
+                      <div className="text-xl font-mono font-semibold text-[#6366f1]">
+                        {formatCurrency(expenseBreakdown.find(e => e.name === 'Investment')?.value || 0)}
+                      </div>
+                      <p className="text-xs text-zinc-500 mt-1">Equipment, R&D, strategic spend</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Gross Margin by Project */}
               {projectMarginData.length > 0 && (
