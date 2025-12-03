@@ -40,6 +40,22 @@ interface Transaction {
   expectedPaymentDate?: string // For AR/AP timing
 }
 
+// Accrual transactions (invoices) - separate from cash
+interface AccrualTransaction {
+  id: string
+  date: string  // Invoice date (when recognized)
+  type: 'revenue' | 'direct_cost'  // Invoice TO client or FROM contractor
+  description: string
+  amount: number  // Positive for revenue, negative for costs
+  project: string  // Required for accrual - must be project-based
+  vendor?: string  // Client name or Contractor name
+  invoiceNumber?: string
+  notes?: string
+}
+
+// Dashboard view mode
+type DashboardView = 'cash' | 'accrual' | 'comparison'
+
 interface Assumption {
   id: string
   name: string
@@ -282,6 +298,7 @@ const generateSampleData = (): { transactions: Transaction[], projects: Project[
 // Storage keys
 const STORAGE_KEYS = {
   transactions: 'cashflow_transactions',
+  accrualTransactions: 'cashflow_accrual_transactions',
   assumptions: 'cashflow_assumptions',
   beginningBalance: 'cashflow_beginning_balance',
   cutoffDate: 'cashflow_cutoff_date',
@@ -326,6 +343,8 @@ export default function CashFlowPro() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'data' | 'assumptions' | 'projections' | 'integrations' | 'settings'>('dashboard')
   const [beginningBalance, setBeginningBalance] = useState<number>(50000)
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [accrualTransactions, setAccrualTransactions] = useState<AccrualTransaction[]>([])
+  const [dashboardView, setDashboardView] = useState<DashboardView>('cash')
   const [assumptions, setAssumptions] = useState<Assumption[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES)
@@ -417,6 +436,7 @@ export default function CashFlowPro() {
     if (typeof window !== 'undefined') {
       try {
         const savedTransactions = localStorage.getItem(STORAGE_KEYS.transactions)
+        const savedAccrualTransactions = localStorage.getItem(STORAGE_KEYS.accrualTransactions)
         const savedAssumptions = localStorage.getItem(STORAGE_KEYS.assumptions)
         const savedBalance = localStorage.getItem(STORAGE_KEYS.beginningBalance)
         const savedCutoff = localStorage.getItem(STORAGE_KEYS.cutoffDate)
@@ -430,6 +450,7 @@ export default function CashFlowPro() {
         const savedCategories = localStorage.getItem(STORAGE_KEYS.categories)
         
         if (savedTransactions) setTransactions(JSON.parse(savedTransactions))
+        if (savedAccrualTransactions) setAccrualTransactions(JSON.parse(savedAccrualTransactions))
         if (savedAssumptions) setAssumptions(JSON.parse(savedAssumptions))
         if (savedBalance) setBeginningBalance(parseFloat(savedBalance) || 0)
         if (savedCutoff) setCutoffDate(savedCutoff)
@@ -457,6 +478,12 @@ export default function CashFlowPro() {
       localStorage.setItem(STORAGE_KEYS.transactions, JSON.stringify(transactions))
     }
   }, [transactions, isLoaded])
+
+  useEffect(() => {
+    if (isLoaded && typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.accrualTransactions, JSON.stringify(accrualTransactions))
+    }
+  }, [accrualTransactions, isLoaded])
 
   useEffect(() => {
     if (isLoaded && typeof window !== 'undefined') {
@@ -729,6 +756,105 @@ export default function CashFlowPro() {
       alert('Please use CSV format. Export from Excel/Sheets using "Save As > CSV"')
     }
   }, [normalizeTransaction])
+
+  // Accrual/Invoice file upload handler
+  const handleAccrualUpload = useCallback((file: File) => {
+    const fileExtension = file.name.split('.').pop()?.toLowerCase()
+    
+    // Helper to normalize date formats
+    const normalizeDate = (dateStr: string): string | null => {
+      if (!dateStr) return null
+      const cleaned = dateStr.trim()
+      
+      if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return cleaned
+      
+      const yyMatch = cleaned.match(/^(\d{2})-(\d{1,2})-(\d{1,2})$/)
+      if (yyMatch) {
+        const [, year, month, day] = yyMatch
+        const fullYear = parseInt(year) > 50 ? `19${year}` : `20${year}`
+        return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+      }
+      
+      const slashMatch = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+      if (slashMatch) {
+        const [, month, day, year] = slashMatch
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+      }
+      
+      const slashYYMatch = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/)
+      if (slashYYMatch) {
+        const [, month, day, year] = slashYYMatch
+        const fullYear = parseInt(year) > 50 ? `19${year}` : `20${year}`
+        return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+      }
+      
+      try {
+        const parsed = new Date(cleaned)
+        if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10)
+      } catch { /* ignore */ }
+      
+      return null
+    }
+    
+    if (fileExtension === 'csv') {
+      Papa.parse<Record<string, string>>(file, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header) => header.trim().toLowerCase().replace(/\s+/g, '_'),
+        complete: (results) => {
+          const imported: AccrualTransaction[] = results.data
+            .filter((row) => row.date && (row.amount || row.amount === '0'))
+            .map((row) => {
+              const normalizedDate = normalizeDate(row.date)
+              if (!normalizedDate) return null
+              
+              const amount = parseFloat(String(row.amount).replace(/[,$"]/g, ''))
+              if (isNaN(amount)) return null
+              
+              // Determine type: revenue (positive invoices to clients) or direct_cost (contractor invoices)
+              let type: 'revenue' | 'direct_cost' = 'revenue'
+              const rawType = (row.type || '').toLowerCase().trim()
+              
+              if (rawType.includes('cost') || rawType.includes('expense') || rawType.includes('contractor') || rawType.includes('direct')) {
+                type = 'direct_cost'
+              } else if (rawType.includes('revenue') || rawType.includes('income') || rawType.includes('invoice')) {
+                type = 'revenue'
+              } else if (amount < 0) {
+                type = 'direct_cost'
+              }
+              
+              const t: AccrualTransaction = {
+                id: generateId(),
+                date: normalizedDate,
+                type,
+                description: row.description?.trim() || '',
+                amount: Math.abs(amount) * (type === 'direct_cost' ? -1 : 1),
+                project: row.project?.trim() || 'Unassigned',
+                vendor: row.vendor?.trim() || row.client?.trim() || undefined,
+                invoiceNumber: row.invoice_number?.trim() || row.invoice?.trim() || undefined,
+                notes: row.notes?.trim() || undefined
+              }
+              return t
+            })
+            .filter((t): t is AccrualTransaction => t !== null)
+            
+          if (imported.length > 0) {
+            setAccrualTransactions(prev => [...prev, ...imported])
+            const revenueCount = imported.filter(t => t.type === 'revenue').length
+            const costCount = imported.filter(t => t.type === 'direct_cost').length
+            alert(`Successfully imported ${imported.length} accrual entries (${revenueCount} revenue, ${costCount} direct costs)`)
+          } else {
+            alert('No valid accrual data found. Check column headers: date, type, description, amount, project, vendor')
+          }
+        },
+        error: (error) => {
+          alert(`Error parsing CSV: ${error.message}`)
+        }
+      })
+    } else {
+      alert('Please use CSV format for accrual data')
+    }
+  }, [])
 
   const exportToCSV = useCallback(() => {
     const csv = Papa.unparse(transactions)
@@ -1318,6 +1444,217 @@ export default function CashFlowPro() {
       status: runwayMonths === Infinity || !isFinite(runwayMonths) ? 'profitable' : runwayMonths < 3 ? 'critical' : runwayMonths < 6 ? 'warning' : 'healthy'
     }
   }, [transactions, chartData, beginningBalance])
+
+  // Accrual monthly data
+  const accrualMonthlyData = useMemo(() => {
+    const months: { [key: string]: { revenue: number; directCosts: number; grossProfit: number; grossMarginPct: number } } = {}
+    
+    accrualTransactions.forEach(t => {
+      const monthKey = t.date.slice(0, 7)
+      if (!months[monthKey]) {
+        months[monthKey] = { revenue: 0, directCosts: 0, grossProfit: 0, grossMarginPct: 0 }
+      }
+      if (t.type === 'revenue') {
+        months[monthKey].revenue += t.amount
+      } else if (t.type === 'direct_cost') {
+        months[monthKey].directCosts += Math.abs(t.amount)
+      }
+    })
+    
+    // Calculate gross profit and margin
+    Object.keys(months).forEach(key => {
+      const m = months[key]
+      m.grossProfit = m.revenue - m.directCosts
+      m.grossMarginPct = m.revenue > 0 ? (m.grossProfit / m.revenue) * 100 : 0
+    })
+    
+    return Object.entries(months)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, data]) => ({ month, ...data }))
+  }, [accrualTransactions])
+
+  // Accrual project analysis with OH allocation
+  const accrualProjectAnalysis = useMemo(() => {
+    // Get total overhead from cash transactions for the period
+    const totalOverhead = transactions
+      .filter(t => t.category === 'overhead' && t.type === 'actual')
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+    
+    // Calculate revenue and direct costs by project
+    const projectData: { [key: string]: { revenue: number; directCosts: number } } = {}
+    
+    accrualTransactions.forEach(t => {
+      if (!projectData[t.project]) {
+        projectData[t.project] = { revenue: 0, directCosts: 0 }
+      }
+      if (t.type === 'revenue') {
+        projectData[t.project].revenue += t.amount
+      } else if (t.type === 'direct_cost') {
+        projectData[t.project].directCosts += Math.abs(t.amount)
+      }
+    })
+    
+    // Calculate total revenue for percentage allocation
+    const totalRevenue = Object.values(projectData).reduce((sum, p) => sum + p.revenue, 0)
+    
+    // Build project analysis with OH allocation
+    const analysis = Object.entries(projectData).map(([project, data]) => {
+      const grossProfit = data.revenue - data.directCosts
+      const grossMarginPct = data.revenue > 0 ? (grossProfit / data.revenue) * 100 : 0
+      const revenueSharePct = totalRevenue > 0 ? (data.revenue / totalRevenue) * 100 : 0
+      const ohAllocation = totalOverhead * (revenueSharePct / 100)
+      const netMargin = grossProfit - ohAllocation
+      const netMarginPct = data.revenue > 0 ? (netMargin / data.revenue) * 100 : 0
+      
+      return {
+        project,
+        revenue: data.revenue,
+        directCosts: data.directCosts,
+        grossProfit,
+        grossMarginPct,
+        revenueSharePct,
+        ohAllocation,
+        netMargin,
+        netMarginPct
+      }
+    }).sort((a, b) => b.revenue - a.revenue)
+    
+    // Calculate totals
+    const totals = analysis.reduce((acc, p) => ({
+      revenue: acc.revenue + p.revenue,
+      directCosts: acc.directCosts + p.directCosts,
+      grossProfit: acc.grossProfit + p.grossProfit,
+      ohAllocation: acc.ohAllocation + p.ohAllocation,
+      netMargin: acc.netMargin + p.netMargin
+    }), { revenue: 0, directCosts: 0, grossProfit: 0, ohAllocation: 0, netMargin: 0 })
+    
+    return { projects: analysis, totals, totalOverhead }
+  }, [accrualTransactions, transactions])
+
+  // Comparison data: Invoiced vs Collected by month
+  const comparisonData = useMemo(() => {
+    const months = new Set<string>()
+    
+    // Get all months from both datasets
+    accrualTransactions.forEach(t => months.add(t.date.slice(0, 7)))
+    transactions.filter(t => t.category === 'revenue').forEach(t => months.add(t.date.slice(0, 7)))
+    
+    const sortedMonths = Array.from(months).sort()
+    
+    return sortedMonths.map(month => {
+      // Invoiced (accrual revenue)
+      const invoiced = accrualTransactions
+        .filter(t => t.date.slice(0, 7) === month && t.type === 'revenue')
+        .reduce((sum, t) => sum + t.amount, 0)
+      
+      // Collected (cash revenue)
+      const collected = transactions
+        .filter(t => t.date.slice(0, 7) === month && t.category === 'revenue' && t.type === 'actual')
+        .reduce((sum, t) => sum + t.amount, 0)
+      
+      const delta = collected - invoiced
+      
+      return { month, invoiced, collected, delta }
+    })
+  }, [accrualTransactions, transactions])
+
+  // Accrual Period Comparison (MoM/QoQ/YoY)
+  const accrualPeriodComparison = useMemo(() => {
+    if (accrualMonthlyData.length < 2) return { mom: [], qoq: [], yoy: [] }
+    
+    // MoM comparison
+    const mom = accrualMonthlyData.slice(1).map((curr, idx) => {
+      const prev = accrualMonthlyData[idx]
+      const revenueChange = prev.revenue > 0 ? ((curr.revenue - prev.revenue) / prev.revenue) * 100 : 0
+      const gmChange = curr.grossMarginPct - prev.grossMarginPct
+      return {
+        period: curr.month,
+        currentRevenue: curr.revenue,
+        prevRevenue: prev.revenue,
+        revenueChange,
+        currentGM: curr.grossMarginPct,
+        prevGM: prev.grossMarginPct,
+        gmChange,
+        currentGrossProfit: curr.grossProfit,
+        prevGrossProfit: prev.grossProfit
+      }
+    })
+    
+    // QoQ comparison
+    const quarterData: { [key: string]: { revenue: number; directCosts: number; grossProfit: number; grossMarginPct: number } } = {}
+    accrualMonthlyData.forEach(m => {
+      const year = m.month.slice(0, 4)
+      const monthNum = parseInt(m.month.slice(5, 7))
+      const quarter = Math.ceil(monthNum / 3)
+      const quarterKey = `${year}-Q${quarter}`
+      
+      if (!quarterData[quarterKey]) {
+        quarterData[quarterKey] = { revenue: 0, directCosts: 0, grossProfit: 0, grossMarginPct: 0 }
+      }
+      quarterData[quarterKey].revenue += m.revenue
+      quarterData[quarterKey].directCosts += m.directCosts
+      quarterData[quarterKey].grossProfit += m.grossProfit
+    })
+    
+    // Calculate GM% for quarters
+    Object.values(quarterData).forEach(q => {
+      q.grossMarginPct = q.revenue > 0 ? (q.grossProfit / q.revenue) * 100 : 0
+    })
+    
+    const sortedQuarters = Object.entries(quarterData).sort(([a], [b]) => a.localeCompare(b))
+    const qoq = sortedQuarters.slice(1).map(([quarter, curr], idx) => {
+      const [, prev] = sortedQuarters[idx]
+      const revenueChange = prev.revenue > 0 ? ((curr.revenue - prev.revenue) / prev.revenue) * 100 : 0
+      const gmChange = curr.grossMarginPct - prev.grossMarginPct
+      return {
+        period: quarter,
+        currentRevenue: curr.revenue,
+        prevRevenue: prev.revenue,
+        revenueChange,
+        currentGM: curr.grossMarginPct,
+        prevGM: prev.grossMarginPct,
+        gmChange,
+        currentGrossProfit: curr.grossProfit,
+        prevGrossProfit: prev.grossProfit
+      }
+    })
+    
+    // YoY comparison
+    const yearData: { [key: string]: { revenue: number; directCosts: number; grossProfit: number; grossMarginPct: number } } = {}
+    accrualMonthlyData.forEach(m => {
+      const year = m.month.slice(0, 4)
+      if (!yearData[year]) {
+        yearData[year] = { revenue: 0, directCosts: 0, grossProfit: 0, grossMarginPct: 0 }
+      }
+      yearData[year].revenue += m.revenue
+      yearData[year].directCosts += m.directCosts
+      yearData[year].grossProfit += m.grossProfit
+    })
+    
+    Object.values(yearData).forEach(y => {
+      y.grossMarginPct = y.revenue > 0 ? (y.grossProfit / y.revenue) * 100 : 0
+    })
+    
+    const sortedYears = Object.entries(yearData).sort(([a], [b]) => a.localeCompare(b))
+    const yoy = sortedYears.slice(1).map(([year, curr], idx) => {
+      const [, prev] = sortedYears[idx]
+      const revenueChange = prev.revenue > 0 ? ((curr.revenue - prev.revenue) / prev.revenue) * 100 : 0
+      const gmChange = curr.grossMarginPct - prev.grossMarginPct
+      return {
+        period: year,
+        currentRevenue: curr.revenue,
+        prevRevenue: prev.revenue,
+        revenueChange,
+        currentGM: curr.grossMarginPct,
+        prevGM: prev.grossMarginPct,
+        gmChange,
+        currentGrossProfit: curr.grossProfit,
+        prevGrossProfit: prev.grossProfit
+      }
+    })
+    
+    return { mom, qoq, yoy }
+  }, [accrualMonthlyData])
 
   // Auto-generated insights
   const insights = useMemo(() => {
@@ -2155,6 +2492,26 @@ export default function CashFlowPro() {
             >
               {/* Filters */}
               <div className={`flex flex-wrap items-center gap-2 sm:gap-4 p-3 sm:p-4 rounded-xl border ${cardClasses}`}>
+                {/* View Mode Dropdown */}
+                <select
+                  value={dashboardView}
+                  onChange={(e) => setDashboardView(e.target.value as DashboardView)}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium border ${
+                    dashboardView === 'cash' 
+                      ? 'bg-accent-primary/10 text-accent-primary border-accent-primary/30' 
+                      : dashboardView === 'accrual'
+                        ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/30'
+                        : 'bg-amber-500/10 text-amber-500 border-amber-500/30'
+                  }`}
+                  style={{ colorScheme: theme }}
+                >
+                  <option value="cash">💵 Cash Flow</option>
+                  <option value="accrual">📊 Accrual (GM)</option>
+                  <option value="comparison">⚖️ Comparison</option>
+                </select>
+                
+                <div className={`hidden sm:block w-px h-6 ${theme === 'light' ? 'bg-gray-300' : 'bg-terminal-border'}`} />
+                
                 <div className="flex items-center gap-2">
                   <Building2 className={`w-4 h-4 sm:w-5 sm:h-5 ${textMuted}`} />
                   <select
@@ -2203,44 +2560,47 @@ export default function CashFlowPro() {
                 </div>
               </div>
 
-              {/* Insights Cards */}
-              {insights.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {insights.map((insight, idx) => (
-                    <div 
-                      key={idx}
-                      className={`rounded-xl p-4 border flex items-start gap-3 ${
-                        insight.type === 'positive' 
-                          ? theme === 'light' ? 'bg-green-50 border-green-200' : 'bg-accent-primary/10 border-accent-primary/30'
-                          : insight.type === 'warning'
-                          ? theme === 'light' ? 'bg-amber-50 border-amber-200' : 'bg-accent-warning/10 border-accent-warning/30'
-                          : insight.type === 'critical'
-                          ? theme === 'light' ? 'bg-red-50 border-red-200' : 'bg-accent-danger/10 border-accent-danger/30'
-                          : cardClasses
-                      }`}
-                    >
-                      <div className={`p-2 rounded-lg ${
-                        insight.type === 'positive' ? 'bg-accent-primary/20' :
-                        insight.type === 'warning' ? 'bg-accent-warning/20' :
-                        insight.type === 'critical' ? 'bg-accent-danger/20' : 'bg-accent-secondary/20'
-                      }`}>
-                        {insight.type === 'positive' ? <TrendingUp className="w-4 h-4 text-accent-primary" /> :
-                         insight.type === 'warning' ? <AlertTriangle className="w-4 h-4 text-accent-warning" /> :
-                         insight.type === 'critical' ? <AlertCircle className="w-4 h-4 text-accent-danger" /> :
-                         <Info className="w-4 h-4 text-accent-secondary" />}
-                      </div>
-                      <div>
-                        <div className={`font-semibold text-sm ${
-                          insight.type === 'positive' ? 'text-accent-primary' :
-                          insight.type === 'warning' ? 'text-accent-warning' :
-                          insight.type === 'critical' ? 'text-accent-danger' : ''
-                        }`}>{insight.title}</div>
-                        <div className={`text-xs mt-0.5 ${textMuted}`}>{insight.message}</div>
-                      </div>
+              {/* Cash Flow View */}
+              {dashboardView === 'cash' && (
+                <>
+                  {/* Insights Cards */}
+                  {insights.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {insights.map((insight, idx) => (
+                        <div 
+                          key={idx}
+                          className={`rounded-xl p-4 border flex items-start gap-3 ${
+                            insight.type === 'positive' 
+                              ? theme === 'light' ? 'bg-green-50 border-green-200' : 'bg-accent-primary/10 border-accent-primary/30'
+                              : insight.type === 'warning'
+                              ? theme === 'light' ? 'bg-amber-50 border-amber-200' : 'bg-accent-warning/10 border-accent-warning/30'
+                              : insight.type === 'critical'
+                              ? theme === 'light' ? 'bg-red-50 border-red-200' : 'bg-accent-danger/10 border-accent-danger/30'
+                              : cardClasses
+                          }`}
+                        >
+                          <div className={`p-2 rounded-lg ${
+                            insight.type === 'positive' ? 'bg-accent-primary/20' :
+                            insight.type === 'warning' ? 'bg-accent-warning/20' :
+                            insight.type === 'critical' ? 'bg-accent-danger/20' : 'bg-accent-secondary/20'
+                          }`}>
+                            {insight.type === 'positive' ? <TrendingUp className="w-4 h-4 text-accent-primary" /> :
+                             insight.type === 'warning' ? <AlertTriangle className="w-4 h-4 text-accent-warning" /> :
+                             insight.type === 'critical' ? <AlertCircle className="w-4 h-4 text-accent-danger" /> :
+                             <Info className="w-4 h-4 text-accent-secondary" />}
+                          </div>
+                          <div>
+                            <div className={`font-semibold text-sm ${
+                              insight.type === 'positive' ? 'text-accent-primary' :
+                              insight.type === 'warning' ? 'text-accent-warning' :
+                              insight.type === 'critical' ? 'text-accent-danger' : ''
+                            }`}>{insight.title}</div>
+                            <div className={`text-xs mt-0.5 ${textMuted}`}>{insight.message}</div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
+                  )}
 
               {/* KPI Cards + Runway */}
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
@@ -2646,7 +3006,7 @@ export default function CashFlowPro() {
               </div>
 
               {/* Quick Stats Row */}
-              {transactions.length > 0 && (
+              {transactions.length > 0 && dashboardView === 'cash' && (
                 <div className={`rounded-xl p-4 border ${cardClasses}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -2668,6 +3028,439 @@ export default function CashFlowPro() {
                     </button>
                   </div>
                 </div>
+              )}
+
+              {/* Accrual (Gross Margin) View */}
+              {dashboardView === 'accrual' && (
+                <>
+                  {/* Accrual KPIs */}
+                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+                    <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                      <div className={`flex items-center gap-2 text-sm ${textMuted}`}>
+                        <TrendingUp className="w-4 h-4" />
+                        Total Invoiced
+                      </div>
+                      <div className="text-2xl font-bold text-accent-primary mt-1">
+                        {formatCurrency(accrualProjectAnalysis.totals.revenue)}
+                      </div>
+                      <div className={`text-xs ${textMuted}`}>{accrualTransactions.filter(t => t.type === 'revenue').length} invoices</div>
+                    </div>
+                    <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                      <div className={`flex items-center gap-2 text-sm ${textMuted}`}>
+                        <TrendingDown className="w-4 h-4" />
+                        Direct Costs
+                      </div>
+                      <div className="text-2xl font-bold text-accent-danger mt-1">
+                        {formatCurrency(accrualProjectAnalysis.totals.directCosts)}
+                      </div>
+                      <div className={`text-xs ${textMuted}`}>Contractor invoices</div>
+                    </div>
+                    <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                      <div className={`flex items-center gap-2 text-sm ${textMuted}`}>
+                        <DollarSign className="w-4 h-4" />
+                        Gross Profit
+                      </div>
+                      <div className={`text-2xl font-bold mt-1 ${accrualProjectAnalysis.totals.grossProfit >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                        {formatCurrency(accrualProjectAnalysis.totals.grossProfit)}
+                      </div>
+                      <div className={`text-xs ${textMuted}`}>
+                        {accrualProjectAnalysis.totals.revenue > 0 
+                          ? `${((accrualProjectAnalysis.totals.grossProfit / accrualProjectAnalysis.totals.revenue) * 100).toFixed(1)}% GM`
+                          : 'N/A'}
+                      </div>
+                    </div>
+                    <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                      <div className={`flex items-center gap-2 text-sm ${textMuted}`}>
+                        <Building2 className="w-4 h-4" />
+                        Total Overhead
+                      </div>
+                      <div className="text-2xl font-bold text-accent-warning mt-1">
+                        {formatCurrency(accrualProjectAnalysis.totalOverhead)}
+                      </div>
+                      <div className={`text-xs ${textMuted}`}>
+                        {accrualProjectAnalysis.totals.revenue > 0 
+                          ? `${((accrualProjectAnalysis.totalOverhead / accrualProjectAnalysis.totals.revenue) * 100).toFixed(1)}% of revenue`
+                          : 'From cash data'}
+                      </div>
+                    </div>
+                    <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                      <div className={`flex items-center gap-2 text-sm ${textMuted}`}>
+                        <Target className="w-4 h-4" />
+                        Net Margin
+                      </div>
+                      <div className={`text-2xl font-bold mt-1 ${accrualProjectAnalysis.totals.netMargin >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                        {formatCurrency(accrualProjectAnalysis.totals.netMargin)}
+                      </div>
+                      <div className={`text-xs ${textMuted}`}>After OH allocation</div>
+                    </div>
+                  </div>
+
+                  {/* Monthly Gross Margin Chart */}
+                  <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
+                    <h3 className="text-lg font-semibold mb-4">Monthly Gross Margin Trend</h3>
+                    {accrualMonthlyData.length > 0 ? (
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart data={accrualMonthlyData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#374151'} />
+                            <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
+                            <YAxis yAxisId="left" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
+                            <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `${v.toFixed(0)}%`} tick={{ fontSize: 11 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
+                            <Tooltip 
+                              formatter={(value: number, name: string) => [
+                                name === 'grossMarginPct' ? `${value.toFixed(1)}%` : formatCurrency(value),
+                                name === 'revenue' ? 'Revenue' : name === 'directCosts' ? 'Direct Costs' : name === 'grossProfit' ? 'Gross Profit' : 'GM %'
+                              ]}
+                              contentStyle={{ background: theme === 'light' ? 'white' : '#1f2937', border: 'none', borderRadius: '8px' }}
+                            />
+                            <Legend />
+                            <Bar yAxisId="left" dataKey="revenue" name="Revenue" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+                            <Bar yAxisId="left" dataKey="directCosts" name="Direct Costs" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                            <Line yAxisId="right" type="monotone" dataKey="grossMarginPct" name="GM %" stroke="#6366f1" strokeWidth={3} dot={{ r: 4 }} />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className={`text-center py-12 ${textMuted}`}>
+                        <p>No accrual data yet. Upload invoices in the Data tab.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Project Analysis Table */}
+                  <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
+                    <h3 className="text-lg font-semibold mb-4">Project Gross Margin Analysis</h3>
+                    {accrualProjectAnalysis.projects.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className={tableHeaderBg}>
+                            <tr className={`border-b ${tableBorder} text-left ${textMuted}`}>
+                              <th className="pb-3 font-medium">Project</th>
+                              <th className="pb-3 font-medium text-right">Revenue</th>
+                              <th className="pb-3 font-medium text-right">Direct Costs</th>
+                              <th className="pb-3 font-medium text-right">Gross Profit</th>
+                              <th className="pb-3 font-medium text-right">GM %</th>
+                              <th className="pb-3 font-medium text-right">Rev Share</th>
+                              <th className="pb-3 font-medium text-right">OH Allocation</th>
+                              <th className="pb-3 font-medium text-right">Net Margin</th>
+                              <th className="pb-3 font-medium text-right">Net %</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {accrualProjectAnalysis.projects.map(p => (
+                              <tr key={p.project} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
+                                <td className="py-3 font-medium">{p.project}</td>
+                                <td className="py-3 text-right font-mono text-accent-primary">{formatCurrency(p.revenue)}</td>
+                                <td className="py-3 text-right font-mono text-accent-danger">{formatCurrency(p.directCosts)}</td>
+                                <td className={`py-3 text-right font-mono ${p.grossProfit >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                  {formatCurrency(p.grossProfit)}
+                                </td>
+                                <td className={`py-3 text-right font-medium ${p.grossMarginPct >= 30 ? 'text-accent-primary' : p.grossMarginPct >= 15 ? 'text-accent-warning' : 'text-accent-danger'}`}>
+                                  {p.grossMarginPct.toFixed(1)}%
+                                </td>
+                                <td className={`py-3 text-right ${textMuted}`}>{p.revenueSharePct.toFixed(1)}%</td>
+                                <td className="py-3 text-right font-mono text-accent-warning">{formatCurrency(p.ohAllocation)}</td>
+                                <td className={`py-3 text-right font-mono ${p.netMargin >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                  {formatCurrency(p.netMargin)}
+                                </td>
+                                <td className={`py-3 text-right font-medium ${p.netMarginPct >= 20 ? 'text-accent-primary' : p.netMarginPct >= 10 ? 'text-accent-warning' : 'text-accent-danger'}`}>
+                                  {p.netMarginPct.toFixed(1)}%
+                                </td>
+                              </tr>
+                            ))}
+                            <tr className={`font-bold ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                              <td className="py-3">TOTAL</td>
+                              <td className="py-3 text-right font-mono text-accent-primary">{formatCurrency(accrualProjectAnalysis.totals.revenue)}</td>
+                              <td className="py-3 text-right font-mono text-accent-danger">{formatCurrency(accrualProjectAnalysis.totals.directCosts)}</td>
+                              <td className={`py-3 text-right font-mono ${accrualProjectAnalysis.totals.grossProfit >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                {formatCurrency(accrualProjectAnalysis.totals.grossProfit)}
+                              </td>
+                              <td className="py-3 text-right">
+                                {accrualProjectAnalysis.totals.revenue > 0 
+                                  ? `${((accrualProjectAnalysis.totals.grossProfit / accrualProjectAnalysis.totals.revenue) * 100).toFixed(1)}%`
+                                  : 'N/A'}
+                              </td>
+                              <td className="py-3 text-right">100%</td>
+                              <td className="py-3 text-right font-mono text-accent-warning">{formatCurrency(accrualProjectAnalysis.totalOverhead)}</td>
+                              <td className={`py-3 text-right font-mono ${accrualProjectAnalysis.totals.netMargin >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                {formatCurrency(accrualProjectAnalysis.totals.netMargin)}
+                              </td>
+                              <td className="py-3 text-right">
+                                {accrualProjectAnalysis.totals.revenue > 0 
+                                  ? `${((accrualProjectAnalysis.totals.netMargin / accrualProjectAnalysis.totals.revenue) * 100).toFixed(1)}%`
+                                  : 'N/A'}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className={`text-center py-12 ${textMuted}`}>
+                        <p>No accrual data yet. Upload invoices in the Data tab.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Period Comparison Buttons */}
+                  <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold">Period Comparison</h3>
+                      <div className="flex items-center gap-2">
+                        {(['mom', 'qoq', 'yoy'] as const).map(view => (
+                          <button
+                            key={view}
+                            onClick={() => setComparisonView(view)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                              comparisonView === view
+                                ? 'bg-indigo-500 text-white'
+                                : theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-terminal-bg hover:bg-terminal-surface'
+                            }`}
+                          >
+                            {view === 'mom' ? 'MoM' : view === 'qoq' ? 'QoQ' : 'YoY'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* Period Comparison Table */}
+                    {comparisonView === 'mom' && accrualPeriodComparison.mom.length > 0 && (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className={tableHeaderBg}>
+                            <tr className={`border-b ${tableBorder} text-left ${textMuted}`}>
+                              <th className="pb-3 font-medium">Month</th>
+                              <th className="pb-3 font-medium text-right">Revenue</th>
+                              <th className="pb-3 font-medium text-right">vs Prior</th>
+                              <th className="pb-3 font-medium text-right">Gross Profit</th>
+                              <th className="pb-3 font-medium text-right">GM %</th>
+                              <th className="pb-3 font-medium text-right">GM Change</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {accrualPeriodComparison.mom.slice(-6).map(row => (
+                              <tr key={row.period} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
+                                <td className="py-3 font-medium">{row.period}</td>
+                                <td className="py-3 text-right font-mono">{formatCurrency(row.currentRevenue)}</td>
+                                <td className={`py-3 text-right font-mono ${row.revenueChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                  {row.revenueChange >= 0 ? '+' : ''}{row.revenueChange.toFixed(1)}%
+                                </td>
+                                <td className={`py-3 text-right font-mono ${row.currentGrossProfit >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                  {formatCurrency(row.currentGrossProfit)}
+                                </td>
+                                <td className="py-3 text-right font-mono">{row.currentGM.toFixed(1)}%</td>
+                                <td className={`py-3 text-right font-mono ${row.gmChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                  {row.gmChange >= 0 ? '+' : ''}{row.gmChange.toFixed(1)}pp
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    
+                    {comparisonView === 'qoq' && accrualPeriodComparison.qoq.length > 0 && (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className={tableHeaderBg}>
+                            <tr className={`border-b ${tableBorder} text-left ${textMuted}`}>
+                              <th className="pb-3 font-medium">Quarter</th>
+                              <th className="pb-3 font-medium text-right">Revenue</th>
+                              <th className="pb-3 font-medium text-right">vs Prior Qtr</th>
+                              <th className="pb-3 font-medium text-right">Gross Profit</th>
+                              <th className="pb-3 font-medium text-right">GM %</th>
+                              <th className="pb-3 font-medium text-right">GM Change</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {accrualPeriodComparison.qoq.map(row => (
+                              <tr key={row.period} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
+                                <td className="py-3 font-medium">{row.period}</td>
+                                <td className="py-3 text-right font-mono">{formatCurrency(row.currentRevenue)}</td>
+                                <td className={`py-3 text-right font-mono ${row.revenueChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                  {row.revenueChange >= 0 ? '+' : ''}{row.revenueChange.toFixed(1)}%
+                                </td>
+                                <td className={`py-3 text-right font-mono ${row.currentGrossProfit >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                  {formatCurrency(row.currentGrossProfit)}
+                                </td>
+                                <td className="py-3 text-right font-mono">{row.currentGM.toFixed(1)}%</td>
+                                <td className={`py-3 text-right font-mono ${row.gmChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                  {row.gmChange >= 0 ? '+' : ''}{row.gmChange.toFixed(1)}pp
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    
+                    {comparisonView === 'yoy' && accrualPeriodComparison.yoy.length > 0 && (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className={tableHeaderBg}>
+                            <tr className={`border-b ${tableBorder} text-left ${textMuted}`}>
+                              <th className="pb-3 font-medium">Year</th>
+                              <th className="pb-3 font-medium text-right">Revenue</th>
+                              <th className="pb-3 font-medium text-right">vs Prior Year</th>
+                              <th className="pb-3 font-medium text-right">Gross Profit</th>
+                              <th className="pb-3 font-medium text-right">GM %</th>
+                              <th className="pb-3 font-medium text-right">GM Change</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {accrualPeriodComparison.yoy.map(row => (
+                              <tr key={row.period} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
+                                <td className="py-3 font-medium">{row.period}</td>
+                                <td className="py-3 text-right font-mono">{formatCurrency(row.currentRevenue)}</td>
+                                <td className={`py-3 text-right font-mono ${row.revenueChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                  {row.revenueChange >= 0 ? '+' : ''}{row.revenueChange.toFixed(1)}%
+                                </td>
+                                <td className={`py-3 text-right font-mono ${row.currentGrossProfit >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                  {formatCurrency(row.currentGrossProfit)}
+                                </td>
+                                <td className="py-3 text-right font-mono">{row.currentGM.toFixed(1)}%</td>
+                                <td className={`py-3 text-right font-mono ${row.gmChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                  {row.gmChange >= 0 ? '+' : ''}{row.gmChange.toFixed(1)}pp
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    
+                    {((comparisonView === 'mom' && accrualPeriodComparison.mom.length === 0) ||
+                      (comparisonView === 'qoq' && accrualPeriodComparison.qoq.length === 0) ||
+                      (comparisonView === 'yoy' && accrualPeriodComparison.yoy.length === 0)) && (
+                      <div className={`text-center py-8 ${textMuted}`}>
+                        <p>Need at least 2 {comparisonView === 'mom' ? 'months' : comparisonView === 'qoq' ? 'quarters' : 'years'} of data for comparison.</p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Comparison View */}
+              {dashboardView === 'comparison' && (
+                <>
+                  {/* Comparison Summary KPIs */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                      <div className={`flex items-center gap-2 text-sm ${textMuted}`}>
+                        <FileText className="w-4 h-4" />
+                        Total Invoiced
+                      </div>
+                      <div className="text-2xl font-bold text-indigo-500 mt-1">
+                        {formatCurrency(comparisonData.reduce((sum, m) => sum + m.invoiced, 0))}
+                      </div>
+                      <div className={`text-xs ${textMuted}`}>Accrual basis</div>
+                    </div>
+                    <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                      <div className={`flex items-center gap-2 text-sm ${textMuted}`}>
+                        <DollarSign className="w-4 h-4" />
+                        Total Collected
+                      </div>
+                      <div className="text-2xl font-bold text-accent-primary mt-1">
+                        {formatCurrency(comparisonData.reduce((sum, m) => sum + m.collected, 0))}
+                      </div>
+                      <div className={`text-xs ${textMuted}`}>Cash basis</div>
+                    </div>
+                    <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                      <div className={`flex items-center gap-2 text-sm ${textMuted}`}>
+                        <TrendingUp className="w-4 h-4" />
+                        Outstanding AR
+                      </div>
+                      <div className={`text-2xl font-bold mt-1 ${
+                        comparisonData.reduce((sum, m) => sum + m.invoiced, 0) - comparisonData.reduce((sum, m) => sum + m.collected, 0) > 0
+                          ? 'text-accent-warning' : 'text-accent-primary'
+                      }`}>
+                        {formatCurrency(
+                          comparisonData.reduce((sum, m) => sum + m.invoiced, 0) - 
+                          comparisonData.reduce((sum, m) => sum + m.collected, 0)
+                        )}
+                      </div>
+                      <div className={`text-xs ${textMuted}`}>Invoiced - Collected</div>
+                    </div>
+                    <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                      <div className={`flex items-center gap-2 text-sm ${textMuted}`}>
+                        <Clock className="w-4 h-4" />
+                        Collection Rate
+                      </div>
+                      <div className="text-2xl font-bold text-accent-primary mt-1">
+                        {comparisonData.reduce((sum, m) => sum + m.invoiced, 0) > 0
+                          ? `${((comparisonData.reduce((sum, m) => sum + m.collected, 0) / comparisonData.reduce((sum, m) => sum + m.invoiced, 0)) * 100).toFixed(1)}%`
+                          : 'N/A'}
+                      </div>
+                      <div className={`text-xs ${textMuted}`}>Cash/Invoiced</div>
+                    </div>
+                  </div>
+
+                  {/* Comparison Chart */}
+                  <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
+                    <h3 className="text-lg font-semibold mb-4">Invoiced vs Collected by Month</h3>
+                    {comparisonData.length > 0 ? (
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart data={comparisonData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#374151'} />
+                            <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
+                            <YAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
+                            <Tooltip 
+                              formatter={(value: number, name: string) => [formatCurrency(value), name]}
+                              contentStyle={{ background: theme === 'light' ? 'white' : '#1f2937', border: 'none', borderRadius: '8px' }}
+                            />
+                            <Legend />
+                            <Bar dataKey="invoiced" name="Invoiced (Accrual)" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="collected" name="Collected (Cash)" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+                            <ReferenceLine y={0} stroke="#6b7280" />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className={`text-center py-12 ${textMuted}`}>
+                        <p>No comparison data. Upload both cash and accrual data in the Data tab.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Comparison Table */}
+                  <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
+                    <h3 className="text-lg font-semibold mb-4">Monthly Comparison Detail</h3>
+                    {comparisonData.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className={tableHeaderBg}>
+                            <tr className={`border-b ${tableBorder} text-left ${textMuted}`}>
+                              <th className="pb-3 font-medium">Month</th>
+                              <th className="pb-3 font-medium text-right">Invoiced (Accrual)</th>
+                              <th className="pb-3 font-medium text-right">Collected (Cash)</th>
+                              <th className="pb-3 font-medium text-right">Delta</th>
+                              <th className="pb-3 font-medium">Notes</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {comparisonData.map(row => (
+                              <tr key={row.month} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
+                                <td className="py-3 font-medium">{row.month}</td>
+                                <td className="py-3 text-right font-mono text-indigo-500">{formatCurrency(row.invoiced)}</td>
+                                <td className="py-3 text-right font-mono text-accent-primary">{formatCurrency(row.collected)}</td>
+                                <td className={`py-3 text-right font-mono font-medium ${row.delta >= 0 ? 'text-accent-primary' : 'text-accent-warning'}`}>
+                                  {row.delta >= 0 ? '+' : ''}{formatCurrency(row.delta)}
+                                </td>
+                                <td className={`py-3 text-xs ${textMuted}`}>
+                                  {row.delta < 0 ? 'Pending collection' : row.delta > 0 ? 'Collected prior invoices' : 'Balanced'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className={`text-center py-12 ${textMuted}`}>
+                        <p>No comparison data. Upload both cash and accrual data in the Data tab.</p>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </motion.div>
           )}
@@ -2857,85 +3650,174 @@ export default function CashFlowPro() {
           {/* Data Tab */}
           {activeTab === 'data' && (
             <motion.div key="data" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className={`rounded-xl p-6 border ${cardClasses}`}>
-                  <h3 className="text-lg font-semibold mb-4">Beginning Balance</h3>
-                  <div className="relative">
-                    <DollarSign className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${textMuted}`} />
+              
+              {/* Cash Flow Settings */}
+              <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-accent-primary" />
+                  Cash Flow Settings
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-sm mb-2 ${textMuted}`}>Beginning Balance</label>
+                    <div className="relative">
+                      <DollarSign className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${textMuted}`} />
+                      <input
+                        type="number"
+                        value={beginningBalance}
+                        onChange={(e) => setBeginningBalance(parseFloat(e.target.value) || 0)}
+                        className={`pl-9 pr-4 py-2.5 rounded-lg font-mono w-full border ${inputClasses}`}
+                        style={{ colorScheme: theme }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={`block text-sm mb-2 ${textMuted}`}>Actuals Cutoff</label>
                     <input
-                      type="number"
-                      value={beginningBalance}
-                      onChange={(e) => setBeginningBalance(parseFloat(e.target.value) || 0)}
-                      className={`pl-10 pr-4 py-3 rounded-lg text-xl font-mono w-full border ${inputClasses}`}
+                      type="month"
+                      value={cutoffDate}
+                      onChange={(e) => setCutoffDate(e.target.value)}
+                      className={`px-4 py-2.5 rounded-lg font-mono w-full border ${inputClasses}`}
                       style={{ colorScheme: theme }}
                     />
                   </div>
                 </div>
-
-                <div className={`rounded-xl p-6 border ${cardClasses}`}>
-                  <h3 className="text-lg font-semibold mb-4">Actuals Cutoff</h3>
-                  <input
-                    type="month"
-                    value={cutoffDate}
-                    onChange={(e) => setCutoffDate(e.target.value)}
-                    className={`px-4 py-3 rounded-lg font-mono w-full border ${inputClasses}`}
-                    style={{ colorScheme: theme }}
-                  />
-                </div>
               </div>
 
-              <div 
-                className={`rounded-xl p-8 border-2 border-dashed transition-all ${
+              {/* Two Upload Sections Side by Side */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* Cash Flow Upload */}
+                <div className={`rounded-xl p-6 border-2 border-dashed transition-all ${
                   isDragging 
                     ? 'border-accent-primary bg-accent-primary/5' 
                     : theme === 'light' ? 'border-gray-300' : 'border-terminal-border'
                 }`}
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={(e) => { e.preventDefault(); setIsDragging(false); const file = e.dataTransfer.files[0]; if (file) handleFileUpload(file) }}
-              >
-                <div className="text-center">
-                  <Upload className={`w-12 h-12 mx-auto mb-4 ${textMuted}`} />
-                  <h3 className="text-lg font-semibold mb-2">Import Data</h3>
-                  <p className={`mb-4 ${textMuted}`}>CSV format • Drag & drop or click</p>
-                  <input type="file" accept=".csv" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleFileUpload(file) }} className="hidden" id="file-upload" />
-                  <label htmlFor="file-upload" className="inline-flex items-center gap-2 px-6 py-3 bg-accent-primary/10 text-accent-primary rounded-lg cursor-pointer hover:bg-accent-primary/20">
-                    <Upload className="w-5 h-5" />
-                    Choose File
-                  </label>
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={(e) => { e.preventDefault(); setIsDragging(false); const file = e.dataTransfer.files[0]; if (file) handleFileUpload(file) }}
+                >
+                  <div className="text-center">
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-accent-primary/10 flex items-center justify-center">
+                      <DollarSign className="w-6 h-6 text-accent-primary" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-1">💵 Cash Flow Data</h3>
+                    <p className={`text-sm mb-4 ${textMuted}`}>Bank transactions, actual payments</p>
+                    <input type="file" accept=".csv" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleFileUpload(file) }} className="hidden" id="cash-file-upload" />
+                    <label htmlFor="cash-file-upload" className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent-primary text-white rounded-lg cursor-pointer hover:bg-accent-primary/90">
+                      <Upload className="w-4 h-4" />
+                      Upload Cash Data
+                    </label>
+                    <div className={`text-xs mt-3 ${textSubtle}`}>
+                      {transactions.length} transactions loaded
+                    </div>
+                  </div>
+                </div>
+
+                {/* Accrual/Invoice Upload */}
+                <div className={`rounded-xl p-6 border-2 border-dashed transition-all ${
+                  theme === 'light' ? 'border-indigo-200 hover:border-indigo-300' : 'border-indigo-500/30 hover:border-indigo-500/50'
+                }`}
+                  onDragOver={(e) => { e.preventDefault() }}
+                  onDrop={(e) => { e.preventDefault(); const file = e.dataTransfer.files[0]; if (file) handleAccrualUpload(file) }}
+                >
+                  <div className="text-center">
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-indigo-500/10 flex items-center justify-center">
+                      <FileText className="w-6 h-6 text-indigo-500" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-1">📊 Accrual Data (Invoices)</h3>
+                    <p className={`text-sm mb-4 ${textMuted}`}>Invoices issued & received (for GM)</p>
+                    <input type="file" accept=".csv" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleAccrualUpload(file) }} className="hidden" id="accrual-file-upload" />
+                    <label htmlFor="accrual-file-upload" className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-500 text-white rounded-lg cursor-pointer hover:bg-indigo-500/90">
+                      <Upload className="w-4 h-4" />
+                      Upload Invoice Data
+                    </label>
+                    <div className={`text-xs mt-3 ${textSubtle}`}>
+                      {accrualTransactions.length} invoices loaded
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className={`rounded-xl p-6 border ${cardClasses}`}>
-                <h3 className="text-lg font-semibold mb-4">Required Format</h3>
-                <div className={`rounded-lg p-4 font-mono text-xs sm:text-sm overflow-x-auto ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
-                  <div className={textMuted}>date,category,description,amount,type,project,notes</div>
-                  <div className="text-accent-primary">2024-01-15,revenue,Consulting,50000,actual,Project Alpha,Q1 retainer</div>
-                  <div className="text-accent-danger">2024-01-01,opex,Labor,-15000,actual,Project Alpha,</div>
-                  <div className="text-accent-warning">2024-01-01,overhead,Rent,-5000,actual,,Monthly rent</div>
-                  <div className="text-accent-secondary">2024-02-15,investment,Equipment,-20000,actual,,Annual purchase</div>
+              {/* Format Instructions */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                  <h4 className="font-semibold mb-3 text-accent-primary">Cash Flow Format</h4>
+                  <div className={`rounded-lg p-3 font-mono text-xs overflow-x-auto ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                    <div className={textMuted}>date,category,description,amount,type,project</div>
+                    <div className="text-accent-primary">2024-01-15,revenue,Payment received,50000,actual,Alpha</div>
+                    <div className="text-accent-danger">2024-01-01,opex,Contractor payment,-15000,actual,Alpha</div>
+                    <div className="text-accent-warning">2024-01-01,overhead,Rent payment,-5000,actual,</div>
+                  </div>
                 </div>
-                <div className={`text-xs mt-3 space-y-1 ${textSubtle}`}>
-                  <p><strong>Categories:</strong> revenue, opex, overhead, investment</p>
-                  <p><strong>Type:</strong> actual or budget</p>
-                  <p><strong>Notes:</strong> optional context (e.g., "Annual renewal")</p>
+                
+                <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                  <h4 className="font-semibold mb-3 text-indigo-500">Accrual/Invoice Format</h4>
+                  <div className={`rounded-lg p-3 font-mono text-xs overflow-x-auto ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                    <div className={textMuted}>date,type,description,amount,project,vendor</div>
+                    <div className="text-accent-primary">2024-01-15,revenue,Invoice #1001,50000,Alpha,Client ABC</div>
+                    <div className="text-accent-danger">2024-01-01,direct_cost,Contractor inv,-15000,Alpha,Dev Co</div>
+                  </div>
+                  <div className={`text-xs mt-2 ${textSubtle}`}>
+                    <strong>Type:</strong> revenue (invoices TO clients) or direct_cost (invoices FROM contractors)
+                  </div>
                 </div>
               </div>
 
+              {/* Actions */}
               <div className="flex flex-wrap gap-4">
-                <button onClick={loadSampleData} className="flex items-center gap-2 px-6 py-3 bg-accent-secondary/10 text-accent-secondary rounded-lg hover:bg-accent-secondary/20">
-                  <RefreshCw className="w-5 h-5" />
+                <button onClick={loadSampleData} className="flex items-center gap-2 px-5 py-2.5 bg-accent-secondary/10 text-accent-secondary rounded-lg hover:bg-accent-secondary/20">
+                  <RefreshCw className="w-4 h-4" />
                   Load Sample
                 </button>
-                <button onClick={exportToCSV} disabled={!transactions.length} className={`flex items-center gap-2 px-6 py-3 rounded-lg border disabled:opacity-50 ${
+                <button onClick={exportToCSV} disabled={!transactions.length} className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border disabled:opacity-50 ${
                   theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-terminal-bg border-terminal-border'
                 }`}>
-                  <Download className="w-5 h-5" />
-                  Export CSV
+                  <Download className="w-4 h-4" />
+                  Export Cash CSV
                 </button>
-                <button onClick={clearAllData} disabled={!transactions.length} className="flex items-center gap-2 px-6 py-3 bg-accent-danger/10 text-accent-danger rounded-lg disabled:opacity-50 hover:bg-accent-danger/20">
-                  <Trash2 className="w-5 h-5" />
-                  Clear All
+                <button 
+                  onClick={() => {
+                    const csv = Papa.unparse(accrualTransactions)
+                    const blob = new Blob([csv], { type: 'text/csv' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = 'accrual-invoices.csv'
+                    a.click()
+                    URL.revokeObjectURL(url)
+                  }} 
+                  disabled={!accrualTransactions.length} 
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border disabled:opacity-50 ${
+                    theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-terminal-bg border-terminal-border'
+                  }`}
+                >
+                  <Download className="w-4 h-4" />
+                  Export Accrual CSV
+                </button>
+                <button 
+                  onClick={() => {
+                    if (confirm('Clear all cash flow transactions?')) {
+                      setTransactions([])
+                    }
+                  }} 
+                  disabled={!transactions.length} 
+                  className="flex items-center gap-2 px-5 py-2.5 bg-accent-danger/10 text-accent-danger rounded-lg disabled:opacity-50 hover:bg-accent-danger/20"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Clear Cash
+                </button>
+                <button 
+                  onClick={() => {
+                    if (confirm('Clear all accrual/invoice data?')) {
+                      setAccrualTransactions([])
+                    }
+                  }} 
+                  disabled={!accrualTransactions.length} 
+                  className="flex items-center gap-2 px-5 py-2.5 bg-indigo-500/10 text-indigo-500 rounded-lg disabled:opacity-50 hover:bg-indigo-500/20"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Clear Accrual
                 </button>
               </div>
             </motion.div>
