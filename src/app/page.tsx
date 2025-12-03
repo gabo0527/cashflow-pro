@@ -1532,7 +1532,7 @@ export default function CashFlowPro() {
   }, [accrualTransactions, transactions])
 
   // Comparison data: Invoiced vs Collected by month
-  const comparisonData = useMemo(() => {
+  const cashVsAccrualData = useMemo(() => {
     const months = new Set<string>()
     
     // Get all months from both datasets
@@ -3352,7 +3352,7 @@ export default function CashFlowPro() {
                         Total Invoiced
                       </div>
                       <div className="text-2xl font-bold text-indigo-500 mt-1">
-                        {formatCurrency(comparisonData.reduce((sum, m) => sum + m.invoiced, 0))}
+                        {formatCurrency(cashVsAccrualData.reduce((sum, m) => sum + m.invoiced, 0))}
                       </div>
                       <div className={`text-xs ${textMuted}`}>Accrual basis</div>
                     </div>
@@ -3362,7 +3362,7 @@ export default function CashFlowPro() {
                         Total Collected
                       </div>
                       <div className="text-2xl font-bold text-accent-primary mt-1">
-                        {formatCurrency(comparisonData.reduce((sum, m) => sum + m.collected, 0))}
+                        {formatCurrency(cashVsAccrualData.reduce((sum, m) => sum + m.collected, 0))}
                       </div>
                       <div className={`text-xs ${textMuted}`}>Cash basis</div>
                     </div>
@@ -3372,12 +3372,12 @@ export default function CashFlowPro() {
                         Outstanding AR
                       </div>
                       <div className={`text-2xl font-bold mt-1 ${
-                        comparisonData.reduce((sum, m) => sum + m.invoiced, 0) - comparisonData.reduce((sum, m) => sum + m.collected, 0) > 0
+                        cashVsAccrualData.reduce((sum, m) => sum + m.invoiced, 0) - cashVsAccrualData.reduce((sum, m) => sum + m.collected, 0) > 0
                           ? 'text-accent-warning' : 'text-accent-primary'
                       }`}>
                         {formatCurrency(
-                          comparisonData.reduce((sum, m) => sum + m.invoiced, 0) - 
-                          comparisonData.reduce((sum, m) => sum + m.collected, 0)
+                          cashVsAccrualData.reduce((sum, m) => sum + m.invoiced, 0) - 
+                          cashVsAccrualData.reduce((sum, m) => sum + m.collected, 0)
                         )}
                       </div>
                       <div className={`text-xs ${textMuted}`}>Invoiced - Collected</div>
@@ -3388,8 +3388,8 @@ export default function CashFlowPro() {
                         Collection Rate
                       </div>
                       <div className="text-2xl font-bold text-accent-primary mt-1">
-                        {comparisonData.reduce((sum, m) => sum + m.invoiced, 0) > 0
-                          ? `${((comparisonData.reduce((sum, m) => sum + m.collected, 0) / comparisonData.reduce((sum, m) => sum + m.invoiced, 0)) * 100).toFixed(1)}%`
+                        {cashVsAccrualData.reduce((sum, m) => sum + m.invoiced, 0) > 0
+                          ? `${((cashVsAccrualData.reduce((sum, m) => sum + m.collected, 0) / cashVsAccrualData.reduce((sum, m) => sum + m.invoiced, 0)) * 100).toFixed(1)}%`
                           : 'N/A'}
                       </div>
                       <div className={`text-xs ${textMuted}`}>Cash/Invoiced</div>
@@ -3399,10 +3399,10 @@ export default function CashFlowPro() {
                   {/* Comparison Chart */}
                   <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
                     <h3 className="text-lg font-semibold mb-4">Invoiced vs Collected by Month</h3>
-                    {comparisonData.length > 0 ? (
+                    {cashVsAccrualData.length > 0 ? (
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
-                          <ComposedChart data={comparisonData}>
+                          <ComposedChart data={cashVsAccrualData}>
                             <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#374151'} />
                             <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
                             <YAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
@@ -3427,7 +3427,7 @@ export default function CashFlowPro() {
                   {/* Comparison Table */}
                   <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
                     <h3 className="text-lg font-semibold mb-4">Monthly Comparison Detail</h3>
-                    {comparisonData.length > 0 ? (
+                    {cashVsAccrualData.length > 0 ? (
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead className={tableHeaderBg}>
@@ -3440,7 +3440,7 @@ export default function CashFlowPro() {
                             </tr>
                           </thead>
                           <tbody>
-                            {comparisonData.map(row => (
+                            {cashVsAccrualData.map(row => (
                               <tr key={row.month} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
                                 <td className="py-3 font-medium">{row.month}</td>
                                 <td className="py-3 text-right font-mono text-indigo-500">{formatCurrency(row.invoiced)}</td>
