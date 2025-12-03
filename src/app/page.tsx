@@ -3029,6 +3029,8 @@ export default function CashFlowPro() {
                   </div>
                 </div>
               )}
+                </>
+              )}
 
               {/* Accrual (Gross Margin) View */}
               {dashboardView === 'accrual' && (
