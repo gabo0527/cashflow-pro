@@ -666,7 +666,7 @@ export default function CashFlowPro() {
         if (!isNaN(parsed.getTime())) {
           return parsed.toISOString().slice(0, 10)
         }
-      } catch {
+      } catch (e) {
         // ignore
       }
       
@@ -791,7 +791,7 @@ export default function CashFlowPro() {
       try {
         const parsed = new Date(cleaned)
         if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10)
-      } catch { /* ignore */ }
+      } catch (e) { /* ignore */ }
       
       return null
     }
@@ -1073,7 +1073,7 @@ export default function CashFlowPro() {
       const monthTransactions = filteredTransactions.filter(t => {
         try {
           return t.date && t.date.slice(0, 7) === monthStr
-        } catch {
+        } catch (e) {
           return false
         }
       })
@@ -1369,7 +1369,7 @@ export default function CashFlowPro() {
         else if (t.category === 'opex') weeks[weekKey].opex += Math.abs(amount)
         else if (t.category === 'overhead') weeks[weekKey].overhead += Math.abs(amount)
         else if (t.category === 'investment') weeks[weekKey].investment += Math.abs(amount)
-      } catch {
+      } catch (e) {
         // Skip invalid transactions
       }
     })
@@ -1399,7 +1399,7 @@ export default function CashFlowPro() {
         if (!t.date || t.type !== 'actual') return false
         const txDate = new Date(t.date)
         return !isNaN(txDate.getTime()) && txDate >= threeMonthsAgo
-      } catch {
+      } catch (e) {
         return false
       }
     })
