@@ -14,14 +14,22 @@ import {
   Filter, RefreshCw, Edit2, X, Check, Building2, Moon, Sun, AlertTriangle,
   FolderPlus, Copy, FileText, Bell, Repeat, Lock, Users, Image, Palette,
   Shield, Eye, EyeOff, HardDrive, CloudOff, ExternalLink, Clock, Target,
-  Sparkles, AlertCircle, CheckCircle, Info, MessageSquare, Gauge
+  Sparkles, AlertCircle, CheckCircle, Info, MessageSquare, Gauge, List, Tag
 } from 'lucide-react'
 
 // Types
+interface Category {
+  id: string
+  name: string
+  type: 'income' | 'expense'  // For grouping in reports
+  color: string
+  isDefault: boolean
+}
+
 interface Transaction {
   id: string
   date: string
-  category: 'revenue' | 'opex' | 'overhead' | 'investment' | 'unassigned'
+  category: string  // Now supports custom categories
   description: string
   amount: number
   type: 'actual' | 'budget'
@@ -35,7 +43,7 @@ interface Transaction {
 interface Assumption {
   id: string
   name: string
-  category: 'revenue' | 'opex' | 'overhead' | 'investment'
+  category: string  // Now supports custom categories
   amount: number
   frequency: 'monthly' | 'quarterly' | 'annually' | 'one-time'
   startDate: string
@@ -283,8 +291,18 @@ const STORAGE_KEYS = {
   theme: 'cashflow_theme',
   balanceAlert: 'cashflow_balance_alert',
   branding: 'cashflow_branding',
-  chartFilters: 'cashflow_chart_filters'
+  chartFilters: 'cashflow_chart_filters',
+  categories: 'cashflow_categories'
 }
+
+// Default categories
+const DEFAULT_CATEGORIES: Category[] = [
+  { id: 'revenue', name: 'Revenue', type: 'income', color: '#14b8a6', isDefault: true },
+  { id: 'opex', name: 'OpEx', type: 'expense', color: '#ef4444', isDefault: true },
+  { id: 'overhead', name: 'Overhead', type: 'expense', color: '#f59e0b', isDefault: true },
+  { id: 'investment', name: 'Investment', type: 'expense', color: '#6366f1', isDefault: true },
+  { id: 'unassigned', name: 'Unassigned', type: 'expense', color: '#a855f7', isDefault: true },
+]
 
 // Branding interface
 interface BrandingSettings {
@@ -305,11 +323,12 @@ interface ChartFilters {
 // Main Component
 export default function CashFlowPro() {
   // Core state
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'data' | 'assumptions' | 'projections' | 'integrations' | 'settings'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'data' | 'assumptions' | 'projections' | 'integrations' | 'settings'>('dashboard')
   const [beginningBalance, setBeginningBalance] = useState<number>(50000)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [assumptions, setAssumptions] = useState<Assumption[]>([])
   const [projects, setProjects] = useState<Project[]>([])
+  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES)
   const [scenarios, setScenarios] = useState<Scenario[]>([{ id: 'base', name: 'Base Case', isBase: true, createdAt: new Date().toISOString() }])
   const [recurringRules, setRecurringRules] = useState<RecurringRule[]>([])
   const [projectionYears, setProjectionYears] = useState<1 | 2 | 3>(1)
@@ -408,6 +427,7 @@ export default function CashFlowPro() {
         const savedRecurring = localStorage.getItem(STORAGE_KEYS.recurringRules)
         const savedBranding = localStorage.getItem(STORAGE_KEYS.branding)
         const savedChartFilters = localStorage.getItem(STORAGE_KEYS.chartFilters)
+        const savedCategories = localStorage.getItem(STORAGE_KEYS.categories)
         
         if (savedTransactions) setTransactions(JSON.parse(savedTransactions))
         if (savedAssumptions) setAssumptions(JSON.parse(savedAssumptions))
@@ -420,6 +440,7 @@ export default function CashFlowPro() {
         if (savedRecurring) setRecurringRules(JSON.parse(savedRecurring))
         if (savedBranding) setBranding(JSON.parse(savedBranding))
         if (savedChartFilters) setChartFilters(JSON.parse(savedChartFilters))
+        if (savedCategories) setCategories(JSON.parse(savedCategories))
       } catch (error) {
         console.error('Error loading data from localStorage:', error)
         // Clear corrupted data
@@ -497,6 +518,23 @@ export default function CashFlowPro() {
       localStorage.setItem(STORAGE_KEYS.chartFilters, JSON.stringify(chartFilters))
     }
   }, [chartFilters, isLoaded])
+
+  useEffect(() => {
+    if (isLoaded && typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.categories, JSON.stringify(categories))
+    }
+  }, [categories, isLoaded])
+
+  // Helper to get category by id
+  const getCategoryById = useCallback((id: string): Category | undefined => {
+    return categories.find(c => c.id === id)
+  }, [categories])
+
+  // Helper to get category color
+  const getCategoryColor = useCallback((categoryId: string): string => {
+    const cat = getCategoryById(categoryId)
+    return cat?.color || '#6b7280' // gray default
+  }, [getCategoryById])
   
   const activeDateRange = useMemo(() => {
     return getDateRangeFromPreset(dateRangePreset, customStartDate, customEndDate)
@@ -627,10 +665,17 @@ export default function CashFlowPro() {
               if (isNaN(amount)) return null
               
               // Normalize category names - default to unassigned for empty/unknown
-              let category: Transaction['category'] = 'unassigned'
+              let category = 'unassigned'
               const rawCategory = (row.category || '').toLowerCase().trim()
               
-              if (rawCategory.includes('revenue') || rawCategory.includes('income') || rawCategory.includes('sales')) {
+              // First try exact match with existing categories (including custom)
+              const exactMatch = categories.find(c => 
+                c.id.toLowerCase() === rawCategory || 
+                c.name.toLowerCase() === rawCategory
+              )
+              if (exactMatch) {
+                category = exactMatch.id
+              } else if (rawCategory.includes('revenue') || rawCategory.includes('income') || rawCategory.includes('sales')) {
                 category = 'revenue'
               } else if (rawCategory.includes('opex') || rawCategory.includes('operating') || rawCategory.includes('direct')) {
                 category = 'opex'
@@ -638,13 +683,21 @@ export default function CashFlowPro() {
                 category = 'overhead'
               } else if (rawCategory.includes('invest') || rawCategory.includes('capex') || rawCategory.includes('capital')) {
                 category = 'investment'
-              } else if (rawCategory === '') {
-                // Empty category - check if amount is positive for revenue hint
-                if (amount > 0) {
-                  category = 'unassigned' // User should categorize
-                } else {
-                  category = 'unassigned' // User should categorize
+              } else if (rawCategory.includes('travel')) {
+                // Auto-create travel category if it doesn't exist
+                if (!categories.find(c => c.id === 'travel')) {
+                  setCategories(prev => [...prev, { id: 'travel', name: 'Travel', type: 'expense', color: '#06b6d4', isDefault: false }])
                 }
+                category = 'travel'
+              } else if (rawCategory.includes('tax')) {
+                // Auto-create taxes category if it doesn't exist
+                if (!categories.find(c => c.id === 'taxes')) {
+                  setCategories(prev => [...prev, { id: 'taxes', name: 'Taxes', type: 'expense', color: '#dc2626', isDefault: false }])
+                }
+                category = 'taxes'
+              } else if (rawCategory !== '') {
+                // Unknown category - keep as unassigned but could auto-create
+                category = 'unassigned'
               }
               
               const t: Transaction = {
@@ -1380,9 +1433,9 @@ export default function CashFlowPro() {
 
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: PieChartIcon },
+    { id: 'transactions', label: 'Transactions', icon: List },
     { id: 'data', label: 'Data', icon: Database },
-    { id: 'assumptions', label: 'Assumptions', icon: Settings },
-    { id: 'projections', label: 'Projections', icon: TrendingUp },
+    { id: 'assumptions', label: 'Assumptions', icon: TrendingUp },
     { id: 'settings', label: 'Settings', icon: Settings }
   ]
 
@@ -1546,14 +1599,13 @@ export default function CashFlowPro() {
                   <label className={`block text-sm mb-1 ${textMuted}`}>Category</label>
                   <select
                     value={quickAddForm.category || 'revenue'}
-                    onChange={(e) => setQuickAddForm(prev => ({ ...prev, category: e.target.value as Transaction['category'] }))}
+                    onChange={(e) => setQuickAddForm(prev => ({ ...prev, category: e.target.value }))}
                     className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
                     style={{ colorScheme: theme }}
                   >
-                    <option value="revenue">Revenue</option>
-                    <option value="opex">OpEx (requires project)</option>
-                    <option value="overhead">Overhead</option>
-                    <option value="investment">Investment</option>
+                    {categories.filter(c => c.id !== 'unassigned').map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
                   </select>
                 </div>
                 
@@ -1699,15 +1751,13 @@ export default function CashFlowPro() {
                     <label className={`block text-sm mb-1 ${textMuted}`}>Category</label>
                     <select
                       value={editForm.category || 'unassigned'}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, category: e.target.value as Transaction['category'] }))}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, category: e.target.value }))}
                       className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
                       style={{ colorScheme: theme }}
                     >
-                      <option value="revenue">Revenue</option>
-                      <option value="opex">OpEx</option>
-                      <option value="overhead">Overhead</option>
-                      <option value="investment">Investment</option>
-                      <option value="unassigned">Unassigned</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
                     </select>
                   </div>
                   <div>
@@ -2595,126 +2645,210 @@ export default function CashFlowPro() {
                 )}
               </div>
 
-              {/* Transactions */}
+              {/* Quick Stats Row */}
               {transactions.length > 0 && (
-                <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
-                  <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-base sm:text-lg font-semibold">Transactions</h3>
-                      <select
-                        value={transactionMonthFilter}
-                        onChange={(e) => setTransactionMonthFilter(e.target.value)}
-                        className={`rounded-lg px-2 py-1 text-xs sm:text-sm border ${inputClasses}`}
-                        style={{ colorScheme: theme }}
-                      >
-                        <option value="all">All Months</option>
-                        {transactionMonths.map(m => (
-                          <option key={m} value={m}>{getMonthLabel(m)}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={transactionCategoryFilter}
-                        onChange={(e) => setTransactionCategoryFilter(e.target.value)}
-                        className={`rounded-lg px-2 py-1 text-xs sm:text-sm border ${inputClasses}`}
-                        style={{ colorScheme: theme }}
-                      >
-                        <option value="all">All Categories</option>
-                        <option value="revenue">Revenue</option>
-                        <option value="opex">OpEx</option>
-                        <option value="overhead">Overhead</option>
-                        <option value="investment">Investment</option>
-                        <option value="unassigned">⚠️ Unassigned</option>
-                      </select>
+                <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <List className="w-4 h-4 text-accent-primary" />
+                        <span className="text-sm font-medium">{transactions.length} Transactions</span>
+                      </div>
+                      {transactions.filter(t => t.category === 'unassigned').length > 0 && (
+                        <span className="px-2 py-1 bg-purple-500/10 text-purple-500 rounded text-xs">
+                          {transactions.filter(t => t.category === 'unassigned').length} need categorization
+                        </span>
+                      )}
                     </div>
-                    <div className="flex gap-2">
-                      <button onClick={exportToCSV} className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm border ${
-                        theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-terminal-bg border-terminal-border'
-                      }`}>
-                        <Download className="w-3 h-3 sm:w-4 sm:h-4" />
-                        <span className="hidden sm:inline">CSV</span>
-                      </button>
-                      <button onClick={exportToPDF} className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm border ${
-                        theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-terminal-bg border-terminal-border'
-                      }`}>
-                        <FileText className="w-3 h-3 sm:w-4 sm:h-4" />
-                        <span className="hidden sm:inline">PDF</span>
-                      </button>
-                    </div>
+                    <button 
+                      onClick={() => setActiveTab('transactions')}
+                      className="text-sm text-accent-primary hover:underline flex items-center gap-1"
+                    >
+                      View All <ExternalLink className="w-3 h-3" />
+                    </button>
                   </div>
-                  
-                  <div className="overflow-x-auto max-h-80 overflow-y-auto">
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* Transactions Tab */}
+          {activeTab === 'transactions' && (
+            <motion.div key="transactions" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
+              {/* Filters Bar */}
+              <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h3 className="text-lg font-semibold">Transactions</h3>
+                    <select
+                      value={transactionMonthFilter}
+                      onChange={(e) => setTransactionMonthFilter(e.target.value)}
+                      className={`rounded-lg px-3 py-2 text-sm border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
+                    >
+                      <option value="all">All Months</option>
+                      {transactionMonths.map(m => (
+                        <option key={m} value={m}>{getMonthLabel(m)}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={transactionCategoryFilter}
+                      onChange={(e) => setTransactionCategoryFilter(e.target.value)}
+                      className={`rounded-lg px-3 py-2 text-sm border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
+                    >
+                      <option value="all">All Categories</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.id === 'unassigned' ? '⚠️ ' : ''}{cat.name}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={selectedProject}
+                      onChange={(e) => setSelectedProject(e.target.value)}
+                      className={`rounded-lg px-3 py-2 text-sm border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
+                    >
+                      <option value="all">All Projects</option>
+                      {projectList.map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setShowQuickAdd(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-primary/90"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add
+                    </button>
+                    <button onClick={exportToCSV} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
+                      theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-terminal-bg border-terminal-border'
+                    }`}>
+                      <Download className="w-4 h-4" />
+                      CSV
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Transaction Table */}
+              {filteredTransactions.length > 0 ? (
+                <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
+                  <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className={`sticky top-0 ${tableHeaderBg}`}>
+                      <thead className={tableHeaderBg}>
                         <tr className={`border-b ${tableBorder} text-left ${textMuted}`}>
-                          <th className="pb-2 font-medium">Date</th>
-                          <th className="pb-2 font-medium">Category</th>
-                          <th className="pb-2 font-medium hidden sm:table-cell">Description</th>
-                          <th className="pb-2 font-medium text-right">Amount</th>
-                          <th className="pb-2 font-medium hidden md:table-cell">Project</th>
-                          <th className="pb-2 font-medium text-center">Actions</th>
+                          <th className="pb-3 font-medium">Date</th>
+                          <th className="pb-3 font-medium">Category</th>
+                          <th className="pb-3 font-medium">Description</th>
+                          <th className="pb-3 font-medium text-right">Amount</th>
+                          <th className="pb-3 font-medium">Project</th>
+                          <th className="pb-3 font-medium">Type</th>
+                          <th className="pb-3 font-medium text-center">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredTransactions.slice(0, 50).map(t => (
-                          <tr key={t.id} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
-                            <td className="py-2 text-xs sm:text-sm">{t.date.slice(5)}</td>
-                            <td className="py-2">
-                              <span className={`px-1.5 py-0.5 rounded text-xs ${
-                                t.category === 'revenue' ? 'bg-accent-primary/10 text-accent-primary' : 
-                                t.category === 'opex' ? 'bg-accent-danger/10 text-accent-danger' : 
-                                t.category === 'overhead' ? 'bg-accent-warning/10 text-accent-warning' :
-                                t.category === 'unassigned' ? 'bg-purple-500/10 text-purple-500' :
-                                'bg-accent-secondary/10 text-accent-secondary'
-                              }`}>
-                                {t.category === 'investment' ? 'InvEx' : t.category}
-                              </span>
-                            </td>
-                            <td className="py-2 text-xs sm:text-sm hidden sm:table-cell">
-                                              <div className="flex items-center gap-1 max-w-40">
-                                                <span className="truncate">{t.description}</span>
-                                                {t.notes && (
-                                                  <button 
-                                                    onClick={() => setExpandedNotes(prev => {
-                                                      const next = new Set(prev)
-                                                      if (next.has(t.id)) next.delete(t.id)
-                                                      else next.add(t.id)
-                                                      return next
-                                                    })}
-                                                    className="p-0.5 text-accent-secondary hover:text-accent-primary"
-                                                    title={t.notes}
-                                                  >
-                                                    <MessageSquare className="w-3 h-3" />
-                                                  </button>
-                                                )}
-                                              </div>
-                                              {t.notes && expandedNotes.has(t.id) && (
-                                                <div className={`text-xs mt-1 p-1.5 rounded ${theme === 'light' ? 'bg-gray-100 text-gray-600' : 'bg-terminal-bg text-zinc-400'}`}>
-                                                  {t.notes}
-                                                </div>
-                                              )}
-                                            </td>
-                            <td className={`py-2 text-right font-mono text-xs sm:text-sm ${t.amount >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                              {formatCurrency(t.amount)}
-                            </td>
-                            <td className={`py-2 text-xs hidden md:table-cell ${textMuted}`}>{t.project || '-'}</td>
-                            <td className="py-2 text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                <button onClick={() => startEdit(t)} className="p-1 text-zinc-400 hover:text-accent-primary">
-                                  <Edit2 className="w-3 h-3" />
-                                </button>
-                                <button onClick={() => deleteTransaction(t.id)} className="p-1 text-zinc-400 hover:text-accent-danger">
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
+                        {filteredTransactions.map(t => {
+                          const cat = getCategoryById(t.category)
+                          return (
+                            <tr key={t.id} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'} hover:${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg/50'}`}>
+                              <td className="py-3 text-sm">{t.date}</td>
+                              <td className="py-3">
+                                <span 
+                                  className="px-2 py-1 rounded text-xs font-medium"
+                                  style={{ 
+                                    backgroundColor: `${cat?.color || '#6b7280'}15`,
+                                    color: cat?.color || '#6b7280'
+                                  }}
+                                >
+                                  {cat?.name || t.category}
+                                </span>
+                              </td>
+                              <td className="py-3 text-sm">
+                                <div className="flex items-center gap-2 max-w-xs">
+                                  <span className="truncate">{t.description}</span>
+                                  {t.notes && (
+                                    <button 
+                                      onClick={() => setExpandedNotes(prev => {
+                                        const next = new Set(prev)
+                                        if (next.has(t.id)) next.delete(t.id)
+                                        else next.add(t.id)
+                                        return next
+                                      })}
+                                      className="p-0.5 text-accent-secondary hover:text-accent-primary flex-shrink-0"
+                                      title={t.notes}
+                                    >
+                                      <MessageSquare className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                                {t.notes && expandedNotes.has(t.id) && (
+                                  <div className={`text-xs mt-1 p-2 rounded ${theme === 'light' ? 'bg-gray-100 text-gray-600' : 'bg-terminal-bg text-zinc-400'}`}>
+                                    {t.notes}
+                                  </div>
+                                )}
+                              </td>
+                              <td className={`py-3 text-right font-mono text-sm ${t.amount >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                {formatCurrency(t.amount)}
+                              </td>
+                              <td className={`py-3 text-sm ${textMuted}`}>{t.project || '-'}</td>
+                              <td className="py-3">
+                                <span className={`px-2 py-0.5 rounded text-xs ${
+                                  t.type === 'actual' 
+                                    ? 'bg-accent-primary/10 text-accent-primary' 
+                                    : 'bg-accent-warning/10 text-accent-warning'
+                                }`}>
+                                  {t.type}
+                                </span>
+                              </td>
+                              <td className="py-3 text-center">
+                                <div className="flex items-center justify-center gap-2">
+                                  <button onClick={() => startEdit(t)} className="p-1.5 text-zinc-400 hover:text-accent-primary hover:bg-accent-primary/10 rounded">
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button onClick={() => deleteTransaction(t.id)} className="p-1.5 text-zinc-400 hover:text-accent-danger hover:bg-accent-danger/10 rounded">
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
-                  <p className={`text-xs mt-3 text-center ${textMuted}`}>
-                    {filteredTransactions.length} transactions
+                  <p className={`text-sm mt-4 text-center ${textMuted}`}>
+                    Showing {filteredTransactions.length} of {transactions.length} transactions
                   </p>
+                </div>
+              ) : (
+                <div className={`rounded-xl p-12 border ${cardClasses} text-center`}>
+                  <List className={`w-12 h-12 mx-auto mb-4 ${textMuted}`} />
+                  <h3 className="text-lg font-semibold mb-2">No Transactions</h3>
+                  <p className={`mb-4 ${textMuted}`}>
+                    {transactions.length === 0 
+                      ? 'Import your data or add transactions manually'
+                      : 'No transactions match your filters'}
+                  </p>
+                  <div className="flex gap-3 justify-center">
+                    <button 
+                      onClick={() => setActiveTab('data')}
+                      className="px-4 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-primary/90"
+                    >
+                      Import Data
+                    </button>
+                    <button 
+                      onClick={() => setShowQuickAdd(true)}
+                      className={`px-4 py-2 rounded-lg border ${
+                        theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                      }`}
+                    >
+                      Add Manually
+                    </button>
+                  </div>
                 </div>
               )}
             </motion.div>
@@ -2859,11 +2993,10 @@ export default function CashFlowPro() {
                 <h3 className="text-lg font-semibold mb-4">Add Assumption</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                   <input type="text" placeholder="Name" value={newAssumption.name || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, name: e.target.value }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }} />
-                  <select value={newAssumption.category || 'revenue'} onChange={(e) => setNewAssumption(prev => ({ ...prev, category: e.target.value as Assumption['category'] }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }}>
-                    <option value="revenue">Revenue</option>
-                    <option value="opex">OpEx</option>
-                    <option value="overhead">Overhead</option>
-                    <option value="investment">Investment</option>
+                  <select value={newAssumption.category || 'revenue'} onChange={(e) => setNewAssumption(prev => ({ ...prev, category: e.target.value }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }}>
+                    {categories.filter(c => c.id !== 'unassigned').map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
                   </select>
                   <input type="number" placeholder="Amount" value={newAssumption.amount || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }} />
                 </div>
@@ -2897,12 +3030,13 @@ export default function CashFlowPro() {
                     {activeAssumptions.map(a => (
                       <div key={a.id} className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
                         <div className="flex items-center gap-3 flex-wrap">
-                          <span className={`px-2 py-0.5 rounded text-xs ${
-                            a.category === 'revenue' ? 'bg-accent-primary/10 text-accent-primary' : 
-                            a.category === 'opex' ? 'bg-accent-danger/10 text-accent-danger' : 
-                            a.category === 'overhead' ? 'bg-accent-warning/10 text-accent-warning' :
-                            'bg-accent-secondary/10 text-accent-secondary'
-                          }`}>{a.category}</span>
+                          <span 
+                            className="px-2 py-0.5 rounded text-xs font-medium"
+                            style={{ 
+                              backgroundColor: `${getCategoryColor(a.category)}15`,
+                              color: getCategoryColor(a.category)
+                            }}
+                          >{getCategoryById(a.category)?.name || a.category}</span>
                           <span className="font-medium">{a.name}</span>
                           <span className={`text-sm ${textMuted}`}>{a.frequency}</span>
                         </div>
@@ -3091,6 +3225,101 @@ export default function CashFlowPro() {
                         <p className={`text-xs mt-1 ${textSubtle}`}>PNG, JPG up to 500KB</p>
                       </div>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category Manager */}
+              <div className={`rounded-xl p-6 border ${cardClasses}`}>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Tag className="w-5 h-5" />
+                  Categories
+                </h3>
+                <p className={`text-sm mb-4 ${textMuted}`}>Create custom categories to track where your money goes</p>
+                
+                <div className="space-y-3 mb-4">
+                  {categories.map(cat => (
+                    <div key={cat.id} className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                      <div className="flex items-center gap-3">
+                        <div 
+                          className="w-4 h-4 rounded-full"
+                          style={{ backgroundColor: cat.color }}
+                        />
+                        <span className="font-medium">{cat.name}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded ${theme === 'light' ? 'bg-gray-200' : 'bg-terminal-surface'}`}>
+                          {cat.type}
+                        </span>
+                        {cat.isDefault && (
+                          <span className={`text-xs ${textMuted}`}>(default)</span>
+                        )}
+                      </div>
+                      {!cat.isDefault && (
+                        <button 
+                          onClick={() => setCategories(prev => prev.filter(c => c.id !== cat.id))}
+                          className="p-1 text-zinc-400 hover:text-accent-danger"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                
+                <div className={`p-4 rounded-lg border-2 border-dashed ${theme === 'light' ? 'border-gray-300' : 'border-terminal-border'}`}>
+                  <h4 className={`text-sm font-medium mb-3 ${textMuted}`}>Add New Category</h4>
+                  <div className="flex flex-wrap gap-3 items-end">
+                    <div className="flex-1 min-w-[150px]">
+                      <label className={`block text-xs mb-1 ${textSubtle}`}>Name</label>
+                      <input
+                        type="text"
+                        id="new-category-name"
+                        placeholder="e.g., Travel, Taxes"
+                        className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                        style={{ colorScheme: theme }}
+                      />
+                    </div>
+                    <div className="w-32">
+                      <label className={`block text-xs mb-1 ${textSubtle}`}>Type</label>
+                      <select
+                        id="new-category-type"
+                        className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                        style={{ colorScheme: theme }}
+                      >
+                        <option value="expense">Expense</option>
+                        <option value="income">Income</option>
+                      </select>
+                    </div>
+                    <div className="w-20">
+                      <label className={`block text-xs mb-1 ${textSubtle}`}>Color</label>
+                      <input
+                        type="color"
+                        id="new-category-color"
+                        defaultValue="#6366f1"
+                        className="w-full h-10 rounded-lg cursor-pointer border-0"
+                      />
+                    </div>
+                    <button 
+                      onClick={() => {
+                        const nameInput = document.getElementById('new-category-name') as HTMLInputElement
+                        const typeSelect = document.getElementById('new-category-type') as HTMLSelectElement
+                        const colorInput = document.getElementById('new-category-color') as HTMLInputElement
+                        
+                        if (nameInput.value.trim()) {
+                          const newCat: Category = {
+                            id: nameInput.value.toLowerCase().replace(/\s+/g, '_'),
+                            name: nameInput.value.trim(),
+                            type: typeSelect.value as 'income' | 'expense',
+                            color: colorInput.value,
+                            isDefault: false
+                          }
+                          setCategories(prev => [...prev, newCat])
+                          nameInput.value = ''
+                        }
+                      }}
+                      className="px-4 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-primary/90"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               </div>
