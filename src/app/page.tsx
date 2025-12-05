@@ -14,7 +14,8 @@ import {
   Filter, RefreshCw, Edit2, X, Check, Building2, Moon, Sun, AlertTriangle,
   FolderPlus, Copy, FileText, Bell, Repeat, Lock, Users, Image, Palette,
   Shield, Eye, EyeOff, HardDrive, CloudOff, ExternalLink, Clock, Target,
-  Sparkles, AlertCircle, CheckCircle, Info, MessageSquare, Gauge, List, Tag
+  Sparkles, AlertCircle, CheckCircle, Info, MessageSquare, Gauge, List, Tag,
+  BarChart3
 } from 'lucide-react'
 
 // Types
@@ -61,6 +62,8 @@ interface Assumption {
   name: string
   category: string  // Now supports custom categories
   amount: number
+  valueType: 'amount' | 'percentage'  // $ or %
+  percentOf?: 'baseline' | 'previous' | 'revenue' | 'opex' | 'overhead' | 'investment'  // What the % references
   frequency: 'monthly' | 'quarterly' | 'annually' | 'one-time'
   startDate: string
   endDate?: string
@@ -356,6 +359,10 @@ export default function CashFlowPro() {
   const [isDragging, setIsDragging] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
   
+  // Projection settings
+  const [baselinePeriod, setBaselinePeriod] = useState<'L3M' | 'L6M' | 'L12M' | 'all'>('L3M')
+  const [projectionPeriod, setProjectionPeriod] = useState<'3M' | '6M' | '12M' | '18M' | '24M'>('12M')
+  
   // UI state
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
   const [balanceAlertThreshold, setBalanceAlertThreshold] = useState<number>(0)
@@ -428,6 +435,8 @@ export default function CashFlowPro() {
     category: 'revenue',
     frequency: 'monthly',
     amount: 0,
+    valueType: 'amount',
+    percentOf: 'baseline',
     startDate: new Date().toISOString().slice(0, 7)
   })
 
@@ -982,6 +991,8 @@ export default function CashFlowPro() {
         name: newAssumption.name,
         category: newAssumption.category || 'revenue',
         amount: newAssumption.amount,
+        valueType: newAssumption.valueType || 'amount',
+        percentOf: newAssumption.valueType === 'percentage' ? (newAssumption.percentOf || 'baseline') : undefined,
         frequency: newAssumption.frequency || 'monthly',
         startDate: newAssumption.startDate,
         endDate: newAssumption.endDate,
@@ -994,6 +1005,8 @@ export default function CashFlowPro() {
         category: 'revenue',
         frequency: 'monthly',
         amount: 0,
+        valueType: 'amount',
+        percentOf: 'baseline',
         startDate: new Date().toISOString().slice(0, 7)
       })
     }
@@ -1656,6 +1669,199 @@ export default function CashFlowPro() {
     return { mom, qoq, yoy }
   }, [accrualMonthlyData])
 
+  // Projection data based on baseline averages + assumptions
+  const projectionData = useMemo(() => {
+    const now = new Date()
+    const currentMonth = now.toISOString().slice(0, 7)
+    
+    // Calculate baseline period start
+    let baselineStart: Date
+    switch (baselinePeriod) {
+      case 'L3M':
+        baselineStart = new Date(now.getFullYear(), now.getMonth() - 3, 1)
+        break
+      case 'L6M':
+        baselineStart = new Date(now.getFullYear(), now.getMonth() - 6, 1)
+        break
+      case 'L12M':
+        baselineStart = new Date(now.getFullYear(), now.getMonth() - 12, 1)
+        break
+      case 'all':
+      default:
+        baselineStart = new Date(2020, 0, 1)
+        break
+    }
+    const baselineStartStr = baselineStart.toISOString().slice(0, 7)
+    
+    // Get baseline transactions
+    const baselineTransactions = transactions.filter(t => 
+      t.type === 'actual' && 
+      t.date.slice(0, 7) >= baselineStartStr && 
+      t.date.slice(0, 7) <= currentMonth
+    )
+    
+    // Calculate monthly averages by category
+    const monthsInBaseline = new Set(baselineTransactions.map(t => t.date.slice(0, 7)))
+    const numMonths = Math.max(1, monthsInBaseline.size)
+    
+    const totals = { revenue: 0, opex: 0, overhead: 0, investment: 0 }
+    baselineTransactions.forEach(t => {
+      const amount = typeof t.amount === 'number' ? t.amount : 0
+      if (t.category === 'revenue') totals.revenue += amount
+      else if (t.category === 'opex') totals.opex += Math.abs(amount)
+      else if (t.category === 'overhead') totals.overhead += Math.abs(amount)
+      else if (t.category === 'investment') totals.investment += Math.abs(amount)
+    })
+    
+    const baselineAvg = {
+      revenue: totals.revenue / numMonths,
+      opex: totals.opex / numMonths,
+      overhead: totals.overhead / numMonths,
+      investment: totals.investment / numMonths
+    }
+    
+    // Determine projection months based on period
+    const periodMonths = {
+      '3M': 3, '6M': 6, '12M': 12, '18M': 18, '24M': 24
+    }[projectionPeriod]
+    
+    // Generate projection months
+    const projectionMonths: {
+      month: string
+      monthLabel: string
+      revenue: number
+      opex: number
+      overhead: number
+      investment: number
+      netCash: number
+      balance: number
+    }[] = []
+    
+    // Get current balance from actual data
+    let runningBalance = beginningBalance
+    transactions
+      .filter(t => t.type === 'actual' && t.date.slice(0, 7) <= currentMonth)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .forEach(t => {
+        runningBalance += t.amount
+      })
+    
+    // Previous month values for compounding calculations
+    let prevValues = { ...baselineAvg }
+    
+    for (let i = 1; i <= periodMonths; i++) {
+      const projDate = new Date(now.getFullYear(), now.getMonth() + i, 1)
+      const monthKey = projDate.toISOString().slice(0, 7)
+      const monthLabel = projDate.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+      
+      // Start with baseline averages
+      let monthRevenue = baselineAvg.revenue
+      let monthOpex = baselineAvg.opex
+      let monthOverhead = baselineAvg.overhead
+      let monthInvestment = baselineAvg.investment
+      
+      // Apply assumptions for this month
+      activeAssumptions.forEach(a => {
+        // Check if assumption applies to this month
+        if (a.startDate > monthKey) return
+        if (a.endDate && a.endDate < monthKey) return
+        
+        // Check frequency
+        const monthsDiff = (projDate.getFullYear() - new Date(a.startDate + '-01').getFullYear()) * 12 + 
+                          (projDate.getMonth() - new Date(a.startDate + '-01').getMonth())
+        
+        let applies = false
+        if (a.frequency === 'monthly') applies = true
+        else if (a.frequency === 'quarterly' && monthsDiff % 3 === 0) applies = true
+        else if (a.frequency === 'annually' && monthsDiff % 12 === 0) applies = true
+        else if (a.frequency === 'one-time' && monthKey === a.startDate) applies = true
+        
+        if (!applies) return
+        
+        // Calculate the actual value
+        let value = a.amount
+        if (a.valueType === 'percentage' && a.percentOf) {
+          const pct = a.amount / 100
+          switch (a.percentOf) {
+            case 'baseline':
+              if (a.category === 'revenue') value = baselineAvg.revenue * pct
+              else if (a.category === 'opex') value = baselineAvg.opex * pct
+              else if (a.category === 'overhead') value = baselineAvg.overhead * pct
+              else if (a.category === 'investment') value = baselineAvg.investment * pct
+              break
+            case 'previous':
+              if (a.category === 'revenue') value = prevValues.revenue * pct
+              else if (a.category === 'opex') value = prevValues.opex * pct
+              else if (a.category === 'overhead') value = prevValues.overhead * pct
+              else if (a.category === 'investment') value = prevValues.investment * pct
+              break
+            case 'revenue':
+              value = monthRevenue * pct
+              break
+            case 'opex':
+              value = monthOpex * pct
+              break
+            case 'overhead':
+              value = monthOverhead * pct
+              break
+            case 'investment':
+              value = monthInvestment * pct
+              break
+          }
+        }
+        
+        // Apply value to appropriate category
+        if (a.category === 'revenue') monthRevenue += value
+        else if (a.category === 'opex') monthOpex += value
+        else if (a.category === 'overhead') monthOverhead += value
+        else if (a.category === 'investment') monthInvestment += value
+      })
+      
+      const netCash = monthRevenue - monthOpex - monthOverhead - monthInvestment
+      runningBalance += netCash
+      
+      projectionMonths.push({
+        month: monthKey,
+        monthLabel,
+        revenue: monthRevenue,
+        opex: monthOpex,
+        overhead: monthOverhead,
+        investment: monthInvestment,
+        netCash,
+        balance: runningBalance
+      })
+      
+      // Update previous values for next iteration
+      prevValues = {
+        revenue: monthRevenue,
+        opex: monthOpex,
+        overhead: monthOverhead,
+        investment: monthInvestment
+      }
+    }
+    
+    // Calculate summary KPIs
+    const avgMonthlyNet = projectionMonths.length > 0 
+      ? projectionMonths.reduce((sum, m) => sum + m.netCash, 0) / projectionMonths.length 
+      : 0
+    const endBalance = projectionMonths.length > 0 
+      ? projectionMonths[projectionMonths.length - 1].balance 
+      : runningBalance
+    const projectedRunway = avgMonthlyNet < 0 
+      ? Math.abs(runningBalance / avgMonthlyNet) 
+      : Infinity
+    
+    return {
+      months: projectionMonths,
+      baselineAvg,
+      currentBalance: runningBalance - (projectionMonths[0]?.netCash || 0),
+      endBalance,
+      avgMonthlyNet,
+      projectedRunway,
+      numBaselineMonths: numMonths
+    }
+  }, [transactions, activeAssumptions, baselinePeriod, projectionPeriod, beginningBalance])
+
   // Auto-generated insights
   const insights = useMemo(() => {
     const result: { type: 'positive' | 'warning' | 'critical' | 'info'; title: string; message: string }[] = []
@@ -1771,9 +1977,10 @@ export default function CashFlowPro() {
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: PieChartIcon },
     { id: 'transactions', label: 'Transactions', icon: List },
+    { id: 'projections', label: 'Projections', icon: TrendingUp },
     { id: 'data', label: 'Data', icon: Database },
-    { id: 'assumptions', label: 'Assumptions', icon: TrendingUp },
-    { id: 'settings', label: 'Settings', icon: Settings }
+    { id: 'assumptions', label: 'Assumptions', icon: Settings },
+    { id: 'settings', label: 'Settings', icon: Palette }
   ]
 
   const themeClasses = theme === 'light' 
@@ -3875,15 +4082,48 @@ export default function CashFlowPro() {
 
               <div className={`rounded-xl p-6 border ${cardClasses}`}>
                 <h3 className="text-lg font-semibold mb-4">Add Assumption</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                  <input type="text" placeholder="Name" value={newAssumption.name || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, name: e.target.value }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                  <input type="text" placeholder="Name (e.g., New Project Alpha)" value={newAssumption.name || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, name: e.target.value }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }} />
                   <select value={newAssumption.category || 'revenue'} onChange={(e) => setNewAssumption(prev => ({ ...prev, category: e.target.value }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }}>
-                    {categories.filter(c => c.id !== 'unassigned').map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
+                    <option value="revenue">Revenue</option>
+                    <option value="opex">OpEx</option>
+                    <option value="overhead">Overhead</option>
+                    <option value="investment">Investment</option>
                   </select>
-                  <input type="number" placeholder="Amount" value={newAssumption.amount || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }} />
+                  <select value={newAssumption.valueType || 'amount'} onChange={(e) => setNewAssumption(prev => ({ ...prev, valueType: e.target.value as 'amount' | 'percentage' }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }}>
+                    <option value="amount">$ Amount</option>
+                    <option value="percentage">% Percentage</option>
+                  </select>
+                  <div className="flex gap-2">
+                    <input 
+                      type="number" 
+                      placeholder={newAssumption.valueType === 'percentage' ? '10' : '50000'} 
+                      value={newAssumption.amount || ''} 
+                      onChange={(e) => setNewAssumption(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))} 
+                      className={`flex-1 px-4 py-2 rounded-lg border ${inputClasses}`} 
+                      style={{ colorScheme: theme }} 
+                    />
+                    <span className={`flex items-center px-2 ${textMuted}`}>{newAssumption.valueType === 'percentage' ? '%' : '$'}</span>
+                  </div>
                 </div>
+                {newAssumption.valueType === 'percentage' && (
+                  <div className="mb-4">
+                    <label className={`block text-sm mb-2 ${textMuted}`}>Percentage Of:</label>
+                    <select 
+                      value={newAssumption.percentOf || 'baseline'} 
+                      onChange={(e) => setNewAssumption(prev => ({ ...prev, percentOf: e.target.value as Assumption['percentOf'] }))} 
+                      className={`px-4 py-2 rounded-lg border ${inputClasses}`} 
+                      style={{ colorScheme: theme }}
+                    >
+                      <option value="baseline">Baseline Average</option>
+                      <option value="previous">Previous Month (Compounding)</option>
+                      <option value="revenue">Revenue</option>
+                      <option value="opex">OpEx</option>
+                      <option value="overhead">Overhead</option>
+                      <option value="investment">Investment</option>
+                    </select>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
                   <select value={newAssumption.frequency || 'monthly'} onChange={(e) => setNewAssumption(prev => ({ ...prev, frequency: e.target.value as Assumption['frequency'] }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }}>
                     <option value="monthly">Monthly</option>
@@ -3891,8 +4131,14 @@ export default function CashFlowPro() {
                     <option value="annually">Annually</option>
                     <option value="one-time">One-time</option>
                   </select>
-                  <input type="month" value={newAssumption.startDate || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, startDate: e.target.value }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }} />
-                  <input type="month" placeholder="End (optional)" value={newAssumption.endDate || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, endDate: e.target.value }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }} />
+                  <div>
+                    <label className={`block text-xs mb-1 ${textMuted}`}>Start Month</label>
+                    <input type="month" value={newAssumption.startDate || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, startDate: e.target.value }))} className={`w-full px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }} />
+                  </div>
+                  <div>
+                    <label className={`block text-xs mb-1 ${textMuted}`}>End Month</label>
+                    <input type="month" placeholder="Optional" value={newAssumption.endDate || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, endDate: e.target.value }))} className={`w-full px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }} />
+                  </div>
                   <select value={newAssumption.project || ''} onChange={(e) => setNewAssumption(prev => ({ ...prev, project: e.target.value || undefined }))} className={`px-4 py-2 rounded-lg border ${inputClasses}`} style={{ colorScheme: theme }}>
                     <option value="">No Project</option>
                     {projectList.map(p => (
@@ -3908,7 +4154,7 @@ export default function CashFlowPro() {
               <div className={`rounded-xl p-6 border ${cardClasses}`}>
                 <h3 className="text-lg font-semibold mb-4">Assumptions ({activeAssumptions.length})</h3>
                 {activeAssumptions.length === 0 ? (
-                  <p className={`text-center py-8 ${textMuted}`}>No assumptions. Add one above.</p>
+                  <p className={`text-center py-8 ${textMuted}`}>No assumptions added yet. Create assumptions above to see them reflected in Projections.</p>
                 ) : (
                   <div className="space-y-2">
                     {activeAssumptions.map(a => (
@@ -3922,11 +4168,19 @@ export default function CashFlowPro() {
                             }}
                           >{getCategoryById(a.category)?.name || a.category}</span>
                           <span className="font-medium">{a.name}</span>
-                          <span className={`text-sm ${textMuted}`}>{a.frequency}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded ${theme === 'light' ? 'bg-gray-200' : 'bg-terminal-surface'} ${textMuted}`}>
+                            {a.frequency}
+                          </span>
+                          <span className={`text-xs ${textMuted}`}>
+                            {a.startDate}{a.endDate ? ` → ${a.endDate}` : '+'}
+                          </span>
                         </div>
                         <div className="flex items-center gap-4">
                           <span className={`font-mono ${a.amount >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                            {formatCurrency(a.amount)}
+                            {a.valueType === 'percentage' 
+                              ? `${a.amount}% of ${a.percentOf || 'baseline'}` 
+                              : formatCurrency(a.amount)
+                            }
                           </span>
                           <button onClick={() => deleteAssumption(a.id)} className={`hover:text-accent-danger ${textMuted}`}>
                             <Trash2 className="w-4 h-4" />
@@ -3943,74 +4197,214 @@ export default function CashFlowPro() {
           {/* Projections Tab */}
           {activeTab === 'projections' && (
             <motion.div key="projections" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
-              <div className={`rounded-xl p-6 border ${cardClasses}`}>
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Projection Horizon</h3>
-                  <div className="flex gap-2">
-                    {([1, 2, 3] as const).map(years => (
-                      <button key={years} onClick={() => setProjectionYears(years)} className={`px-4 py-2 rounded-lg font-medium ${
-                        projectionYears === years 
-                          ? 'bg-accent-primary text-white' 
-                          : theme === 'light' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-terminal-bg'
-                      }`}>
-                        {years}Y
+              {/* Controls Bar */}
+              <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <label className={`block text-xs mb-1 ${textMuted}`}>Baseline Period</label>
+                      <select
+                        value={baselinePeriod}
+                        onChange={(e) => setBaselinePeriod(e.target.value as typeof baselinePeriod)}
+                        className={`rounded-lg px-3 py-2 text-sm border ${inputClasses}`}
+                        style={{ colorScheme: theme }}
+                      >
+                        <option value="L3M">Last 3 Months</option>
+                        <option value="L6M">Last 6 Months</option>
+                        <option value="L12M">Last 12 Months</option>
+                        <option value="all">All Historical</option>
+                      </select>
+                    </div>
+                    <div className={`text-sm ${textMuted}`}>
+                      Based on {projectionData.numBaselineMonths} month{projectionData.numBaselineMonths !== 1 ? 's' : ''} of data
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm ${textMuted}`}>Show:</span>
+                    {(['3M', '6M', '12M', '18M', '24M'] as const).map(period => (
+                      <button 
+                        key={period} 
+                        onClick={() => setProjectionPeriod(period)} 
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                          projectionPeriod === period 
+                            ? 'bg-accent-primary text-white' 
+                            : theme === 'light' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-terminal-bg hover:bg-terminal-surface'
+                        }`}
+                      >
+                        {period}
                       </button>
                     ))}
                   </div>
                 </div>
               </div>
 
-              <div className={`rounded-xl p-6 border ${cardClasses}`}>
-                <h3 className="text-lg font-semibold mb-4">{projectionYears}-Year Projection</h3>
-                <ResponsiveContainer width="100%" height={350}>
-                  <AreaChart data={monthlyData}>
-                    <defs>
-                      <linearGradient id="projGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#1e1e2e'} />
-                    <XAxis dataKey="monthLabel" stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} />
-                    <YAxis stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} tickFormatter={(v) => `$${v/1000}k`} />
-                    <Tooltip contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#12121a', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#1e1e2e'}`, borderRadius: '8px' }} formatter={(value: number) => formatCurrency(value)} />
-                    <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" />
-                    <Area type="monotone" dataKey={(d: MonthlyData) => d.runningBalance.projected} stroke="#10b981" fill="url(#projGradient)" strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className={`rounded-xl p-6 border ${cardClasses}`}>
-                <h3 className="text-lg font-semibold mb-4">Monthly Detail</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className={`border-b ${tableBorder} ${textMuted}`}>
-                        <th className="pb-2 text-left">Month</th>
-                        <th className="pb-2 text-right">Revenue</th>
-                        <th className="pb-2 text-right">OpEx</th>
-                        <th className="pb-2 text-right">Overhead</th>
-                        <th className="pb-2 text-right">InvEx</th>
-                        <th className="pb-2 text-right">Net</th>
-                        <th className="pb-2 text-right">Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {monthlyData.slice(0, 24).map(d => (
-                        <tr key={d.month} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
-                          <td className="py-2 font-medium">{d.monthLabel}</td>
-                          <td className="py-2 text-right font-mono text-accent-primary">{formatCurrency(d.revenue.projected)}</td>
-                          <td className="py-2 text-right font-mono text-accent-danger">{formatCurrency(d.opex.projected)}</td>
-                          <td className="py-2 text-right font-mono text-accent-warning">{formatCurrency(d.overhead.projected)}</td>
-                          <td className="py-2 text-right font-mono text-accent-secondary">{formatCurrency(d.investment.projected)}</td>
-                          <td className={`py-2 text-right font-mono ${d.netCash.projected >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>{formatCurrency(d.netCash.projected)}</td>
-                          <td className={`py-2 text-right font-mono ${d.runningBalance.projected >= 0 ? 'text-accent-secondary' : 'text-accent-danger'}`}>{formatCurrency(d.runningBalance.projected)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              {/* KPI Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                  <div className={`flex items-center gap-2 text-sm ${textMuted}`}>
+                    <DollarSign className="w-4 h-4" />
+                    Current Balance
+                  </div>
+                  <div className={`text-2xl font-bold mt-1 ${projectionData.currentBalance >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                    {formatCurrency(projectionData.currentBalance)}
+                  </div>
+                  <div className={`text-xs ${textMuted}`}>Starting point</div>
+                </div>
+                <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                  <div className={`flex items-center gap-2 text-sm ${textMuted}`}>
+                    <TrendingUp className="w-4 h-4" />
+                    Projected End Balance
+                  </div>
+                  <div className={`text-2xl font-bold mt-1 ${projectionData.endBalance >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                    {formatCurrency(projectionData.endBalance)}
+                  </div>
+                  <div className={`text-xs ${textMuted}`}>After {projectionPeriod}</div>
+                </div>
+                <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                  <div className={`flex items-center gap-2 text-sm ${textMuted}`}>
+                    <BarChart3 className="w-4 h-4" />
+                    Avg Monthly Net
+                  </div>
+                  <div className={`text-2xl font-bold mt-1 ${projectionData.avgMonthlyNet >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                    {formatCurrency(projectionData.avgMonthlyNet)}
+                  </div>
+                  <div className={`text-xs ${textMuted}`}>Cash flow/month</div>
+                </div>
+                <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                  <div className={`flex items-center gap-2 text-sm ${textMuted}`}>
+                    <Clock className="w-4 h-4" />
+                    Projected Runway
+                  </div>
+                  <div className={`text-2xl font-bold mt-1 ${
+                    projectionData.projectedRunway === Infinity ? 'text-accent-primary' :
+                    projectionData.projectedRunway < 6 ? 'text-accent-danger' :
+                    projectionData.projectedRunway < 12 ? 'text-accent-warning' : 'text-accent-primary'
+                  }`}>
+                    {projectionData.projectedRunway === Infinity 
+                      ? '∞ Profitable' 
+                      : `${projectionData.projectedRunway.toFixed(1)} months`
+                    }
+                  </div>
+                  <div className={`text-xs ${textMuted}`}>
+                    {projectionData.projectedRunway === Infinity ? 'Cash positive' : 'Until zero balance'}
+                  </div>
                 </div>
               </div>
+
+              {/* Baseline Averages */}
+              <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                <h4 className={`text-sm font-medium mb-3 ${textMuted}`}>Baseline Monthly Averages ({baselinePeriod})</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div>
+                    <div className={`text-xs ${textMuted}`}>Revenue</div>
+                    <div className="text-lg font-mono text-accent-primary">{formatCurrency(projectionData.baselineAvg.revenue)}</div>
+                  </div>
+                  <div>
+                    <div className={`text-xs ${textMuted}`}>OpEx</div>
+                    <div className="text-lg font-mono text-accent-danger">{formatCurrency(projectionData.baselineAvg.opex)}</div>
+                  </div>
+                  <div>
+                    <div className={`text-xs ${textMuted}`}>Overhead</div>
+                    <div className="text-lg font-mono text-accent-warning">{formatCurrency(projectionData.baselineAvg.overhead)}</div>
+                  </div>
+                  <div>
+                    <div className={`text-xs ${textMuted}`}>Investment</div>
+                    <div className="text-lg font-mono text-accent-secondary">{formatCurrency(projectionData.baselineAvg.investment)}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Projection Chart */}
+              <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
+                <h3 className="text-lg font-semibold mb-4">Projected Cash Flow & Balance</h3>
+                {projectionData.months.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <ComposedChart data={projectionData.months}>
+                      <defs>
+                        <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#374151'} />
+                      <XAxis dataKey="monthLabel" tick={{ fontSize: 11 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
+                      <YAxis yAxisId="left" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
+                      <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#1f1f1f', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#374151'}`, borderRadius: '8px' }}
+                        formatter={(value: number, name: string) => [formatCurrency(value), name]}
+                      />
+                      <Legend />
+                      <ReferenceLine yAxisId="left" y={0} stroke="#ef4444" strokeDasharray="3 3" />
+                      <Bar yAxisId="left" dataKey="netCash" name="Net Cash" fill={theme === 'light' ? '#10b981' : '#34d399'} radius={[4, 4, 0, 0]} />
+                      <Area yAxisId="right" type="monotone" dataKey="balance" name="Balance" stroke="#6366f1" fill="url(#balanceGradient)" strokeWidth={2} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className={`text-center py-12 ${textMuted}`}>
+                    <p>No projection data. Upload cash transactions in the Data tab.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Projection Table */}
+              <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Monthly Projection Detail</h3>
+                  <span className={`text-sm ${textMuted}`}>{projectionData.months.length} months</span>
+                </div>
+                {projectionData.months.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className={`border-b ${tableBorder}`}>
+                          <th className={`pb-3 text-left font-medium ${textMuted}`}>Month</th>
+                          <th className={`pb-3 text-right font-medium ${textMuted}`}>Revenue</th>
+                          <th className={`pb-3 text-right font-medium ${textMuted}`}>OpEx</th>
+                          <th className={`pb-3 text-right font-medium ${textMuted}`}>Overhead</th>
+                          <th className={`pb-3 text-right font-medium ${textMuted}`}>Investment</th>
+                          <th className={`pb-3 text-right font-medium ${textMuted}`}>Net Cash</th>
+                          <th className={`pb-3 text-right font-medium ${textMuted}`}>Balance</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {projectionData.months.map((m, idx) => (
+                          <tr key={m.month} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'} ${idx % 2 === 0 ? '' : theme === 'light' ? 'bg-gray-50/50' : 'bg-terminal-bg/50'}`}>
+                            <td className="py-3 font-medium">{m.monthLabel}</td>
+                            <td className="py-3 text-right font-mono text-accent-primary">{formatCurrency(m.revenue)}</td>
+                            <td className="py-3 text-right font-mono text-accent-danger">{formatCurrency(m.opex)}</td>
+                            <td className="py-3 text-right font-mono text-accent-warning">{formatCurrency(m.overhead)}</td>
+                            <td className="py-3 text-right font-mono text-accent-secondary">{formatCurrency(m.investment)}</td>
+                            <td className={`py-3 text-right font-mono font-medium ${m.netCash >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                              {formatCurrency(m.netCash)}
+                            </td>
+                            <td className={`py-3 text-right font-mono font-medium ${m.balance >= 0 ? 'text-indigo-500' : 'text-accent-danger'}`}>
+                              {formatCurrency(m.balance)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className={`text-center py-12 ${textMuted}`}>
+                    <p>No projection data available.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Assumptions Applied Notice */}
+              {activeAssumptions.length > 0 && (
+                <div className={`rounded-xl p-4 border ${theme === 'light' ? 'bg-indigo-50 border-indigo-200' : 'bg-indigo-500/10 border-indigo-500/30'}`}>
+                  <div className="flex items-center gap-2 text-indigo-500 font-medium">
+                    <Info className="w-4 h-4" />
+                    {activeAssumptions.length} assumption{activeAssumptions.length > 1 ? 's' : ''} applied to this projection
+                  </div>
+                  <p className={`text-sm mt-1 ${theme === 'light' ? 'text-indigo-600' : 'text-indigo-400'}`}>
+                    Edit assumptions in the Assumptions tab to adjust the forecast.
+                  </p>
+                </div>
+              )}
             </motion.div>
           )}
 
