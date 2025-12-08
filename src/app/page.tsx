@@ -417,6 +417,25 @@ export default function CashFlowPro() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<Transaction>>({})
   
+  // Accrual transaction management
+  const [transactionViewType, setTransactionViewType] = useState<'cash' | 'accrual'>('cash')
+  const [accrualMonthFilter, setAccrualMonthFilter] = useState<string>('all')
+  const [accrualTypeFilter, setAccrualTypeFilter] = useState<string>('all')
+  const [accrualProjectFilter, setAccrualProjectFilter] = useState<string>('all')
+  const [selectedAccrualIds, setSelectedAccrualIds] = useState<Set<string>>(new Set())
+  const [editingAccrualId, setEditingAccrualId] = useState<string | null>(null)
+  const [editAccrualForm, setEditAccrualForm] = useState<Partial<AccrualTransaction>>({})
+  const [showAccrualModal, setShowAccrualModal] = useState(false)
+  const [accrualModalMode, setAccrualModalMode] = useState<'add' | 'edit'>('add')
+  const [accrualModalForm, setAccrualModalForm] = useState<Partial<AccrualTransaction>>({
+    date: new Date().toISOString().slice(0, 10),
+    type: 'revenue',
+    description: '',
+    amount: 0,
+    project: '',
+    vendor: ''
+  })
+  
   // Quick add form
   const [quickAddForm, setQuickAddForm] = useState<Partial<Transaction>>({
     date: new Date().toISOString().slice(0, 10),
@@ -596,6 +615,44 @@ export default function CashFlowPro() {
     })
     return Array.from(months).sort().reverse()
   }, [transactions])
+
+  // Accrual transaction filter options
+  const accrualMonths = useMemo(() => {
+    const months = new Set<string>()
+    accrualTransactions.forEach(t => {
+      months.add(t.date.slice(0, 7))
+    })
+    return Array.from(months).sort().reverse()
+  }, [accrualTransactions])
+
+  const accrualProjects = useMemo(() => {
+    const projects = new Set<string>()
+    accrualTransactions.forEach(t => {
+      if (t.project) projects.add(t.project)
+    })
+    return Array.from(projects).sort()
+  }, [accrualTransactions])
+
+  const filteredAccrualTransactions = useMemo(() => {
+    let result = accrualTransactions.filter(t => 
+      t && 
+      typeof t.date === 'string' && 
+      t.date.length >= 7 &&
+      typeof t.amount === 'number' &&
+      !isNaN(t.amount)
+    )
+    
+    if (accrualMonthFilter !== 'all') {
+      result = result.filter(t => t.date.slice(0, 7) === accrualMonthFilter)
+    }
+    if (accrualTypeFilter !== 'all') {
+      result = result.filter(t => t.type === accrualTypeFilter)
+    }
+    if (accrualProjectFilter !== 'all') {
+      result = result.filter(t => t.project === accrualProjectFilter)
+    }
+    return result.sort((a, b) => b.date.localeCompare(a.date))
+  }, [accrualTransactions, accrualMonthFilter, accrualTypeFilter, accrualProjectFilter])
 
   // Auto-categorize: no project = overhead for expense categories
   const normalizeTransaction = useCallback((t: Partial<Transaction>): Transaction => {
@@ -876,6 +933,17 @@ export default function CashFlowPro() {
     URL.revokeObjectURL(url)
   }, [transactions])
 
+  const exportAccrualToCSV = useCallback(() => {
+    const csv = Papa.unparse(accrualTransactions)
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'accrual-transactions.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [accrualTransactions])
+
   const exportToPDF = useCallback(() => {
     setShowPdfExport(true)
   }, [])
@@ -935,6 +1003,164 @@ export default function CashFlowPro() {
   const cancelEdit = useCallback(() => {
     setEditingId(null)
     setEditForm({})
+  }, [])
+
+  // Accrual Transaction Management
+  const deleteAccrualTransaction = useCallback((id: string) => {
+    setAccrualTransactions(prev => prev.filter(t => t.id !== id))
+    setSelectedAccrualIds(prev => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  }, [])
+
+  const bulkDeleteAccrualTransactions = useCallback(() => {
+    if (selectedAccrualIds.size === 0) return
+    if (confirm(`Delete ${selectedAccrualIds.size} selected accrual transaction(s)?`)) {
+      setAccrualTransactions(prev => prev.filter(t => !selectedAccrualIds.has(t.id)))
+      setSelectedAccrualIds(new Set())
+    }
+  }, [selectedAccrualIds])
+
+  const clearAllAccrualTransactions = useCallback(() => {
+    if (confirm('Clear ALL accrual transactions? This cannot be undone.')) {
+      setAccrualTransactions([])
+      setSelectedAccrualIds(new Set())
+    }
+  }, [])
+
+  const toggleAccrualSelection = useCallback((id: string) => {
+    setSelectedAccrualIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const toggleAllAccrualSelection = useCallback((ids: string[]) => {
+    setSelectedAccrualIds(prev => {
+      const allSelected = ids.every(id => prev.has(id))
+      if (allSelected) {
+        return new Set()
+      } else {
+        return new Set(ids)
+      }
+    })
+  }, [])
+
+  const startEditAccrual = useCallback((transaction: AccrualTransaction) => {
+    setEditingAccrualId(transaction.id)
+    setEditAccrualForm({
+      date: transaction.date,
+      type: transaction.type,
+      description: transaction.description,
+      amount: transaction.amount,
+      project: transaction.project,
+      vendor: transaction.vendor,
+      invoiceNumber: transaction.invoiceNumber,
+      notes: transaction.notes
+    })
+  }, [])
+
+  const saveEditAccrual = useCallback(() => {
+    if (editingAccrualId) {
+      setAccrualTransactions(prev => prev.map(t => 
+        t.id === editingAccrualId 
+          ? { ...t, ...editAccrualForm }
+          : t
+      ))
+      setEditingAccrualId(null)
+      setEditAccrualForm({})
+    }
+  }, [editingAccrualId, editAccrualForm])
+
+  const cancelEditAccrual = useCallback(() => {
+    setEditingAccrualId(null)
+    setEditAccrualForm({})
+  }, [])
+
+  // Accrual Modal Functions
+  const openAddAccrualModal = useCallback(() => {
+    setAccrualModalMode('add')
+    setAccrualModalForm({
+      date: new Date().toISOString().slice(0, 10),
+      type: 'revenue',
+      description: '',
+      amount: 0,
+      project: '',
+      vendor: ''
+    })
+    setShowAccrualModal(true)
+  }, [])
+
+  const openEditAccrualModal = useCallback((transaction: AccrualTransaction) => {
+    setAccrualModalMode('edit')
+    setAccrualModalForm({
+      id: transaction.id,
+      date: transaction.date,
+      type: transaction.type,
+      description: transaction.description,
+      amount: Math.abs(transaction.amount),
+      project: transaction.project,
+      vendor: transaction.vendor,
+      invoiceNumber: transaction.invoiceNumber,
+      notes: transaction.notes
+    })
+    setShowAccrualModal(true)
+  }, [])
+
+  const saveAccrualModal = useCallback(() => {
+    if (!accrualModalForm.description || !accrualModalForm.project) {
+      alert('Please fill in description and project')
+      return
+    }
+    
+    const amount = Math.abs(accrualModalForm.amount || 0) * (accrualModalForm.type === 'direct_cost' ? -1 : 1)
+    
+    if (accrualModalMode === 'add') {
+      const newAccrual: AccrualTransaction = {
+        id: generateId(),
+        date: accrualModalForm.date || new Date().toISOString().slice(0, 10),
+        type: accrualModalForm.type || 'revenue',
+        description: accrualModalForm.description,
+        amount,
+        project: accrualModalForm.project,
+        vendor: accrualModalForm.vendor,
+        invoiceNumber: accrualModalForm.invoiceNumber,
+        notes: accrualModalForm.notes
+      }
+      setAccrualTransactions(prev => [...prev, newAccrual])
+    } else {
+      setAccrualTransactions(prev => prev.map(t => 
+        t.id === accrualModalForm.id 
+          ? { ...t, ...accrualModalForm, amount }
+          : t
+      ))
+    }
+    
+    setShowAccrualModal(false)
+    setAccrualModalForm({
+      date: new Date().toISOString().slice(0, 10),
+      type: 'revenue',
+      description: '',
+      amount: 0,
+      project: '',
+      vendor: ''
+    })
+  }, [accrualModalMode, accrualModalForm])
+
+  const closeAccrualModal = useCallback(() => {
+    setShowAccrualModal(false)
+    setAccrualModalForm({
+      date: new Date().toISOString().slice(0, 10),
+      type: 'revenue',
+      description: '',
+      amount: 0,
+      project: '',
+      vendor: ''
+    })
   }, [])
 
   // Quick Add Transaction
@@ -2367,6 +2593,162 @@ export default function CashFlowPro() {
         )}
       </AnimatePresence>
 
+      {/* Accrual Transaction Modal */}
+      <AnimatePresence>
+        {showAccrualModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={closeAccrualModal}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-md rounded-xl p-6 border ${cardClasses}`}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-indigo-500" />
+                  {accrualModalMode === 'add' ? 'Add Accrual Transaction' : 'Edit Accrual Transaction'}
+                </h3>
+                <button onClick={closeAccrualModal} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-sm mb-1 ${textMuted}`}>Date</label>
+                    <input
+                      type="date"
+                      value={accrualModalForm.date || ''}
+                      onChange={(e) => setAccrualModalForm(prev => ({ ...prev, date: e.target.value }))}
+                      className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm mb-1 ${textMuted}`}>Type</label>
+                    <select
+                      value={accrualModalForm.type || 'revenue'}
+                      onChange={(e) => setAccrualModalForm(prev => ({ ...prev, type: e.target.value as 'revenue' | 'direct_cost' }))}
+                      className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
+                    >
+                      <option value="revenue">Revenue (Invoice to Client)</option>
+                      <option value="direct_cost">Direct Cost (Contractor)</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className={`block text-sm mb-1 ${textMuted}`}>Description</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Oct services invoice"
+                    value={accrualModalForm.description || ''}
+                    onChange={(e) => setAccrualModalForm(prev => ({ ...prev, description: e.target.value }))}
+                    className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                    style={{ colorScheme: theme }}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-sm mb-1 ${textMuted}`}>Amount</label>
+                    <input
+                      type="number"
+                      placeholder="50000"
+                      value={accrualModalForm.amount || ''}
+                      onChange={(e) => setAccrualModalForm(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
+                      className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm mb-1 ${textMuted}`}>Project *</label>
+                    <input
+                      type="text"
+                      placeholder="Project name"
+                      value={accrualModalForm.project || ''}
+                      onChange={(e) => setAccrualModalForm(prev => ({ ...prev, project: e.target.value }))}
+                      className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
+                      list="accrual-projects"
+                    />
+                    <datalist id="accrual-projects">
+                      {accrualProjects.map(p => (
+                        <option key={p} value={p} />
+                      ))}
+                    </datalist>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-sm mb-1 ${textMuted}`}>Vendor/Client</label>
+                    <input
+                      type="text"
+                      placeholder="Client or contractor name"
+                      value={accrualModalForm.vendor || ''}
+                      onChange={(e) => setAccrualModalForm(prev => ({ ...prev, vendor: e.target.value }))}
+                      className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm mb-1 ${textMuted}`}>Invoice #</label>
+                    <input
+                      type="text"
+                      placeholder="INV-001"
+                      value={accrualModalForm.invoiceNumber || ''}
+                      onChange={(e) => setAccrualModalForm(prev => ({ ...prev, invoiceNumber: e.target.value }))}
+                      className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                      style={{ colorScheme: theme }}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className={`block text-sm mb-1 ${textMuted}`}>Notes (optional)</label>
+                  <input
+                    type="text"
+                    placeholder="Additional notes"
+                    value={accrualModalForm.notes || ''}
+                    onChange={(e) => setAccrualModalForm(prev => ({ ...prev, notes: e.target.value }))}
+                    className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                    style={{ colorScheme: theme }}
+                  />
+                </div>
+                
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={saveAccrualModal}
+                    disabled={!accrualModalForm.description || !accrualModalForm.project}
+                    className="flex-1 py-2 bg-indigo-500 text-white rounded-lg font-medium disabled:opacity-50 hover:bg-indigo-600"
+                  >
+                    {accrualModalMode === 'add' ? 'Add Transaction' : 'Save Changes'}
+                  </button>
+                  <button
+                    onClick={closeAccrualModal}
+                    className={`px-4 py-2 border rounded-lg ${
+                      theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Project Modal */}
       <AnimatePresence>
         {showProjectModal && (
@@ -3317,8 +3699,8 @@ export default function CashFlowPro() {
                             <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `${v.toFixed(0)}%`} tick={{ fontSize: 11 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
                             <Tooltip 
                               formatter={(value: number, name: string) => [
-                                name === 'grossMarginPct' ? `${value.toFixed(1)}%` : formatCurrency(value),
-                                name === 'revenue' ? 'Revenue' : name === 'directCosts' ? 'Direct Costs' : name === 'grossProfit' ? 'Gross Profit' : 'GM %'
+                                name === 'GM %' ? `${value.toFixed(1)}%` : formatCurrency(value),
+                                name === 'Revenue' ? 'Revenue' : name === 'Direct Costs' ? 'Direct Costs' : name === 'Gross Profit' ? 'Gross Profit' : 'GM %'
                               ]}
                               contentStyle={{ background: theme === 'light' ? 'white' : '#1f2937', border: 'none', borderRadius: '8px' }}
                             />
@@ -3677,181 +4059,472 @@ export default function CashFlowPro() {
           {/* Transactions Tab */}
           {activeTab === 'transactions' && (
             <motion.div key="transactions" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
-              {/* Filters Bar */}
+              {/* View Toggle */}
               <div className={`rounded-xl p-4 border ${cardClasses}`}>
                 <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <h3 className="text-lg font-semibold">Transactions</h3>
-                    <select
-                      value={transactionMonthFilter}
-                      onChange={(e) => setTransactionMonthFilter(e.target.value)}
-                      className={`rounded-lg px-3 py-2 text-sm border ${inputClasses}`}
-                      style={{ colorScheme: theme }}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setTransactionViewType('cash')}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                        transactionViewType === 'cash'
+                          ? 'bg-accent-primary text-white'
+                          : theme === 'light' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-terminal-bg text-zinc-400 hover:bg-terminal-surface'
+                      }`}
                     >
-                      <option value="all">All Months</option>
-                      {transactionMonths.map(m => (
-                        <option key={m} value={m}>{getMonthLabel(m)}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={transactionCategoryFilter}
-                      onChange={(e) => setTransactionCategoryFilter(e.target.value)}
-                      className={`rounded-lg px-3 py-2 text-sm border ${inputClasses}`}
-                      style={{ colorScheme: theme }}
-                    >
-                      <option value="all">All Categories</option>
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.id === 'unassigned' ? '⚠️ ' : ''}{cat.name}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      value={selectedProject}
-                      onChange={(e) => setSelectedProject(e.target.value)}
-                      className={`rounded-lg px-3 py-2 text-sm border ${inputClasses}`}
-                      style={{ colorScheme: theme }}
-                    >
-                      <option value="all">All Projects</option>
-                      {projectList.map(p => (
-                        <option key={p} value={p}>{p}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => setShowQuickAdd(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-primary/90"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Add
+                      <DollarSign className="w-4 h-4" />
+                      Cash ({transactions.length})
                     </button>
-                    <button onClick={exportToCSV} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
-                      theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-terminal-bg border-terminal-border'
-                    }`}>
-                      <Download className="w-4 h-4" />
-                      CSV
+                    <button
+                      onClick={() => setTransactionViewType('accrual')}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                        transactionViewType === 'accrual'
+                          ? 'bg-indigo-500 text-white'
+                          : theme === 'light' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-terminal-bg text-zinc-400 hover:bg-terminal-surface'
+                      }`}
+                    >
+                      <FileText className="w-4 h-4" />
+                      Accrual ({accrualTransactions.length})
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* Transaction Table */}
-              {filteredTransactions.length > 0 ? (
-                <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className={tableHeaderBg}>
-                        <tr className={`border-b ${tableBorder} text-left ${textMuted}`}>
-                          <th className="pb-3 font-medium">Date</th>
-                          <th className="pb-3 font-medium">Category</th>
-                          <th className="pb-3 font-medium">Description</th>
-                          <th className="pb-3 font-medium text-right">Amount</th>
-                          <th className="pb-3 font-medium">Project</th>
-                          <th className="pb-3 font-medium">Type</th>
-                          <th className="pb-3 font-medium text-center">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredTransactions.map(t => {
-                          const cat = getCategoryById(t.category)
-                          return (
-                            <tr key={t.id} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'} hover:${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg/50'}`}>
-                              <td className="py-3 text-sm">{t.date}</td>
-                              <td className="py-3">
-                                <span 
-                                  className="px-2 py-1 rounded text-xs font-medium"
-                                  style={{ 
-                                    backgroundColor: `${cat?.color || '#6b7280'}15`,
-                                    color: cat?.color || '#6b7280'
-                                  }}
-                                >
-                                  {cat?.name || t.category}
-                                </span>
-                              </td>
-                              <td className="py-3 text-sm">
-                                <div className="flex items-center gap-2 max-w-xs">
-                                  <span className="truncate">{t.description}</span>
-                                  {t.notes && (
-                                    <button 
-                                      onClick={() => setExpandedNotes(prev => {
-                                        const next = new Set(prev)
-                                        if (next.has(t.id)) next.delete(t.id)
-                                        else next.add(t.id)
-                                        return next
-                                      })}
-                                      className="p-0.5 text-accent-secondary hover:text-accent-primary flex-shrink-0"
-                                      title={t.notes}
-                                    >
-                                      <MessageSquare className="w-3 h-3" />
-                                    </button>
-                                  )}
-                                </div>
-                                {t.notes && expandedNotes.has(t.id) && (
-                                  <div className={`text-xs mt-1 p-2 rounded ${theme === 'light' ? 'bg-gray-100 text-gray-600' : 'bg-terminal-bg text-zinc-400'}`}>
-                                    {t.notes}
-                                  </div>
-                                )}
-                              </td>
-                              <td className={`py-3 text-right font-mono text-sm ${t.amount >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                                {formatCurrency(t.amount)}
-                              </td>
-                              <td className={`py-3 text-sm ${textMuted}`}>{t.project || '-'}</td>
-                              <td className="py-3">
-                                <span className={`px-2 py-0.5 rounded text-xs ${
-                                  t.type === 'actual' 
-                                    ? 'bg-accent-primary/10 text-accent-primary' 
-                                    : 'bg-accent-warning/10 text-accent-warning'
-                                }`}>
-                                  {t.type}
-                                </span>
-                              </td>
-                              <td className="py-3 text-center">
-                                <div className="flex items-center justify-center gap-2">
-                                  <button onClick={() => startEdit(t)} className="p-1.5 text-zinc-400 hover:text-accent-primary hover:bg-accent-primary/10 rounded">
-                                    <Edit2 className="w-4 h-4" />
-                                  </button>
-                                  <button onClick={() => deleteTransaction(t.id)} className="p-1.5 text-zinc-400 hover:text-accent-danger hover:bg-accent-danger/10 rounded">
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </td>
+              {/* Cash Transactions View */}
+              {transactionViewType === 'cash' && (
+                <>
+                  {/* Filters Bar */}
+                  <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <h3 className="text-lg font-semibold">Cash Transactions</h3>
+                        <select
+                          value={transactionMonthFilter}
+                          onChange={(e) => setTransactionMonthFilter(e.target.value)}
+                          className={`rounded-lg px-3 py-2 text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                        >
+                          <option value="all">All Months</option>
+                          {transactionMonths.map(m => (
+                            <option key={m} value={m}>{getMonthLabel(m)}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={transactionCategoryFilter}
+                          onChange={(e) => setTransactionCategoryFilter(e.target.value)}
+                          className={`rounded-lg px-3 py-2 text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                        >
+                          <option value="all">All Categories</option>
+                          {categories.map(cat => (
+                            <option key={cat.id} value={cat.id}>
+                              {cat.id === 'unassigned' ? '⚠️ ' : ''}{cat.name}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={selectedProject}
+                          onChange={(e) => setSelectedProject(e.target.value)}
+                          className={`rounded-lg px-3 py-2 text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                        >
+                          <option value="all">All Projects</option>
+                          {projectList.map(p => (
+                            <option key={p} value={p}>{p}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => setShowQuickAdd(true)}
+                          className="flex items-center gap-2 px-4 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-primary/90"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add
+                        </button>
+                        <button onClick={exportToCSV} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
+                          theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-terminal-bg border-terminal-border'
+                        }`}>
+                          <Download className="w-4 h-4" />
+                          CSV
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Transaction Table */}
+                  {filteredTransactions.length > 0 ? (
+                    <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className={tableHeaderBg}>
+                            <tr className={`border-b ${tableBorder} text-left ${textMuted}`}>
+                              <th className="pb-3 font-medium">Date</th>
+                              <th className="pb-3 font-medium">Category</th>
+                              <th className="pb-3 font-medium">Description</th>
+                              <th className="pb-3 font-medium text-right">Amount</th>
+                              <th className="pb-3 font-medium">Project</th>
+                              <th className="pb-3 font-medium">Type</th>
+                              <th className="pb-3 font-medium text-center">Actions</th>
                             </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
+                          </thead>
+                          <tbody>
+                            {filteredTransactions.map(t => {
+                              const cat = getCategoryById(t.category)
+                              return (
+                                <tr key={t.id} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'} hover:${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg/50'}`}>
+                                  <td className="py-3 text-sm">{t.date}</td>
+                                  <td className="py-3">
+                                    <span 
+                                      className="px-2 py-1 rounded text-xs font-medium"
+                                      style={{ 
+                                        backgroundColor: `${cat?.color || '#6b7280'}15`,
+                                        color: cat?.color || '#6b7280'
+                                      }}
+                                    >
+                                      {cat?.name || t.category}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 text-sm">
+                                    <div className="flex items-center gap-2 max-w-xs">
+                                      <span className="truncate">{t.description}</span>
+                                      {t.notes && (
+                                        <button 
+                                          onClick={() => setExpandedNotes(prev => {
+                                            const next = new Set(prev)
+                                            if (next.has(t.id)) next.delete(t.id)
+                                            else next.add(t.id)
+                                            return next
+                                          })}
+                                          className="p-0.5 text-accent-secondary hover:text-accent-primary flex-shrink-0"
+                                          title={t.notes}
+                                        >
+                                          <MessageSquare className="w-3 h-3" />
+                                        </button>
+                                      )}
+                                    </div>
+                                    {t.notes && expandedNotes.has(t.id) && (
+                                      <div className={`text-xs mt-1 p-2 rounded ${theme === 'light' ? 'bg-gray-100 text-gray-600' : 'bg-terminal-bg text-zinc-400'}`}>
+                                        {t.notes}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className={`py-3 text-right font-mono text-sm ${t.amount >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                    {formatCurrency(t.amount)}
+                                  </td>
+                                  <td className={`py-3 text-sm ${textMuted}`}>{t.project || '-'}</td>
+                                  <td className="py-3">
+                                    <span className={`px-2 py-0.5 rounded text-xs ${
+                                      t.type === 'actual' 
+                                        ? 'bg-accent-primary/10 text-accent-primary' 
+                                        : 'bg-accent-warning/10 text-accent-warning'
+                                    }`}>
+                                      {t.type}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 text-center">
+                                    <div className="flex items-center justify-center gap-2">
+                                      <button onClick={() => startEdit(t)} className="p-1.5 text-zinc-400 hover:text-accent-primary hover:bg-accent-primary/10 rounded">
+                                        <Edit2 className="w-4 h-4" />
+                                      </button>
+                                      <button onClick={() => deleteTransaction(t.id)} className="p-1.5 text-zinc-400 hover:text-accent-danger hover:bg-accent-danger/10 rounded">
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      <p className={`text-sm mt-4 text-center ${textMuted}`}>
+                        Showing {filteredTransactions.length} of {transactions.length} transactions
+                      </p>
+                    </div>
+                  ) : (
+                    <div className={`rounded-xl p-12 border ${cardClasses} text-center`}>
+                      <List className={`w-12 h-12 mx-auto mb-4 ${textMuted}`} />
+                      <h3 className="text-lg font-semibold mb-2">No Transactions</h3>
+                      <p className={`mb-4 ${textMuted}`}>
+                        {transactions.length === 0 
+                          ? 'Import your data or add transactions manually'
+                          : 'No transactions match your filters'}
+                      </p>
+                      <div className="flex gap-3 justify-center">
+                        <button 
+                          onClick={() => setActiveTab('data')}
+                          className="px-4 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-primary/90"
+                        >
+                          Import Data
+                        </button>
+                        <button 
+                          onClick={() => setShowQuickAdd(true)}
+                          className={`px-4 py-2 rounded-lg border ${
+                            theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                          }`}
+                        >
+                          Add Manually
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Accrual Transactions View */}
+              {transactionViewType === 'accrual' && (
+                <>
+                  {/* Filters Bar */}
+                  <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <h3 className="text-lg font-semibold">Accrual Transactions</h3>
+                        <select
+                          value={accrualMonthFilter}
+                          onChange={(e) => setAccrualMonthFilter(e.target.value)}
+                          className={`rounded-lg px-3 py-2 text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                        >
+                          <option value="all">All Months</option>
+                          {accrualMonths.map(m => (
+                            <option key={m} value={m}>{getMonthLabel(m)}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={accrualTypeFilter}
+                          onChange={(e) => setAccrualTypeFilter(e.target.value)}
+                          className={`rounded-lg px-3 py-2 text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                        >
+                          <option value="all">All Types</option>
+                          <option value="revenue">Revenue</option>
+                          <option value="direct_cost">Direct Cost</option>
+                        </select>
+                        <select
+                          value={accrualProjectFilter}
+                          onChange={(e) => setAccrualProjectFilter(e.target.value)}
+                          className={`rounded-lg px-3 py-2 text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                        >
+                          <option value="all">All Projects</option>
+                          {accrualProjects.map(p => (
+                            <option key={p} value={p}>{p}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={openAddAccrualModal}
+                          className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add
+                        </button>
+                        {selectedAccrualIds.size > 0 && (
+                          <button 
+                            onClick={bulkDeleteAccrualTransactions}
+                            className="flex items-center gap-2 px-3 py-2 bg-accent-danger text-white rounded-lg hover:bg-accent-danger/90"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Delete ({selectedAccrualIds.size})
+                          </button>
+                        )}
+                        <button 
+                          onClick={clearAllAccrualTransactions}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
+                            theme === 'light' ? 'border-red-300 text-red-600 hover:bg-red-50' : 'border-accent-danger/50 text-accent-danger hover:bg-accent-danger/10'
+                          }`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Clear All
+                        </button>
+                        <button onClick={exportAccrualToCSV} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
+                          theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-terminal-bg border-terminal-border'
+                        }`}>
+                          <Download className="w-4 h-4" />
+                          CSV
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <p className={`text-sm mt-4 text-center ${textMuted}`}>
-                    Showing {filteredTransactions.length} of {transactions.length} transactions
-                  </p>
-                </div>
-              ) : (
-                <div className={`rounded-xl p-12 border ${cardClasses} text-center`}>
-                  <List className={`w-12 h-12 mx-auto mb-4 ${textMuted}`} />
-                  <h3 className="text-lg font-semibold mb-2">No Transactions</h3>
-                  <p className={`mb-4 ${textMuted}`}>
-                    {transactions.length === 0 
-                      ? 'Import your data or add transactions manually'
-                      : 'No transactions match your filters'}
-                  </p>
-                  <div className="flex gap-3 justify-center">
-                    <button 
-                      onClick={() => setActiveTab('data')}
-                      className="px-4 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-primary/90"
-                    >
-                      Import Data
-                    </button>
-                    <button 
-                      onClick={() => setShowQuickAdd(true)}
-                      className={`px-4 py-2 rounded-lg border ${
-                        theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
-                      }`}
-                    >
-                      Add Manually
-                    </button>
-                  </div>
-                </div>
+
+                  {/* Accrual Transaction Table */}
+                  {filteredAccrualTransactions.length > 0 ? (
+                    <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className={tableHeaderBg}>
+                            <tr className={`border-b ${tableBorder} text-left ${textMuted}`}>
+                              <th className="pb-3 font-medium w-10">
+                                <input 
+                                  type="checkbox" 
+                                  checked={filteredAccrualTransactions.length > 0 && filteredAccrualTransactions.every(t => selectedAccrualIds.has(t.id))}
+                                  onChange={() => toggleAllAccrualSelection(filteredAccrualTransactions.map(t => t.id))}
+                                  className="rounded"
+                                />
+                              </th>
+                              <th className="pb-3 font-medium">Date</th>
+                              <th className="pb-3 font-medium">Type</th>
+                              <th className="pb-3 font-medium">Description</th>
+                              <th className="pb-3 font-medium text-right">Amount</th>
+                              <th className="pb-3 font-medium">Project</th>
+                              <th className="pb-3 font-medium">Vendor</th>
+                              <th className="pb-3 font-medium text-center">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredAccrualTransactions.map(t => (
+                              <tr key={t.id} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'} ${selectedAccrualIds.has(t.id) ? (theme === 'light' ? 'bg-indigo-50' : 'bg-indigo-500/10') : ''} hover:${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg/50'}`}>
+                                <td className="py-3">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={selectedAccrualIds.has(t.id)}
+                                    onChange={() => toggleAccrualSelection(t.id)}
+                                    className="rounded"
+                                  />
+                                </td>
+                                {editingAccrualId === t.id ? (
+                                  <>
+                                    <td className="py-2">
+                                      <input 
+                                        type="date" 
+                                        value={editAccrualForm.date || ''} 
+                                        onChange={(e) => setEditAccrualForm(prev => ({ ...prev, date: e.target.value }))}
+                                        className={`w-full px-2 py-1 text-sm rounded border ${inputClasses}`}
+                                        style={{ colorScheme: theme }}
+                                      />
+                                    </td>
+                                    <td className="py-2">
+                                      <select 
+                                        value={editAccrualForm.type || 'revenue'} 
+                                        onChange={(e) => setEditAccrualForm(prev => ({ ...prev, type: e.target.value as 'revenue' | 'direct_cost' }))}
+                                        className={`px-2 py-1 text-sm rounded border ${inputClasses}`}
+                                        style={{ colorScheme: theme }}
+                                      >
+                                        <option value="revenue">Revenue</option>
+                                        <option value="direct_cost">Direct Cost</option>
+                                      </select>
+                                    </td>
+                                    <td className="py-2">
+                                      <input 
+                                        type="text" 
+                                        value={editAccrualForm.description || ''} 
+                                        onChange={(e) => setEditAccrualForm(prev => ({ ...prev, description: e.target.value }))}
+                                        className={`w-full px-2 py-1 text-sm rounded border ${inputClasses}`}
+                                        style={{ colorScheme: theme }}
+                                      />
+                                    </td>
+                                    <td className="py-2">
+                                      <input 
+                                        type="number" 
+                                        value={editAccrualForm.amount || ''} 
+                                        onChange={(e) => setEditAccrualForm(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
+                                        className={`w-24 px-2 py-1 text-sm rounded border text-right ${inputClasses}`}
+                                        style={{ colorScheme: theme }}
+                                      />
+                                    </td>
+                                    <td className="py-2">
+                                      <input 
+                                        type="text" 
+                                        value={editAccrualForm.project || ''} 
+                                        onChange={(e) => setEditAccrualForm(prev => ({ ...prev, project: e.target.value }))}
+                                        className={`w-full px-2 py-1 text-sm rounded border ${inputClasses}`}
+                                        style={{ colorScheme: theme }}
+                                      />
+                                    </td>
+                                    <td className="py-2">
+                                      <input 
+                                        type="text" 
+                                        value={editAccrualForm.vendor || ''} 
+                                        onChange={(e) => setEditAccrualForm(prev => ({ ...prev, vendor: e.target.value }))}
+                                        className={`w-full px-2 py-1 text-sm rounded border ${inputClasses}`}
+                                        style={{ colorScheme: theme }}
+                                      />
+                                    </td>
+                                    <td className="py-2 text-center">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <button onClick={saveEditAccrual} className="p-1.5 text-accent-primary hover:bg-accent-primary/10 rounded">
+                                          <Check className="w-4 h-4" />
+                                        </button>
+                                        <button onClick={cancelEditAccrual} className="p-1.5 text-zinc-400 hover:bg-zinc-500/10 rounded">
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </>
+                                ) : (
+                                  <>
+                                    <td className="py-3 text-sm">{t.date}</td>
+                                    <td className="py-3">
+                                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                        t.type === 'revenue' 
+                                          ? 'bg-accent-primary/10 text-accent-primary' 
+                                          : 'bg-accent-danger/10 text-accent-danger'
+                                      }`}>
+                                        {t.type === 'revenue' ? 'Revenue' : 'Direct Cost'}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 text-sm max-w-xs truncate">{t.description}</td>
+                                    <td className={`py-3 text-right font-mono text-sm ${t.type === 'revenue' ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                      {formatCurrency(Math.abs(t.amount))}
+                                    </td>
+                                    <td className={`py-3 text-sm ${textMuted}`}>{t.project}</td>
+                                    <td className={`py-3 text-sm ${textMuted}`}>{t.vendor || '-'}</td>
+                                    <td className="py-3 text-center">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <button onClick={() => startEditAccrual(t)} className="p-1.5 text-zinc-400 hover:text-indigo-500 hover:bg-indigo-500/10 rounded" title="Inline edit">
+                                          <Edit2 className="w-4 h-4" />
+                                        </button>
+                                        <button onClick={() => openEditAccrualModal(t)} className="p-1.5 text-zinc-400 hover:text-accent-primary hover:bg-accent-primary/10 rounded" title="Edit in modal">
+                                          <ExternalLink className="w-4 h-4" />
+                                        </button>
+                                        <button onClick={() => deleteAccrualTransaction(t.id)} className="p-1.5 text-zinc-400 hover:text-accent-danger hover:bg-accent-danger/10 rounded" title="Delete">
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </>
+                                )}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <p className={`text-sm mt-4 text-center ${textMuted}`}>
+                        Showing {filteredAccrualTransactions.length} of {accrualTransactions.length} accrual transactions
+                        {selectedAccrualIds.size > 0 && ` • ${selectedAccrualIds.size} selected`}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className={`rounded-xl p-12 border ${cardClasses} text-center`}>
+                      <FileText className={`w-12 h-12 mx-auto mb-4 ${textMuted}`} />
+                      <h3 className="text-lg font-semibold mb-2">No Accrual Transactions</h3>
+                      <p className={`mb-4 ${textMuted}`}>
+                        {accrualTransactions.length === 0 
+                          ? 'Add invoice data to track gross margin'
+                          : 'No transactions match your filters'}
+                      </p>
+                      <div className="flex gap-3 justify-center">
+                        <button 
+                          onClick={openAddAccrualModal}
+                          className="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 flex items-center gap-2"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add Manually
+                        </button>
+                        <button 
+                          onClick={() => setActiveTab('data')}
+                          className={`px-4 py-2 rounded-lg border flex items-center gap-2 ${
+                            theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                          }`}
+                        >
+                          <Upload className="w-4 h-4" />
+                          Import CSV
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </motion.div>
           )}
