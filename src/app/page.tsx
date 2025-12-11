@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { 
   LineChart, Line, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -15,8 +16,9 @@ import {
   FolderPlus, Copy, FileText, Bell, Repeat, Lock, Users, Image, Palette,
   Shield, Eye, EyeOff, HardDrive, CloudOff, ExternalLink, Clock, Target,
   Sparkles, AlertCircle, CheckCircle, Info, MessageSquare, Gauge, List, Tag,
-  BarChart3
+  BarChart3, LogOut, User
 } from 'lucide-react'
+import { supabase, signOut, getCurrentUser } from '../lib/supabase'
 
 // Types
 interface Category {
@@ -342,6 +344,12 @@ interface ChartFilters {
 
 // Main Component
 export default function CashFlowPro() {
+  const router = useRouter()
+  
+  // Auth state
+  const [user, setUser] = useState<any>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  
   // Core state
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'data' | 'assumptions' | 'projections' | 'integrations' | 'settings'>('dashboard')
   const [beginningBalance, setBeginningBalance] = useState<number>(50000)
@@ -382,9 +390,9 @@ export default function CashFlowPro() {
   
   // Branding state
   const [branding, setBranding] = useState<BrandingSettings>({
-    companyName: 'CashFlow Pro',
+    companyName: 'Vantage',
     companyLogo: null,
-    brandColor: '#10b981'
+    brandColor: '#14b8a6'
   })
   
   // Chart filter state
@@ -458,6 +466,24 @@ export default function CashFlowPro() {
     percentOf: 'baseline',
     startDate: new Date().toISOString().slice(0, 7)
   })
+
+  // Auth check
+  useEffect(() => {
+    getCurrentUser().then(({ user }) => {
+      if (!user) {
+        router.push('/login')
+      } else {
+        setUser(user)
+      }
+      setAuthLoading(false)
+    })
+  }, [router])
+
+  // Sign out handler
+  const handleSignOut = async () => {
+    await signOut()
+    router.push('/login')
+  }
 
   // Load from localStorage
   useEffect(() => {
@@ -2242,6 +2268,20 @@ export default function CashFlowPro() {
   const textMuted = theme === 'light' ? 'text-gray-500' : 'text-zinc-400'
   const textSubtle = theme === 'light' ? 'text-gray-400' : 'text-zinc-500'
 
+  // Auth loading screen
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center mx-auto mb-4">
+            <DollarSign className="w-6 h-6 text-white" />
+          </div>
+          <div className="text-teal-400 animate-pulse">Loading...</div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={`min-h-screen font-body transition-colors ${themeClasses}`} style={{ colorScheme: theme }}>
       {/* Header */}
@@ -2308,6 +2348,25 @@ export default function CashFlowPro() {
                 <Plus className="w-4 h-4" />
                 <span className="hidden sm:inline">Add</span>
               </button>
+              
+              {/* User menu */}
+              {user && (
+                <div className="flex items-center gap-2 ml-2 pl-2 border-l border-terminal-border">
+                  <div className="hidden sm:flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-teal-500/20 flex items-center justify-center">
+                      <User className="w-4 h-4 text-teal-400" />
+                    </div>
+                    <span className={`text-sm ${textMuted}`}>{user.email?.split('@')[0]}</span>
+                  </div>
+                  <button
+                    onClick={handleSignOut}
+                    className={`p-2 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100 text-gray-600' : 'hover:bg-terminal-surface text-zinc-400'}`}
+                    title="Sign out"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
           
