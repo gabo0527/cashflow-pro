@@ -18,7 +18,19 @@ import {
   Sparkles, AlertCircle, CheckCircle, Info, MessageSquare, Gauge, List, Tag,
   BarChart3, LogOut, User
 } from 'lucide-react'
-import { supabase, signOut, getCurrentUser } from '../lib/supabase'
+import { 
+  supabase, signOut, getCurrentUser, getCurrentProfile,
+  fetchTransactions, insertTransaction as supabaseInsertTransaction, 
+  updateTransaction as supabaseUpdateTransaction, deleteTransaction as supabaseDeleteTransaction, 
+  bulkInsertTransactions, deleteAllTransactions,
+  fetchAccrualTransactions, insertAccrualTransaction as supabaseInsertAccrualTransaction, 
+  updateAccrualTransaction as supabaseUpdateAccrualTransaction, 
+  deleteAccrualTransaction as supabaseDeleteAccrualTransaction, 
+  bulkInsertAccrualTransactions, deleteAllAccrualTransactions,
+  fetchAssumptions, insertAssumption as supabaseInsertAssumption, 
+  deleteAssumption as supabaseDeleteAssumption,
+  fetchCategories, fetchCompanySettings, updateCompanySettings
+} from '../lib/supabase'
 
 // Types
 interface Category {
@@ -348,7 +360,10 @@ export default function CashFlowPro() {
   
   // Auth state
   const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
+  const [companyId, setCompanyId] = useState<string | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
+  const [dataLoading, setDataLoading] = useState(false)
   
   // Core state
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'data' | 'assumptions' | 'projections' | 'integrations' | 'settings'>('dashboard')
@@ -467,16 +482,127 @@ export default function CashFlowPro() {
     startDate: new Date().toISOString().slice(0, 7)
   })
 
-  // Auth check
+  // Auth check and data loading from Supabase
   useEffect(() => {
-    getCurrentUser().then(({ user }) => {
+    const initAuth = async () => {
+      const { user } = await getCurrentUser()
       if (!user) {
         router.push('/login')
-      } else {
-        setUser(user)
+        return
       }
+      
+      setUser(user)
+      
+      // Get profile with company_id
+      const { profile } = await getCurrentProfile()
+      if (profile) {
+        setProfile(profile)
+        setCompanyId(profile.company_id)
+        
+        // Load data from Supabase
+        setDataLoading(true)
+        try {
+          const [
+            transactionsRes, 
+            accrualRes, 
+            assumptionsRes, 
+            categoriesRes,
+            settingsRes
+          ] = await Promise.all([
+            fetchTransactions(profile.company_id),
+            fetchAccrualTransactions(profile.company_id),
+            fetchAssumptions(profile.company_id),
+            fetchCategories(profile.company_id),
+            fetchCompanySettings(profile.company_id)
+          ])
+          
+          if (transactionsRes.data) {
+            // Map Supabase format to app format
+            const mapped = transactionsRes.data.map((t: any) => ({
+              id: t.id,
+              date: t.date,
+              category: t.category,
+              description: t.description,
+              amount: parseFloat(t.amount),
+              type: t.type,
+              project: t.project,
+              notes: t.notes
+            }))
+            setTransactions(mapped)
+          }
+          
+          if (accrualRes.data) {
+            const mapped = accrualRes.data.map((t: any) => ({
+              id: t.id,
+              date: t.date,
+              type: t.type,
+              description: t.description,
+              amount: parseFloat(t.amount),
+              project: t.project,
+              vendor: t.vendor,
+              invoiceNumber: t.invoice_number,
+              notes: t.notes
+            }))
+            setAccrualTransactions(mapped)
+          }
+          
+          if (assumptionsRes.data) {
+            const mapped = assumptionsRes.data.map((a: any) => ({
+              id: a.id,
+              name: a.name,
+              category: a.category,
+              amount: parseFloat(a.amount),
+              valueType: a.value_type,
+              percentOf: a.percent_of,
+              frequency: a.frequency,
+              startDate: a.start_date,
+              endDate: a.end_date,
+              project: a.project,
+              scenarioId: a.scenario_id
+            }))
+            setAssumptions(mapped)
+          }
+          
+          if (categoriesRes.data && categoriesRes.data.length > 0) {
+            const mapped = categoriesRes.data.map((c: any) => ({
+              id: c.category_id,
+              name: c.name,
+              type: c.type,
+              color: c.color,
+              isDefault: c.is_default
+            }))
+            setCategories(mapped)
+          }
+          
+          if (settingsRes.data) {
+            if (settingsRes.data.beginning_balance) {
+              setBeginningBalance(parseFloat(settingsRes.data.beginning_balance))
+            }
+            if (settingsRes.data.company_name) {
+              setBranding(prev => ({ ...prev, companyName: settingsRes.data.company_name }))
+            }
+            if (settingsRes.data.brand_color) {
+              setBranding(prev => ({ ...prev, brandColor: settingsRes.data.brand_color }))
+            }
+          }
+          
+          // Load UI preferences from localStorage (these stay local)
+          const savedTheme = localStorage.getItem(STORAGE_KEYS.theme)
+          const savedChartFilters = localStorage.getItem(STORAGE_KEYS.chartFilters)
+          if (savedTheme) setTheme(savedTheme as 'dark' | 'light')
+          if (savedChartFilters) setChartFilters(JSON.parse(savedChartFilters))
+          
+        } catch (error) {
+          console.error('Error loading data from Supabase:', error)
+        }
+        setDataLoading(false)
+      }
+      
       setAuthLoading(false)
-    })
+      setIsLoaded(true)
+    }
+    
+    initAuth()
   }, [router])
 
   // Sign out handler
@@ -485,84 +611,9 @@ export default function CashFlowPro() {
     router.push('/login')
   }
 
-  // Load from localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const savedTransactions = localStorage.getItem(STORAGE_KEYS.transactions)
-        const savedAccrualTransactions = localStorage.getItem(STORAGE_KEYS.accrualTransactions)
-        const savedAssumptions = localStorage.getItem(STORAGE_KEYS.assumptions)
-        const savedBalance = localStorage.getItem(STORAGE_KEYS.beginningBalance)
-        const savedCutoff = localStorage.getItem(STORAGE_KEYS.cutoffDate)
-        const savedProjects = localStorage.getItem(STORAGE_KEYS.projects)
-        const savedTheme = localStorage.getItem(STORAGE_KEYS.theme)
-        const savedAlert = localStorage.getItem(STORAGE_KEYS.balanceAlert)
-        const savedScenarios = localStorage.getItem(STORAGE_KEYS.scenarios)
-        const savedRecurring = localStorage.getItem(STORAGE_KEYS.recurringRules)
-        const savedBranding = localStorage.getItem(STORAGE_KEYS.branding)
-        const savedChartFilters = localStorage.getItem(STORAGE_KEYS.chartFilters)
-        const savedCategories = localStorage.getItem(STORAGE_KEYS.categories)
-        
-        if (savedTransactions) setTransactions(JSON.parse(savedTransactions))
-        if (savedAccrualTransactions) setAccrualTransactions(JSON.parse(savedAccrualTransactions))
-        if (savedAssumptions) setAssumptions(JSON.parse(savedAssumptions))
-        if (savedBalance) setBeginningBalance(parseFloat(savedBalance) || 0)
-        if (savedCutoff) setCutoffDate(savedCutoff)
-        if (savedProjects) setProjects(JSON.parse(savedProjects))
-        if (savedTheme) setTheme(savedTheme as 'dark' | 'light')
-        if (savedAlert) setBalanceAlertThreshold(parseFloat(savedAlert) || 0)
-        if (savedScenarios) setScenarios(JSON.parse(savedScenarios))
-        if (savedRecurring) setRecurringRules(JSON.parse(savedRecurring))
-        if (savedBranding) setBranding(JSON.parse(savedBranding))
-        if (savedChartFilters) setChartFilters(JSON.parse(savedChartFilters))
-        if (savedCategories) setCategories(JSON.parse(savedCategories))
-      } catch (error) {
-        console.error('Error loading data from localStorage:', error)
-        // Clear corrupted data
-        Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key))
-      }
-      
-      setIsLoaded(true)
-    }
-  }, [])
+  // Save UI preferences to localStorage (theme, chart filters stay local)
 
-  // Save to localStorage
-  useEffect(() => {
-    if (isLoaded && typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.transactions, JSON.stringify(transactions))
-    }
-  }, [transactions, isLoaded])
-
-  useEffect(() => {
-    if (isLoaded && typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.accrualTransactions, JSON.stringify(accrualTransactions))
-    }
-  }, [accrualTransactions, isLoaded])
-
-  useEffect(() => {
-    if (isLoaded && typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.assumptions, JSON.stringify(assumptions))
-    }
-  }, [assumptions, isLoaded])
-
-  useEffect(() => {
-    if (isLoaded && typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.beginningBalance, beginningBalance.toString())
-    }
-  }, [beginningBalance, isLoaded])
-
-  useEffect(() => {
-    if (isLoaded && typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.cutoffDate, cutoffDate)
-    }
-  }, [cutoffDate, isLoaded])
-
-  useEffect(() => {
-    if (isLoaded && typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.projects, JSON.stringify(projects))
-    }
-  }, [projects, isLoaded])
-
+  // Only save UI preferences to localStorage - data is in Supabase
   useEffect(() => {
     if (isLoaded && typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.theme, theme)
@@ -572,39 +623,9 @@ export default function CashFlowPro() {
 
   useEffect(() => {
     if (isLoaded && typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.balanceAlert, balanceAlertThreshold.toString())
-    }
-  }, [balanceAlertThreshold, isLoaded])
-
-  useEffect(() => {
-    if (isLoaded && typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.scenarios, JSON.stringify(scenarios))
-    }
-  }, [scenarios, isLoaded])
-
-  useEffect(() => {
-    if (isLoaded && typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.recurringRules, JSON.stringify(recurringRules))
-    }
-  }, [recurringRules, isLoaded])
-
-  useEffect(() => {
-    if (isLoaded && typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.branding, JSON.stringify(branding))
-    }
-  }, [branding, isLoaded])
-
-  useEffect(() => {
-    if (isLoaded && typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.chartFilters, JSON.stringify(chartFilters))
     }
   }, [chartFilters, isLoaded])
-
-  useEffect(() => {
-    if (isLoaded && typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.categories, JSON.stringify(categories))
-    }
-  }, [categories, isLoaded])
 
   // Helper to get category by id
   const getCategoryById = useCallback((id: string): Category | undefined => {
@@ -697,17 +718,51 @@ export default function CashFlowPro() {
     return normalized
   }, [])
 
-  const loadSampleData = useCallback(() => {
+  const loadSampleData = useCallback(async () => {
+    if (!companyId || !user) return
     const { transactions: sampleTx, projects: sampleProjects } = generateSampleData()
-    setTransactions(sampleTx)
-    setProjects(sampleProjects)
-  }, [])
-
-  const clearAllData = useCallback(() => {
-    if (confirm('Are you sure you want to delete all transactions? This cannot be undone.')) {
-      setTransactions([])
+    
+    // Insert to Supabase
+    const toInsert = sampleTx.map(t => ({
+      date: t.date,
+      category: t.category,
+      description: t.description,
+      amount: t.amount,
+      type: t.type,
+      project: t.project,
+      notes: t.notes
+    }))
+    
+    const { error } = await bulkInsertTransactions(toInsert, companyId, user.id)
+    if (!error) {
+      // Reload from Supabase to get proper IDs
+      const { data } = await fetchTransactions(companyId)
+      if (data) {
+        const mapped = data.map((t: any) => ({
+          id: t.id,
+          date: t.date,
+          category: t.category,
+          description: t.description,
+          amount: parseFloat(t.amount),
+          type: t.type,
+          project: t.project,
+          notes: t.notes
+        }))
+        setTransactions(mapped)
+      }
+      setProjects(sampleProjects)
     }
-  }, [])
+  }, [companyId, user])
+
+  const clearAllData = useCallback(async () => {
+    if (!companyId) return
+    if (confirm('Are you sure you want to delete all transactions? This cannot be undone.')) {
+      const { error } = await deleteAllTransactions(companyId)
+      if (!error) {
+        setTransactions([])
+      }
+    }
+  }, [companyId])
 
   const handleFileUpload = useCallback((file: File) => {
     const fileExtension = file.name.split('.').pop()?.toLowerCase()
@@ -834,8 +889,40 @@ export default function CashFlowPro() {
             .filter((t): t is Transaction => t !== null)
             
           if (imported.length > 0) {
-            setTransactions(prev => [...prev, ...imported])
-            alert(`Successfully imported ${imported.length} transactions`)
+            // Insert to Supabase
+            if (companyId && user) {
+              const toInsert = imported.map(t => ({
+                date: t.date,
+                category: t.category,
+                description: t.description,
+                amount: t.amount,
+                type: t.type,
+                project: t.project,
+                notes: t.notes
+              }))
+              
+              const { data, error } = await bulkInsertTransactions(toInsert, companyId, user.id)
+              if (error) {
+                alert(`Error importing to database: ${error.message}`)
+              } else if (data) {
+                // Map returned data with proper IDs
+                const mapped = data.map((t: any) => ({
+                  id: t.id,
+                  date: t.date,
+                  category: t.category,
+                  description: t.description,
+                  amount: parseFloat(t.amount),
+                  type: t.type,
+                  project: t.project,
+                  notes: t.notes
+                }))
+                setTransactions(prev => [...prev, ...mapped])
+                alert(`Successfully imported ${imported.length} transactions`)
+              }
+            } else {
+              setTransactions(prev => [...prev, ...imported])
+              alert(`Successfully imported ${imported.length} transactions`)
+            }
           } else {
             alert('No valid transactions found. Check column headers: date, category, description, amount, type, project')
           }
@@ -998,8 +1085,11 @@ export default function CashFlowPro() {
     }, 100)
   }, [pdfSections])
 
-  const deleteTransaction = useCallback((id: string) => {
-    setTransactions(prev => prev.filter(t => t.id !== id))
+  const deleteTransaction = useCallback(async (id: string) => {
+    const { error } = await supabaseDeleteTransaction(id)
+    if (!error) {
+      setTransactions(prev => prev.filter(t => t.id !== id))
+    }
   }, [])
 
   const startEdit = useCallback((transaction: Transaction) => {
@@ -1014,13 +1104,25 @@ export default function CashFlowPro() {
     })
   }, [])
 
-  const saveEdit = useCallback(() => {
+  const saveEdit = useCallback(async () => {
     if (editingId) {
-      setTransactions(prev => prev.map(t => 
-        t.id === editingId 
-          ? normalizeTransaction({ ...t, ...editForm })
-          : t
-      ))
+      const updates = {
+        category: editForm.category,
+        type: editForm.type,
+        project: editForm.project,
+        description: editForm.description,
+        amount: editForm.amount,
+        date: editForm.date
+      }
+      
+      const { error } = await supabaseUpdateTransaction(editingId, updates)
+      if (!error) {
+        setTransactions(prev => prev.map(t => 
+          t.id === editingId 
+            ? normalizeTransaction({ ...t, ...editForm })
+            : t
+        ))
+      }
       setEditingId(null)
       setEditForm({})
     }
@@ -1032,13 +1134,16 @@ export default function CashFlowPro() {
   }, [])
 
   // Accrual Transaction Management
-  const deleteAccrualTransaction = useCallback((id: string) => {
-    setAccrualTransactions(prev => prev.filter(t => t.id !== id))
-    setSelectedAccrualIds(prev => {
-      const next = new Set(prev)
-      next.delete(id)
-      return next
-    })
+  const deleteAccrualTransaction = useCallback(async (id: string) => {
+    const { error } = await supabaseDeleteAccrualTransaction(id)
+    if (!error) {
+      setAccrualTransactions(prev => prev.filter(t => t.id !== id))
+      setSelectedAccrualIds(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
   }, [])
 
   const bulkDeleteAccrualTransactions = useCallback(() => {
@@ -1137,7 +1242,7 @@ export default function CashFlowPro() {
     setShowAccrualModal(true)
   }, [])
 
-  const saveAccrualModal = useCallback(() => {
+  const saveAccrualModal = useCallback(async () => {
     if (!accrualModalForm.description || !accrualModalForm.project) {
       alert('Please fill in description and project')
       return
@@ -1146,24 +1251,58 @@ export default function CashFlowPro() {
     const amount = Math.abs(accrualModalForm.amount || 0) * (accrualModalForm.type === 'direct_cost' ? -1 : 1)
     
     if (accrualModalMode === 'add') {
-      const newAccrual: AccrualTransaction = {
-        id: generateId(),
+      if (!companyId || !user) return
+      
+      const txData = {
         date: accrualModalForm.date || new Date().toISOString().slice(0, 10),
         type: accrualModalForm.type || 'revenue',
         description: accrualModalForm.description,
         amount,
         project: accrualModalForm.project,
         vendor: accrualModalForm.vendor,
-        invoiceNumber: accrualModalForm.invoiceNumber,
+        invoice_number: accrualModalForm.invoiceNumber,
         notes: accrualModalForm.notes
       }
-      setAccrualTransactions(prev => [...prev, newAccrual])
+      
+      const { data, error } = await supabaseInsertAccrualTransaction(txData, companyId, user.id)
+      
+      if (!error && data) {
+        const newAccrual: AccrualTransaction = {
+          id: data.id,
+          date: data.date,
+          type: data.type,
+          description: data.description,
+          amount: parseFloat(data.amount),
+          project: data.project,
+          vendor: data.vendor,
+          invoiceNumber: data.invoice_number,
+          notes: data.notes
+        }
+        setAccrualTransactions(prev => [...prev, newAccrual])
+      }
     } else {
-      setAccrualTransactions(prev => prev.map(t => 
-        t.id === accrualModalForm.id 
-          ? { ...t, ...accrualModalForm, amount }
-          : t
-      ))
+      if (!accrualModalForm.id) return
+      
+      const updates = {
+        date: accrualModalForm.date,
+        type: accrualModalForm.type,
+        description: accrualModalForm.description,
+        amount,
+        project: accrualModalForm.project,
+        vendor: accrualModalForm.vendor,
+        invoice_number: accrualModalForm.invoiceNumber,
+        notes: accrualModalForm.notes
+      }
+      
+      const { error } = await supabaseUpdateAccrualTransaction(accrualModalForm.id, updates)
+      
+      if (!error) {
+        setAccrualTransactions(prev => prev.map(t => 
+          t.id === accrualModalForm.id 
+            ? { ...t, ...accrualModalForm, amount }
+            : t
+        ))
+      }
     }
     
     setShowAccrualModal(false)
@@ -1190,10 +1329,9 @@ export default function CashFlowPro() {
   }, [])
 
   // Quick Add Transaction
-  const handleQuickAdd = useCallback(() => {
-    if (quickAddForm.description && quickAddForm.amount) {
-      const newTx: Transaction = normalizeTransaction({
-        id: generateId(),
+  const handleQuickAdd = useCallback(async () => {
+    if (quickAddForm.description && quickAddForm.amount && companyId && user) {
+      const txData = {
         date: quickAddForm.date || new Date().toISOString().slice(0, 10),
         category: quickAddForm.category || 'revenue',
         description: quickAddForm.description,
@@ -1201,8 +1339,24 @@ export default function CashFlowPro() {
         type: quickAddForm.type || 'actual',
         project: quickAddForm.project,
         notes: quickAddForm.notes
-      })
-      setTransactions(prev => [...prev, newTx])
+      }
+      
+      const { data, error } = await supabaseInsertTransaction(txData, companyId, user.id)
+      
+      if (!error && data) {
+        const newTx: Transaction = normalizeTransaction({
+          id: data.id,
+          date: data.date,
+          category: data.category,
+          description: data.description,
+          amount: parseFloat(data.amount),
+          type: data.type,
+          project: data.project,
+          notes: data.notes
+        })
+        setTransactions(prev => [...prev, newTx])
+      }
+      
       setQuickAddForm({
         date: new Date().toISOString().slice(0, 10),
         category: 'revenue',
@@ -1213,7 +1367,7 @@ export default function CashFlowPro() {
       })
       setShowQuickAdd(false)
     }
-  }, [quickAddForm, normalizeTransaction])
+  }, [quickAddForm, normalizeTransaction, companyId, user])
 
   // Project Management
   const addProject = useCallback(() => {
@@ -2269,14 +2423,16 @@ export default function CashFlowPro() {
   const textSubtle = theme === 'light' ? 'text-gray-400' : 'text-zinc-500'
 
   // Auth loading screen
-  if (authLoading) {
+  if (authLoading || dataLoading) {
     return (
       <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center mx-auto mb-4">
             <DollarSign className="w-6 h-6 text-white" />
           </div>
-          <div className="text-teal-400 animate-pulse">Loading...</div>
+          <div className="text-teal-400 animate-pulse">
+            {authLoading ? 'Authenticating...' : 'Loading data...'}
+          </div>
         </div>
       </div>
     )
@@ -3001,36 +3157,37 @@ export default function CashFlowPro() {
                 
                 <h4 className="font-semibold mt-4">1. Data Collection</h4>
                 <p className={textMuted}>
-                  {branding.companyName} does not collect, store, or transmit any of your financial data to external servers. 
-                  All data you enter is stored exclusively in your web browser's local storage on your device.
+                  {branding.companyName} collects and stores your financial data to provide the service. 
+                  This includes transaction data, invoices, and related business information you enter.
                 </p>
                 
                 <h4 className="font-semibold mt-4">2. Data Storage</h4>
                 <p className={textMuted}>
-                  Your data is stored locally using your browser's localStorage feature. This means:
+                  Your data is securely stored in the cloud using Supabase (hosted on AWS). This means:
                 </p>
                 <ul className={`list-disc pl-5 ${textMuted}`}>
-                  <li>Data never leaves your device</li>
-                  <li>Data is not accessible to us or any third party</li>
-                  <li>Data persists until you clear your browser data</li>
-                  <li>Data is not synced across devices or browsers</li>
+                  <li>Data is encrypted at rest and in transit</li>
+                  <li>Data is accessible from any device after login</li>
+                  <li>Data is backed up automatically</li>
+                  <li>Only authenticated users from your organization can access your data</li>
                 </ul>
                 
                 <h4 className="font-semibold mt-4">3. Data Security</h4>
                 <p className={textMuted}>
-                  Since all data remains on your device, security depends on your device and browser security. 
-                  We recommend keeping your device secure and regularly exporting your data as a backup.
+                  We implement industry-standard security measures including encryption, secure authentication via Google SSO, 
+                  and row-level security policies to ensure only authorized users can access your data.
                 </p>
                 
                 <h4 className="font-semibold mt-4">4. Third-Party Services</h4>
                 <p className={textMuted}>
-                  This application does not integrate with any third-party analytics, tracking, or data collection services.
+                  This application uses Supabase for database hosting and Google for authentication. 
+                  These services have their own privacy policies and security certifications.
                 </p>
                 
                 <h4 className="font-semibold mt-4">5. Your Rights</h4>
                 <p className={textMuted}>
                   You have complete control over your data. You can export, modify, or delete your data at any time 
-                  through the application interface or by clearing your browser's local storage.
+                  through the application interface. Contact your administrator to request full data deletion.
                 </p>
                 
                 <h4 className="font-semibold mt-4">6. Contact</h4>
@@ -3090,16 +3247,16 @@ export default function CashFlowPro() {
                 
                 <h4 className="font-semibold mt-4">2. Description of Service</h4>
                 <p className={textMuted}>
-                  {branding.companyName} is a cash flow forecasting and financial planning tool. The application 
-                  provides tools for tracking transactions, projecting cash flow, and analyzing financial data.
+                  {branding.companyName} is a financial intelligence platform for cash flow forecasting, gross margin analysis, 
+                  and financial planning. The application provides tools for tracking transactions, projections, and reporting.
                 </p>
                 
                 <h4 className="font-semibold mt-4">3. User Responsibilities</h4>
                 <p className={textMuted}>You are responsible for:</p>
                 <ul className={`list-disc pl-5 ${textMuted}`}>
                   <li>The accuracy of data you enter</li>
-                  <li>Maintaining backups of your data (via export)</li>
-                  <li>Securing your device and browser</li>
+                  <li>Maintaining security of your login credentials</li>
+                  <li>Ensuring authorized access within your organization</li>
                   <li>Any decisions made based on the application's output</li>
                 </ul>
                 
@@ -3116,11 +3273,10 @@ export default function CashFlowPro() {
                   but not limited to financial losses, data loss, or business interruption.
                 </p>
                 
-                <h4 className="font-semibold mt-4">6. Data Loss</h4>
+                <h4 className="font-semibold mt-4">6. Data & Security</h4>
                 <p className={textMuted}>
-                  Since data is stored in your browser's local storage, clearing browser data or using 
-                  incognito/private browsing will result in data loss. We are not responsible for any 
-                  data loss. Regular exports are recommended.
+                  Data is stored securely in the cloud with encryption. While we implement industry-standard 
+                  security measures, we recommend regular data exports as an additional backup measure.
                 </p>
                 
                 <h4 className="font-semibold mt-4">7. Modifications</h4>
@@ -5544,7 +5700,7 @@ export default function CashFlowPro() {
 
       <footer className={`border-t mt-12 py-4 print:hidden ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
         <div className={`max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs ${textMuted}`}>
-          <span>{branding.companyName} • Data stored locally in browser</span>
+          <span>{branding.companyName} • Data secured in cloud</span>
           <div className="flex items-center gap-4">
             <button onClick={() => setShowPrivacyModal(true)} className="hover:underline">Privacy</button>
             <button onClick={() => setShowTermsModal(true)} className="hover:underline">Terms</button>
