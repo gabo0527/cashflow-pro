@@ -1688,7 +1688,13 @@ export default function CashFlowPro() {
   const accrualMonthlyData = useMemo(() => {
     const months: { [key: string]: { revenue: number; directCosts: number; grossProfit: number; grossMarginPct: number } } = {}
     
-    accrualTransactions.forEach(t => {
+    // Filter by date range
+    const filtered = accrualTransactions.filter(t => {
+      const monthKey = t.date.slice(0, 7)
+      return monthKey >= activeDateRange.start && monthKey <= activeDateRange.end
+    })
+    
+    filtered.forEach(t => {
       const monthKey = t.date.slice(0, 7)
       if (!months[monthKey]) {
         months[monthKey] = { revenue: 0, directCosts: 0, grossProfit: 0, grossMarginPct: 0 }
@@ -1710,19 +1716,29 @@ export default function CashFlowPro() {
     return Object.entries(months)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, data]) => ({ month, ...data }))
-  }, [accrualTransactions])
+  }, [accrualTransactions, activeDateRange])
 
   // Accrual project analysis with OH allocation
   const accrualProjectAnalysis = useMemo(() => {
-    // Get total overhead from cash transactions for the period
+    // Filter accrual transactions by date range
+    const filteredAccrual = accrualTransactions.filter(t => {
+      const monthKey = t.date.slice(0, 7)
+      return monthKey >= activeDateRange.start && monthKey <= activeDateRange.end
+    })
+    
+    // Get total overhead from cash transactions for the same period
     const totalOverhead = transactions
-      .filter(t => t.category === 'overhead' && t.type === 'actual')
+      .filter(t => {
+        if (t.category !== 'overhead' || t.type !== 'actual') return false
+        const monthKey = t.date.slice(0, 7)
+        return monthKey >= activeDateRange.start && monthKey <= activeDateRange.end
+      })
       .reduce((sum, t) => sum + Math.abs(t.amount), 0)
     
     // Calculate revenue and direct costs by project
     const projectData: { [key: string]: { revenue: number; directCosts: number } } = {}
     
-    accrualTransactions.forEach(t => {
+    filteredAccrual.forEach(t => {
       if (!projectData[t.project]) {
         projectData[t.project] = { revenue: 0, directCosts: 0 }
       }
@@ -1768,7 +1784,7 @@ export default function CashFlowPro() {
     }), { revenue: 0, directCosts: 0, grossProfit: 0, ohAllocation: 0, netMargin: 0 })
     
     return { projects: analysis, totals, totalOverhead }
-  }, [accrualTransactions, transactions])
+  }, [accrualTransactions, transactions, activeDateRange])
 
   // Comparison data: Invoiced vs Collected by month
   const cashVsAccrualData = useMemo(() => {
@@ -3720,7 +3736,20 @@ export default function CashFlowPro() {
 
                   {/* Project Analysis Table */}
                   <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
-                    <h3 className="text-lg font-semibold mb-4">Project Gross Margin Analysis</h3>
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                      <h3 className="text-lg font-semibold">Project Gross Margin Analysis</h3>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm ${textMuted}`}>
+                          {dateRangePreset === 'custom' 
+                            ? `${activeDateRange.start} to ${activeDateRange.end}`
+                            : datePresets.find(p => p.key === dateRangePreset)?.label || dateRangePreset
+                          }
+                        </span>
+                        <span className={`text-xs px-2 py-1 rounded ${theme === 'light' ? 'bg-gray-100' : 'bg-terminal-bg'} ${textMuted}`}>
+                          {accrualMonthlyData.length} month{accrualMonthlyData.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    </div>
                     {accrualProjectAnalysis.projects.length > 0 ? (
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
