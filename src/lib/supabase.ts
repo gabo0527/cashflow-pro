@@ -28,7 +28,7 @@ export const fetchTransactions = async (companyId?: string) => {
   if (companyId) query = query.eq('company_id', companyId)
   const { data, error } = await query
   if (error) throw error
-  return data
+  return { data }
 }
 
 export const insertTransaction = async (transaction: any) => {
@@ -65,7 +65,7 @@ export const fetchAccrualTransactions = async (companyId?: string) => {
   if (companyId) query = query.eq('company_id', companyId)
   const { data, error } = await query
   if (error) throw error
-  return data
+  return { data }
 }
 
 export const insertAccrualTransaction = async (transaction: any) => {
@@ -102,7 +102,7 @@ export const fetchAssumptions = async (companyId?: string) => {
   if (companyId) query = query.eq('company_id', companyId)
   const { data, error } = await query
   if (error) throw error
-  return data
+  return { data }
 }
 
 export const insertAssumption = async (assumption: any) => {
@@ -122,7 +122,7 @@ export const fetchCategories = async (companyId?: string) => {
   if (companyId) query = query.eq('company_id', companyId)
   const { data, error } = await query
   if (error) throw error
-  return data
+  return { data }
 }
 
 export const insertCategory = async (category: any) => {
@@ -148,7 +148,7 @@ export const fetchCompanySettings = async (companyId?: string) => {
   if (companyId) query = query.eq('company_id', companyId)
   const { data, error } = await query.single()
   if (error && error.code !== 'PGRST116') throw error
-  return data
+  return { data }
 }
 
 export const updateCompanySettings = async (settings: any) => {
