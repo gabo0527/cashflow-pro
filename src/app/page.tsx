@@ -496,10 +496,12 @@ export default function CashFlowPro() {
       setUser(user)
       
       // Get profile with company_id
-      const { profile } = await getCurrentProfile()
-      if (profile) {
-        setProfile(profile)
-        setCompanyId(profile.company_id)
+     export const getCurrentProfile = async () => {
+  const { user } = await getCurrentUser()
+  if (!user) return { profile: null }
+  const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+  return { profile: data }
+}
         
         // Load data from Supabase
         setDataLoading(true)
