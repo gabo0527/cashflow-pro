@@ -932,7 +932,7 @@ export default function CashFlowPro() {
     } else {
       alert('Please use CSV format. Export from Excel/Sheets using "Save As > CSV"')
     }
-  }, [normalizeTransaction])
+}, [normalizeTransaction, companyId, user])
 
   // Accrual/Invoice file upload handler
   const handleAccrualUpload = useCallback((file: File) => {
