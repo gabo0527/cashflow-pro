@@ -17,9 +17,9 @@ export const getCurrentUser = async () => {
 
 export const getCurrentProfile = async () => {
   const { user } = await getCurrentUser()
-  if (!user) return null
+  if (!user) return { profile: null }
   const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-  return data
+  return { profile: data }
 }
 
 // ============ TRANSACTIONS ============
