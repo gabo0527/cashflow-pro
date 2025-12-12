@@ -5462,31 +5462,36 @@ export default function CashFlowPro() {
                 <p className={`text-sm mb-4 ${textMuted}`}>Create custom categories to track where your money goes</p>
                 
                 <div className="space-y-3 mb-4">
-                  {categories.map(cat => (
-                    <div key={cat.id} className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
-                      <div className="flex items-center gap-3">
-                        <div 
-                          className="w-4 h-4 rounded-full"
-                          style={{ backgroundColor: cat.color }}
-                        />
-                        <span className="font-medium">{cat.name}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded ${theme === 'light' ? 'bg-gray-200' : 'bg-terminal-surface'}`}>
-                          {cat.type}
-                        </span>
-                        {cat.isDefault && (
-                          <span className={`text-xs ${textMuted}`}>(default)</span>
-                        )}
-                      </div>
-                      {!cat.isDefault && (
-                        <button 
-                          onClick={() => setCategories(prev => prev.filter(c => c.id !== cat.id))}
-                          className="p-1 text-zinc-400 hover:text-accent-danger"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
+      {categories.map(cat => (
+  <div key={cat.id} className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+    <div className="flex items-center gap-3">
+      <input
+        type="color"
+        value={cat.color}
+        onChange={(e) => setCategories(prev => prev.map(c => 
+          c.id === cat.id ? { ...c, color: e.target.value } : c
+        ))}
+        className="w-6 h-6 rounded-full cursor-pointer border-0 p-0"
+        title="Click to change color"
+      />
+      <span className="font-medium">{cat.name}</span>
+      <span className={`text-xs px-2 py-0.5 rounded ${theme === 'light' ? 'bg-gray-200' : 'bg-terminal-surface'}`}>
+        {cat.type}
+      </span>
+      {cat.isDefault && (
+        <span className={`text-xs ${textMuted}`}>(default)</span>
+      )}
+    </div>
+    {!cat.isDefault && (
+      <button 
+        onClick={() => setCategories(prev => prev.filter(c => c.id !== cat.id))}
+        className="p-1 text-zinc-400 hover:text-accent-danger"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    )}
+  </div>
+))}
                 </div>
                 
                 <div className={`p-4 rounded-lg border-2 border-dashed ${theme === 'light' ? 'border-gray-300' : 'border-terminal-border'}`}>
@@ -5605,58 +5610,67 @@ export default function CashFlowPro() {
                 </div>
               </div>
 
-              {/* Your Data */}
-              <div className={`rounded-xl p-6 border ${cardClasses}`}>
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <HardDrive className="w-5 h-5" />
-                  Your Data
-                </h3>
-                
-                <div className={`p-4 rounded-lg mb-4 ${theme === 'light' ? 'bg-green-50 border border-green-200' : 'bg-accent-primary/10 border border-accent-primary/20'}`}>
-                  <div className="flex items-start gap-3">
-                    <CloudOff className="w-5 h-5 text-accent-primary mt-0.5" />
-                    <div>
-                      <p className={`font-medium ${theme === 'light' ? 'text-green-800' : 'text-accent-primary'}`}>100% Private & Local</p>
-                      <p className={`text-sm mt-1 ${theme === 'light' ? 'text-green-700' : 'text-accent-primary/80'}`}>
-                        Your financial data never leaves your device. All data is stored in your browser's local storage. 
-                        We have no servers, no accounts, and no access to your information.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
-                    <div className="flex items-center gap-3">
-                      <Database className="w-5 h-5" />
-                      <div>
-                        <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-zinc-200'}`}>Storage Location</p>
-                        <p className={`text-sm ${textMuted}`}>Browser localStorage (this device only)</p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
-                    <div className="flex items-center gap-3">
-                      <Shield className="w-5 h-5" />
-                      <div>
-                        <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-zinc-200'}`}>Data Ownership</p>
-                        <p className={`text-sm ${textMuted}`}>You own 100% of your data. Export anytime.</p>
-                      </div>
-                    </div>
-                    <button onClick={exportToCSV} className={`px-3 py-1.5 text-sm rounded-lg border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-100' : 'border-terminal-border hover:bg-terminal-bg'}`}>
-                      Export
-                    </button>
-                  </div>
-                </div>
-                
-                <div className={`mt-4 p-3 rounded-lg ${theme === 'light' ? 'bg-amber-50 border border-amber-200' : 'bg-accent-warning/10 border border-accent-warning/20'}`}>
-                  <p className={`text-sm ${theme === 'light' ? 'text-amber-800' : 'text-accent-warning'}`}>
-                    <strong>Important:</strong> Clearing your browser data or using a different browser/device will reset your data. 
-                    We recommend exporting regularly as a backup.
-                  </p>
-                </div>
-              </div>
+             {/* Your Data */}
+<div className={`rounded-xl p-6 border ${cardClasses}`}>
+  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+    <HardDrive className="w-5 h-5" />
+    Your Data
+  </h3>
+  
+  <div className={`p-4 rounded-lg mb-4 ${theme === 'light' ? 'bg-blue-50 border border-blue-200' : 'bg-accent-secondary/10 border border-accent-secondary/20'}`}>
+    <div className="flex items-start gap-3">
+      <Shield className="w-5 h-5 text-accent-secondary mt-0.5" />
+      <div>
+        <p className={`font-medium ${theme === 'light' ? 'text-blue-800' : 'text-accent-secondary'}`}>Secure Cloud Storage</p>
+        <p className={`text-sm mt-1 ${theme === 'light' ? 'text-blue-700' : 'text-accent-secondary/80'}`}>
+          Your data is encrypted and stored securely on Supabase (AWS). Access from any device with your login.
+          Team members with the same email domain share data automatically.
+        </p>
+      </div>
+    </div>
+  </div>
+  
+  <div className="space-y-3">
+    <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+      <div className="flex items-center gap-3">
+        <Database className="w-5 h-5" />
+        <div>
+          <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-zinc-200'}`}>Storage Location</p>
+          <p className={`text-sm ${textMuted}`}>Supabase Cloud (AWS) • Encrypted</p>
+        </div>
+      </div>
+    </div>
+    
+    <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+      <div className="flex items-center gap-3">
+        <Users className="w-5 h-5" />
+        <div>
+          <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-zinc-200'}`}>Team Access</p>
+          <p className={`text-sm ${textMuted}`}>Role: {profile?.role || 'user'} • Company shared data</p>
+        </div>
+      </div>
+    </div>
+    
+    <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+      <div className="flex items-center gap-3">
+        <Shield className="w-5 h-5" />
+        <div>
+          <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-zinc-200'}`}>Data Ownership</p>
+          <p className={`text-sm ${textMuted}`}>You own 100% of your data. Export anytime.</p>
+        </div>
+      </div>
+      <button onClick={exportToCSV} className={`px-3 py-1.5 text-sm rounded-lg border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-100' : 'border-terminal-border hover:bg-terminal-bg'}`}>
+        Export
+      </button>
+    </div>
+  </div>
+  
+  <div className={`mt-4 p-3 rounded-lg ${theme === 'light' ? 'bg-green-50 border border-green-200' : 'bg-accent-primary/10 border border-accent-primary/20'}`}>
+    <p className={`text-sm ${theme === 'light' ? 'text-green-800' : 'text-accent-primary'}`}>
+      <strong>Auto-sync:</strong> All changes save automatically to the cloud. Your data is backed up and accessible from any device.
+    </p>
+  </div>
+</div>
 
               {/* Security & Data (Coming Soon) */}
               <div className={`rounded-xl p-6 border ${cardClasses}`}>
