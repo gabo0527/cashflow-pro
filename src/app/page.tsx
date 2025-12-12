@@ -1984,9 +1984,10 @@ const handleQuickAdd = useCallback(async () => {
     })
     
     // Get total overhead from cash transactions for the same period
+    // Read from "Mano OH" project regardless of category
     const totalOverhead = transactions
       .filter(t => {
-        if (t.category !== 'overhead' || t.type !== 'actual') return false
+        if (t.project !== 'Mano OH' || t.type !== 'actual') return false
         const monthKey = t.date.slice(0, 7)
         return monthKey >= activeDateRange.start && monthKey <= activeDateRange.end
       })
@@ -2072,27 +2073,27 @@ const handleQuickAdd = useCallback(async () => {
 
   // Accrual Period Comparison (MoM/QoQ/YoY)
   const accrualPeriodComparison = useMemo(() => {
-    if (accrualMonthlyData.length < 2) return { mom: [], qoq: [], yoy: [] }
+    if (accrualMonthlyData.length < 1) return { mom: [], qoq: [], yoy: [] }
     
-    // MoM comparison
-    const mom = accrualMonthlyData.slice(1).map((curr, idx) => {
-      const prev = accrualMonthlyData[idx]
-      const revenueChange = prev.revenue > 0 ? ((curr.revenue - prev.revenue) / prev.revenue) * 100 : 0
-      const gmChange = curr.grossMarginPct - prev.grossMarginPct
+    // MoM comparison - include first month with N/A comparison
+    const mom = accrualMonthlyData.map((curr, idx) => {
+      const prev = idx > 0 ? accrualMonthlyData[idx - 1] : null
+      const revenueChange = prev && prev.revenue > 0 ? ((curr.revenue - prev.revenue) / prev.revenue) * 100 : null
+      const gmChange = prev ? curr.grossMarginPct - prev.grossMarginPct : null
       return {
         period: curr.month,
         currentRevenue: curr.revenue,
-        prevRevenue: prev.revenue,
+        prevRevenue: prev?.revenue || 0,
         revenueChange,
         currentGM: curr.grossMarginPct,
-        prevGM: prev.grossMarginPct,
+        prevGM: prev?.grossMarginPct || 0,
         gmChange,
         currentGrossProfit: curr.grossProfit,
-        prevGrossProfit: prev.grossProfit
+        prevGrossProfit: prev?.grossProfit || 0
       }
     })
     
-    // QoQ comparison
+    // QoQ comparison - include first quarter
     const quarterData: { [key: string]: { revenue: number; directCosts: number; grossProfit: number; grossMarginPct: number } } = {}
     accrualMonthlyData.forEach(m => {
       const year = m.month.slice(0, 4)
@@ -2114,20 +2115,20 @@ const handleQuickAdd = useCallback(async () => {
     })
     
     const sortedQuarters = Object.entries(quarterData).sort(([a], [b]) => a.localeCompare(b))
-    const qoq = sortedQuarters.slice(1).map(([quarter, curr], idx) => {
-      const [, prev] = sortedQuarters[idx]
-      const revenueChange = prev.revenue > 0 ? ((curr.revenue - prev.revenue) / prev.revenue) * 100 : 0
-      const gmChange = curr.grossMarginPct - prev.grossMarginPct
+    const qoq = sortedQuarters.map(([quarter, curr], idx) => {
+      const prev = idx > 0 ? sortedQuarters[idx - 1][1] : null
+      const revenueChange = prev && prev.revenue > 0 ? ((curr.revenue - prev.revenue) / prev.revenue) * 100 : null
+      const gmChange = prev ? curr.grossMarginPct - prev.grossMarginPct : null
       return {
         period: quarter,
         currentRevenue: curr.revenue,
-        prevRevenue: prev.revenue,
+        prevRevenue: prev?.revenue || 0,
         revenueChange,
         currentGM: curr.grossMarginPct,
-        prevGM: prev.grossMarginPct,
+        prevGM: prev?.grossMarginPct || 0,
         gmChange,
         currentGrossProfit: curr.grossProfit,
-        prevGrossProfit: prev.grossProfit
+        prevGrossProfit: prev?.grossProfit || 0
       }
     })
     
@@ -3421,9 +3422,9 @@ const handleQuickAdd = useCallback(async () => {
                   }`}
                   style={{ colorScheme: theme }}
                 >
-                  <option value="cash">💵 Cash Flow</option>
-                  <option value="accrual">📊 Accrual (GM)</option>
-                  <option value="comparison">⚖️ Comparison</option>
+                  <option value="cash">Cash Flow</option>
+                  <option value="accrual">Accrual (GM)</option>
+                  <option value="comparison">Comparison</option>
                 </select>
                 
                 <div className={`hidden sm:block w-px h-6 ${theme === 'light' ? 'bg-gray-300' : 'bg-terminal-border'}`} />
@@ -4189,19 +4190,19 @@ const handleQuickAdd = useCallback(async () => {
                             </tr>
                           </thead>
                           <tbody>
-                            {accrualPeriodComparison.mom.slice(-6).map(row => (
+                            {accrualPeriodComparison.mom.map(row => (
                               <tr key={row.period} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
                                 <td className="py-3 font-medium">{row.period}</td>
                                 <td className="py-3 text-right font-mono">{formatCurrency(row.currentRevenue)}</td>
-                                <td className={`py-3 text-right font-mono ${row.revenueChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                                  {row.revenueChange >= 0 ? '+' : ''}{row.revenueChange.toFixed(1)}%
+                                <td className={`py-3 text-right font-mono ${row.revenueChange === null ? textMuted : row.revenueChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                  {row.revenueChange === null ? '-' : `${row.revenueChange >= 0 ? '+' : ''}${row.revenueChange.toFixed(1)}%`}
                                 </td>
                                 <td className={`py-3 text-right font-mono ${row.currentGrossProfit >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
                                   {formatCurrency(row.currentGrossProfit)}
                                 </td>
                                 <td className="py-3 text-right font-mono">{row.currentGM.toFixed(1)}%</td>
-                                <td className={`py-3 text-right font-mono ${row.gmChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                                  {row.gmChange >= 0 ? '+' : ''}{row.gmChange.toFixed(1)}pp
+                                <td className={`py-3 text-right font-mono ${row.gmChange === null ? textMuted : row.gmChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                  {row.gmChange === null ? '-' : `${row.gmChange >= 0 ? '+' : ''}${row.gmChange.toFixed(1)}pp`}
                                 </td>
                               </tr>
                             ))}
@@ -4228,15 +4229,15 @@ const handleQuickAdd = useCallback(async () => {
                               <tr key={row.period} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
                                 <td className="py-3 font-medium">{row.period}</td>
                                 <td className="py-3 text-right font-mono">{formatCurrency(row.currentRevenue)}</td>
-                                <td className={`py-3 text-right font-mono ${row.revenueChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                                  {row.revenueChange >= 0 ? '+' : ''}{row.revenueChange.toFixed(1)}%
+                                <td className={`py-3 text-right font-mono ${row.revenueChange === null ? textMuted : row.revenueChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                  {row.revenueChange === null ? '-' : `${row.revenueChange >= 0 ? '+' : ''}${row.revenueChange.toFixed(1)}%`}
                                 </td>
                                 <td className={`py-3 text-right font-mono ${row.currentGrossProfit >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
                                   {formatCurrency(row.currentGrossProfit)}
                                 </td>
                                 <td className="py-3 text-right font-mono">{row.currentGM.toFixed(1)}%</td>
-                                <td className={`py-3 text-right font-mono ${row.gmChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                                  {row.gmChange >= 0 ? '+' : ''}{row.gmChange.toFixed(1)}pp
+                                <td className={`py-3 text-right font-mono ${row.gmChange === null ? textMuted : row.gmChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                  {row.gmChange === null ? '-' : `${row.gmChange >= 0 ? '+' : ''}${row.gmChange.toFixed(1)}pp`}
                                 </td>
                               </tr>
                             ))}
