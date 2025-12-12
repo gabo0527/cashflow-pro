@@ -387,12 +387,6 @@ export default function CashFlowPro() {
   const [assumptions, setAssumptions] = useState<Assumption[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES)
-  
-  // Helper to get category color dynamically
-  const getCategoryColor = useCallback((categoryId: string) => {
-    const cat = categories.find(c => c.id === categoryId)
-    return cat?.color || '#6b7280'
-  }, [categories])
   const [scenarios, setScenarios] = useState<Scenario[]>([{ id: 'base', name: 'Base Case', isBase: true, createdAt: new Date().toISOString() }])
   const [recurringRules, setRecurringRules] = useState<RecurringRule[]>([])
   const [projectionYears, setProjectionYears] = useState<1 | 2 | 3>(1)
