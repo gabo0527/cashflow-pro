@@ -1358,8 +1358,42 @@ export default function CashFlowPro() {
   }, [])
 
   // Quick Add Transaction
-  const handleQuickAdd = useCallback(async () => {
-    if (quickAddForm.description && quickAddForm.amount && companyId && user) {
+const handleQuickAdd = useCallback(async () => {
+    if (!quickAddForm.description || !quickAddForm.amount || !companyId || !user) return
+    
+    const isAccrual = (quickAddForm as any).targetType === 'accrual'
+    
+    if (isAccrual) {
+      // Add to Accrual transactions
+      const txData = {
+        date: quickAddForm.date || new Date().toISOString().slice(0, 10),
+        type: quickAddForm.category === 'revenue' ? 'revenue' : 'direct_cost',
+        description: quickAddForm.description,
+        amount: quickAddForm.category === 'revenue' ? Math.abs(quickAddForm.amount) : -Math.abs(quickAddForm.amount),
+        project: quickAddForm.project || 'Unassigned',
+        vendor: '',
+        invoice_number: '',
+        notes: quickAddForm.notes
+      }
+      
+      const { data, error } = await supabaseInsertAccrualTransaction(txData, companyId, user.id)
+      
+      if (!error && data) {
+        const newAccrual: AccrualTransaction = {
+          id: data.id,
+          date: data.date,
+          type: data.type,
+          description: data.description,
+          amount: parseFloat(data.amount),
+          project: data.project,
+          vendor: data.vendor,
+          invoiceNumber: data.invoice_number,
+          notes: data.notes
+        }
+        setAccrualTransactions(prev => [...prev, newAccrual])
+      }
+    } else {
+      // Add to Cash transactions
       const txData = {
         date: quickAddForm.date || new Date().toISOString().slice(0, 10),
         category: quickAddForm.category || 'revenue',
@@ -1385,17 +1419,17 @@ export default function CashFlowPro() {
         })
         setTransactions(prev => [...prev, newTx])
       }
-      
-      setQuickAddForm({
-        date: new Date().toISOString().slice(0, 10),
-        category: 'revenue',
-        type: 'actual',
-        amount: 0,
-        description: '',
-        notes: ''
-      })
-      setShowQuickAdd(false)
     }
+    
+    setQuickAddForm({
+      date: new Date().toISOString().slice(0, 10),
+      category: 'revenue',
+      type: 'actual',
+      amount: 0,
+      description: '',
+      notes: ''
+    })
+    setShowQuickAdd(false)
   }, [quickAddForm, normalizeTransaction, companyId, user])
 
   // Project Management
@@ -2598,7 +2632,31 @@ export default function CashFlowPro() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              
+              {/* Cash vs Accrual Toggle */}
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => setQuickAddForm(prev => ({ ...prev, targetType: 'cash' }))}
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                  (quickAddForm as any).targetType !== 'accrual'
+                    ? 'bg-accent-primary text-white'
+                    : theme === 'light' ? 'bg-gray-100 text-gray-600' : 'bg-terminal-bg text-zinc-400'
+                }`}
+              >
+                <DollarSign className="w-4 h-4" />
+                Cash Flow
+              </button>
+              <button
+                onClick={() => setQuickAddForm(prev => ({ ...prev, targetType: 'accrual' }))}
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                  (quickAddForm as any).targetType === 'accrual'
+                    ? 'bg-indigo-500 text-white'
+                    : theme === 'light' ? 'bg-gray-100 text-gray-600' : 'bg-terminal-bg text-zinc-400'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                Accrual
+              </button>
+            </div>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
