@@ -33,6 +33,17 @@ import {
   updateCategory as supabaseUpdateCategory, insertCategory as supabaseInsertCategory, deleteCategory as supabaseDeleteCategory
 } from '../lib/supabase'
 
+// Vantage Logo Component
+const VantageLogo = ({ size = 48, className = "" }: { size?: number, className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <circle cx="24" cy="24" r="22" stroke="#3d8a96" strokeWidth="2.5" fill="none"/>
+    <rect x="12" y="28" width="5" height="10" rx="1" fill="#7cc5cf"/>
+    <rect x="19" y="22" width="5" height="16" rx="1" fill="#4da8b5"/>
+    <rect x="26" y="14" width="5" height="24" rx="1" fill="#2d8a96"/>
+    <path d="M10 32L18 26L25 20L38 12" stroke="#2d6b78" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+)
+
 // Types
 interface Category {
   id: string
@@ -376,6 +387,12 @@ export default function CashFlowPro() {
   const [assumptions, setAssumptions] = useState<Assumption[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES)
+  
+  // Helper to get category color dynamically
+  const getCategoryColor = useCallback((categoryId: string) => {
+    const cat = categories.find(c => c.id === categoryId)
+    return cat?.color || '#6b7280'
+  }, [categories])
   const [scenarios, setScenarios] = useState<Scenario[]>([{ id: 'base', name: 'Base Case', isBase: true, createdAt: new Date().toISOString() }])
   const [recurringRules, setRecurringRules] = useState<RecurringRule[]>([])
   const [projectionYears, setProjectionYears] = useState<1 | 2 | 3>(1)
@@ -1738,9 +1755,9 @@ const handleQuickAdd = useCallback(async () => {
     const total = totals.opex + totals.overhead + totals.investment
     
     return [
-      { name: 'OpEx', value: totals.opex, color: '#ef4444', percent: total ? (totals.opex / total * 100).toFixed(1) : '0' },
-      { name: 'Overhead', value: totals.overhead, color: '#f59e0b', percent: total ? (totals.overhead / total * 100).toFixed(1) : '0' },
-      { name: 'Investment', value: totals.investment, color: '#6366f1', percent: total ? (totals.investment / total * 100).toFixed(1) : '0' }
+      { name: 'OpEx', value: totals.opex, color: getCategoryColor('opex'), percent: total ? (totals.opex / total * 100).toFixed(1) : '0' },
+      { name: 'Overhead', value: totals.overhead, color: getCategoryColor('overhead'), percent: total ? (totals.overhead / total * 100).toFixed(1) : '0' },
+      { name: 'Investment', value: totals.investment, color: getCategoryColor('investment'), percent: total ? (totals.investment / total * 100).toFixed(1) : '0' }
     ].filter(d => d.value > 0)
   }, [filteredMonthlyData])
 
@@ -2493,8 +2510,8 @@ const handleQuickAdd = useCallback(async () => {
     return (
       <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center mx-auto mb-4">
-            <DollarSign className="w-6 h-6 text-white" />
+          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-teal-500/20 to-cyan-500/20 flex items-center justify-center mx-auto mb-4">
+            <VantageLogo size={40} />
           </div>
           <div className="text-teal-400 animate-pulse">
             {authLoading ? 'Authenticating...' : 'Loading data...'}
@@ -2518,12 +2535,7 @@ const handleQuickAdd = useCallback(async () => {
                   className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg object-contain"
                 />
               ) : (
-                <div 
-                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center"
-                  style={{ background: `linear-gradient(135deg, ${branding.brandColor}, ${branding.brandColor}dd)` }}
-                >
-                  <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                </div>
+                <VantageLogo size={40} />
               )}
               <div>
                 <h1 className="text-lg sm:text-xl font-display font-bold tracking-tight">{branding.companyName}</h1>
@@ -3695,10 +3707,10 @@ const handleQuickAdd = useCallback(async () => {
                         formatter={(value: number, name: string) => [formatCurrency(value), name]}
                       />
                       <Legend wrapperStyle={{ fontSize: '12px' }} />
-                      {chartFilters.revenue && <Bar dataKey="revenue" name="Revenue" fill="#10b981" radius={[2, 2, 0, 0]} />}
-                      {chartFilters.opex && <Bar dataKey="opex" name="OpEx" fill="#ef4444" radius={[2, 2, 0, 0]} />}
-                      {chartFilters.overhead && <Bar dataKey="overhead" name="Overhead" fill="#f59e0b" radius={[2, 2, 0, 0]} />}
-                      {chartFilters.investment && <Bar dataKey="investment" name="InvEx" fill="#6366f1" radius={[2, 2, 0, 0]} />}
+                      {chartFilters.revenue && <Bar dataKey="revenue" name="Revenue" fill={getCategoryColor('revenue')} radius={[2, 2, 0, 0]} />}
+                      {chartFilters.opex && <Bar dataKey="opex" name="OpEx" fill={getCategoryColor('opex')} radius={[2, 2, 0, 0]} />}
+                      {chartFilters.overhead && <Bar dataKey="overhead" name="Overhead" fill={getCategoryColor('overhead')} radius={[2, 2, 0, 0]} />}
+                      {chartFilters.investment && <Bar dataKey="investment" name="InvEx" fill={getCategoryColor('investment')} radius={[2, 2, 0, 0]} />}
                       {chartFilters.net && <Line type="monotone" dataKey="netCash" name="Net" stroke="#22d3ee" strokeWidth={2} dot={false} />}
                     </ComposedChart>
                   </ResponsiveContainer>
@@ -3772,10 +3784,10 @@ const handleQuickAdd = useCallback(async () => {
                   <div className="lg:col-span-2 grid grid-cols-3 gap-3 sm:gap-4">
                     <div className={`rounded-xl p-4 border ${cardClasses}`}>
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" />
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getCategoryColor('opex') }} />
                         <span className={`text-sm ${textMuted}`}>OpEx</span>
                       </div>
-                      <div className="text-lg sm:text-xl font-mono font-semibold text-[#ef4444]">
+                      <div className="text-lg sm:text-xl font-mono font-semibold" style={{ color: getCategoryColor('opex') }}>
                         {formatCurrency(kpis.totalOpex)}
                       </div>
                       <p className={`text-xs mt-1 ${textSubtle}`}>Project costs</p>
@@ -3783,10 +3795,10 @@ const handleQuickAdd = useCallback(async () => {
                     
                     <div className={`rounded-xl p-4 border ${cardClasses}`}>
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#f59e0b]" />
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getCategoryColor('overhead') }} />
                         <span className={`text-sm ${textMuted}`}>Overhead</span>
                       </div>
-                      <div className="text-lg sm:text-xl font-mono font-semibold text-[#f59e0b]">
+                      <div className="text-lg sm:text-xl font-mono font-semibold" style={{ color: getCategoryColor('overhead') }}>
                         {formatCurrency(kpis.totalOverhead)}
                       </div>
                       <p className={`text-xs mt-1 ${textSubtle}`}>Company-wide</p>
@@ -3794,10 +3806,10 @@ const handleQuickAdd = useCallback(async () => {
                     
                     <div className={`rounded-xl p-4 border ${cardClasses}`}>
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#6366f1]" />
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getCategoryColor('investment') }} />
                         <span className={`text-sm ${textMuted}`}>Investment</span>
                       </div>
-                      <div className="text-lg sm:text-xl font-mono font-semibold text-[#6366f1]">
+                      <div className="text-lg sm:text-xl font-mono font-semibold" style={{ color: getCategoryColor('investment') }}>
                         {formatCurrency(kpis.totalInvestment)}
                       </div>
                       <p className={`text-xs mt-1 ${textSubtle}`}>Capital spend</p>
@@ -3888,8 +3900,8 @@ const handleQuickAdd = useCallback(async () => {
                         formatter={(value: number) => formatCurrency(value)}
                       />
                       <Legend wrapperStyle={{ fontSize: '12px' }} />
-                      <Bar dataKey="revenue" name="Revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="opex" name="OpEx" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="revenue" name="Revenue" fill={getCategoryColor('revenue')} radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="opex" name="OpEx" fill={getCategoryColor('opex')} radius={[4, 4, 0, 0]} />
                     </BarChart>
                   )}
                 </ResponsiveContainer>
@@ -5572,7 +5584,7 @@ const handleQuickAdd = useCallback(async () => {
         <span className={`text-xs ${textMuted}`}>(default)</span>
       )}
     </div>
-    {!cat.isDefault && (
+    {categories.length > 1 && (
       <button 
         onClick={async () => {
           // Delete from database if we have dbId
