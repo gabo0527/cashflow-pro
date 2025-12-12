@@ -1,5 +1,5 @@
 // src/app/login/page.tsx
-// Redesigned Login page with premium Vantage branding
+// Login page with Vantage branding
 
 'use client'
 
@@ -7,14 +7,24 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { 
-  DollarSign, TrendingUp, PieChart, BarChart3, Shield, Users,
+  TrendingUp, PieChart, BarChart3, Shield, Users,
   ArrowRight, Zap, LineChart, Target, CheckCircle2
 } from 'lucide-react'
+
+// Vantage Logo Component
+const VantageLogo = ({ size = 48, className = "" }: { size?: number, className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <circle cx="24" cy="24" r="22" stroke="#3d8a96" stroke-width="2.5" fill="none"/>
+    <rect x="12" y="28" width="5" height="10" rx="1" fill="#7cc5cf"/>
+    <rect x="19" y="22" width="5" height="16" rx="1" fill="#4da8b5"/>
+    <rect x="26" y="14" width="5" height="24" rx="1" fill="#2d8a96"/>
+    <path d="M10 32L18 26L25 20L38 12" stroke="#2d6b78" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+)
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [companyLogo, setCompanyLogo] = useState<string | null>(null)
   const router = useRouter()
 
   // Check if already authenticated
@@ -27,25 +37,6 @@ export default function LoginPage() {
     }
     checkAuth()
   }, [router])
-
-  // Try to fetch company logo from settings
-  useEffect(() => {
-    const fetchLogo = async () => {
-      try {
-        const { data } = await supabase
-          .from('company_settings')
-          .select('company_logo')
-          .limit(1)
-          .single()
-        if (data?.company_logo) {
-          setCompanyLogo(data.company_logo)
-        }
-      } catch {
-        // No logo found, use default
-      }
-    }
-    fetchLogo()
-  }, [])
 
   const handleGoogleLogin = async () => {
     setLoading(true)
@@ -100,8 +91,8 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-[#0f172a] to-slate-900">
           {/* Gradient Orbs */}
           <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-teal-500/20 rounded-full blur-[120px] animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-indigo-500/15 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
-          <div className="absolute top-1/2 left-1/2 w-[300px] h-[300px] bg-cyan-500/10 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '2s' }} />
+          <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-cyan-500/15 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
+          <div className="absolute top-1/2 left-1/2 w-[300px] h-[300px] bg-teal-400/10 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '2s' }} />
           
           {/* Grid Pattern */}
           <div className="absolute inset-0 opacity-[0.03]" style={{
@@ -114,15 +105,9 @@ export default function LoginPage() {
           {/* Header */}
           <div>
             {/* Logo */}
-            <div className="flex items-center gap-3 mb-20">
-              {companyLogo ? (
-                <img src={companyLogo} alt="Vantage" className="w-11 h-11 rounded-xl object-contain" />
-              ) : (
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-lg shadow-teal-500/25">
-                  <DollarSign className="w-6 h-6 text-white" strokeWidth={2.5} />
-                </div>
-              )}
-              <span className="text-2xl font-bold text-white tracking-tight">Vantage</span>
+            <div className="flex items-center gap-4 mb-20">
+              <VantageLogo size={52} />
+              <span className="text-2xl font-bold text-white tracking-tight uppercase">Vantage</span>
             </div>
             
             {/* Hero Text */}
@@ -147,7 +132,7 @@ export default function LoginPage() {
                 key={idx} 
                 className="flex items-start gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/[0.05] backdrop-blur-sm hover:bg-white/[0.05] transition-colors group"
               >
-                <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-teal-500/20 to-teal-600/20 flex items-center justify-center flex-shrink-0 group-hover:from-teal-500/30 group-hover:to-teal-600/30 transition-colors">
+                <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-teal-500/20 to-cyan-500/20 flex items-center justify-center flex-shrink-0 group-hover:from-teal-500/30 group-hover:to-cyan-500/30 transition-colors">
                   <feature.icon className="w-5 h-5 text-teal-400" />
                 </div>
                 <div>
@@ -176,14 +161,8 @@ export default function LoginPage() {
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-10">
             <div className="inline-flex items-center gap-3 mb-3">
-              {companyLogo ? (
-                <img src={companyLogo} alt="Vantage" className="w-11 h-11 rounded-xl object-contain" />
-              ) : (
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-lg shadow-teal-500/25">
-                  <DollarSign className="w-6 h-6 text-white" strokeWidth={2.5} />
-                </div>
-              )}
-              <span className="text-2xl font-bold text-white">Vantage</span>
+              <VantageLogo size={48} />
+              <span className="text-2xl font-bold text-white uppercase">Vantage</span>
             </div>
             <p className="text-slate-500">Project & Cash Flow Analytics</p>
           </div>
@@ -191,8 +170,8 @@ export default function LoginPage() {
           {/* Login Card */}
           <div className="bg-gradient-to-b from-slate-800/50 to-slate-900/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl shadow-black/20">
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-teal-500/20 to-cyan-500/20 mb-5">
-                <Zap className="w-7 h-7 text-teal-400" />
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-teal-500/20 to-cyan-500/20 mb-5">
+                <VantageLogo size={40} />
               </div>
               <h2 className="text-2xl font-bold text-white mb-2">Welcome back</h2>
               <p className="text-slate-400">Sign in to access your dashboard</p>
