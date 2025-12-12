@@ -1031,7 +1031,7 @@ export default function CashFlowPro() {
     } else {
       alert('Please use CSV format for accrual data')
     }
-  }, [])
+  }, [companyId, user])
 
   const exportToCSV = useCallback(() => {
     const csv = Papa.unparse(transactions)
