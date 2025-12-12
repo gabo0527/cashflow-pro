@@ -16,143 +16,170 @@ export const getCurrentUser = async () => {
 }
 
 export const getCurrentProfile = async () => {
-  const user = await getCurrentUser()
+  const { user } = await getCurrentUser()
   if (!user) return null
   const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
   return data
 }
 
-// Transaction functions
+// ============ TRANSACTIONS ============
+
 export const fetchTransactions = async (companyId?: string) => {
   let query = supabase.from('transactions').select('*').order('date', { ascending: false })
   if (companyId) query = query.eq('company_id', companyId)
   const { data, error } = await query
-  if (error) throw error
-  return { data }
+  return { data, error }
 }
 
-export const insertTransaction = async (transaction: any) => {
-  const { data, error } = await supabase.from('transactions').insert(transaction).select().single()
-  if (error) throw error
-  return data
+export const insertTransaction = async (transaction: any, companyId?: string, userId?: string) => {
+  const toInsert = {
+    ...transaction,
+    company_id: companyId,
+    user_id: userId
+  }
+  const { data, error } = await supabase.from('transactions').insert(toInsert).select().single()
+  return { data, error }
 }
 
 export const updateTransaction = async (id: string, updates: any) => {
   const { data, error } = await supabase.from('transactions').update(updates).eq('id', id).select().single()
-  if (error) throw error
-  return data
+  return { data, error }
 }
 
 export const deleteTransaction = async (id: string) => {
   const { error } = await supabase.from('transactions').delete().eq('id', id)
-  if (error) throw error
+  return { error }
 }
 
-export const bulkInsertTransactions = async (transactions: any[]) => {
-  const { data, error } = await supabase.from('transactions').insert(transactions).select()
-  if (error) throw error
-  return data
+export const bulkInsertTransactions = async (transactions: any[], companyId?: string, userId?: string) => {
+  const toInsert = transactions.map(t => ({
+    ...t,
+    company_id: companyId,
+    user_id: userId
+  }))
+  const { data, error } = await supabase.from('transactions').insert(toInsert).select()
+  return { data, error }
 }
 
-export const deleteAllTransactions = async () => {
-  const { error } = await supabase.from('transactions').delete().neq('id', '')
-  if (error) throw error
+export const deleteAllTransactions = async (companyId?: string) => {
+  let query = supabase.from('transactions').delete()
+  if (companyId) {
+    query = query.eq('company_id', companyId)
+  } else {
+    query = query.neq('id', '')
+  }
+  const { error } = await query
+  return { error }
 }
 
-// Accrual Transaction functions
+// ============ ACCRUAL TRANSACTIONS ============
+
 export const fetchAccrualTransactions = async (companyId?: string) => {
   let query = supabase.from('accrual_transactions').select('*').order('date', { ascending: false })
   if (companyId) query = query.eq('company_id', companyId)
   const { data, error } = await query
-  if (error) throw error
-  return { data }
+  return { data, error }
 }
 
-export const insertAccrualTransaction = async (transaction: any) => {
-  const { data, error } = await supabase.from('accrual_transactions').insert(transaction).select().single()
-  if (error) throw error
-  return data
+export const insertAccrualTransaction = async (transaction: any, companyId?: string, userId?: string) => {
+  const toInsert = {
+    ...transaction,
+    company_id: companyId,
+    user_id: userId
+  }
+  const { data, error } = await supabase.from('accrual_transactions').insert(toInsert).select().single()
+  return { data, error }
 }
 
 export const updateAccrualTransaction = async (id: string, updates: any) => {
   const { data, error } = await supabase.from('accrual_transactions').update(updates).eq('id', id).select().single()
-  if (error) throw error
-  return data
+  return { data, error }
 }
 
 export const deleteAccrualTransaction = async (id: string) => {
   const { error } = await supabase.from('accrual_transactions').delete().eq('id', id)
-  if (error) throw error
+  return { error }
 }
 
-export const bulkInsertAccrualTransactions = async (transactions: any[]) => {
-  const { data, error } = await supabase.from('accrual_transactions').insert(transactions).select()
-  if (error) throw error
-  return data
+export const bulkInsertAccrualTransactions = async (transactions: any[], companyId?: string, userId?: string) => {
+  const toInsert = transactions.map(t => ({
+    ...t,
+    company_id: companyId,
+    user_id: userId
+  }))
+  const { data, error } = await supabase.from('accrual_transactions').insert(toInsert).select()
+  return { data, error }
 }
 
-export const deleteAllAccrualTransactions = async () => {
-  const { error } = await supabase.from('accrual_transactions').delete().neq('id', '')
-  if (error) throw error
+export const deleteAllAccrualTransactions = async (companyId?: string) => {
+  let query = supabase.from('accrual_transactions').delete()
+  if (companyId) {
+    query = query.eq('company_id', companyId)
+  } else {
+    query = query.neq('id', '')
+  }
+  const { error } = await query
+  return { error }
 }
 
-// Assumptions functions
+// ============ ASSUMPTIONS ============
+
 export const fetchAssumptions = async (companyId?: string) => {
   let query = supabase.from('assumptions').select('*').order('created_at', { ascending: false })
   if (companyId) query = query.eq('company_id', companyId)
   const { data, error } = await query
-  if (error) throw error
-  return { data }
+  return { data, error }
 }
 
-export const insertAssumption = async (assumption: any) => {
-  const { data, error } = await supabase.from('assumptions').insert(assumption).select().single()
-  if (error) throw error
-  return data
+export const insertAssumption = async (assumption: any, companyId?: string, userId?: string) => {
+  const toInsert = {
+    ...assumption,
+    company_id: companyId,
+    user_id: userId
+  }
+  const { data, error } = await supabase.from('assumptions').insert(toInsert).select().single()
+  return { data, error }
 }
 
 export const deleteAssumption = async (id: string) => {
   const { error } = await supabase.from('assumptions').delete().eq('id', id)
-  if (error) throw error
+  return { error }
 }
 
-// Category functions
+// ============ CATEGORIES ============
+
 export const fetchCategories = async (companyId?: string) => {
   let query = supabase.from('categories').select('*').order('name', { ascending: true })
   if (companyId) query = query.eq('company_id', companyId)
   const { data, error } = await query
-  if (error) throw error
-  return { data }
+  return { data, error }
 }
 
 export const insertCategory = async (category: any) => {
   const { data, error } = await supabase.from('categories').insert(category).select().single()
-  if (error) throw error
-  return data
+  return { data, error }
 }
 
 export const updateCategory = async (id: string, updates: any) => {
   const { data, error } = await supabase.from('categories').update(updates).eq('id', id).select().single()
-  if (error) throw error
-  return data
+  return { data, error }
 }
 
 export const deleteCategory = async (id: string) => {
   const { error } = await supabase.from('categories').delete().eq('id', id)
-  if (error) throw error
+  return { error }
 }
 
-// Company Settings functions
+// ============ COMPANY SETTINGS ============
+
 export const fetchCompanySettings = async (companyId?: string) => {
   let query = supabase.from('company_settings').select('*')
   if (companyId) query = query.eq('company_id', companyId)
   const { data, error } = await query.single()
-  if (error && error.code !== 'PGRST116') throw error
-  return { data }
+  return { data, error }
 }
 
 export const updateCompanySettings = async (settings: any) => {
   const { data, error } = await supabase.from('company_settings').upsert(settings).select().single()
-  if (error) throw error
-  return data
+  return { data, error }
 }
