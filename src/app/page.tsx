@@ -3445,7 +3445,7 @@ const handleQuickAdd = useCallback(async () => {
                 
                 <div className={`hidden sm:block w-px h-6 ${theme === 'light' ? 'bg-gray-300' : 'bg-terminal-border'}`} />
                 
-                <div className="flex gap-1 sm:gap-2 flex-wrap">
+                <div className="flex gap-1 sm:gap-2 flex-wrap items-center">
                   {datePresets.map(preset => (
                     <button
                       key={preset.key}
@@ -3464,8 +3464,28 @@ const handleQuickAdd = useCallback(async () => {
                       {preset.label}
                     </button>
                   ))}
+                  
+                  {/* Custom Date Range Inputs */}
+                  {dateRangePreset === 'custom' && (
+                    <div className="flex items-center gap-2 ml-2 pl-2 border-l border-terminal-border">
+                      <input
+                        type="month"
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        className={`px-2 py-1 rounded-lg text-xs border ${inputClasses}`}
+                        style={{ colorScheme: theme }}
+                      />
+                      <span className={textMuted}>to</span>
+                      <input
+                        type="month"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        className={`px-2 py-1 rounded-lg text-xs border ${inputClasses}`}
+                        style={{ colorScheme: theme }}
+                      />
+                    </div>
+                  )}
                 </div>
-              </div>
 
               {/* Cash Flow View */}
               {dashboardView === 'cash' && (
