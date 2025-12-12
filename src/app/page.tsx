@@ -978,7 +978,7 @@ export default function CashFlowPro() {
         header: true,
         skipEmptyLines: true,
         transformHeader: (header) => header.trim().toLowerCase().replace(/\s+/g, '_'),
-        complete: (results) => {
+        complete: async (results) => {
           const imported: AccrualTransaction[] = results.data
             .filter((row) => row.date && (row.amount || row.amount === '0'))
             .map((row) => {
@@ -1015,12 +1015,40 @@ export default function CashFlowPro() {
             })
             .filter((t): t is AccrualTransaction => t !== null)
             
-          if (imported.length > 0) {
-            setAccrualTransactions(prev => [...prev, ...imported])
-            const revenueCount = imported.filter(t => t.type === 'revenue').length
-            const costCount = imported.filter(t => t.type === 'direct_cost').length
-            alert(`Successfully imported ${imported.length} accrual entries (${revenueCount} revenue, ${costCount} direct costs)`)
-          } else {
+         if (imported.length > 0) {
+  if (companyId && user) {
+    const toInsert = imported.map(t => ({
+      date: t.date,
+      type: t.type,
+      description: t.description,
+      amount: t.amount,
+      project: t.project,
+      vendor: t.vendor,
+      invoice_number: t.invoiceNumber,
+      notes: t.notes
+    }))
+    
+    const { data, error } = await bulkInsertAccrualTransactions(toInsert, companyId, user.id)
+    if (error) {
+      alert(`Error importing to database: ${error.message}`)
+    } else if (data) {
+      const mapped = data.map((t: any) => ({
+        id: t.id,
+        date: t.date,
+        type: t.type,
+        description: t.description,
+        amount: parseFloat(t.amount),
+        project: t.project,
+        vendor: t.vendor,
+        invoiceNumber: t.invoice_number,
+        notes: t.notes
+      }))
+      setAccrualTransactions(prev => [...prev, ...mapped])
+      const revenueCount = mapped.filter(t => t.type === 'revenue').length
+      const costCount = mapped.filter(t => t.type === 'direct_cost').length
+      alert(`Successfully imported ${mapped.length} accrual entries (${revenueCount} revenue, ${costCount} direct costs)`)
+    }
+  }          } else {
             alert('No valid accrual data found. Check column headers: date, type, description, amount, project, vendor')
           }
         },
