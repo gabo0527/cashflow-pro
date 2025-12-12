@@ -826,7 +826,7 @@ export default function CashFlowPro() {
         header: true,
         skipEmptyLines: true,
         transformHeader: (header) => header.trim().toLowerCase().replace(/\s+/g, '_'),
-        complete: (results) => {
+        complete: async (results) => {
           const imported: Transaction[] = results.data
             .filter((row) => row.date && (row.amount || row.amount === '0'))
             .map((row) => {
