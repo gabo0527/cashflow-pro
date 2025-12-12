@@ -764,7 +764,7 @@ export default function CashFlowPro() {
     }
   }, [companyId])
 
-  const handleFileUpload = useCallback((file: File) => {
+  const handleFileUpload = useCallback(async (file: File) => {
     const fileExtension = file.name.split('.').pop()?.toLowerCase()
     
     // Helper to normalize date formats
