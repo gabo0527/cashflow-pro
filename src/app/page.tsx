@@ -2487,7 +2487,7 @@ export default function CashFlowPro() {
               )}
               <div>
                 <h1 className="text-lg sm:text-xl font-display font-bold tracking-tight">{branding.companyName}</h1>
-                <p className={`text-xs hidden sm:block ${textMuted}`}>Financial Intelligence Platform</p>
+                <p className={`text-xs hidden sm:block ${textMuted}`}>Project & Cash Flow Analytics</p>
               </div>
             </div>
             
@@ -3273,7 +3273,7 @@ export default function CashFlowPro() {
                 
                 <h4 className="font-semibold mt-4">2. Description of Service</h4>
                 <p className={textMuted}>
-                  {branding.companyName} is a financial intelligence platform for cash flow forecasting, gross margin analysis, 
+                  {branding.companyName} is a Project & Cash Flow Analytics for cash flow forecasting, gross margin analysis, 
                   and financial planning. The application provides tools for tracking transactions, projections, and reporting.
                 </p>
                 
