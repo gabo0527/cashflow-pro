@@ -23,8 +23,10 @@ export const getCurrentProfile = async () => {
 }
 
 // Transaction functions
-export const fetchTransactions = async () => {
-  const { data, error } = await supabase.from('transactions').select('*').order('date', { ascending: false })
+export const fetchTransactions = async (companyId?: string) => {
+  let query = supabase.from('transactions').select('*').order('date', { ascending: false })
+  if (companyId) query = query.eq('company_id', companyId)
+  const { data, error } = await query
   if (error) throw error
   return data
 }
@@ -58,8 +60,10 @@ export const deleteAllTransactions = async () => {
 }
 
 // Accrual Transaction functions
-export const fetchAccrualTransactions = async () => {
-  const { data, error } = await supabase.from('accrual_transactions').select('*').order('date', { ascending: false })
+export const fetchAccrualTransactions = async (companyId?: string) => {
+  let query = supabase.from('accrual_transactions').select('*').order('date', { ascending: false })
+  if (companyId) query = query.eq('company_id', companyId)
+  const { data, error } = await query
   if (error) throw error
   return data
 }
@@ -93,8 +97,10 @@ export const deleteAllAccrualTransactions = async () => {
 }
 
 // Assumptions functions
-export const fetchAssumptions = async () => {
-  const { data, error } = await supabase.from('assumptions').select('*').order('created_at', { ascending: false })
+export const fetchAssumptions = async (companyId?: string) => {
+  let query = supabase.from('assumptions').select('*').order('created_at', { ascending: false })
+  if (companyId) query = query.eq('company_id', companyId)
+  const { data, error } = await query
   if (error) throw error
   return data
 }
@@ -111,8 +117,10 @@ export const deleteAssumption = async (id: string) => {
 }
 
 // Category functions
-export const fetchCategories = async () => {
-  const { data, error } = await supabase.from('categories').select('*').order('name', { ascending: true })
+export const fetchCategories = async (companyId?: string) => {
+  let query = supabase.from('categories').select('*').order('name', { ascending: true })
+  if (companyId) query = query.eq('company_id', companyId)
+  const { data, error } = await query
   if (error) throw error
   return data
 }
@@ -135,8 +143,10 @@ export const deleteCategory = async (id: string) => {
 }
 
 // Company Settings functions
-export const fetchCompanySettings = async () => {
-  const { data, error } = await supabase.from('company_settings').select('*').single()
+export const fetchCompanySettings = async (companyId?: string) => {
+  let query = supabase.from('company_settings').select('*')
+  if (companyId) query = query.eq('company_id', companyId)
+  const { data, error } = await query.single()
   if (error && error.code !== 'PGRST116') throw error
   return data
 }
