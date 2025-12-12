@@ -578,7 +578,10 @@ export default function CashFlowPro() {
             if (settingsRes.data.beginning_balance) {
               setBeginningBalance(parseFloat(settingsRes.data.beginning_balance))
             }
-           
+            
+           if (settingsRes.data.company_logo) {
+  setBranding(prev => ({ ...prev, companyLogo: settingsRes.data.company_logo }))
+}
             if (settingsRes.data.brand_color) {
               setBranding(prev => ({ ...prev, brandColor: settingsRes.data.brand_color }))
             }
