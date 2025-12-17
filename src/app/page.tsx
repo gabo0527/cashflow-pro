@@ -103,6 +103,8 @@ interface Project {
   name: string
   color: string
   status: 'active' | 'completed' | 'on-hold'
+  budget?: number
+  budgetAlertThreshold?: number // percentage (default 80)
   createdAt: string
 }
 
@@ -421,6 +423,14 @@ export default function CashFlowPro() {
   })
   const [activeScenario, setActiveScenario] = useState<string>('base')
   
+  // AI Categorization state
+  const [showAiPreview, setShowAiPreview] = useState(false)
+  const [aiSuggestions, setAiSuggestions] = useState<any[]>([])
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [pendingUploadData, setPendingUploadData] = useState<any[]>([])
+  const [uploadType, setUploadType] = useState<'cash' | 'accrual'>('cash')
+  
   // Branding state
   const [branding, setBranding] = useState<BrandingSettings>({
     companyName: 'Vantage',
@@ -488,6 +498,8 @@ export default function CashFlowPro() {
   
   // New project form
   const [newProjectName, setNewProjectName] = useState('')
+  const [newProjectBudget, setNewProjectBudget] = useState<number | ''>('')
+  const [editingProject, setEditingProject] = useState<Project | null>(null)
   
   // Assumption form
   const [newAssumption, setNewAssumption] = useState<Partial<Assumption>>({
@@ -1123,6 +1135,165 @@ export default function CashFlowPro() {
     URL.revokeObjectURL(url)
   }, [accrualTransactions])
 
+  // AI Categorization
+  const categorizeWithAI = useCallback(async (data: any[], type: 'cash' | 'accrual') => {
+    setAiLoading(true)
+    setAiError(null)
+    setPendingUploadData(data)
+    setUploadType(type)
+    
+    try {
+      const response = await fetch('/api/categorize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactions: data.map((t, idx) => ({
+            id: `temp-${idx}`,
+            date: t.date,
+            description: t.description,
+            amount: t.amount,
+            vendor: t.vendor,
+            project: t.project
+          })),
+          existingCategories: categories.map(c => c.name),
+          existingProjects: projectList
+        })
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to categorize')
+      }
+      
+      const result = await response.json()
+      
+      // Merge AI suggestions back with original data
+      const suggestions = data.map((original, idx) => {
+        const aiSuggestion = result.categorizedTransactions.find((s: any) => s.id === `temp-${idx}`)
+        return {
+          ...original,
+          id: `temp-${idx}`,
+          suggestedCategory: aiSuggestion?.suggestedCategory || 'unassigned',
+          suggestedProject: aiSuggestion?.suggestedProject || original.project || '',
+          suggestedType: aiSuggestion?.suggestedType || (original.amount >= 0 ? 'revenue' : 'direct_cost'),
+          confidence: aiSuggestion?.confidence || 50,
+          reasoning: aiSuggestion?.reasoning || '',
+          accepted: true // Default to accepted
+        }
+      })
+      
+      setAiSuggestions(suggestions)
+      setShowAiPreview(true)
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : 'Failed to categorize transactions')
+      // Still show preview with original data
+      const fallbackSuggestions = data.map((original, idx) => ({
+        ...original,
+        id: `temp-${idx}`,
+        suggestedCategory: original.category || 'unassigned',
+        suggestedProject: original.project || '',
+        suggestedType: original.type || (original.amount >= 0 ? 'revenue' : 'direct_cost'),
+        confidence: 0,
+        reasoning: 'AI categorization failed - using original values',
+        accepted: true
+      }))
+      setAiSuggestions(fallbackSuggestions)
+      setShowAiPreview(true)
+    } finally {
+      setAiLoading(false)
+    }
+  }, [categories, projectList])
+
+  const applyAiSuggestions = useCallback(async () => {
+    const acceptedSuggestions = aiSuggestions.filter(s => s.accepted)
+    
+    if (acceptedSuggestions.length === 0) {
+      setShowAiPreview(false)
+      setAiSuggestions([])
+      return
+    }
+    
+    if (uploadType === 'accrual') {
+      const toInsert = acceptedSuggestions.map(s => ({
+        date: s.date,
+        type: s.suggestedType,
+        description: s.description,
+        amount: Math.abs(s.amount) * (s.suggestedType === 'direct_cost' ? -1 : 1),
+        project: s.suggestedProject,
+        vendor: s.vendor,
+        invoice_number: s.invoiceNumber,
+        notes: s.notes
+      }))
+      
+      if (companyId && user) {
+        const { data, error } = await bulkInsertAccrualTransactions(toInsert, companyId, user.id)
+        if (error) {
+          alert(`Error importing to database: ${error.message}`)
+        } else if (data) {
+          const mapped = data.map((t: any) => ({
+            id: t.id,
+            date: t.date,
+            type: t.type,
+            description: t.description,
+            amount: parseFloat(t.amount),
+            project: t.project,
+            vendor: t.vendor,
+            invoiceNumber: t.invoice_number,
+            notes: t.notes
+          }))
+          setAccrualTransactions(prev => [...prev, ...mapped])
+          alert(`Successfully imported ${mapped.length} accrual entries with AI categorization`)
+        }
+      }
+    } else {
+      const toInsert = acceptedSuggestions.map(s => ({
+        date: s.date,
+        category: s.suggestedCategory,
+        type: s.type || 'actual',
+        description: s.description,
+        amount: s.amount,
+        project: s.suggestedProject,
+        notes: s.notes
+      }))
+      
+      if (companyId && user) {
+        const { data, error } = await bulkInsertTransactions(toInsert, companyId, user.id)
+        if (error) {
+          alert(`Error importing to database: ${error.message}`)
+        } else if (data) {
+          const mapped = data.map((t: any) => ({
+            id: t.id,
+            date: t.date,
+            category: t.category,
+            description: t.description,
+            amount: parseFloat(t.amount),
+            type: t.type,
+            project: t.project,
+            notes: t.notes
+          }))
+          setTransactions(prev => [...prev, ...mapped])
+          alert(`Successfully imported ${mapped.length} transactions with AI categorization`)
+        }
+      }
+    }
+    
+    setShowAiPreview(false)
+    setAiSuggestions([])
+    setPendingUploadData([])
+  }, [aiSuggestions, uploadType, companyId, user])
+
+  const toggleSuggestionAccepted = useCallback((id: string) => {
+    setAiSuggestions(prev => prev.map(s => 
+      s.id === id ? { ...s, accepted: !s.accepted } : s
+    ))
+  }, [])
+
+  const updateSuggestion = useCallback((id: string, field: string, value: any) => {
+    setAiSuggestions(prev => prev.map(s => 
+      s.id === id ? { ...s, [field]: value } : s
+    ))
+  }, [])
+
   const exportToPDF = useCallback(() => {
     setShowPdfExport(true)
   }, [])
@@ -1507,13 +1678,21 @@ const handleQuickAdd = useCallback(async () => {
         name: newProjectName.trim(),
         color: PROJECT_COLORS[projects.length % PROJECT_COLORS.length],
         status: 'active',
+        budget: newProjectBudget !== '' ? Number(newProjectBudget) : undefined,
+        budgetAlertThreshold: 80,
         createdAt: new Date().toISOString()
       }
       setProjects(prev => [...prev, newProject])
       setNewProjectName('')
+      setNewProjectBudget('')
       setShowProjectModal(false)
     }
-  }, [newProjectName, projects.length])
+  }, [newProjectName, newProjectBudget, projects.length])
+
+  const updateProject = useCallback((id: string, updates: Partial<Project>) => {
+    setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
+    setEditingProject(null)
+  }, [])
 
   const deleteProject = useCallback((id: string) => {
     setProjects(prev => prev.filter(p => p.id !== id))
@@ -2222,6 +2401,46 @@ const handleQuickAdd = useCallback(async () => {
     
     return { mom, qoq, yoy }
   }, [accrualMonthlyData])
+
+  // Project Budget Tracking
+  const projectBudgetTracking = useMemo(() => {
+    return projects.map(project => {
+      // Get all costs for this project from accrual transactions (case-insensitive)
+      const projectCosts = accrualTransactions
+        .filter(t => normalizeProjectName(t.project) === normalizeProjectName(project.name) && t.type === 'direct_cost')
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+      
+      // Get revenue for this project
+      const projectRevenue = accrualTransactions
+        .filter(t => normalizeProjectName(t.project) === normalizeProjectName(project.name) && t.type === 'revenue')
+        .reduce((sum, t) => sum + t.amount, 0)
+      
+      const budget = project.budget || 0
+      const spent = projectCosts
+      const remaining = budget - spent
+      const percentUsed = budget > 0 ? (spent / budget) * 100 : 0
+      const isOverBudget = budget > 0 && spent > budget
+      const isNearBudget = budget > 0 && percentUsed >= (project.budgetAlertThreshold || 80) && !isOverBudget
+      
+      // Gross margin for this project
+      const grossProfit = projectRevenue - projectCosts
+      const grossMarginPct = projectRevenue > 0 ? (grossProfit / projectRevenue) * 100 : 0
+      
+      return {
+        ...project,
+        revenue: projectRevenue,
+        spent,
+        budget,
+        remaining,
+        percentUsed,
+        isOverBudget,
+        isNearBudget,
+        grossProfit,
+        grossMarginPct
+      }
+    }).filter(p => p.budget > 0 || p.spent > 0) // Only show projects with budget or activity
+      .sort((a, b) => b.percentUsed - a.percentUsed) // Sort by most used first
+  }, [projects, accrualTransactions])
 
   // Projection data based on baseline averages + assumptions
   const projectionData = useMemo(() => {
@@ -3276,62 +3495,198 @@ const handleQuickAdd = useCallback(async () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-            onClick={() => setShowProjectModal(false)}
+            onClick={() => { setShowProjectModal(false); setEditingProject(null); }}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className={`w-full max-w-md rounded-xl p-6 border ${cardClasses}`}
+              className={`w-full max-w-lg rounded-xl p-6 border ${cardClasses}`}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Manage Projects</h3>
-                <button onClick={() => setShowProjectModal(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                <h3 className="text-lg font-semibold">{editingProject ? 'Edit Project' : 'Manage Projects'}</h3>
+                <button onClick={() => { setShowProjectModal(false); setEditingProject(null); }} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
               
               <div className="space-y-4">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="New project name"
-                    value={newProjectName}
-                    onChange={(e) => setNewProjectName(e.target.value)}
-                    className={`flex-1 px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
-                    style={{ colorScheme: theme }}
-                    onKeyDown={(e) => e.key === 'Enter' && addProject()}
-                  />
-                  <button
-                    onClick={addProject}
-                    disabled={!newProjectName.trim()}
-                    className="px-4 py-2 bg-accent-primary text-white rounded-lg font-medium disabled:opacity-50 hover:bg-accent-primary/90"
-                  >
-                    Add
-                  </button>
-                </div>
-                
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {projects.length === 0 ? (
-                    <p className={`text-sm text-center py-4 ${textMuted}`}>No projects yet</p>
-                  ) : (
-                    projects.map(p => (
-                      <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
-                        <div className="flex items-center gap-3">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
-                          <span>{p.name}</span>
+                {/* Add/Edit Project Form */}
+                {editingProject ? (
+                  <div className={`p-4 rounded-lg border ${theme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-terminal-bg border-terminal-border'}`}>
+                    <div className="space-y-3">
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Project Name</label>
+                        <input
+                          type="text"
+                          value={editingProject.name}
+                          onChange={(e) => setEditingProject({ ...editingProject, name: e.target.value })}
+                          className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Budget ($)</label>
+                          <input
+                            type="number"
+                            value={editingProject.budget || ''}
+                            onChange={(e) => setEditingProject({ ...editingProject, budget: e.target.value ? Number(e.target.value) : undefined })}
+                            placeholder="No budget"
+                            className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                            style={{ colorScheme: theme }}
+                          />
                         </div>
-                        <button
-                          onClick={() => deleteProject(p.id)}
-                          className={`p-1 hover:text-accent-danger ${textMuted}`}
+                        <div>
+                          <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Alert at (%)</label>
+                          <input
+                            type="number"
+                            value={editingProject.budgetAlertThreshold || 80}
+                            onChange={(e) => setEditingProject({ ...editingProject, budgetAlertThreshold: Number(e.target.value) })}
+                            min={1}
+                            max={100}
+                            className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                            style={{ colorScheme: theme }}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Status</label>
+                        <select
+                          value={editingProject.status}
+                          onChange={(e) => setEditingProject({ ...editingProject, status: e.target.value as Project['status'] })}
+                          className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <option value="active">Active</option>
+                          <option value="completed">Completed</option>
+                          <option value="on-hold">On Hold</option>
+                        </select>
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          onClick={() => {
+                            updateProject(editingProject.id, editingProject)
+                          }}
+                          className="flex-1 px-4 py-2 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90"
+                        >
+                          Save Changes
+                        </button>
+                        <button
+                          onClick={() => setEditingProject(null)}
+                          className={`px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-100' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                        >
+                          Cancel
                         </button>
                       </div>
-                    ))
-                  )}
-                </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={`p-4 rounded-lg border ${theme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-terminal-bg border-terminal-border'}`}>
+                    <div className="space-y-3">
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Project Name</label>
+                        <input
+                          type="text"
+                          placeholder="New project name"
+                          value={newProjectName}
+                          onChange={(e) => setNewProjectName(e.target.value)}
+                          className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                          onKeyDown={(e) => e.key === 'Enter' && addProject()}
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Budget (optional)</label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 50000"
+                          value={newProjectBudget}
+                          onChange={(e) => setNewProjectBudget(e.target.value ? Number(e.target.value) : '')}
+                          className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                        />
+                      </div>
+                      <button
+                        onClick={addProject}
+                        disabled={!newProjectName.trim()}
+                        className="w-full px-4 py-2 bg-accent-primary text-white rounded-lg font-medium disabled:opacity-50 hover:bg-accent-primary/90"
+                      >
+                        Add Project
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Project List */}
+                {!editingProject && (
+                  <div>
+                    <h4 className={`text-sm font-medium mb-2 ${textMuted}`}>Existing Projects</h4>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {projects.length === 0 ? (
+                        <p className={`text-sm text-center py-4 ${textMuted}`}>No projects yet</p>
+                      ) : (
+                        projects.map(p => {
+                          const tracking = projectBudgetTracking.find(t => t.id === p.id)
+                          return (
+                            <div key={p.id} className={`p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
+                                  <span className="font-medium">{p.name}</span>
+                                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                    p.status === 'active' ? 'bg-green-500/20 text-green-400' :
+                                    p.status === 'completed' ? 'bg-blue-500/20 text-blue-400' :
+                                    'bg-yellow-500/20 text-yellow-400'
+                                  }`}>
+                                    {p.status}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => setEditingProject(p)}
+                                    className={`p-1.5 hover:text-accent-primary ${textMuted}`}
+                                    title="Edit project"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => deleteProject(p.id)}
+                                    className={`p-1.5 hover:text-accent-danger ${textMuted}`}
+                                    title="Delete project"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                              {p.budget && p.budget > 0 && tracking && (
+                                <div className="mt-2">
+                                  <div className="flex justify-between text-xs mb-1">
+                                    <span className={textMuted}>Budget: {formatCurrency(p.budget)}</span>
+                                    <span className={tracking.isOverBudget ? 'text-accent-danger' : tracking.isNearBudget ? 'text-yellow-400' : textMuted}>
+                                      {tracking.percentUsed.toFixed(0)}% used
+                                    </span>
+                                  </div>
+                                  <div className={`h-2 rounded-full ${theme === 'light' ? 'bg-gray-200' : 'bg-terminal-border'}`}>
+                                    <div 
+                                      className={`h-full rounded-full transition-all ${
+                                        tracking.isOverBudget ? 'bg-accent-danger' : 
+                                        tracking.isNearBudget ? 'bg-yellow-400' : 
+                                        'bg-accent-primary'
+                                      }`}
+                                      style={{ width: `${Math.min(tracking.percentUsed, 100)}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>
@@ -3581,6 +3936,171 @@ const handleQuickAdd = useCallback(async () => {
                 >
                   Close
                 </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* AI Categorization Preview Modal */}
+      <AnimatePresence>
+        {showAiPreview && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowAiPreview(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-5xl max-h-[85vh] rounded-xl border overflow-hidden flex flex-col ${cardClasses}`}
+            >
+              {/* Header */}
+              <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Sparkles className="w-5 h-5 text-accent-primary" />
+                    <h3 className="text-lg font-semibold">AI Categorization Preview</h3>
+                    <span className={`text-sm px-2 py-0.5 rounded-full ${theme === 'light' ? 'bg-gray-100' : 'bg-terminal-bg'} ${textMuted}`}>
+                      {aiSuggestions.filter(s => s.accepted).length} of {aiSuggestions.length} selected
+                    </span>
+                  </div>
+                  <button onClick={() => setShowAiPreview(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                {aiError && (
+                  <div className="mt-2 p-2 bg-accent-danger/10 text-accent-danger text-sm rounded-lg flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    {aiError}
+                  </div>
+                )}
+              </div>
+              
+              {/* Table */}
+              <div className="flex-1 overflow-auto p-4">
+                <table className="w-full text-sm">
+                  <thead className={`sticky top-0 ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-surface'}`}>
+                    <tr className={`border-b ${tableBorder} text-left ${textMuted}`}>
+                      <th className="pb-3 px-2">
+                        <input
+                          type="checkbox"
+                          checked={aiSuggestions.every(s => s.accepted)}
+                          onChange={(e) => setAiSuggestions(prev => prev.map(s => ({ ...s, accepted: e.target.checked })))}
+                          className="rounded"
+                        />
+                      </th>
+                      <th className="pb-3 px-2 font-medium">Date</th>
+                      <th className="pb-3 px-2 font-medium">Description</th>
+                      <th className="pb-3 px-2 font-medium text-right">Amount</th>
+                      <th className="pb-3 px-2 font-medium">Category/Type</th>
+                      <th className="pb-3 px-2 font-medium">Project</th>
+                      <th className="pb-3 px-2 font-medium text-center">Confidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {aiSuggestions.map(suggestion => (
+                      <tr 
+                        key={suggestion.id} 
+                        className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'} ${!suggestion.accepted ? 'opacity-50' : ''}`}
+                      >
+                        <td className="py-3 px-2">
+                          <input
+                            type="checkbox"
+                            checked={suggestion.accepted}
+                            onChange={() => toggleSuggestionAccepted(suggestion.id)}
+                            className="rounded"
+                          />
+                        </td>
+                        <td className="py-3 px-2 font-mono text-xs">{suggestion.date}</td>
+                        <td className="py-3 px-2 max-w-xs truncate" title={suggestion.description}>
+                          {suggestion.description}
+                        </td>
+                        <td className={`py-3 px-2 text-right font-mono ${suggestion.amount >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                          {formatCurrency(suggestion.amount)}
+                        </td>
+                        <td className="py-3 px-2">
+                          <select
+                            value={uploadType === 'accrual' ? suggestion.suggestedType : suggestion.suggestedCategory}
+                            onChange={(e) => updateSuggestion(
+                              suggestion.id, 
+                              uploadType === 'accrual' ? 'suggestedType' : 'suggestedCategory', 
+                              e.target.value
+                            )}
+                            className={`w-full px-2 py-1 rounded text-xs border ${inputClasses}`}
+                            style={{ colorScheme: theme }}
+                          >
+                            {uploadType === 'accrual' ? (
+                              <>
+                                <option value="revenue">Revenue</option>
+                                <option value="direct_cost">Direct Cost</option>
+                              </>
+                            ) : (
+                              <>
+                                {categories.map(c => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                              </>
+                            )}
+                          </select>
+                        </td>
+                        <td className="py-3 px-2">
+                          <input
+                            type="text"
+                            value={suggestion.suggestedProject}
+                            onChange={(e) => updateSuggestion(suggestion.id, 'suggestedProject', e.target.value)}
+                            placeholder="Project name"
+                            className={`w-full px-2 py-1 rounded text-xs border ${inputClasses}`}
+                            style={{ colorScheme: theme }}
+                            list="project-suggestions"
+                          />
+                        </td>
+                        <td className="py-3 px-2 text-center">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
+                            suggestion.confidence >= 80 ? 'bg-green-500/20 text-green-400' :
+                            suggestion.confidence >= 60 ? 'bg-yellow-500/20 text-yellow-400' :
+                            'bg-red-500/20 text-red-400'
+                          }`}>
+                            {suggestion.confidence}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <datalist id="project-suggestions">
+                  {projectList.map(p => (
+                    <option key={p} value={p} />
+                  ))}
+                </datalist>
+              </div>
+              
+              {/* Footer */}
+              <div className={`p-4 border-t ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'} flex items-center justify-between`}>
+                <div className={`text-sm ${textMuted}`}>
+                  <Sparkles className="w-4 h-4 inline mr-1" />
+                  AI suggestions - review and adjust before importing
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setShowAiPreview(false)}
+                    className={`px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-100' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={applyAiSuggestions}
+                    disabled={aiSuggestions.filter(s => s.accepted).length === 0}
+                    className="px-4 py-2 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <Check className="w-4 h-4" />
+                    Import {aiSuggestions.filter(s => s.accepted).length} Transactions
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
@@ -4345,6 +4865,123 @@ const handleQuickAdd = useCallback(async () => {
                       </div>
                     )}
                   </div>
+
+                  {/* Project Budget Tracking */}
+                  {projectBudgetTracking.length > 0 && (
+                    <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-lg font-semibold">Project Budget Tracking</h3>
+                          {projectBudgetTracking.some(p => p.isOverBudget) && (
+                            <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-accent-danger/20 text-accent-danger">
+                              <AlertTriangle className="w-3 h-3" />
+                              Over Budget
+                            </span>
+                          )}
+                          {projectBudgetTracking.some(p => p.isNearBudget) && !projectBudgetTracking.some(p => p.isOverBudget) && (
+                            <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-400">
+                              <AlertCircle className="w-3 h-3" />
+                              Near Limit
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setShowProjectModal(true)}
+                          className={`text-sm px-3 py-1.5 rounded-lg ${theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-terminal-bg hover:bg-terminal-surface'}`}
+                        >
+                          Manage Budgets
+                        </button>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        {projectBudgetTracking.map(p => (
+                          <div key={p.id} className={`p-4 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-3">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
+                                <span className="font-semibold">{p.name}</span>
+                                {p.isOverBudget && (
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-accent-danger/20 text-accent-danger">
+                                    Over Budget
+                                  </span>
+                                )}
+                                {p.isNearBudget && (
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400">
+                                    Near Limit
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <span className={`font-mono font-semibold ${p.isOverBudget ? 'text-accent-danger' : ''}`}>
+                                  {formatCurrency(p.spent)}
+                                </span>
+                                {p.budget > 0 && (
+                                  <span className={textMuted}> / {formatCurrency(p.budget)}</span>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {p.budget > 0 && (
+                              <>
+                                <div className={`h-3 rounded-full overflow-hidden ${theme === 'light' ? 'bg-gray-200' : 'bg-terminal-border'}`}>
+                                  <div 
+                                    className={`h-full rounded-full transition-all ${
+                                      p.isOverBudget ? 'bg-accent-danger' : 
+                                      p.isNearBudget ? 'bg-yellow-400' : 
+                                      'bg-accent-primary'
+                                    }`}
+                                    style={{ width: `${Math.min(p.percentUsed, 100)}%` }}
+                                  />
+                                </div>
+                                <div className="flex justify-between mt-2 text-xs">
+                                  <span className={textMuted}>
+                                    {p.percentUsed.toFixed(0)}% used
+                                  </span>
+                                  <span className={p.remaining < 0 ? 'text-accent-danger' : textMuted}>
+                                    {p.remaining >= 0 
+                                      ? `${formatCurrency(p.remaining)} remaining`
+                                      : `${formatCurrency(Math.abs(p.remaining))} over`
+                                    }
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                            
+                            {/* Project metrics row */}
+                            <div className={`flex gap-4 mt-3 pt-3 border-t text-xs ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
+                              <div>
+                                <span className={textMuted}>Revenue: </span>
+                                <span className="font-mono text-accent-primary">{formatCurrency(p.revenue)}</span>
+                              </div>
+                              <div>
+                                <span className={textMuted}>Gross Profit: </span>
+                                <span className={`font-mono ${p.grossProfit >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                  {formatCurrency(p.grossProfit)}
+                                </span>
+                              </div>
+                              <div>
+                                <span className={textMuted}>GM: </span>
+                                <span className={`font-semibold ${p.grossMarginPct >= 30 ? 'text-accent-primary' : p.grossMarginPct >= 15 ? 'text-yellow-400' : 'text-accent-danger'}`}>
+                                  {p.grossMarginPct.toFixed(1)}%
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {/* Projects without budgets hint */}
+                      {projects.filter(p => !p.budget).length > 0 && (
+                        <p className={`text-xs mt-4 ${textMuted}`}>
+                          <Info className="w-3 h-3 inline mr-1" />
+                          {projects.filter(p => !p.budget).length} project(s) without budgets. 
+                          <button onClick={() => setShowProjectModal(true)} className="text-accent-primary hover:underline ml-1">
+                            Add budgets
+                          </button>
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Period Comparison Buttons */}
                   <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
@@ -5197,6 +5834,152 @@ const handleQuickAdd = useCallback(async () => {
                   <div className={`text-xs mt-2 ${textSubtle}`}>
                     <strong>Type:</strong> revenue (invoices TO clients) or direct_cost (invoices FROM contractors)
                   </div>
+                </div>
+              </div>
+
+              {/* AI Categorization */}
+              <div className={`rounded-xl p-6 border ${cardClasses}`}>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-purple-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">AI-Powered Categorization</h3>
+                    <p className={`text-sm ${textMuted}`}>Let AI analyze and categorize your transactions before import</p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Cash AI Upload */}
+                  <div className={`p-4 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="font-medium text-sm">Cash Transactions</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full bg-accent-primary/10 text-accent-primary`}>
+                        AI Ready
+                      </span>
+                    </div>
+                    <input 
+                      type="file" 
+                      accept=".csv" 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          Papa.parse(file, {
+                            header: true,
+                            skipEmptyLines: true,
+                            complete: (results) => {
+                              const data = results.data.map((row: any, idx: number) => ({
+                                date: row.date,
+                                category: row.category || 'unassigned',
+                                description: row.description,
+                                amount: parseFloat(row.amount) || 0,
+                                type: row.type || 'actual',
+                                project: row.project,
+                                notes: row.notes
+                              })).filter(t => t.date && !isNaN(t.amount))
+                              
+                              if (data.length > 0) {
+                                categorizeWithAI(data, 'cash')
+                              } else {
+                                alert('No valid data found in CSV')
+                              }
+                            }
+                          })
+                        }
+                        e.target.value = ''
+                      }} 
+                      className="hidden" 
+                      id="ai-cash-upload" 
+                    />
+                    <label 
+                      htmlFor="ai-cash-upload" 
+                      className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg cursor-pointer font-medium text-sm transition-all ${
+                        aiLoading 
+                          ? 'bg-gray-400 cursor-not-allowed' 
+                          : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600'
+                      }`}
+                    >
+                      {aiLoading && uploadType === 'cash' ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          AI Categorize Cash CSV
+                        </>
+                      )}
+                    </label>
+                  </div>
+                  
+                  {/* Accrual AI Upload */}
+                  <div className={`p-4 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="font-medium text-sm">Accrual/Invoices</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400`}>
+                        AI Ready
+                      </span>
+                    </div>
+                    <input 
+                      type="file" 
+                      accept=".csv" 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          Papa.parse(file, {
+                            header: true,
+                            skipEmptyLines: true,
+                            complete: (results) => {
+                              const data = results.data.map((row: any) => ({
+                                date: row.date,
+                                type: row.type || 'revenue',
+                                description: row.description,
+                                amount: parseFloat(row.amount) || 0,
+                                project: row.project,
+                                vendor: row.vendor,
+                                invoiceNumber: row.invoice_number || row.invoiceNumber,
+                                notes: row.notes
+                              })).filter(t => t.date && !isNaN(t.amount))
+                              
+                              if (data.length > 0) {
+                                categorizeWithAI(data, 'accrual')
+                              } else {
+                                alert('No valid data found in CSV')
+                              }
+                            }
+                          })
+                        }
+                        e.target.value = ''
+                      }} 
+                      className="hidden" 
+                      id="ai-accrual-upload" 
+                    />
+                    <label 
+                      htmlFor="ai-accrual-upload" 
+                      className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg cursor-pointer font-medium text-sm transition-all ${
+                        aiLoading 
+                          ? 'bg-gray-400 cursor-not-allowed' 
+                          : 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white hover:from-indigo-600 hover:to-purple-600'
+                      }`}
+                    >
+                      {aiLoading && uploadType === 'accrual' ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          AI Categorize Accrual CSV
+                        </>
+                      )}
+                    </label>
+                  </div>
+                </div>
+                
+                <div className={`mt-4 p-3 rounded-lg text-sm ${theme === 'light' ? 'bg-purple-50 text-purple-700' : 'bg-purple-500/10 text-purple-300'}`}>
+                  <strong>How it works:</strong> Upload a CSV and AI will analyze each transaction description to suggest categories and projects. You can review, edit, and approve suggestions before importing.
                 </div>
               </div>
 
