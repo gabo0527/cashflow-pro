@@ -183,3 +183,32 @@ export const updateCompanySettings = async (settings: any) => {
   const { data, error } = await supabase.from('company_settings').upsert(settings).select().single()
   return { data, error }
 }
+
+// ============ CLIENTS ============
+
+export const fetchClients = async (companyId?: string) => {
+  let query = supabase.from('clients').select('*').order('name', { ascending: true })
+  if (companyId) query = query.eq('company_id', companyId)
+  const { data, error } = await query
+  return { data, error }
+}
+
+export const insertClient = async (client: any, companyId?: string, userId?: string) => {
+  const toInsert = {
+    ...client,
+    company_id: companyId,
+    user_id: userId
+  }
+  const { data, error } = await supabase.from('clients').insert(toInsert).select().single()
+  return { data, error }
+}
+
+export const updateClient = async (id: string, updates: any) => {
+  const { data, error } = await supabase.from('clients').update(updates).eq('id', id).select().single()
+  return { data, error }
+}
+
+export const deleteClient = async (id: string) => {
+  const { error } = await supabase.from('clients').delete().eq('id', id)
+  return { error }
+}
