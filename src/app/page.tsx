@@ -1189,20 +1189,32 @@ export default function CashFlowPro() {
     }
   }, [])
 
-  const bulkDeleteAccrualTransactions = useCallback(() => {
-    if (selectedAccrualIds.size === 0) return
-    if (confirm(`Delete ${selectedAccrualIds.size} selected accrual transaction(s)?`)) {
-      setAccrualTransactions(prev => prev.filter(t => !selectedAccrualIds.has(t.id)))
-      setSelectedAccrualIds(new Set())
+ const bulkDeleteAccrualTransactions = useCallback(async () => {
+  if (selectedAccrualIds.size === 0) return
+  if (confirm(`Delete ${selectedAccrualIds.size} selected accrual transaction(s)?`)) {
+    for (const id of selectedAccrualIds) {
+      const { error } = await supabaseDeleteAccrualTransaction(id)
+      if (error) {
+        console.error('Error deleting accrual transaction:', error)
+      }
     }
-  }, [selectedAccrualIds])
+    setAccrualTransactions(prev => prev.filter(t => !selectedAccrualIds.has(t.id)))
+    setSelectedAccrualIds(new Set())
+  }
+}, [selectedAccrualIds])
 
-  const clearAllAccrualTransactions = useCallback(() => {
-    if (confirm('Clear ALL accrual transactions? This cannot be undone.')) {
-      setAccrualTransactions([])
-      setSelectedAccrualIds(new Set())
+const clearAllAccrualTransactions = useCallback(async () => {
+  if (confirm('Clear ALL accrual transactions? This cannot be undone.')) {
+    const { error } = await deleteAllAccrualTransactions(companyId || undefined)
+    if (error) {
+      console.error('Error clearing accrual transactions:', error)
+      alert('Failed to clear transactions. Please try again.')
+      return
     }
-  }, [])
+    setAccrualTransactions([])
+    setSelectedAccrualIds(new Set())
+  }
+}, [companyId])
 
   const toggleAccrualSelection = useCallback((id: string) => {
     setSelectedAccrualIds(prev => {
@@ -1238,17 +1250,35 @@ export default function CashFlowPro() {
     })
   }, [])
 
-  const saveEditAccrual = useCallback(() => {
-    if (editingAccrualId) {
-      setAccrualTransactions(prev => prev.map(t => 
-        t.id === editingAccrualId 
-          ? { ...t, ...editAccrualForm }
-          : t
-      ))
-      setEditingAccrualId(null)
-      setEditAccrualForm({})
+  const saveEditAccrual = useCallback(async () => {
+  if (editingAccrualId) {
+    const updates = {
+      date: editAccrualForm.date,
+      type: editAccrualForm.type,
+      description: editAccrualForm.description,
+      amount: editAccrualForm.amount,
+      project: editAccrualForm.project,
+      vendor: editAccrualForm.vendor,
+      invoice_number: editAccrualForm.invoiceNumber,
+      notes: editAccrualForm.notes
     }
-  }, [editingAccrualId, editAccrualForm])
+    
+    const { error } = await supabaseUpdateAccrualTransaction(editingAccrualId, updates)
+    if (error) {
+      console.error('Error updating accrual transaction:', error)
+      alert('Failed to save changes. Please try again.')
+      return
+    }
+    
+    setAccrualTransactions(prev => prev.map(t => 
+      t.id === editingAccrualId 
+        ? { ...t, ...editAccrualForm }
+        : t
+    ))
+    setEditingAccrualId(null)
+    setEditAccrualForm({})
+  }
+}, [editingAccrualId, editAccrualForm])
 
   const cancelEditAccrual = useCallback(() => {
     setEditingAccrualId(null)
