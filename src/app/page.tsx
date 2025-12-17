@@ -2344,10 +2344,12 @@ const handleQuickAdd = useCallback(async () => {
   const accrualMonthlyData = useMemo(() => {
     const months: { [key: string]: { revenue: number; directCosts: number; grossProfit: number; grossMarginPct: number } } = {}
     
-    // Filter by date range
+    // Filter by date range AND selected project
     const filtered = accrualTransactions.filter(t => {
       const monthKey = t.date.slice(0, 7)
-      return monthKey >= activeDateRange.start && monthKey <= activeDateRange.end
+      const inDateRange = monthKey >= activeDateRange.start && monthKey <= activeDateRange.end
+      const matchesProject = selectedProject === 'all' || normalizeProjectName(t.project) === normalizeProjectName(selectedProject)
+      return inDateRange && matchesProject
     })
     
     filtered.forEach(t => {
@@ -2372,14 +2374,16 @@ const handleQuickAdd = useCallback(async () => {
     return Object.entries(months)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, data]) => ({ month, ...data }))
-  }, [accrualTransactions, activeDateRange])
+  }, [accrualTransactions, activeDateRange, selectedProject])
 
   // Accrual project analysis with OH allocation
   const accrualProjectAnalysis = useMemo(() => {
-    // Filter accrual transactions by date range
+    // Filter accrual transactions by date range AND selected project
     const filteredAccrual = accrualTransactions.filter(t => {
       const monthKey = t.date.slice(0, 7)
-      return monthKey >= activeDateRange.start && monthKey <= activeDateRange.end
+      const inDateRange = monthKey >= activeDateRange.start && monthKey <= activeDateRange.end
+      const matchesProject = selectedProject === 'all' || normalizeProjectName(t.project) === normalizeProjectName(selectedProject)
+      return inDateRange && matchesProject
     })
     
     // Get total overhead from cash transactions for the same period
@@ -2442,7 +2446,7 @@ const handleQuickAdd = useCallback(async () => {
     }), { revenue: 0, directCosts: 0, grossProfit: 0, ohAllocation: 0, netMargin: 0 })
     
     return { projects: analysis, totals, totalOverhead }
-  }, [accrualTransactions, transactions, activeDateRange])
+  }, [accrualTransactions, transactions, activeDateRange, selectedProject])
 
   // Comparison data: Invoiced vs Collected by month
   const cashVsAccrualData = useMemo(() => {
@@ -6840,229 +6844,222 @@ const handleQuickAdd = useCallback(async () => {
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <h2 className="text-2xl font-bold">Clients & Projects</h2>
-                  <p className={`text-sm ${textMuted}`}>Manage your clients and track project performance</p>
+                  <p className={`text-sm ${textMuted}`}>Manage clients and assign projects</p>
                 </div>
-                <button
-                  onClick={() => setShowClientModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Client
-                </button>
-              </div>
-
-              {/* Client Stats Summary */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className={`rounded-xl p-4 border ${cardClasses}`}>
-                  <div className={`text-sm ${textMuted}`}>Total Clients</div>
-                  <div className="text-2xl font-bold">{clients.length}</div>
-                  <div className={`text-xs ${textMuted}`}>{clients.filter(c => c.status === 'active').length} active</div>
-                </div>
-                <div className={`rounded-xl p-4 border ${cardClasses}`}>
-                  <div className={`text-sm ${textMuted}`}>Total Revenue</div>
-                  <div className="text-2xl font-bold text-accent-primary">{formatCurrency(clientAnalytics.reduce((sum, c) => sum + c.revenue, 0))}</div>
-                  <div className={`text-xs ${textMuted}`}>All time</div>
-                </div>
-                <div className={`rounded-xl p-4 border ${cardClasses}`}>
-                  <div className={`text-sm ${textMuted}`}>Avg. Gross Margin</div>
-                  <div className="text-2xl font-bold">
-                    {clientAnalytics.length > 0 
-                      ? `${(clientAnalytics.reduce((sum, c) => sum + c.grossMarginPct, 0) / clientAnalytics.filter(c => c.revenue > 0).length || 0).toFixed(1)}%`
-                      : 'N/A'
-                    }
-                  </div>
-                  <div className={`text-xs ${textMuted}`}>Across all clients</div>
-                </div>
-                <div className={`rounded-xl p-4 border ${cardClasses}`}>
-                  <div className={`text-sm ${textMuted}`}>Active Projects</div>
-                  <div className="text-2xl font-bold">{projects.filter(p => p.status === 'active').length}</div>
-                  <div className={`text-xs ${textMuted}`}>{projects.filter(p => p.clientId).length} linked to clients</div>
-                </div>
-              </div>
-
-              {/* Filter by Client Status */}
-              <div className={`flex items-center gap-4 p-4 rounded-xl border ${cardClasses}`}>
-                <span className={`text-sm font-medium ${textMuted}`}>Filter:</span>
                 <div className="flex gap-2">
-                  {['all', 'active', 'inactive', 'prospect'].map(status => (
-                    <button
-                      key={status}
-                      onClick={() => setSelectedClientId(status === selectedClientId ? 'all' : status)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                        (status === 'all' && selectedClientId === 'all') || selectedClientId === status
-                          ? 'bg-accent-primary text-white'
-                          : theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-terminal-bg hover:bg-terminal-surface'
-                      }`}
-                    >
-                      {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Clients List */}
-              {clients.length === 0 ? (
-                <div className={`rounded-xl p-12 border ${cardClasses} text-center`}>
-                  <Users className={`w-12 h-12 mx-auto mb-4 ${textMuted}`} />
-                  <h3 className="text-lg font-semibold mb-2">No clients yet</h3>
-                  <p className={`text-sm mb-4 ${textMuted}`}>Add your first client to start tracking project performance by client</p>
+                  <button
+                    onClick={() => setShowProjectModal(true)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-100' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                  >
+                    <FolderPlus className="w-4 h-4" />
+                    Manage Projects
+                  </button>
                   <button
                     onClick={() => setShowClientModal(true)}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90"
+                    className="flex items-center gap-2 px-4 py-2 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90"
                   >
                     <Plus className="w-4 h-4" />
                     Add Client
                   </button>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {clientAnalytics
-                    .filter(c => selectedClientId === 'all' || c.status === selectedClientId)
-                    .map(client => (
-                    <div key={client.id} className={`rounded-xl border overflow-hidden ${cardClasses}`}>
-                      {/* Client Header */}
-                      <div className={`p-4 flex items-center justify-between ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
-                        <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold ${
-                            client.status === 'active' ? 'bg-green-500/20 text-green-400' :
-                            client.status === 'prospect' ? 'bg-blue-500/20 text-blue-400' :
-                            'bg-gray-500/20 text-gray-400'
-                          }`}>
-                            {client.name.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-lg">{client.name}</h3>
-                            <div className={`flex items-center gap-3 text-sm ${textMuted}`}>
-                              <span className={`px-2 py-0.5 rounded-full text-xs ${
+              </div>
+
+              {/* Quick Stats Row */}
+              <div className="grid grid-cols-4 gap-4">
+                <div className={`rounded-lg p-3 border ${cardClasses}`}>
+                  <div className={`text-xs ${textMuted}`}>Clients</div>
+                  <div className="text-xl font-bold">{clients.length}</div>
+                </div>
+                <div className={`rounded-lg p-3 border ${cardClasses}`}>
+                  <div className={`text-xs ${textMuted}`}>Total Revenue</div>
+                  <div className="text-xl font-bold text-accent-primary">{formatCurrency(clientAnalytics.reduce((sum, c) => sum + c.revenue, 0))}</div>
+                </div>
+                <div className={`rounded-lg p-3 border ${cardClasses}`}>
+                  <div className={`text-xs ${textMuted}`}>Avg. GM%</div>
+                  <div className="text-xl font-bold">
+                    {clientAnalytics.filter(c => c.revenue > 0).length > 0 
+                      ? `${(clientAnalytics.filter(c => c.revenue > 0).reduce((sum, c) => sum + c.grossMarginPct, 0) / clientAnalytics.filter(c => c.revenue > 0).length).toFixed(1)}%`
+                      : 'N/A'
+                    }
+                  </div>
+                </div>
+                <div className={`rounded-lg p-3 border ${cardClasses}`}>
+                  <div className={`text-xs ${textMuted}`}>Projects</div>
+                  <div className="text-xl font-bold">{projects.length} <span className={`text-sm font-normal ${textMuted}`}>({projects.filter(p => !p.clientId).length} unassigned)</span></div>
+                </div>
+              </div>
+
+              {/* Clients Table */}
+              <div className={`rounded-xl border overflow-hidden ${cardClasses}`}>
+                <div className={`flex items-center justify-between px-4 py-3 border-b ${theme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-terminal-bg border-terminal-border'}`}>
+                  <h3 className="font-semibold">Clients</h3>
+                  <div className="flex gap-1">
+                    {['all', 'active', 'inactive', 'prospect'].map(status => (
+                      <button
+                        key={status}
+                        onClick={() => setSelectedClientId(status === selectedClientId ? 'all' : status)}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                          (status === 'all' && selectedClientId === 'all') || selectedClientId === status
+                            ? 'bg-accent-primary text-white'
+                            : theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-terminal-surface hover:bg-terminal-border'
+                        }`}
+                      >
+                        {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                {clients.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <Users className={`w-10 h-10 mx-auto mb-3 ${textMuted}`} />
+                    <p className={`text-sm ${textMuted}`}>No clients yet. Add your first client to get started.</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead className={theme === 'light' ? 'bg-gray-50' : 'bg-terminal-surface'}>
+                      <tr className={`border-b ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'} text-left ${textMuted}`}>
+                        <th className="px-4 py-3 font-medium">Client</th>
+                        <th className="px-4 py-3 font-medium text-right">Revenue</th>
+                        <th className="px-4 py-3 font-medium text-right">Costs</th>
+                        <th className="px-4 py-3 font-medium text-right">GM%</th>
+                        <th className="px-4 py-3 font-medium">Projects</th>
+                        <th className="px-4 py-3 font-medium w-24"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {clientAnalytics
+                        .filter(c => selectedClientId === 'all' || c.status === selectedClientId)
+                        .map(client => (
+                        <tr key={client.id} className={`border-b ${theme === 'light' ? 'border-gray-100 hover:bg-gray-50' : 'border-terminal-border/50 hover:bg-terminal-bg'}`}>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
                                 client.status === 'active' ? 'bg-green-500/20 text-green-400' :
                                 client.status === 'prospect' ? 'bg-blue-500/20 text-blue-400' :
                                 'bg-gray-500/20 text-gray-400'
                               }`}>
-                                {client.status}
-                              </span>
-                              {client.contactEmail && <span>{client.contactEmail}</span>}
+                                {client.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="font-medium">{client.name}</div>
+                                <div className={`text-xs ${textMuted}`}>{client.contactEmail || client.status}</div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setEditingClient(client)}
-                            className={`p-2 rounded-lg hover:bg-accent-primary/10 ${textMuted} hover:text-accent-primary`}
-                            title="Edit client"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => deleteClientData(client.id)}
-                            className={`p-2 rounded-lg hover:bg-accent-danger/10 ${textMuted} hover:text-accent-danger`}
-                            title="Delete client"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                      
-                      {/* Client Metrics */}
-                      <div className="p-4 grid grid-cols-2 md:grid-cols-5 gap-4">
-                        <div>
-                          <div className={`text-xs ${textMuted}`}>Revenue</div>
-                          <div className="text-lg font-semibold text-accent-primary">{formatCurrency(client.revenue)}</div>
-                        </div>
-                        <div>
-                          <div className={`text-xs ${textMuted}`}>Direct Costs</div>
-                          <div className="text-lg font-semibold text-accent-danger">{formatCurrency(client.costs)}</div>
-                        </div>
-                        <div>
-                          <div className={`text-xs ${textMuted}`}>Gross Profit</div>
-                          <div className={`text-lg font-semibold ${client.grossProfit >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                            {formatCurrency(client.grossProfit)}
-                          </div>
-                        </div>
-                        <div>
-                          <div className={`text-xs ${textMuted}`}>Gross Margin</div>
-                          <div className={`text-lg font-semibold ${
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-accent-primary">{formatCurrency(client.revenue)}</td>
+                          <td className="px-4 py-3 text-right font-mono text-accent-danger">{formatCurrency(client.costs)}</td>
+                          <td className={`px-4 py-3 text-right font-semibold ${
                             client.grossMarginPct >= 30 ? 'text-accent-primary' : 
                             client.grossMarginPct >= 15 ? 'text-yellow-400' : 'text-accent-danger'
                           }`}>
                             {client.revenue > 0 ? `${client.grossMarginPct.toFixed(1)}%` : 'N/A'}
-                          </div>
-                        </div>
-                        <div>
-                          <div className={`text-xs ${textMuted}`}>Projects</div>
-                          <div className="text-lg font-semibold">{client.projectCount}</div>
-                        </div>
-                      </div>
-                      
-                      {/* Client Projects */}
-                      {client.projects.length > 0 && (
-                        <div className={`px-4 pb-4 border-t ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
-                          <div className={`text-xs font-medium mt-3 mb-2 ${textMuted}`}>Projects</div>
-                          <div className="flex flex-wrap gap-2">
-                            {client.projects.map(project => (
-                              <div 
-                                key={project.id} 
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${theme === 'light' ? 'bg-gray-100' : 'bg-terminal-bg'}`}
-                              >
-                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: project.color }} />
-                                <span>{project.name}</span>
-                                <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                  project.status === 'active' ? 'bg-green-500/20 text-green-400' :
-                                  project.status === 'completed' ? 'bg-blue-500/20 text-blue-400' :
-                                  'bg-yellow-500/20 text-yellow-400'
-                                }`}>
-                                  {project.status}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-wrap gap-1">
+                              {client.projects.slice(0, 3).map(p => (
+                                <span key={p.id} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs ${theme === 'light' ? 'bg-gray-100' : 'bg-terminal-bg'}`}>
+                                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: p.color }} />
+                                  {p.name}
                                 </span>
-                                {project.budget && (
-                                  <span className={textMuted}>{formatCurrency(project.budget)}</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* No projects assigned */}
-                      {client.projects.length === 0 && (
-                        <div className={`px-4 pb-4 text-sm ${textMuted}`}>
-                          <Info className="w-4 h-4 inline mr-1" />
-                          No projects assigned. Link projects in the Manage Projects modal.
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+                              ))}
+                              {client.projects.length > 3 && (
+                                <span className={`px-2 py-0.5 rounded text-xs ${textMuted}`}>+{client.projects.length - 3}</span>
+                              )}
+                              {client.projects.length === 0 && (
+                                <span className={`text-xs ${textMuted}`}>None</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => setEditingClient(client)}
+                                className={`p-1.5 rounded hover:bg-accent-primary/10 ${textMuted} hover:text-accent-primary`}
+                                title="Edit"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => deleteClientData(client.id)}
+                                className={`p-1.5 rounded hover:bg-accent-danger/10 ${textMuted} hover:text-accent-danger`}
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
 
-              {/* Unassigned Projects Section */}
-              {projects.filter(p => !p.clientId).length > 0 && (
-                <div className={`rounded-xl p-4 border ${cardClasses}`}>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-yellow-400" />
-                    Unassigned Projects ({projects.filter(p => !p.clientId).length})
-                  </h3>
-                  <p className={`text-sm mb-3 ${textMuted}`}>These projects are not linked to any client</p>
-                  <div className="flex flex-wrap gap-2">
-                    {projects.filter(p => !p.clientId).map(project => (
-                      <div 
-                        key={project.id}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg ${theme === 'light' ? 'bg-gray-100' : 'bg-terminal-bg'}`}
-                      >
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: project.color }} />
-                        <span>{project.name}</span>
-                        <button
-                          onClick={() => {
-                            setEditingProject(project)
-                            setShowProjectModal(true)
-                          }}
-                          className={`text-xs px-2 py-0.5 rounded bg-accent-primary/20 text-accent-primary hover:bg-accent-primary/30`}
-                        >
-                          Assign
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+              {/* Assign Projects Section */}
+              <div className={`rounded-xl border overflow-hidden ${cardClasses}`}>
+                <div className={`px-4 py-3 border-b ${theme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-terminal-bg border-terminal-border'}`}>
+                  <h3 className="font-semibold">Assign Projects to Clients</h3>
+                  <p className={`text-xs mt-1 ${textMuted}`}>Link your projects to clients for consolidated reporting</p>
                 </div>
-              )}
+                
+                <div className="p-4">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className={`border-b ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'} text-left ${textMuted}`}>
+                        <th className="pb-2 font-medium">Project</th>
+                        <th className="pb-2 font-medium">Status</th>
+                        <th className="pb-2 font-medium">Budget</th>
+                        <th className="pb-2 font-medium">Assigned Client</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {projects.map(project => (
+                        <tr key={project.id} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
+                          <td className="py-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: project.color }} />
+                              <span className="font-medium">{project.name}</span>
+                            </div>
+                          </td>
+                          <td className="py-2">
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              project.status === 'active' ? 'bg-green-500/20 text-green-400' :
+                              project.status === 'completed' ? 'bg-blue-500/20 text-blue-400' :
+                              'bg-yellow-500/20 text-yellow-400'
+                            }`}>
+                              {project.status}
+                            </span>
+                          </td>
+                          <td className="py-2 font-mono text-sm">
+                            {project.budget ? formatCurrency(project.budget) : <span className={textMuted}>—</span>}
+                          </td>
+                          <td className="py-2">
+                            <select
+                              value={project.clientId || ''}
+                              onChange={(e) => updateProject(project.id, { clientId: e.target.value || undefined })}
+                              className={`w-full max-w-[200px] px-2 py-1 rounded text-sm border ${inputClasses}`}
+                              style={{ colorScheme: theme }}
+                            >
+                              <option value="">No client</option>
+                              {clients.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                      {projects.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className={`py-4 text-center ${textMuted}`}>
+                            No projects yet. Create projects in the Manage Projects modal.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </motion.div>
           )}
 
