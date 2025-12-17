@@ -720,7 +720,7 @@ export default function CashFlowPro() {
 
   useEffect(() => {
     if (isLoaded && typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.collapsedSections, JSON.stringify([...collapsedSections]))
+      localStorage.setItem(STORAGE_KEYS.collapsedSections, JSON.stringify(Array.from(collapsedSections)))
     }
   }, [collapsedSections, isLoaded])
 
