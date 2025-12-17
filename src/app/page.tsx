@@ -30,7 +30,8 @@ import {
   fetchAssumptions, insertAssumption as supabaseInsertAssumption, 
   deleteAssumption as supabaseDeleteAssumption,
   fetchCategories, fetchCompanySettings, updateCompanySettings,
-  updateCategory as supabaseUpdateCategory, insertCategory as supabaseInsertCategory, deleteCategory as supabaseDeleteCategory
+  updateCategory as supabaseUpdateCategory, insertCategory as supabaseInsertCategory, deleteCategory as supabaseDeleteCategory,
+  fetchClients, insertClient as supabaseInsertClient, updateClient as supabaseUpdateClient, deleteClient as supabaseDeleteClient
 } from '../lib/supabase'
 
 // Vantage Logo Component
@@ -105,6 +106,21 @@ interface Project {
   status: 'active' | 'completed' | 'on-hold'
   budget?: number
   budgetAlertThreshold?: number // percentage (default 80)
+  clientId?: string // Links to Client
+  targetGrossMargin?: number // KPI goal percentage
+  startDate?: string
+  endDate?: string
+  createdAt: string
+}
+
+interface Client {
+  id: string
+  name: string
+  contactName?: string
+  contactEmail?: string
+  contactPhone?: string
+  status: 'active' | 'inactive' | 'prospect'
+  notes?: string
   createdAt: string
 }
 
@@ -386,13 +402,21 @@ export default function CashFlowPro() {
   const [dataLoading, setDataLoading] = useState(false)
   
   // Core state
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'data' | 'assumptions' | 'projections' | 'integrations' | 'settings'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'data' | 'assumptions' | 'projections' | 'clients' | 'integrations' | 'settings'>('dashboard')
   const [beginningBalance, setBeginningBalance] = useState<number>(50000)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [accrualTransactions, setAccrualTransactions] = useState<AccrualTransaction[]>([])
   const [dashboardView, setDashboardView] = useState<DashboardView>('cash')
   const [assumptions, setAssumptions] = useState<Assumption[]>([])
   const [projects, setProjects] = useState<Project[]>([])
+  const [clients, setClients] = useState<Client[]>([])
+  const [selectedClientId, setSelectedClientId] = useState<string>('all')
+  const [showClientModal, setShowClientModal] = useState(false)
+  const [editingClient, setEditingClient] = useState<Client | null>(null)
+  const [newClientForm, setNewClientForm] = useState<Partial<Client>>({
+    name: '',
+    status: 'active'
+  })
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES)
   const [scenarios, setScenarios] = useState<Scenario[]>([{ id: 'base', name: 'Base Case', isBase: true, createdAt: new Date().toISOString() }])
   const [recurringRules, setRecurringRules] = useState<RecurringRule[]>([])
@@ -499,6 +523,7 @@ export default function CashFlowPro() {
   // New project form
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectBudget, setNewProjectBudget] = useState<number | ''>('')
+  const [newProjectClientId, setNewProjectClientId] = useState<string>('')
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   
   // Assumption form
@@ -537,13 +562,15 @@ export default function CashFlowPro() {
             accrualRes, 
             assumptionsRes, 
             categoriesRes,
-            settingsRes
+            settingsRes,
+            clientsRes
           ] = await Promise.all([
             fetchTransactions(profile.company_id),
             fetchAccrualTransactions(profile.company_id),
             fetchAssumptions(profile.company_id),
             fetchCategories(profile.company_id),
-            fetchCompanySettings(profile.company_id)
+            fetchCompanySettings(profile.company_id),
+            fetchClients(profile.company_id)
           ])
           
           if (transactionsRes.data) {
@@ -616,6 +643,20 @@ export default function CashFlowPro() {
             if (settingsRes.data.brand_color) {
               setBranding(prev => ({ ...prev, brandColor: settingsRes.data.brand_color }))
             }
+          }
+          
+          if (clientsRes.data) {
+            const mapped = clientsRes.data.map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              contactName: c.contact_name,
+              contactEmail: c.contact_email,
+              contactPhone: c.contact_phone,
+              status: c.status,
+              notes: c.notes,
+              createdAt: c.created_at
+            }))
+            setClients(mapped)
           }
           
           // Load UI preferences from localStorage (these stay local)
@@ -1680,14 +1721,16 @@ const handleQuickAdd = useCallback(async () => {
         status: 'active',
         budget: newProjectBudget !== '' ? Number(newProjectBudget) : undefined,
         budgetAlertThreshold: 80,
+        clientId: newProjectClientId || undefined,
         createdAt: new Date().toISOString()
       }
       setProjects(prev => [...prev, newProject])
       setNewProjectName('')
       setNewProjectBudget('')
+      setNewProjectClientId('')
       setShowProjectModal(false)
     }
-  }, [newProjectName, newProjectBudget, projects.length])
+  }, [newProjectName, newProjectBudget, newProjectClientId, projects.length])
 
   const updateProject = useCallback((id: string, updates: Partial<Project>) => {
     setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
@@ -1697,6 +1740,130 @@ const handleQuickAdd = useCallback(async () => {
   const deleteProject = useCallback((id: string) => {
     setProjects(prev => prev.filter(p => p.id !== id))
   }, [])
+
+  // Client Management
+  const addClient = useCallback(async () => {
+    if (!newClientForm.name?.trim()) return
+    
+    const clientData = {
+      name: newClientForm.name.trim(),
+      contact_name: newClientForm.contactName || null,
+      contact_email: newClientForm.contactEmail || null,
+      contact_phone: newClientForm.contactPhone || null,
+      status: newClientForm.status || 'active',
+      notes: newClientForm.notes || null
+    }
+    
+    if (companyId && user) {
+      const { data, error } = await supabaseInsertClient(clientData, companyId, user.id)
+      if (error) {
+        alert(`Error creating client: ${error.message}`)
+        return
+      }
+      if (data) {
+        const newClient: Client = {
+          id: data.id,
+          name: data.name,
+          contactName: data.contact_name,
+          contactEmail: data.contact_email,
+          contactPhone: data.contact_phone,
+          status: data.status,
+          notes: data.notes,
+          createdAt: data.created_at
+        }
+        setClients(prev => [...prev, newClient])
+      }
+    } else {
+      // Fallback to local-only if no Supabase
+      const newClient: Client = {
+        id: generateId(),
+        name: newClientForm.name.trim(),
+        contactName: newClientForm.contactName,
+        contactEmail: newClientForm.contactEmail,
+        contactPhone: newClientForm.contactPhone,
+        status: newClientForm.status || 'active',
+        notes: newClientForm.notes,
+        createdAt: new Date().toISOString()
+      }
+      setClients(prev => [...prev, newClient])
+    }
+    
+    setNewClientForm({ name: '', status: 'active' })
+    setShowClientModal(false)
+  }, [newClientForm, companyId, user])
+
+  const updateClientData = useCallback(async (id: string, updates: Partial<Client>) => {
+    const dbUpdates = {
+      name: updates.name,
+      contact_name: updates.contactName,
+      contact_email: updates.contactEmail,
+      contact_phone: updates.contactPhone,
+      status: updates.status,
+      notes: updates.notes
+    }
+    
+    const { error } = await supabaseUpdateClient(id, dbUpdates)
+    if (error) {
+      alert(`Error updating client: ${error.message}`)
+      return
+    }
+    
+    setClients(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
+    setEditingClient(null)
+  }, [])
+
+  const deleteClientData = useCallback(async (id: string) => {
+    if (!confirm('Delete this client? Projects linked to this client will be unlinked.')) return
+    
+    const { error } = await supabaseDeleteClient(id)
+    if (error) {
+      alert(`Error deleting client: ${error.message}`)
+      return
+    }
+    
+    setClients(prev => prev.filter(c => c.id !== id))
+    // Unlink projects from deleted client
+    setProjects(prev => prev.map(p => p.clientId === id ? { ...p, clientId: undefined } : p))
+  }, [])
+
+  // Client analytics
+  const clientAnalytics = useMemo(() => {
+    return clients.map(client => {
+      // Get projects for this client
+      const clientProjects = projects.filter(p => p.clientId === client.id)
+      const projectNames = clientProjects.map(p => p.name)
+      
+      // Get accrual data for client's projects (case-insensitive)
+      const clientRevenue = accrualTransactions
+        .filter(t => projectNames.some(pn => normalizeProjectName(pn) === normalizeProjectName(t.project)) && t.type === 'revenue')
+        .reduce((sum, t) => sum + t.amount, 0)
+      
+      const clientCosts = accrualTransactions
+        .filter(t => projectNames.some(pn => normalizeProjectName(pn) === normalizeProjectName(t.project)) && t.type === 'direct_cost')
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+      
+      const grossProfit = clientRevenue - clientCosts
+      const grossMarginPct = clientRevenue > 0 ? (grossProfit / clientRevenue) * 100 : 0
+      
+      // Budget tracking
+      const totalBudget = clientProjects.reduce((sum, p) => sum + (p.budget || 0), 0)
+      const totalSpent = clientCosts
+      
+      return {
+        ...client,
+        projectCount: clientProjects.length,
+        projects: clientProjects,
+        revenue: clientRevenue,
+        costs: clientCosts,
+        grossProfit,
+        grossMarginPct,
+        totalBudget,
+        totalSpent,
+        budgetRemaining: totalBudget - totalSpent,
+        budgetUsedPct: totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0
+      }
+    }).sort((a, b) => b.revenue - a.revenue)
+  }, [clients, projects, accrualTransactions])
 
   // Assumptions
   const addAssumption = useCallback(() => {
@@ -2766,6 +2933,13 @@ const handleQuickAdd = useCallback(async () => {
       ]
     },
     {
+      id: 'clients-section',
+      label: 'Clients & Projects',
+      items: [
+        { id: 'clients', label: 'Clients', icon: Users },
+      ]
+    },
+    {
       id: 'data-section',
       label: 'Data',
       items: [
@@ -2793,7 +2967,7 @@ const handleQuickAdd = useCallback(async () => {
   // Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['main', 'data-section', 'forecast', 'config']))
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['main', 'clients-section', 'data-section', 'forecast', 'config']))
 
   const toggleSection = (sectionId: string) => {
     setExpandedSections(prev => {
@@ -3564,6 +3738,20 @@ const handleQuickAdd = useCallback(async () => {
                           <option value="on-hold">On Hold</option>
                         </select>
                       </div>
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Client</label>
+                        <select
+                          value={editingProject.clientId || ''}
+                          onChange={(e) => setEditingProject({ ...editingProject, clientId: e.target.value || undefined })}
+                          className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                        >
+                          <option value="">No client assigned</option>
+                          {clients.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
                       <div className="flex gap-2 pt-2">
                         <button
                           onClick={() => {
@@ -3608,6 +3796,20 @@ const handleQuickAdd = useCallback(async () => {
                           style={{ colorScheme: theme }}
                         />
                       </div>
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Client (optional)</label>
+                        <select
+                          value={newProjectClientId}
+                          onChange={(e) => setNewProjectClientId(e.target.value)}
+                          className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                        >
+                          <option value="">No client</option>
+                          {clients.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
                       <button
                         onClick={addProject}
                         disabled={!newProjectName.trim()}
@@ -3629,10 +3831,11 @@ const handleQuickAdd = useCallback(async () => {
                       ) : (
                         projects.map(p => {
                           const tracking = projectBudgetTracking.find(t => t.id === p.id)
+                          const clientName = p.clientId ? clients.find(c => c.id === p.clientId)?.name : null
                           return (
                             <div key={p.id} className={`p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
                               <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-3 flex-wrap">
                                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
                                   <span className="font-medium">{p.name}</span>
                                   <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -3642,6 +3845,11 @@ const handleQuickAdd = useCallback(async () => {
                                   }`}>
                                     {p.status}
                                   </span>
+                                  {clientName && (
+                                    <span className={`text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400`}>
+                                      {clientName}
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="flex items-center gap-1">
                                   <button
@@ -3686,6 +3894,212 @@ const handleQuickAdd = useCallback(async () => {
                       )}
                     </div>
                   </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Client Modal */}
+      <AnimatePresence>
+        {(showClientModal || editingClient) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => { setShowClientModal(false); setEditingClient(null); setNewClientForm({ name: '', status: 'active' }); }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-lg rounded-xl p-6 border ${cardClasses}`}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">{editingClient ? 'Edit Client' : 'Add New Client'}</h3>
+                <button onClick={() => { setShowClientModal(false); setEditingClient(null); setNewClientForm({ name: '', status: 'active' }); }} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                {editingClient ? (
+                  /* Edit Client Form */
+                  <>
+                    <div>
+                      <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Client Name *</label>
+                      <input
+                        type="text"
+                        value={editingClient.name}
+                        onChange={(e) => setEditingClient({ ...editingClient, name: e.target.value })}
+                        className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                        style={{ colorScheme: theme }}
+                        placeholder="Company or client name"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Contact Name</label>
+                        <input
+                          type="text"
+                          value={editingClient.contactName || ''}
+                          onChange={(e) => setEditingClient({ ...editingClient, contactName: e.target.value })}
+                          className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                          placeholder="Primary contact"
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Status</label>
+                        <select
+                          value={editingClient.status}
+                          onChange={(e) => setEditingClient({ ...editingClient, status: e.target.value as Client['status'] })}
+                          className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                        >
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                          <option value="prospect">Prospect</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Email</label>
+                        <input
+                          type="email"
+                          value={editingClient.contactEmail || ''}
+                          onChange={(e) => setEditingClient({ ...editingClient, contactEmail: e.target.value })}
+                          className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                          placeholder="contact@client.com"
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Phone</label>
+                        <input
+                          type="tel"
+                          value={editingClient.contactPhone || ''}
+                          onChange={(e) => setEditingClient({ ...editingClient, contactPhone: e.target.value })}
+                          className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                          placeholder="(555) 123-4567"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Notes</label>
+                      <textarea
+                        value={editingClient.notes || ''}
+                        onChange={(e) => setEditingClient({ ...editingClient, notes: e.target.value })}
+                        className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                        style={{ colorScheme: theme }}
+                        placeholder="Additional notes about this client..."
+                        rows={2}
+                      />
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        onClick={() => updateClientData(editingClient.id, editingClient)}
+                        disabled={!editingClient.name.trim()}
+                        className="flex-1 px-4 py-2 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90 disabled:opacity-50"
+                      >
+                        Save Changes
+                      </button>
+                      <button
+                        onClick={() => setEditingClient(null)}
+                        className={`px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-100' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  /* Add New Client Form */
+                  <>
+                    <div>
+                      <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Client Name *</label>
+                      <input
+                        type="text"
+                        value={newClientForm.name || ''}
+                        onChange={(e) => setNewClientForm({ ...newClientForm, name: e.target.value })}
+                        className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                        style={{ colorScheme: theme }}
+                        placeholder="Company or client name"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Contact Name</label>
+                        <input
+                          type="text"
+                          value={newClientForm.contactName || ''}
+                          onChange={(e) => setNewClientForm({ ...newClientForm, contactName: e.target.value })}
+                          className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                          placeholder="Primary contact"
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Status</label>
+                        <select
+                          value={newClientForm.status || 'active'}
+                          onChange={(e) => setNewClientForm({ ...newClientForm, status: e.target.value as Client['status'] })}
+                          className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                        >
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                          <option value="prospect">Prospect</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Email</label>
+                        <input
+                          type="email"
+                          value={newClientForm.contactEmail || ''}
+                          onChange={(e) => setNewClientForm({ ...newClientForm, contactEmail: e.target.value })}
+                          className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                          placeholder="contact@client.com"
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Phone</label>
+                        <input
+                          type="tel"
+                          value={newClientForm.contactPhone || ''}
+                          onChange={(e) => setNewClientForm({ ...newClientForm, contactPhone: e.target.value })}
+                          className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                          placeholder="(555) 123-4567"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Notes</label>
+                      <textarea
+                        value={newClientForm.notes || ''}
+                        onChange={(e) => setNewClientForm({ ...newClientForm, notes: e.target.value })}
+                        className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                        style={{ colorScheme: theme }}
+                        placeholder="Additional notes about this client..."
+                        rows={2}
+                      />
+                    </div>
+                    <button
+                      onClick={addClient}
+                      disabled={!newClientForm.name?.trim()}
+                      className="w-full px-4 py-2 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90 disabled:opacity-50"
+                    >
+                      Add Client
+                    </button>
+                  </>
                 )}
               </div>
             </motion.div>
@@ -6413,6 +6827,240 @@ const handleQuickAdd = useCallback(async () => {
                   <p className={`text-sm mt-1 ${theme === 'light' ? 'text-indigo-600' : 'text-indigo-400'}`}>
                     Edit assumptions in the Assumptions tab to adjust the forecast.
                   </p>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* Clients Tab */}
+          {activeTab === 'clients' && (
+            <motion.div key="clients" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
+              
+              {/* Header */}
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold">Clients & Projects</h2>
+                  <p className={`text-sm ${textMuted}`}>Manage your clients and track project performance</p>
+                </div>
+                <button
+                  onClick={() => setShowClientModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Client
+                </button>
+              </div>
+
+              {/* Client Stats Summary */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                  <div className={`text-sm ${textMuted}`}>Total Clients</div>
+                  <div className="text-2xl font-bold">{clients.length}</div>
+                  <div className={`text-xs ${textMuted}`}>{clients.filter(c => c.status === 'active').length} active</div>
+                </div>
+                <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                  <div className={`text-sm ${textMuted}`}>Total Revenue</div>
+                  <div className="text-2xl font-bold text-accent-primary">{formatCurrency(clientAnalytics.reduce((sum, c) => sum + c.revenue, 0))}</div>
+                  <div className={`text-xs ${textMuted}`}>All time</div>
+                </div>
+                <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                  <div className={`text-sm ${textMuted}`}>Avg. Gross Margin</div>
+                  <div className="text-2xl font-bold">
+                    {clientAnalytics.length > 0 
+                      ? `${(clientAnalytics.reduce((sum, c) => sum + c.grossMarginPct, 0) / clientAnalytics.filter(c => c.revenue > 0).length || 0).toFixed(1)}%`
+                      : 'N/A'
+                    }
+                  </div>
+                  <div className={`text-xs ${textMuted}`}>Across all clients</div>
+                </div>
+                <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                  <div className={`text-sm ${textMuted}`}>Active Projects</div>
+                  <div className="text-2xl font-bold">{projects.filter(p => p.status === 'active').length}</div>
+                  <div className={`text-xs ${textMuted}`}>{projects.filter(p => p.clientId).length} linked to clients</div>
+                </div>
+              </div>
+
+              {/* Filter by Client Status */}
+              <div className={`flex items-center gap-4 p-4 rounded-xl border ${cardClasses}`}>
+                <span className={`text-sm font-medium ${textMuted}`}>Filter:</span>
+                <div className="flex gap-2">
+                  {['all', 'active', 'inactive', 'prospect'].map(status => (
+                    <button
+                      key={status}
+                      onClick={() => setSelectedClientId(status === selectedClientId ? 'all' : status)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                        (status === 'all' && selectedClientId === 'all') || selectedClientId === status
+                          ? 'bg-accent-primary text-white'
+                          : theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-terminal-bg hover:bg-terminal-surface'
+                      }`}
+                    >
+                      {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Clients List */}
+              {clients.length === 0 ? (
+                <div className={`rounded-xl p-12 border ${cardClasses} text-center`}>
+                  <Users className={`w-12 h-12 mx-auto mb-4 ${textMuted}`} />
+                  <h3 className="text-lg font-semibold mb-2">No clients yet</h3>
+                  <p className={`text-sm mb-4 ${textMuted}`}>Add your first client to start tracking project performance by client</p>
+                  <button
+                    onClick={() => setShowClientModal(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Client
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {clientAnalytics
+                    .filter(c => selectedClientId === 'all' || c.status === selectedClientId)
+                    .map(client => (
+                    <div key={client.id} className={`rounded-xl border overflow-hidden ${cardClasses}`}>
+                      {/* Client Header */}
+                      <div className={`p-4 flex items-center justify-between ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold ${
+                            client.status === 'active' ? 'bg-green-500/20 text-green-400' :
+                            client.status === 'prospect' ? 'bg-blue-500/20 text-blue-400' :
+                            'bg-gray-500/20 text-gray-400'
+                          }`}>
+                            {client.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-lg">{client.name}</h3>
+                            <div className={`flex items-center gap-3 text-sm ${textMuted}`}>
+                              <span className={`px-2 py-0.5 rounded-full text-xs ${
+                                client.status === 'active' ? 'bg-green-500/20 text-green-400' :
+                                client.status === 'prospect' ? 'bg-blue-500/20 text-blue-400' :
+                                'bg-gray-500/20 text-gray-400'
+                              }`}>
+                                {client.status}
+                              </span>
+                              {client.contactEmail && <span>{client.contactEmail}</span>}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setEditingClient(client)}
+                            className={`p-2 rounded-lg hover:bg-accent-primary/10 ${textMuted} hover:text-accent-primary`}
+                            title="Edit client"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => deleteClientData(client.id)}
+                            className={`p-2 rounded-lg hover:bg-accent-danger/10 ${textMuted} hover:text-accent-danger`}
+                            title="Delete client"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Client Metrics */}
+                      <div className="p-4 grid grid-cols-2 md:grid-cols-5 gap-4">
+                        <div>
+                          <div className={`text-xs ${textMuted}`}>Revenue</div>
+                          <div className="text-lg font-semibold text-accent-primary">{formatCurrency(client.revenue)}</div>
+                        </div>
+                        <div>
+                          <div className={`text-xs ${textMuted}`}>Direct Costs</div>
+                          <div className="text-lg font-semibold text-accent-danger">{formatCurrency(client.costs)}</div>
+                        </div>
+                        <div>
+                          <div className={`text-xs ${textMuted}`}>Gross Profit</div>
+                          <div className={`text-lg font-semibold ${client.grossProfit >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                            {formatCurrency(client.grossProfit)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className={`text-xs ${textMuted}`}>Gross Margin</div>
+                          <div className={`text-lg font-semibold ${
+                            client.grossMarginPct >= 30 ? 'text-accent-primary' : 
+                            client.grossMarginPct >= 15 ? 'text-yellow-400' : 'text-accent-danger'
+                          }`}>
+                            {client.revenue > 0 ? `${client.grossMarginPct.toFixed(1)}%` : 'N/A'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className={`text-xs ${textMuted}`}>Projects</div>
+                          <div className="text-lg font-semibold">{client.projectCount}</div>
+                        </div>
+                      </div>
+                      
+                      {/* Client Projects */}
+                      {client.projects.length > 0 && (
+                        <div className={`px-4 pb-4 border-t ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
+                          <div className={`text-xs font-medium mt-3 mb-2 ${textMuted}`}>Projects</div>
+                          <div className="flex flex-wrap gap-2">
+                            {client.projects.map(project => (
+                              <div 
+                                key={project.id} 
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${theme === 'light' ? 'bg-gray-100' : 'bg-terminal-bg'}`}
+                              >
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: project.color }} />
+                                <span>{project.name}</span>
+                                <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                  project.status === 'active' ? 'bg-green-500/20 text-green-400' :
+                                  project.status === 'completed' ? 'bg-blue-500/20 text-blue-400' :
+                                  'bg-yellow-500/20 text-yellow-400'
+                                }`}>
+                                  {project.status}
+                                </span>
+                                {project.budget && (
+                                  <span className={textMuted}>{formatCurrency(project.budget)}</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* No projects assigned */}
+                      {client.projects.length === 0 && (
+                        <div className={`px-4 pb-4 text-sm ${textMuted}`}>
+                          <Info className="w-4 h-4 inline mr-1" />
+                          No projects assigned. Link projects in the Manage Projects modal.
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Unassigned Projects Section */}
+              {projects.filter(p => !p.clientId).length > 0 && (
+                <div className={`rounded-xl p-4 border ${cardClasses}`}>
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-yellow-400" />
+                    Unassigned Projects ({projects.filter(p => !p.clientId).length})
+                  </h3>
+                  <p className={`text-sm mb-3 ${textMuted}`}>These projects are not linked to any client</p>
+                  <div className="flex flex-wrap gap-2">
+                    {projects.filter(p => !p.clientId).map(project => (
+                      <div 
+                        key={project.id}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg ${theme === 'light' ? 'bg-gray-100' : 'bg-terminal-bg'}`}
+                      >
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: project.color }} />
+                        <span>{project.name}</span>
+                        <button
+                          onClick={() => {
+                            setEditingProject(project)
+                            setShowProjectModal(true)
+                          }}
+                          className={`text-xs px-2 py-0.5 rounded bg-accent-primary/20 text-accent-primary hover:bg-accent-primary/30`}
+                        >
+                          Assign
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </motion.div>
