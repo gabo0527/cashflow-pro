@@ -3059,7 +3059,7 @@ const handleQuickAdd = useCallback(async () => {
                 {sidebarOpen && (
                   <div>
                     <h1 className="text-base font-display font-bold tracking-tight">{branding.companyName}</h1>
-                    <p className={`text-xs ${textMuted}`}>Analytics</p>
+                    <p className={`text-xs ${textMuted}`}>Stop guessing. Start knowing.</p>
                   </div>
                 )}
               </div>
@@ -3828,54 +3828,68 @@ const handleQuickAdd = useCallback(async () => {
                 {/* Project List */}
                 {!editingProject && (
                   <div>
-                    <h4 className={`text-sm font-medium mb-2 ${textMuted}`}>Existing Projects</h4>
+                    <h4 className={`text-sm font-medium mb-2 ${textMuted}`}>Projects from Your Data ({projectList.length})</h4>
                     <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {projects.length === 0 ? (
-                        <p className={`text-sm text-center py-4 ${textMuted}`}>No projects yet</p>
+                      {projectList.length === 0 ? (
+                        <p className={`text-sm text-center py-4 ${textMuted}`}>No projects found in transaction data</p>
                       ) : (
-                        projects.map(p => {
-                          const tracking = projectBudgetTracking.find(t => t.id === p.id)
-                          const clientName = p.clientId ? clients.find(c => c.id === p.clientId)?.name : null
+                        projectList.map(projectName => {
+                          const existingProject = projects.find(p => normalizeProjectName(p.name) === normalizeProjectName(projectName))
+                          const projectColor = existingProject?.color || PROJECT_COLORS[projectList.indexOf(projectName) % PROJECT_COLORS.length]
+                          const clientName = existingProject?.clientId ? clients.find(c => c.id === existingProject.clientId)?.name : null
+                          const tracking = existingProject ? projectBudgetTracking.find(t => t.id === existingProject.id) : null
+                          
                           return (
-                            <div key={p.id} className={`p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
-                              <div className="flex items-center justify-between mb-2">
+                            <div key={projectName} className={`p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                              <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3 flex-wrap">
-                                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
-                                  <span className="font-medium">{p.name}</span>
-                                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                    p.status === 'active' ? 'bg-green-500/20 text-green-400' :
-                                    p.status === 'completed' ? 'bg-blue-500/20 text-blue-400' :
-                                    'bg-yellow-500/20 text-yellow-400'
-                                  }`}>
-                                    {p.status}
-                                  </span>
+                                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: projectColor }} />
+                                  <span className="font-medium">{projectName}</span>
+                                  {existingProject && (
+                                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                      existingProject.status === 'active' ? 'bg-green-500/20 text-green-400' :
+                                      existingProject.status === 'completed' ? 'bg-blue-500/20 text-blue-400' :
+                                      'bg-yellow-500/20 text-yellow-400'
+                                    }`}>
+                                      {existingProject.status}
+                                    </span>
+                                  )}
                                   {clientName && (
                                     <span className={`text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400`}>
                                       {clientName}
                                     </span>
                                   )}
+                                  {existingProject?.budget && (
+                                    <span className={`text-xs ${textMuted}`}>{formatCurrency(existingProject.budget)}</span>
+                                  )}
                                 </div>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => setEditingProject(p)}
-                                    className={`p-1.5 hover:text-accent-primary ${textMuted}`}
-                                    title="Edit project"
-                                  >
-                                    <Edit2 className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => deleteProject(p.id)}
-                                    className={`p-1.5 hover:text-accent-danger ${textMuted}`}
-                                    title="Delete project"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
+                                <button
+                                  onClick={() => {
+                                    if (existingProject) {
+                                      setEditingProject(existingProject)
+                                    } else {
+                                      // Create project from transaction data for editing
+                                      const newProject: Project = {
+                                        id: generateId(),
+                                        name: projectName,
+                                        color: projectColor,
+                                        status: 'active',
+                                        createdAt: new Date().toISOString()
+                                      }
+                                      setProjects(prev => [...prev, newProject])
+                                      setEditingProject(newProject)
+                                    }
+                                  }}
+                                  className={`p-1.5 hover:text-accent-primary ${textMuted}`}
+                                  title={existingProject ? "Edit project" : "Configure project"}
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
                               </div>
-                              {p.budget && p.budget > 0 && tracking && (
+                              {tracking && existingProject?.budget && existingProject.budget > 0 && (
                                 <div className="mt-2">
                                   <div className="flex justify-between text-xs mb-1">
-                                    <span className={textMuted}>Budget: {formatCurrency(p.budget)}</span>
+                                    <span className={textMuted}>Budget: {formatCurrency(existingProject.budget)}</span>
                                     <span className={tracking.isOverBudget ? 'text-accent-danger' : tracking.isNearBudget ? 'text-yellow-400' : textMuted}>
                                       {tracking.percentUsed.toFixed(0)}% used
                                     </span>
@@ -3897,6 +3911,10 @@ const handleQuickAdd = useCallback(async () => {
                         })
                       )}
                     </div>
+                    <p className={`text-xs mt-3 ${textMuted}`}>
+                      <Info className="w-3 h-3 inline mr-1" />
+                      Click edit to set budget, status, or assign to a client
+                    </p>
                   </div>
                 )}
               </div>
@@ -7008,51 +7026,72 @@ const handleQuickAdd = useCallback(async () => {
                     <thead>
                       <tr className={`border-b ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'} text-left ${textMuted}`}>
                         <th className="pb-2 font-medium">Project</th>
-                        <th className="pb-2 font-medium">Status</th>
-                        <th className="pb-2 font-medium">Budget</th>
+                        <th className="pb-2 font-medium text-right">Revenue</th>
+                        <th className="pb-2 font-medium text-right">Costs</th>
                         <th className="pb-2 font-medium">Assigned Client</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {projects.map(project => (
-                        <tr key={project.id} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
-                          <td className="py-2">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: project.color }} />
-                              <span className="font-medium">{project.name}</span>
-                            </div>
-                          </td>
-                          <td className="py-2">
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${
-                              project.status === 'active' ? 'bg-green-500/20 text-green-400' :
-                              project.status === 'completed' ? 'bg-blue-500/20 text-blue-400' :
-                              'bg-yellow-500/20 text-yellow-400'
-                            }`}>
-                              {project.status}
-                            </span>
-                          </td>
-                          <td className="py-2 font-mono text-sm">
-                            {project.budget ? formatCurrency(project.budget) : <span className={textMuted}>—</span>}
-                          </td>
-                          <td className="py-2">
-                            <select
-                              value={project.clientId || ''}
-                              onChange={(e) => updateProject(project.id, { clientId: e.target.value || undefined })}
-                              className={`w-full max-w-[200px] px-2 py-1 rounded text-sm border ${inputClasses}`}
-                              style={{ colorScheme: theme }}
-                            >
-                              <option value="">No client</option>
-                              {clients.map(c => (
-                                <option key={c.id} value={c.id}>{c.name}</option>
-                              ))}
-                            </select>
-                          </td>
-                        </tr>
-                      ))}
-                      {projects.length === 0 && (
+                      {projectList.map(projectName => {
+                        // Find existing project object or use defaults
+                        const existingProject = projects.find(p => normalizeProjectName(p.name) === normalizeProjectName(projectName))
+                        const projectColor = existingProject?.color || PROJECT_COLORS[projectList.indexOf(projectName) % PROJECT_COLORS.length]
+                        
+                        // Get revenue/costs for this project from accrual data
+                        const projectRevenue = accrualTransactions
+                          .filter(t => normalizeProjectName(t.project) === normalizeProjectName(projectName) && t.type === 'revenue')
+                          .reduce((sum, t) => sum + t.amount, 0)
+                        const projectCosts = accrualTransactions
+                          .filter(t => normalizeProjectName(t.project) === normalizeProjectName(projectName) && t.type === 'direct_cost')
+                          .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+                        
+                        return (
+                          <tr key={projectName} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
+                            <td className="py-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: projectColor }} />
+                                <span className="font-medium">{projectName}</span>
+                              </div>
+                            </td>
+                            <td className="py-2 text-right font-mono text-accent-primary">{formatCurrency(projectRevenue)}</td>
+                            <td className="py-2 text-right font-mono text-accent-danger">{formatCurrency(projectCosts)}</td>
+                            <td className="py-2">
+                              <select
+                                value={existingProject?.clientId || ''}
+                                onChange={(e) => {
+                                  const clientId = e.target.value || undefined
+                                  if (existingProject) {
+                                    // Update existing project
+                                    updateProject(existingProject.id, { clientId })
+                                  } else {
+                                    // Create new project with client assignment
+                                    const newProject: Project = {
+                                      id: generateId(),
+                                      name: projectName,
+                                      color: projectColor,
+                                      status: 'active',
+                                      clientId,
+                                      createdAt: new Date().toISOString()
+                                    }
+                                    setProjects(prev => [...prev, newProject])
+                                  }
+                                }}
+                                className={`w-full max-w-[200px] px-2 py-1 rounded text-sm border ${inputClasses}`}
+                                style={{ colorScheme: theme }}
+                              >
+                                <option value="">No client</option>
+                                {clients.map(c => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                              </select>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                      {projectList.length === 0 && (
                         <tr>
                           <td colSpan={4} className={`py-4 text-center ${textMuted}`}>
-                            No projects yet. Create projects in the Manage Projects modal.
+                            No projects found. Upload transaction data with project names.
                           </td>
                         </tr>
                       )}
