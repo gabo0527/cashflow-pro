@@ -16,7 +16,7 @@ import {
   FolderPlus, Copy, FileText, Bell, Repeat, Lock, Users, Image, Palette,
   Shield, Eye, EyeOff, HardDrive, CloudOff, ExternalLink, Clock, Target,
   Sparkles, AlertCircle, CheckCircle, Info, MessageSquare, Gauge, List, Tag,
-  BarChart3, LogOut, User
+  BarChart3, LogOut, User, Menu, ChevronDown, ChevronRight, PanelLeftClose, PanelLeft
 } from 'lucide-react'
 import { 
   supabase, signOut, getCurrentUser, getCurrentProfile,
@@ -183,6 +183,11 @@ const formatCurrency = (value: number): string => {
 const formatPercent = (value: number): string => {
   const sign = value >= 0 ? '+' : ''
   return `${sign}${value.toFixed(1)}%`
+}
+
+// Normalize project name for case-insensitive matching
+const normalizeProjectName = (name: string | undefined): string => {
+  return (name || '').trim().toUpperCase()
 }
 
 const generateId = (): string => Math.random().toString(36).substr(2, 9)
@@ -661,14 +666,27 @@ export default function CashFlowPro() {
     const fromProjects = projects.map(p => p.name)
     const fromTransactions: string[] = []
     transactions.forEach(t => {
-      if (t.project && !fromTransactions.includes(t.project)) {
+      if (t.project && !fromTransactions.some(p => normalizeProjectName(p) === normalizeProjectName(t.project))) {
+        fromTransactions.push(t.project)
+      }
+    })
+    // Also include from accrual transactions
+    accrualTransactions.forEach(t => {
+      if (t.project && !fromTransactions.some(p => normalizeProjectName(p) === normalizeProjectName(t.project))) {
         fromTransactions.push(t.project)
       }
     })
     const combined = [...fromProjects, ...fromTransactions]
-    const unique = Array.from(new Set(combined))
-    return unique.sort()
-  }, [transactions, projects])
+    // Deduplicate case-insensitively, keeping first occurrence
+    const seen = new Map<string, string>()
+    combined.forEach(p => {
+      const normalized = normalizeProjectName(p)
+      if (!seen.has(normalized)) {
+        seen.set(normalized, p)
+      }
+    })
+    return Array.from(seen.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+  }, [transactions, accrualTransactions, projects])
 
   const transactionMonths = useMemo(() => {
     const months = new Set<string>()
@@ -688,11 +706,16 @@ export default function CashFlowPro() {
   }, [accrualTransactions])
 
   const accrualProjects = useMemo(() => {
-    const projects = new Set<string>()
+    const seen = new Map<string, string>()
     accrualTransactions.forEach(t => {
-      if (t.project) projects.add(t.project)
+      if (t.project) {
+        const normalized = normalizeProjectName(t.project)
+        if (!seen.has(normalized)) {
+          seen.set(normalized, t.project)
+        }
+      }
     })
-    return Array.from(projects).sort()
+    return Array.from(seen.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
   }, [accrualTransactions])
 
   const filteredAccrualTransactions = useMemo(() => {
@@ -711,7 +734,7 @@ export default function CashFlowPro() {
       result = result.filter(t => t.type === accrualTypeFilter)
     }
     if (accrualProjectFilter !== 'all') {
-      result = result.filter(t => t.project === accrualProjectFilter)
+      result = result.filter(t => normalizeProjectName(t.project) === normalizeProjectName(accrualProjectFilter))
     }
     return result.sort((a, b) => b.date.localeCompare(a.date))
   }, [accrualTransactions, accrualMonthFilter, accrualTypeFilter, accrualProjectFilter])
@@ -1564,7 +1587,7 @@ const handleQuickAdd = useCallback(async () => {
     )
     
     if (selectedProject !== 'all') {
-      result = result.filter(t => t.project === selectedProject)
+      result = result.filter(t => normalizeProjectName(t.project) === normalizeProjectName(selectedProject))
     }
     if (transactionMonthFilter !== 'all') {
       result = result.filter(t => t.date.slice(0, 7) === transactionMonthFilter)
@@ -1623,7 +1646,7 @@ const handleQuickAdd = useCallback(async () => {
       let projectedInvestment = 0
       
       activeAssumptions.forEach(a => {
-        if (selectedProject !== 'all' && a.project !== selectedProject) return
+        if (selectedProject !== 'all' && normalizeProjectName(a.project) !== normalizeProjectName(selectedProject)) return
         
         const aStart = new Date(a.startDate + '-01')
         const aEnd = a.endDate ? new Date(a.endDate + '-01') : endDate
@@ -2014,26 +2037,27 @@ const handleQuickAdd = useCallback(async () => {
     })
     
     // Get total overhead from cash transactions for the same period
-    // Read from "Mano OH" project regardless of category
+    // Read from "Mano OH" project regardless of category (case-insensitive)
     const totalOverhead = transactions
       .filter(t => {
-        if (t.project !== 'Mano OH' || t.type !== 'actual') return false
+        if (normalizeProjectName(t.project) !== normalizeProjectName('Mano OH') || t.type !== 'actual') return false
         const monthKey = t.date.slice(0, 7)
         return monthKey >= activeDateRange.start && monthKey <= activeDateRange.end
       })
       .reduce((sum, t) => sum + Math.abs(t.amount), 0)
     
-    // Calculate revenue and direct costs by project
-    const projectData: { [key: string]: { revenue: number; directCosts: number } } = {}
+    // Calculate revenue and direct costs by project (case-insensitive grouping)
+    const projectData: { [key: string]: { revenue: number; directCosts: number; displayName: string } } = {}
     
     filteredAccrual.forEach(t => {
-      if (!projectData[t.project]) {
-        projectData[t.project] = { revenue: 0, directCosts: 0 }
+      const normalizedKey = normalizeProjectName(t.project)
+      if (!projectData[normalizedKey]) {
+        projectData[normalizedKey] = { revenue: 0, directCosts: 0, displayName: t.project }
       }
       if (t.type === 'revenue') {
-        projectData[t.project].revenue += t.amount
+        projectData[normalizedKey].revenue += t.amount
       } else if (t.type === 'direct_cost') {
-        projectData[t.project].directCosts += Math.abs(t.amount)
+        projectData[normalizedKey].directCosts += Math.abs(t.amount)
       }
     })
     
@@ -2041,7 +2065,7 @@ const handleQuickAdd = useCallback(async () => {
     const totalRevenue = Object.values(projectData).reduce((sum, p) => sum + p.revenue, 0)
     
     // Build project analysis with OH allocation
-    const analysis = Object.entries(projectData).map(([project, data]) => {
+    const analysis = Object.entries(projectData).map(([normalizedKey, data]) => {
       const grossProfit = data.revenue - data.directCosts
       const grossMarginPct = data.revenue > 0 ? (grossProfit / data.revenue) * 100 : 0
       const revenueSharePct = totalRevenue > 0 ? (data.revenue / totalRevenue) * 100 : 0
@@ -2050,7 +2074,7 @@ const handleQuickAdd = useCallback(async () => {
       const netMarginPct = data.revenue > 0 ? (netMargin / data.revenue) * 100 : 0
       
       return {
-        project,
+        project: data.displayName,
         revenue: data.revenue,
         directCosts: data.directCosts,
         grossProfit,
@@ -2513,6 +2537,57 @@ const handleQuickAdd = useCallback(async () => {
     { id: 'settings', label: 'Settings', icon: Palette }
   ]
 
+  // Sidebar navigation structure with sections
+  const sidebarSections = [
+    {
+      id: 'main',
+      label: 'Main',
+      items: [
+        { id: 'dashboard', label: 'Dashboard', icon: PieChartIcon }
+      ]
+    },
+    {
+      id: 'data-section',
+      label: 'Data',
+      items: [
+        { id: 'transactions', label: 'Transactions', icon: List },
+        { id: 'data', label: 'Import/Export', icon: Database }
+      ]
+    },
+    {
+      id: 'forecast',
+      label: 'Forecast',
+      items: [
+        { id: 'projections', label: 'Projections', icon: TrendingUp },
+        { id: 'assumptions', label: 'Assumptions', icon: Target }
+      ]
+    },
+    {
+      id: 'config',
+      label: 'Configuration',
+      items: [
+        { id: 'settings', label: 'Settings', icon: Palette }
+      ]
+    }
+  ]
+
+  // Sidebar state
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['main', 'data-section', 'forecast', 'config']))
+
+  const toggleSection = (sectionId: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev)
+      if (next.has(sectionId)) {
+        next.delete(sectionId)
+      } else {
+        next.add(sectionId)
+      }
+      return next
+    })
+  }
+
   const themeClasses = theme === 'light' 
     ? 'bg-gray-100 text-gray-900' 
     : 'bg-terminal-bg text-zinc-100'
@@ -2548,106 +2623,192 @@ const handleQuickAdd = useCallback(async () => {
 
   return (
     <div className={`min-h-screen font-body transition-colors ${themeClasses}`} style={{ colorScheme: theme }}>
-      {/* Header */}
-      <header className={`border-b sticky top-0 z-50 backdrop-blur-sm ${theme === 'light' ? 'bg-white/80 border-gray-200' : 'bg-terminal-surface/80 border-terminal-border'}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {branding.companyLogo ? (
-                <img 
-                  src={branding.companyLogo} 
-                  alt={branding.companyName} 
-                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg object-contain"
-                />
-              ) : (
-                <VantageLogo size={40} />
-              )}
-              <div>
-                <h1 className="text-lg sm:text-xl font-display font-bold tracking-tight">{branding.companyName}</h1>
-                <p className={`text-xs hidden sm:block ${textMuted}`}>Project & Cash Flow Analytics</p>
-              </div>
-            </div>
-            
-            {/* Desktop Nav */}
-            <nav className="hidden md:flex gap-1">
-              {tabs.map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                  className={`flex items-center gap-2 px-3 lg:px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    activeTab === tab.id 
-                      ? 'bg-accent-primary/10 text-accent-primary' 
-                      : theme === 'light' ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-100' : 'text-zinc-400 hover:text-zinc-200 hover:bg-terminal-surface'
-                  }`}
-                >
-                  <tab.icon className="w-4 h-4" />
-                  <span className="hidden lg:inline">{tab.label}</span>
-                </button>
-              ))}
-            </nav>
+      {/* Mobile Sidebar Overlay */}
+      <AnimatePresence>
+        {sidebarMobileOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={() => setSidebarMobileOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
-            {/* Right side actions */}
-            <div className="flex items-center gap-2">
-              {balanceAlert && (
-                <div className="flex items-center gap-1 px-2 py-1 bg-accent-danger/10 text-accent-danger rounded-lg text-xs">
-                  <AlertTriangle className="w-3 h-3" />
-                  <span className="hidden sm:inline">Low Balance</span>
-                </div>
-              )}
-              <button
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className={`p-2 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-surface'}`}
-              >
-                {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </button>
-              <button
-                onClick={() => setShowQuickAdd(true)}
-                className="flex items-center gap-1 px-3 py-2 bg-accent-primary text-white rounded-lg text-sm font-medium hover:bg-accent-primary/90 transition-all"
-              >
-                <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">Add</span>
-              </button>
-              
-              {/* User menu */}
-              {user && (
-                <div className="flex items-center gap-2 ml-2 pl-2 border-l border-terminal-border">
-                  <div className="hidden sm:flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-teal-500/20 flex items-center justify-center">
-                      <User className="w-4 h-4 text-teal-400" />
-                    </div>
-                    <span className={`text-sm ${textMuted}`}>{user.email?.split('@')[0]}</span>
+      <div className="flex">
+        {/* Sidebar */}
+        <aside className={`
+          fixed lg:sticky top-0 left-0 z-50 h-screen
+          ${sidebarOpen ? 'w-64' : 'w-20'} 
+          ${sidebarMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          transition-all duration-300 ease-in-out
+          ${theme === 'light' ? 'bg-white border-gray-200' : 'bg-terminal-surface border-terminal-border'}
+          border-r flex flex-col
+        `}>
+          {/* Sidebar Header */}
+          <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {branding.companyLogo ? (
+                  <img 
+                    src={branding.companyLogo} 
+                    alt={branding.companyName} 
+                    className="w-9 h-9 rounded-lg object-contain"
+                  />
+                ) : (
+                  <VantageLogo size={36} />
+                )}
+                {sidebarOpen && (
+                  <div>
+                    <h1 className="text-base font-display font-bold tracking-tight">{branding.companyName}</h1>
+                    <p className={`text-xs ${textMuted}`}>Analytics</p>
                   </div>
+                )}
+              </div>
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className={`hidden lg:flex p-1.5 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-bg'}`}
+              >
+                {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
+              </button>
+              <button
+                onClick={() => setSidebarMobileOpen(false)}
+                className={`lg:hidden p-1.5 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-bg'}`}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Sidebar Navigation */}
+          <nav className="flex-1 overflow-y-auto p-3">
+            {sidebarSections.map(section => (
+              <div key={section.id} className="mb-4">
+                {sidebarOpen && (
+                  <button
+                    onClick={() => toggleSection(section.id)}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider ${textMuted} hover:text-zinc-300`}
+                  >
+                    <span>{section.label}</span>
+                    <ChevronDown className={`w-3 h-3 transition-transform ${expandedSections.has(section.id) ? '' : '-rotate-90'}`} />
+                  </button>
+                )}
+                <AnimatePresence initial={false}>
+                  {(expandedSections.has(section.id) || !sidebarOpen) && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      {section.items.map(item => (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            setActiveTab(item.id as typeof activeTab)
+                            setSidebarMobileOpen(false)
+                          }}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all mb-1 ${
+                            activeTab === item.id 
+                              ? 'bg-accent-primary/15 text-accent-primary' 
+                              : theme === 'light' 
+                                ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-100' 
+                                : 'text-zinc-400 hover:text-zinc-100 hover:bg-terminal-bg'
+                          }`}
+                          title={!sidebarOpen ? item.label : undefined}
+                        >
+                          <item.icon className={`${sidebarOpen ? 'w-4 h-4' : 'w-5 h-5 mx-auto'}`} />
+                          {sidebarOpen && <span>{item.label}</span>}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ))}
+          </nav>
+
+          {/* Sidebar Footer */}
+          <div className={`p-3 border-t ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
+            {user && (
+              <div className={`flex items-center ${sidebarOpen ? 'gap-3' : 'justify-center'}`}>
+                <div className="w-8 h-8 rounded-full bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+                  <User className="w-4 h-4 text-teal-400" />
+                </div>
+                {sidebarOpen && (
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{user.email?.split('@')[0]}</p>
+                    <p className={`text-xs ${textMuted} truncate`}>{user.email}</p>
+                  </div>
+                )}
+                {sidebarOpen && (
                   <button
                     onClick={handleSignOut}
-                    className={`p-2 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100 text-gray-600' : 'hover:bg-terminal-surface text-zinc-400'}`}
+                    className={`p-1.5 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100 text-gray-500' : 'hover:bg-terminal-bg text-zinc-400'}`}
                     title="Sign out"
                   >
                     <LogOut className="w-4 h-4" />
                   </button>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
-          
-          {/* Mobile Nav */}
-          <nav className="flex md:hidden gap-1 mt-3 overflow-x-auto pb-1">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
-                  activeTab === tab.id 
-                    ? 'bg-accent-primary/10 text-accent-primary' 
-                    : theme === 'light' ? 'text-gray-500 hover:text-gray-700' : 'text-zinc-400'
-                }`}
-              >
-                <tab.icon className="w-3 h-3" />
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
-      </header>
+        </aside>
+
+        {/* Main Content Area */}
+        <div className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ${sidebarOpen ? 'lg:ml-0' : 'lg:ml-0'}`}>
+          {/* Top Header Bar */}
+          <header className={`sticky top-0 z-30 border-b backdrop-blur-sm ${theme === 'light' ? 'bg-white/90 border-gray-200' : 'bg-terminal-bg/90 border-terminal-border'}`}>
+            <div className="px-4 sm:px-6 py-3">
+              <div className="flex items-center justify-between">
+                {/* Mobile menu button */}
+                <button
+                  onClick={() => setSidebarMobileOpen(true)}
+                  className={`lg:hidden p-2 rounded-lg ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-surface'}`}
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
+
+                {/* Page Title - shows current tab */}
+                <div className="hidden lg:flex items-center gap-2">
+                  <h2 className="text-lg font-semibold">
+                    {tabs.find(t => t.id === activeTab)?.label || 'Dashboard'}
+                  </h2>
+                </div>
+
+                {/* Mobile Logo */}
+                <div className="lg:hidden flex items-center gap-2">
+                  <VantageLogo size={32} />
+                  <span className="font-semibold">{branding.companyName}</span>
+                </div>
+
+                {/* Right side actions */}
+                <div className="flex items-center gap-2">
+                  {balanceAlert && (
+                    <div className="flex items-center gap-1 px-2 py-1 bg-accent-danger/10 text-accent-danger rounded-lg text-xs">
+                      <AlertTriangle className="w-3 h-3" />
+                      <span className="hidden sm:inline">Low Balance</span>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                    className={`p-2 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-surface'}`}
+                  >
+                    {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                  </button>
+                  <button
+                    onClick={() => setShowQuickAdd(true)}
+                    className="flex items-center gap-1 px-3 py-2 bg-accent-primary text-white rounded-lg text-sm font-medium hover:bg-accent-primary/90 transition-all"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline">Add</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </header>
 
       {/* Quick Add Modal */}
       <AnimatePresence>
@@ -3426,7 +3587,8 @@ const handleQuickAdd = useCallback(async () => {
         )}
       </AnimatePresence>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+          {/* Main Content */}
+          <main className="flex-1 px-4 sm:px-6 py-4 sm:py-6 overflow-auto">
         <AnimatePresence mode="wait">
           {/* Dashboard Tab */}
           {activeTab === 'dashboard' && (
@@ -5898,17 +6060,20 @@ const handleQuickAdd = useCallback(async () => {
             </motion.div>
           )}
         </AnimatePresence>
-      </main>
+          </main>
 
-      <footer className={`border-t mt-12 py-4 print:hidden ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
-        <div className={`max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs ${textMuted}`}>
-          <span>{branding.companyName} • Data secured in cloud</span>
-          <div className="flex items-center gap-4">
-            <button onClick={() => setShowPrivacyModal(true)} className="hover:underline">Privacy</button>
-            <button onClick={() => setShowTermsModal(true)} className="hover:underline">Terms</button>
-          </div>
+          {/* Footer */}
+          <footer className={`border-t py-4 print:hidden ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
+            <div className={`px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs ${textMuted}`}>
+              <span>{branding.companyName} • Data secured in cloud</span>
+              <div className="flex items-center gap-4">
+                <button onClick={() => setShowPrivacyModal(true)} className="hover:underline">Privacy</button>
+                <button onClick={() => setShowTermsModal(true)} className="hover:underline">Terms</button>
+              </div>
+            </div>
+          </footer>
         </div>
-      </footer>
+      </div>
 
       {/* Print styles */}
       <style jsx global>{`
