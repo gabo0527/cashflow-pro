@@ -362,7 +362,8 @@ const STORAGE_KEYS = {
   balanceAlert: 'cashflow_balance_alert',
   branding: 'cashflow_branding',
   chartFilters: 'cashflow_chart_filters',
-  categories: 'cashflow_categories'
+  categories: 'cashflow_categories',
+  collapsedSections: 'cashflow_collapsed_sections'
 }
 
 // Default categories
@@ -446,6 +447,21 @@ export default function CashFlowPro() {
     transactions: false
   })
   const [activeScenario, setActiveScenario] = useState<string>('base')
+  
+  // Dashboard collapsible sections
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+  
+  const toggleDashboardSection = (sectionId: string) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev)
+      if (next.has(sectionId)) {
+        next.delete(sectionId)
+      } else {
+        next.add(sectionId)
+      }
+      return next
+    })
+  }
   
   // AI Categorization state
   const [showAiPreview, setShowAiPreview] = useState(false)
@@ -662,8 +678,10 @@ export default function CashFlowPro() {
           // Load UI preferences from localStorage (these stay local)
           const savedTheme = localStorage.getItem(STORAGE_KEYS.theme)
           const savedChartFilters = localStorage.getItem(STORAGE_KEYS.chartFilters)
+          const savedCollapsedSections = localStorage.getItem(STORAGE_KEYS.collapsedSections)
           if (savedTheme) setTheme(savedTheme as 'dark' | 'light')
           if (savedChartFilters) setChartFilters(JSON.parse(savedChartFilters))
+          if (savedCollapsedSections) setCollapsedSections(new Set(JSON.parse(savedCollapsedSections)))
           
         } catch (error) {
           console.error('Error loading data from Supabase:', error)
@@ -699,6 +717,12 @@ export default function CashFlowPro() {
       localStorage.setItem(STORAGE_KEYS.chartFilters, JSON.stringify(chartFilters))
     }
   }, [chartFilters, isLoaded])
+
+  useEffect(() => {
+    if (isLoaded && typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.collapsedSections, JSON.stringify([...collapsedSections]))
+    }
+  }, [collapsedSections, isLoaded])
 
   // Helper to get category by id
   const getCategoryById = useCallback((id: string): Category | undefined => {
@@ -5184,41 +5208,65 @@ const handleQuickAdd = useCallback(async () => {
                   </div>
 
                   {/* Monthly Gross Margin Chart */}
-                  <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
-                    <h3 className="text-lg font-semibold mb-4">Monthly Gross Margin Trend</h3>
-                    {accrualMonthlyData.length > 0 ? (
-                      <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <ComposedChart data={accrualMonthlyData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#374151'} />
-                            <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
-                            <YAxis yAxisId="left" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
-                            <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `${v.toFixed(0)}%`} tick={{ fontSize: 11 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
-                            <Tooltip 
-                              formatter={(value: number, name: string) => [
-                                name === 'GM %' ? `${value.toFixed(1)}%` : formatCurrency(value),
-                                name === 'Revenue' ? 'Revenue' : name === 'Direct Costs' ? 'Direct Costs' : name === 'Gross Profit' ? 'Gross Profit' : 'GM %'
-                              ]}
-                              contentStyle={{ background: theme === 'light' ? 'white' : '#1f2937', border: 'none', borderRadius: '8px' }}
-                            />
-                            <Legend />
-                            <Bar yAxisId="left" dataKey="revenue" name="Revenue" fill="#14b8a6" radius={[4, 4, 0, 0]} />
-                            <Bar yAxisId="left" dataKey="directCosts" name="Direct Costs" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                            <Line yAxisId="right" type="monotone" dataKey="grossMarginPct" name="GM %" stroke="#6366f1" strokeWidth={3} dot={{ r: 4 }} />
-                          </ComposedChart>
-                        </ResponsiveContainer>
+                  <div className={`rounded-xl border ${cardClasses}`}>
+                    <button
+                      onClick={() => toggleDashboardSection('monthly-gm')}
+                      className={`w-full p-4 sm:p-6 flex items-center justify-between ${collapsedSections.has('monthly-gm') ? '' : 'border-b ' + (theme === 'light' ? 'border-gray-200' : 'border-terminal-border')}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <ChevronRight className={`w-5 h-5 transition-transform ${collapsedSections.has('monthly-gm') ? '' : 'rotate-90'}`} />
+                        <h3 className="text-lg font-semibold">Monthly Gross Margin Trend</h3>
+                        {collapsedSections.has('monthly-gm') && (
+                          <span className={`text-sm ${textMuted}`}>({accrualMonthlyData.length} months)</span>
+                        )}
                       </div>
-                    ) : (
-                      <div className={`text-center py-12 ${textMuted}`}>
-                        <p>No accrual data yet. Upload invoices in the Data tab.</p>
+                    </button>
+                    {!collapsedSections.has('monthly-gm') && (
+                      <div className="p-4 sm:p-6 pt-0 sm:pt-0">
+                        {accrualMonthlyData.length > 0 ? (
+                          <div className="h-64">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <ComposedChart data={accrualMonthlyData}>
+                                <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#374151'} />
+                                <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
+                                <YAxis yAxisId="left" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
+                                <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `${v.toFixed(0)}%`} tick={{ fontSize: 11 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
+                                <Tooltip 
+                                  formatter={(value: number, name: string) => [
+                                    name === 'GM %' ? `${value.toFixed(1)}%` : formatCurrency(value),
+                                    name === 'Revenue' ? 'Revenue' : name === 'Direct Costs' ? 'Direct Costs' : name === 'Gross Profit' ? 'Gross Profit' : 'GM %'
+                                  ]}
+                                  contentStyle={{ background: theme === 'light' ? 'white' : '#1f2937', border: 'none', borderRadius: '8px' }}
+                                />
+                                <Legend />
+                                <Bar yAxisId="left" dataKey="revenue" name="Revenue" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+                                <Bar yAxisId="left" dataKey="directCosts" name="Direct Costs" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                                <Line yAxisId="right" type="monotone" dataKey="grossMarginPct" name="GM %" stroke="#6366f1" strokeWidth={3} dot={{ r: 4 }} />
+                              </ComposedChart>
+                            </ResponsiveContainer>
+                          </div>
+                        ) : (
+                          <div className={`text-center py-12 ${textMuted}`}>
+                            <p>No accrual data yet. Upload invoices in the Data tab.</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
 
                   {/* Project Analysis Table */}
-                  <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
-                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                      <h3 className="text-lg font-semibold">Project Gross Margin Analysis</h3>
+                  <div className={`rounded-xl border ${cardClasses}`}>
+                    <button
+                      onClick={() => toggleDashboardSection('project-analysis')}
+                      className={`w-full p-4 sm:p-6 flex items-center justify-between ${collapsedSections.has('project-analysis') ? '' : 'border-b ' + (theme === 'light' ? 'border-gray-200' : 'border-terminal-border')}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <ChevronRight className={`w-5 h-5 transition-transform ${collapsedSections.has('project-analysis') ? '' : 'rotate-90'}`} />
+                        <h3 className="text-lg font-semibold">Project Gross Margin Analysis</h3>
+                        {collapsedSections.has('project-analysis') && (
+                          <span className={`text-sm ${textMuted}`}>({accrualProjectAnalysis.projects.length} projects)</span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2">
                         <span className={`text-sm ${textMuted}`}>
                           {dateRangePreset === 'custom' 
@@ -5230,83 +5278,91 @@ const handleQuickAdd = useCallback(async () => {
                           {accrualMonthlyData.length} month{accrualMonthlyData.length !== 1 ? 's' : ''}
                         </span>
                       </div>
-                    </div>
-                    {accrualProjectAnalysis.projects.length > 0 ? (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead className={tableHeaderBg}>
-                            <tr className={`border-b ${tableBorder} text-left ${textMuted}`}>
-                              <th className="pb-3 font-medium">Project</th>
-                              <th className="pb-3 font-medium text-right">Revenue</th>
-                              <th className="pb-3 font-medium text-right">Direct Costs</th>
-                              <th className="pb-3 font-medium text-right">Gross Profit</th>
-                              <th className="pb-3 font-medium text-right">GM %</th>
-                              <th className="pb-3 font-medium text-right">Rev Share</th>
-                              <th className="pb-3 font-medium text-right">OH Allocation</th>
-                              <th className="pb-3 font-medium text-right">Net Margin</th>
-                              <th className="pb-3 font-medium text-right">Net %</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {accrualProjectAnalysis.projects.map(p => (
-                              <tr key={p.project} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
-                                <td className="py-3 font-medium">{p.project}</td>
-                                <td className="py-3 text-right font-mono text-accent-primary">{formatCurrency(p.revenue)}</td>
-                                <td className="py-3 text-right font-mono text-accent-danger">{formatCurrency(p.directCosts)}</td>
-                                <td className={`py-3 text-right font-mono ${p.grossProfit >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                                  {formatCurrency(p.grossProfit)}
-                                </td>
-                                <td className={`py-3 text-right font-medium ${p.grossMarginPct >= 30 ? 'text-accent-primary' : p.grossMarginPct >= 15 ? 'text-accent-warning' : 'text-accent-danger'}`}>
-                                  {p.grossMarginPct.toFixed(1)}%
-                                </td>
-                                <td className={`py-3 text-right ${textMuted}`}>{p.revenueSharePct.toFixed(1)}%</td>
-                                <td className="py-3 text-right font-mono text-accent-warning">{formatCurrency(p.ohAllocation)}</td>
-                                <td className={`py-3 text-right font-mono ${p.netMargin >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                                  {formatCurrency(p.netMargin)}
-                                </td>
-                                <td className={`py-3 text-right font-medium ${p.netMarginPct >= 20 ? 'text-accent-primary' : p.netMarginPct >= 10 ? 'text-accent-warning' : 'text-accent-danger'}`}>
-                                  {p.netMarginPct.toFixed(1)}%
-                                </td>
-                              </tr>
-                            ))}
-                            <tr className={`font-bold ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
-                              <td className="py-3">TOTAL</td>
-                              <td className="py-3 text-right font-mono text-accent-primary">{formatCurrency(accrualProjectAnalysis.totals.revenue)}</td>
-                              <td className="py-3 text-right font-mono text-accent-danger">{formatCurrency(accrualProjectAnalysis.totals.directCosts)}</td>
-                              <td className={`py-3 text-right font-mono ${accrualProjectAnalysis.totals.grossProfit >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                                {formatCurrency(accrualProjectAnalysis.totals.grossProfit)}
-                              </td>
-                              <td className="py-3 text-right">
-                                {accrualProjectAnalysis.totals.revenue > 0 
-                                  ? `${((accrualProjectAnalysis.totals.grossProfit / accrualProjectAnalysis.totals.revenue) * 100).toFixed(1)}%`
-                                  : 'N/A'}
-                              </td>
-                              <td className="py-3 text-right">100%</td>
-                              <td className="py-3 text-right font-mono text-accent-warning">{formatCurrency(accrualProjectAnalysis.totalOverhead)}</td>
-                              <td className={`py-3 text-right font-mono ${accrualProjectAnalysis.totals.netMargin >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                                {formatCurrency(accrualProjectAnalysis.totals.netMargin)}
-                              </td>
-                              <td className="py-3 text-right">
-                                {accrualProjectAnalysis.totals.revenue > 0 
-                                  ? `${((accrualProjectAnalysis.totals.netMargin / accrualProjectAnalysis.totals.revenue) * 100).toFixed(1)}%`
-                                  : 'N/A'}
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className={`text-center py-12 ${textMuted}`}>
-                        <p>No accrual data yet. Upload invoices in the Data tab.</p>
+                    </button>
+                    {!collapsedSections.has('project-analysis') && (
+                      <div className="p-4 sm:p-6 pt-0 sm:pt-0">
+                        {accrualProjectAnalysis.projects.length > 0 ? (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead className={tableHeaderBg}>
+                                <tr className={`border-b ${tableBorder} text-left ${textMuted}`}>
+                                  <th className="pb-3 font-medium">Project</th>
+                                  <th className="pb-3 font-medium text-right">Revenue</th>
+                                  <th className="pb-3 font-medium text-right">Direct Costs</th>
+                                  <th className="pb-3 font-medium text-right">Gross Profit</th>
+                                  <th className="pb-3 font-medium text-right">GM %</th>
+                                  <th className="pb-3 font-medium text-right">Rev Share</th>
+                                  <th className="pb-3 font-medium text-right">OH Allocation</th>
+                                  <th className="pb-3 font-medium text-right">Net Margin</th>
+                                  <th className="pb-3 font-medium text-right">Net %</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {accrualProjectAnalysis.projects.map(p => (
+                                  <tr key={p.project} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
+                                    <td className="py-3 font-medium">{p.project}</td>
+                                    <td className="py-3 text-right font-mono text-accent-primary">{formatCurrency(p.revenue)}</td>
+                                    <td className="py-3 text-right font-mono text-accent-danger">{formatCurrency(p.directCosts)}</td>
+                                    <td className={`py-3 text-right font-mono ${p.grossProfit >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                      {formatCurrency(p.grossProfit)}
+                                    </td>
+                                    <td className={`py-3 text-right font-medium ${p.grossMarginPct >= 30 ? 'text-accent-primary' : p.grossMarginPct >= 15 ? 'text-accent-warning' : 'text-accent-danger'}`}>
+                                      {p.grossMarginPct.toFixed(1)}%
+                                    </td>
+                                    <td className={`py-3 text-right ${textMuted}`}>{p.revenueSharePct.toFixed(1)}%</td>
+                                    <td className="py-3 text-right font-mono text-accent-warning">{formatCurrency(p.ohAllocation)}</td>
+                                    <td className={`py-3 text-right font-mono ${p.netMargin >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                      {formatCurrency(p.netMargin)}
+                                    </td>
+                                    <td className={`py-3 text-right font-medium ${p.netMarginPct >= 20 ? 'text-accent-primary' : p.netMarginPct >= 10 ? 'text-accent-warning' : 'text-accent-danger'}`}>
+                                      {p.netMarginPct.toFixed(1)}%
+                                    </td>
+                                  </tr>
+                                ))}
+                                <tr className={`font-bold ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                                  <td className="py-3">TOTAL</td>
+                                  <td className="py-3 text-right font-mono text-accent-primary">{formatCurrency(accrualProjectAnalysis.totals.revenue)}</td>
+                                  <td className="py-3 text-right font-mono text-accent-danger">{formatCurrency(accrualProjectAnalysis.totals.directCosts)}</td>
+                                  <td className={`py-3 text-right font-mono ${accrualProjectAnalysis.totals.grossProfit >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                    {formatCurrency(accrualProjectAnalysis.totals.grossProfit)}
+                                  </td>
+                                  <td className="py-3 text-right">
+                                    {accrualProjectAnalysis.totals.revenue > 0 
+                                      ? `${((accrualProjectAnalysis.totals.grossProfit / accrualProjectAnalysis.totals.revenue) * 100).toFixed(1)}%`
+                                      : 'N/A'}
+                                  </td>
+                                  <td className="py-3 text-right">100%</td>
+                                  <td className="py-3 text-right font-mono text-accent-warning">{formatCurrency(accrualProjectAnalysis.totalOverhead)}</td>
+                                  <td className={`py-3 text-right font-mono ${accrualProjectAnalysis.totals.netMargin >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                    {formatCurrency(accrualProjectAnalysis.totals.netMargin)}
+                                  </td>
+                                  <td className="py-3 text-right">
+                                    {accrualProjectAnalysis.totals.revenue > 0 
+                                      ? `${((accrualProjectAnalysis.totals.netMargin / accrualProjectAnalysis.totals.revenue) * 100).toFixed(1)}%`
+                                      : 'N/A'}
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className={`text-center py-12 ${textMuted}`}>
+                            <p>No accrual data yet. Upload invoices in the Data tab.</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
 
                   {/* Project Budget Tracking */}
                   {projectBudgetTracking.length > 0 && (
-                    <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
-                      <div className="flex items-center justify-between mb-4">
+                    <div className={`rounded-xl border ${cardClasses}`}>
+                      <button
+                        onClick={() => toggleDashboardSection('budget-tracking')}
+                        className={`w-full p-4 sm:p-6 flex items-center justify-between ${collapsedSections.has('budget-tracking') ? '' : 'border-b ' + (theme === 'light' ? 'border-gray-200' : 'border-terminal-border')}`}
+                      >
                         <div className="flex items-center gap-3">
+                          <ChevronRight className={`w-5 h-5 transition-transform ${collapsedSections.has('budget-tracking') ? '' : 'rotate-90'}`} />
                           <h3 className="text-lg font-semibold">Project Budget Tracking</h3>
                           {projectBudgetTracking.some(p => p.isOverBudget) && (
                             <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-accent-danger/20 text-accent-danger">
@@ -5320,115 +5376,133 @@ const handleQuickAdd = useCallback(async () => {
                               Near Limit
                             </span>
                           )}
+                          {collapsedSections.has('budget-tracking') && (
+                            <span className={`text-sm ${textMuted}`}>({projectBudgetTracking.length} projects)</span>
+                          )}
                         </div>
-                        <button
-                          onClick={() => setShowProjectModal(true)}
-                          className={`text-sm px-3 py-1.5 rounded-lg ${theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-terminal-bg hover:bg-terminal-surface'}`}
-                        >
-                          Manage Budgets
-                        </button>
-                      </div>
-                      
-                      <div className="space-y-4">
-                        {projectBudgetTracking.map(p => (
-                          <div key={p.id} className={`p-4 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-3">
-                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
-                                <span className="font-semibold">{p.name}</span>
-                                {p.isOverBudget && (
-                                  <span className="text-xs px-2 py-0.5 rounded-full bg-accent-danger/20 text-accent-danger">
-                                    Over Budget
-                                  </span>
-                                )}
-                                {p.isNearBudget && (
-                                  <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400">
-                                    Near Limit
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                <span className={`font-mono font-semibold ${p.isOverBudget ? 'text-accent-danger' : ''}`}>
-                                  {formatCurrency(p.spent)}
-                                </span>
-                                {p.budget > 0 && (
-                                  <span className={textMuted}> / {formatCurrency(p.budget)}</span>
-                                )}
-                              </div>
-                            </div>
-                            
-                            {p.budget > 0 && (
-                              <>
-                                <div className={`h-3 rounded-full overflow-hidden ${theme === 'light' ? 'bg-gray-200' : 'bg-terminal-border'}`}>
-                                  <div 
-                                    className={`h-full rounded-full transition-all ${
-                                      p.isOverBudget ? 'bg-accent-danger' : 
-                                      p.isNearBudget ? 'bg-yellow-400' : 
-                                      'bg-accent-primary'
-                                    }`}
-                                    style={{ width: `${Math.min(p.percentUsed, 100)}%` }}
-                                  />
-                                </div>
-                                <div className="flex justify-between mt-2 text-xs">
-                                  <span className={textMuted}>
-                                    {p.percentUsed.toFixed(0)}% used
-                                  </span>
-                                  <span className={p.remaining < 0 ? 'text-accent-danger' : textMuted}>
-                                    {p.remaining >= 0 
-                                      ? `${formatCurrency(p.remaining)} remaining`
-                                      : `${formatCurrency(Math.abs(p.remaining))} over`
-                                    }
-                                  </span>
-                                </div>
-                              </>
-                            )}
-                            
-                            {/* Project metrics row */}
-                            <div className={`flex gap-4 mt-3 pt-3 border-t text-xs ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
-                              <div>
-                                <span className={textMuted}>Revenue: </span>
-                                <span className="font-mono text-accent-primary">{formatCurrency(p.revenue)}</span>
-                              </div>
-                              <div>
-                                <span className={textMuted}>Gross Profit: </span>
-                                <span className={`font-mono ${p.grossProfit >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                                  {formatCurrency(p.grossProfit)}
-                                </span>
-                              </div>
-                              <div>
-                                <span className={textMuted}>GM: </span>
-                                <span className={`font-semibold ${p.grossMarginPct >= 30 ? 'text-accent-primary' : p.grossMarginPct >= 15 ? 'text-yellow-400' : 'text-accent-danger'}`}>
-                                  {p.grossMarginPct.toFixed(1)}%
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      
-                      {/* Projects without budgets hint */}
-                      {projects.filter(p => !p.budget).length > 0 && (
-                        <p className={`text-xs mt-4 ${textMuted}`}>
-                          <Info className="w-3 h-3 inline mr-1" />
-                          {projects.filter(p => !p.budget).length} project(s) without budgets. 
-                          <button onClick={() => setShowProjectModal(true)} className="text-accent-primary hover:underline ml-1">
-                            Add budgets
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => setShowProjectModal(true)}
+                            className={`text-sm px-3 py-1.5 rounded-lg ${theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-terminal-bg hover:bg-terminal-surface'}`}
+                          >
+                            Manage Budgets
                           </button>
-                        </p>
+                        </div>
+                      </button>
+                      
+                      {!collapsedSections.has('budget-tracking') && (
+                        <div className="p-4 sm:p-6 pt-0 sm:pt-0">
+                          <div className="space-y-4">
+                            {projectBudgetTracking.map(p => (
+                              <div key={p.id} className={`p-4 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
+                                    <span className="font-semibold">{p.name}</span>
+                                    {p.isOverBudget && (
+                                      <span className="text-xs px-2 py-0.5 rounded-full bg-accent-danger/20 text-accent-danger">
+                                        Over Budget
+                                      </span>
+                                    )}
+                                    {p.isNearBudget && (
+                                      <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400">
+                                        Near Limit
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-right">
+                                    <span className={`font-mono font-semibold ${p.isOverBudget ? 'text-accent-danger' : ''}`}>
+                                      {formatCurrency(p.spent)}
+                                    </span>
+                                    {p.budget > 0 && (
+                                      <span className={textMuted}> / {formatCurrency(p.budget)}</span>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {p.budget > 0 && (
+                                  <>
+                                    <div className={`h-3 rounded-full overflow-hidden ${theme === 'light' ? 'bg-gray-200' : 'bg-terminal-border'}`}>
+                                      <div 
+                                        className={`h-full rounded-full transition-all ${
+                                          p.isOverBudget ? 'bg-accent-danger' : 
+                                          p.isNearBudget ? 'bg-yellow-400' : 
+                                          'bg-accent-primary'
+                                        }`}
+                                        style={{ width: `${Math.min(p.percentUsed, 100)}%` }}
+                                      />
+                                    </div>
+                                    <div className="flex justify-between mt-2 text-xs">
+                                      <span className={textMuted}>
+                                        {p.percentUsed.toFixed(0)}% used
+                                      </span>
+                                      <span className={p.remaining < 0 ? 'text-accent-danger' : textMuted}>
+                                        {p.remaining >= 0 
+                                          ? `${formatCurrency(p.remaining)} remaining`
+                                          : `${formatCurrency(Math.abs(p.remaining))} over`
+                                        }
+                                      </span>
+                                    </div>
+                                  </>
+                                )}
+                                
+                                {/* Project metrics row */}
+                                <div className={`flex gap-4 mt-3 pt-3 border-t text-xs ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
+                                  <div>
+                                    <span className={textMuted}>Revenue: </span>
+                                    <span className="font-mono text-accent-primary">{formatCurrency(p.revenue)}</span>
+                                  </div>
+                                  <div>
+                                    <span className={textMuted}>Gross Profit: </span>
+                                    <span className={`font-mono ${p.grossProfit >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                      {formatCurrency(p.grossProfit)}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className={textMuted}>GM: </span>
+                                    <span className={`font-semibold ${p.grossMarginPct >= 30 ? 'text-accent-primary' : p.grossMarginPct >= 15 ? 'text-yellow-400' : 'text-accent-danger'}`}>
+                                      {p.grossMarginPct.toFixed(1)}%
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          
+                          {/* Projects without budgets hint */}
+                          {projects.filter(p => !p.budget).length > 0 && (
+                            <p className={`text-xs mt-4 ${textMuted}`}>
+                              <Info className="w-3 h-3 inline mr-1" />
+                              {projects.filter(p => !p.budget).length} project(s) without budgets. 
+                              <button onClick={() => setShowProjectModal(true)} className="text-accent-primary hover:underline ml-1">
+                                Add budgets
+                              </button>
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
 
                   {/* Period Comparison Buttons */}
-                  <div className={`rounded-xl p-4 sm:p-6 border ${cardClasses}`}>
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold">Period Comparison</h3>
-                      <div className="flex items-center gap-2">
+                  <div className={`rounded-xl border ${cardClasses}`}>
+                    <button
+                      onClick={() => toggleDashboardSection('period-comparison')}
+                      className={`w-full p-4 sm:p-6 flex items-center justify-between ${collapsedSections.has('period-comparison') ? '' : 'border-b ' + (theme === 'light' ? 'border-gray-200' : 'border-terminal-border')}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <ChevronRight className={`w-5 h-5 transition-transform ${collapsedSections.has('period-comparison') ? '' : 'rotate-90'}`} />
+                        <h3 className="text-lg font-semibold">Period Comparison</h3>
+                        {collapsedSections.has('period-comparison') && (
+                          <span className={`text-sm ${textMuted}`}>({comparisonView.toUpperCase()})</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         {(['mom', 'qoq', 'yoy'] as const).map(view => (
                           <button
                             key={view}
                             onClick={() => setComparisonView(view)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
                               comparisonView === view
                                 ? 'bg-indigo-500 text-white'
                                 : theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-terminal-bg hover:bg-terminal-surface'
@@ -5438,10 +5512,12 @@ const handleQuickAdd = useCallback(async () => {
                           </button>
                         ))}
                       </div>
-                    </div>
+                    </button>
                     
-                    {/* Period Comparison Table */}
-                    {comparisonView === 'mom' && accrualPeriodComparison.mom.length > 0 && (
+                    {!collapsedSections.has('period-comparison') && (
+                      <div className="p-4 sm:p-6 pt-0 sm:pt-0">
+                        {/* Period Comparison Table */}
+                        {comparisonView === 'mom' && accrualPeriodComparison.mom.length > 0 && (
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead className={tableHeaderBg}>
@@ -5547,10 +5623,12 @@ const handleQuickAdd = useCallback(async () => {
                     )}
                     
                     {((comparisonView === 'mom' && accrualPeriodComparison.mom.length === 0) ||
-                      (comparisonView === 'qoq' && accrualPeriodComparison.qoq.length === 0) ||
-                      (comparisonView === 'yoy' && accrualPeriodComparison.yoy.length === 0)) && (
-                      <div className={`text-center py-8 ${textMuted}`}>
-                        <p>Need at least 2 {comparisonView === 'mom' ? 'months' : comparisonView === 'qoq' ? 'quarters' : 'years'} of data for comparison.</p>
+                          (comparisonView === 'qoq' && accrualPeriodComparison.qoq.length === 0) ||
+                          (comparisonView === 'yoy' && accrualPeriodComparison.yoy.length === 0)) && (
+                          <div className={`text-center py-8 ${textMuted}`}>
+                            <p>Need at least 2 {comparisonView === 'mom' ? 'months' : comparisonView === 'qoq' ? 'quarters' : 'years'} of data for comparison.</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
