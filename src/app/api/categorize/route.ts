@@ -1,10 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
-
-// Initialize Anthropic client
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-})
 
 interface Transaction {
   id: string
@@ -15,20 +9,17 @@ interface Transaction {
   project?: string
 }
 
-interface CategorizedTransaction extends Transaction {
-  suggestedCategory: string
-  suggestedProject?: string
-  suggestedType: 'revenue' | 'direct_cost'
-  confidence: number
-  reasoning?: string
-}
-
 export async function POST(request: NextRequest) {
   try {
     const { transactions, existingCategories, existingProjects } = await request.json()
     
     if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
       return NextResponse.json({ error: 'No transactions provided' }, { status: 400 })
+    }
+    
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      return NextResponse.json({ error: 'API key not configured' }, { status: 500 })
     }
     
     // Limit batch size to prevent timeouts
@@ -66,23 +57,39 @@ ${JSON.stringify(batch, null, 2)}
 
 Return ONLY a valid JSON array, no other text.`
 
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
-      messages: [
-        { role: 'user', content: userPrompt }
-      ],
-      system: systemPrompt,
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: [
+          { role: 'user', content: userPrompt }
+        ]
+      })
     })
 
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Anthropic API error:', errorText)
+      throw new Error(`API request failed: ${response.status}`)
+    }
+
+    const data = await response.json()
+    
     // Extract text from response
-    const textContent = response.content.find(block => block.type === 'text')
+    const textContent = data.content?.find((block: any) => block.type === 'text')
     if (!textContent || textContent.type !== 'text') {
       throw new Error('No text response from AI')
     }
 
     // Parse the JSON response
-    let categorizedTransactions: CategorizedTransaction[]
+    let categorizedTransactions: any[]
     try {
       // Clean the response - remove any markdown code blocks if present
       let jsonText = textContent.text.trim()
@@ -105,7 +112,7 @@ Return ONLY a valid JSON array, no other text.`
 
     // Merge AI suggestions with original transaction data
     const result = batch.map((original: Transaction) => {
-      const suggestion = categorizedTransactions.find(s => s.id === original.id)
+      const suggestion = categorizedTransactions.find((s: any) => s.id === original.id)
       return {
         ...original,
         suggestedCategory: suggestion?.suggestedCategory || 'unassigned',
