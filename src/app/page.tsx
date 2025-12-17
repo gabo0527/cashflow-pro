@@ -1192,7 +1192,7 @@ export default function CashFlowPro() {
  const bulkDeleteAccrualTransactions = useCallback(async () => {
   if (selectedAccrualIds.size === 0) return
   if (confirm(`Delete ${selectedAccrualIds.size} selected accrual transaction(s)?`)) {
-    for (const id of selectedAccrualIds) {
+    for (const id of Array.from(selectedAccrualIds)) {
       const { error } = await supabaseDeleteAccrualTransaction(id)
       if (error) {
         console.error('Error deleting accrual transaction:', error)
