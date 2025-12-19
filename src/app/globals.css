@@ -2,75 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Professional Fintech Color Scheme - Dark & Sophisticated */
+/* Professional Fintech Color Scheme - Muted Gold Accent */
 :root {
-  /* Primary Blues - Deep, Professional */
-  --color-primary: #1d4ed8;
-  --color-primary-hover: #1e40af;
-  --color-primary-muted: #1d4ed820;
+  /* Core Neutrals */
+  --color-charcoal: #0F1113;
+  --color-graphite: #161A1D;
+  --color-dark-slate: #1E2328;
+  --color-muted-steel: #2A3036;
+  --color-soft-white: #E6E8EB;
+  --color-cool-gray: #9AA1A9;
+  --color-steel-gray: #5F6A72;
   
-  /* Dark Mode Backgrounds */
-  --color-bg-dark: #0a0f1a;
-  --color-surface-dark: #111827;
-  --color-border-dark: #1f2937;
+  /* Accent */
+  --color-primary: #C9A44D;
+  --color-primary-hover: #B8943D;
+  --color-primary-muted: #C9A44D20;
   
-  /* Light Mode - Better Contrast */
-  --color-bg-light: #f1f5f9;
-  --color-surface-light: #ffffff;
-  --color-border-light: #cbd5e1;
+  /* Semantic */
+  --color-success: #1F7A5B;
+  --color-danger: #8C2F2F;
+  --color-warning: #C9A44D;
   
-  /* Semantic Colors */
-  --color-success: #10b981;
-  --color-danger: #dc2626;
-  --color-warning: #d97706;
-  --color-info: #0891b2;
-  
-  /* Text Colors - Dark Mode */
-  --color-text-primary: #f9fafb;
-  --color-text-secondary: #9ca3af;
-  --color-text-muted: #6b7280;
-  
-  /* Text Colors - Light Mode (Better Contrast) */
-  --color-text-light-primary: #0f172a;
-  --color-text-light-secondary: #334155;
-  --color-text-light-muted: #475569;
+  /* Light Mode */
+  --color-bg-light: #F5F5F5;
+  --color-surface-light: #FFFFFF;
+  --color-border-light: #D1D5DB;
 }
 
 @layer base {
   :root {
-    --accent-primary: 29 78 216;
-    --accent-secondary: 100 116 139;
-    --accent-success: 16 185 129;
-    --accent-danger: 220 38 38;
-    --accent-warning: 217 119 6;
+    --accent-primary: 201 164 77;
+    --accent-secondary: 154 161 169;
+    --accent-success: 31 122 91;
+    --accent-danger: 140 47 47;
+    --accent-warning: 201 164 77;
     
-    --terminal-bg: 10 15 26;
-    --terminal-surface: 17 24 39;
-    --terminal-border: 31 41 55;
+    --terminal-bg: 15 17 19;
+    --terminal-surface: 22 26 29;
+    --terminal-border: 42 48 54;
   }
 }
 
 /* Dark mode default */
 body {
-  @apply bg-[#0a0f1a] text-gray-100;
+  @apply bg-[#0F1113] text-[#E6E8EB];
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
-/* Light mode - Better text contrast */
+/* Light mode */
 body.light-mode,
 .light-mode {
-  @apply bg-slate-100 text-slate-900;
+  @apply bg-[#F5F5F5] text-[#161A1D];
 }
 
-/* Light mode specific overrides for better visibility */
+/* Light mode text overrides */
 .light-mode .text-zinc-400,
 .light-mode .text-gray-400 {
-  @apply text-slate-600;
+  @apply text-[#5F6A72];
 }
 
 .light-mode .text-zinc-500,
 .light-mode .text-gray-500 {
-  @apply text-slate-500;
+  @apply text-[#5F6A72];
 }
 
 /* Scrollbar - Dark */
@@ -80,33 +73,33 @@ body.light-mode,
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-[#111827];
+  @apply bg-[#161A1D];
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-600 rounded-full;
+  @apply bg-[#2A3036] rounded-full;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-500;
+  @apply bg-[#5F6A72];
 }
 
 /* Light mode scrollbar */
 .light-mode ::-webkit-scrollbar-track {
-  @apply bg-slate-200;
+  @apply bg-gray-200;
 }
 
 .light-mode ::-webkit-scrollbar-thumb {
-  @apply bg-slate-400;
+  @apply bg-gray-400;
 }
 
 .light-mode ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-500;
+  @apply bg-gray-500;
 }
 
 /* Focus states */
 *:focus-visible {
-  @apply outline-none ring-2 ring-blue-600 ring-offset-2 ring-offset-[#0a0f1a];
+  @apply outline-none ring-2 ring-[#C9A44D] ring-offset-2 ring-offset-[#0F1113];
 }
 
 .light-mode *:focus-visible {
@@ -126,60 +119,56 @@ body.light-mode,
 
 /* Button styles */
 .btn-primary {
-  @apply px-4 py-2 bg-blue-700 text-white rounded-lg font-medium 
-         hover:bg-blue-800 active:bg-blue-900 
+  @apply px-4 py-2 bg-[#C9A44D] text-[#0F1113] rounded-lg font-medium 
+         hover:bg-[#B8943D] active:bg-[#A7842D] 
          transition-all duration-150 ease-in-out;
 }
 
 .btn-secondary {
-  @apply px-4 py-2 bg-gray-700 text-gray-200 rounded-lg font-medium
-         hover:bg-gray-600 border border-gray-600;
+  @apply px-4 py-2 bg-[#1E2328] text-[#E6E8EB] rounded-lg font-medium
+         hover:bg-[#2A3036] border border-[#2A3036];
 }
 
 .light-mode .btn-secondary {
-  @apply bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200;
+  @apply bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200;
 }
 
-/* Status badges - NO purple */
+/* Status badges */
 .badge-success {
-  @apply bg-emerald-500/15 text-emerald-400;
+  @apply bg-[#1F7A5B]/15 text-[#1F7A5B];
 }
 
 .badge-danger {
-  @apply bg-red-500/15 text-red-400;
+  @apply bg-[#8C2F2F]/15 text-[#8C2F2F];
 }
 
 .badge-warning {
-  @apply bg-amber-500/15 text-amber-500;
+  @apply bg-[#C9A44D]/15 text-[#C9A44D];
 }
 
 .badge-info {
-  @apply bg-cyan-500/15 text-cyan-400;
+  @apply bg-[#5F6A72]/15 text-[#9AA1A9];
 }
 
 .light-mode .badge-success {
-  @apply bg-emerald-100 text-emerald-700;
+  @apply bg-[#1F7A5B]/10 text-[#1F7A5B];
 }
 
 .light-mode .badge-danger {
-  @apply bg-red-100 text-red-700;
+  @apply bg-[#8C2F2F]/10 text-[#8C2F2F];
 }
 
 .light-mode .badge-warning {
-  @apply bg-amber-100 text-amber-700;
-}
-
-.light-mode .badge-info {
-  @apply bg-cyan-100 text-cyan-700;
+  @apply bg-[#C9A44D]/10 text-[#9A7A2D];
 }
 
 /* Sidebar active state */
 .sidebar-item.active {
-  @apply bg-blue-700/15 text-blue-400;
+  @apply bg-[#C9A44D]/15 text-[#C9A44D];
 }
 
 .light-mode .sidebar-item.active {
-  @apply bg-blue-100 text-blue-700;
+  @apply bg-[#C9A44D]/10 text-[#9A7A2D];
 }
 
 /* Print styles */
