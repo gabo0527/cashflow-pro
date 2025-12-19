@@ -4764,9 +4764,9 @@ const handleQuickAdd = useCallback(async () => {
                       }))
                       
                       // Add to transactions (Supabase)
-                      if (currentUser && currentCompanyId) {
+                      if (companyId && user) {
                         try {
-                          await bulkInsertTransactions(newTransactions, currentCompanyId, currentUser.id)
+                          await bulkInsertTransactions(newTransactions, companyId, user.id)
                           setTransactions(prev => [...prev, ...newTransactions])
                           setShowStatementPreview(false)
                           setStatementData([])
