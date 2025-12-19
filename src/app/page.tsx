@@ -37,11 +37,11 @@ import {
 // Vantage Logo Component
 const VantageLogo = ({ size = 48, className = "" }: { size?: number, className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-    <circle cx="24" cy="24" r="22" stroke="#3b82f6" strokeWidth="2.5" fill="none"/>
-    <rect x="12" y="28" width="5" height="10" rx="1" fill="#93c5fd"/>
-    <rect x="19" y="22" width="5" height="16" rx="1" fill="#60a5fa"/>
-    <rect x="26" y="14" width="5" height="24" rx="1" fill="#3b82f6"/>
-    <path d="M10 32L18 26L25 20L38 12" stroke="#1d4ed8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <circle cx="24" cy="24" r="22" stroke="#1d4ed8" strokeWidth="2.5" fill="none"/>
+    <rect x="12" y="28" width="5" height="10" rx="1" fill="#60a5fa"/>
+    <rect x="19" y="22" width="5" height="16" rx="1" fill="#3b82f6"/>
+    <rect x="26" y="14" width="5" height="24" rx="1" fill="#1d4ed8"/>
+    <path d="M10 32L18 26L25 20L38 12" stroke="#1e40af" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 )
 
@@ -216,7 +216,7 @@ const getMonthLabel = (monthStr: string): string => {
   return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
 }
 
-const PROJECT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316']
+const PROJECT_COLORS = ['#1d4ed8', '#10b981', '#d97706', '#dc2626', '#0891b2', '#0d9488', '#2563eb', '#ea580c']
 
 // Sample data generator
 const generateSampleData = (): { transactions: Transaction[], projects: Project[] } => {
@@ -371,8 +371,8 @@ const DEFAULT_CATEGORIES: Category[] = [
   { id: 'revenue', name: 'Revenue', type: 'income', color: '#10b981', isDefault: true },
   { id: 'opex', name: 'OpEx', type: 'expense', color: '#ef4444', isDefault: true },
   { id: 'overhead', name: 'Overhead', type: 'expense', color: '#f59e0b', isDefault: true },
-  { id: 'investment', name: 'Investment', type: 'expense', color: '#6366f1', isDefault: true },
-  { id: 'unassigned', name: 'Unassigned', type: 'expense', color: '#a855f7', isDefault: true },
+  { id: 'investment', name: 'Investment', type: 'expense', color: '#0891b2', isDefault: true },
+  { id: 'unassigned', name: 'Unassigned', type: 'expense', color: '#6b7280', isDefault: true },
 ]
 
 // Branding interface
@@ -482,7 +482,7 @@ export default function CashFlowPro() {
   const [branding, setBranding] = useState<BrandingSettings>({
     companyName: 'Vantage',
     companyLogo: null,
-    brandColor: '#3b82f6'
+    brandColor: '#1d4ed8'
   })
   
   // Chart filter state
@@ -3036,9 +3036,9 @@ const handleQuickAdd = useCallback(async () => {
   // Auth loading screen
   if (authLoading || dataLoading) {
     return (
-      <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
+      <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 flex items-center justify-center mx-auto mb-4">
+          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-700/20 flex items-center justify-center mx-auto mb-4">
             <VantageLogo size={40} />
           </div>
           <div className="text-blue-400 animate-pulse">
@@ -3287,7 +3287,7 @@ const handleQuickAdd = useCallback(async () => {
                 onClick={() => setQuickAddForm(prev => ({ ...prev, targetType: 'accrual' }))}
                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                   (quickAddForm as any).targetType === 'accrual'
-                    ? 'bg-indigo-500 text-white'
+                    ? 'bg-blue-700 text-white'
                     : theme === 'light' ? 'bg-gray-100 text-gray-600' : 'bg-terminal-bg text-zinc-400'
                 }`}
               >
@@ -3568,7 +3568,7 @@ const handleQuickAdd = useCallback(async () => {
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-indigo-500" />
+                  <FileText className="w-5 h-5 text-blue-700" />
                   {accrualModalMode === 'add' ? 'Add Accrual Transaction' : 'Edit Accrual Transaction'}
                 </h3>
                 <button onClick={closeAccrualModal} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
@@ -3686,7 +3686,7 @@ const handleQuickAdd = useCallback(async () => {
                   <button
                     onClick={saveAccrualModal}
                     disabled={!accrualModalForm.description || !accrualModalForm.project}
-                    className="flex-1 py-2 bg-indigo-500 text-white rounded-lg font-medium disabled:opacity-50 hover:bg-indigo-600"
+                    className="flex-1 py-2 bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 hover:bg-blue-800"
                   >
                     {accrualModalMode === 'add' ? 'Add Transaction' : 'Save Changes'}
                   </button>
@@ -3895,7 +3895,7 @@ const handleQuickAdd = useCallback(async () => {
                                     </span>
                                   )}
                                   {clientName && (
-                                    <span className={`text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400`}>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full bg-blue-700/20 text-blue-400`}>
                                       {clientName}
                                     </span>
                                   )}
@@ -4827,7 +4827,7 @@ const handleQuickAdd = useCallback(async () => {
                     dashboardView === 'cash' 
                       ? 'bg-accent-primary/10 text-accent-primary border-accent-primary/30' 
                       : dashboardView === 'accrual'
-                        ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/30'
+                        ? 'bg-blue-700/10 text-blue-700 border-blue-700/30'
                         : 'bg-amber-500/10 text-amber-500 border-amber-500/30'
                   }`}
                   style={{ colorScheme: theme }}
@@ -5082,7 +5082,7 @@ const handleQuickAdd = useCallback(async () => {
                         { key: 'revenue', label: 'Rev', color: '#10b981' },
                         { key: 'opex', label: 'OpEx', color: '#ef4444' },
                         { key: 'overhead', label: 'OH', color: '#f59e0b' },
-                        { key: 'investment', label: 'Inv', color: '#6366f1' },
+                        { key: 'investment', label: 'Inv', color: '#0891b2' },
                         { key: 'net', label: 'Net', color: '#22d3ee' },
                       ].map(f => (
                         <button
@@ -5363,7 +5363,7 @@ const handleQuickAdd = useCallback(async () => {
                         <span className="text-sm font-medium">{transactions.length} Transactions</span>
                       </div>
                       {transactions.filter(t => t.category === 'unassigned').length > 0 && (
-                        <span className="px-2 py-1 bg-purple-500/10 text-purple-500 rounded text-xs">
+                        <span className="px-2 py-1 bg-blue-600/10 text-blue-500 rounded text-xs">
                           {transactions.filter(t => t.category === 'unassigned').length} need categorization
                         </span>
                       )}
@@ -5479,7 +5479,7 @@ const handleQuickAdd = useCallback(async () => {
                                 <Legend />
                                 <Bar yAxisId="left" dataKey="revenue" name="Revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
                                 <Bar yAxisId="left" dataKey="directCosts" name="Direct Costs" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                                <Line yAxisId="right" type="monotone" dataKey="grossMarginPct" name="GM %" stroke="#6366f1" strokeWidth={3} dot={{ r: 4 }} />
+                                <Line yAxisId="right" type="monotone" dataKey="grossMarginPct" name="GM %" stroke="#0891b2" strokeWidth={3} dot={{ r: 4 }} />
                               </ComposedChart>
                             </ResponsiveContainer>
                           </div>
@@ -5742,7 +5742,7 @@ const handleQuickAdd = useCallback(async () => {
                             onClick={() => setComparisonView(view)}
                             className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
                               comparisonView === view
-                                ? 'bg-indigo-500 text-white'
+                                ? 'bg-blue-700 text-white'
                                 : theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-terminal-bg hover:bg-terminal-surface'
                             }`}
                           >
@@ -5883,7 +5883,7 @@ const handleQuickAdd = useCallback(async () => {
                         <FileText className="w-4 h-4" />
                         Total Invoiced
                       </div>
-                      <div className="text-2xl font-bold text-indigo-500 mt-1">
+                      <div className="text-2xl font-bold text-blue-700 mt-1">
                         {formatCurrency(cashVsAccrualData.reduce((sum, m) => sum + m.invoiced, 0))}
                       </div>
                       <div className={`text-xs ${textMuted}`}>Accrual basis</div>
@@ -5943,7 +5943,7 @@ const handleQuickAdd = useCallback(async () => {
                               contentStyle={{ background: theme === 'light' ? 'white' : '#1f2937', border: 'none', borderRadius: '8px' }}
                             />
                             <Legend />
-                            <Bar dataKey="invoiced" name="Invoiced (Accrual)" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="invoiced" name="Invoiced (Accrual)" fill="#1d4ed8" radius={[4, 4, 0, 0]} />
                             <Bar dataKey="collected" name="Collected (Cash)" fill="#10b981" radius={[4, 4, 0, 0]} />
                             <ReferenceLine y={0} stroke="#6b7280" />
                           </ComposedChart>
@@ -5975,7 +5975,7 @@ const handleQuickAdd = useCallback(async () => {
                             {cashVsAccrualData.map(row => (
                               <tr key={row.month} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
                                 <td className="py-3 font-medium">{row.month}</td>
-                                <td className="py-3 text-right font-mono text-indigo-500">{formatCurrency(row.invoiced)}</td>
+                                <td className="py-3 text-right font-mono text-blue-700">{formatCurrency(row.invoiced)}</td>
                                 <td className="py-3 text-right font-mono text-accent-primary">{formatCurrency(row.collected)}</td>
                                 <td className={`py-3 text-right font-mono font-medium ${row.delta >= 0 ? 'text-accent-primary' : 'text-accent-warning'}`}>
                                   {row.delta >= 0 ? '+' : ''}{formatCurrency(row.delta)}
@@ -6021,7 +6021,7 @@ const handleQuickAdd = useCallback(async () => {
                       onClick={() => setTransactionViewType('accrual')}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
                         transactionViewType === 'accrual'
-                          ? 'bg-indigo-500 text-white'
+                          ? 'bg-blue-700 text-white'
                           : theme === 'light' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-terminal-bg text-zinc-400 hover:bg-terminal-surface'
                       }`}
                     >
@@ -6258,7 +6258,7 @@ const handleQuickAdd = useCallback(async () => {
                       <div className="flex gap-2">
                         <button 
                           onClick={openAddAccrualModal}
-                          className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600"
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800"
                         >
                           <Plus className="w-4 h-4" />
                           Add
@@ -6317,7 +6317,7 @@ const handleQuickAdd = useCallback(async () => {
                           </thead>
                           <tbody>
                             {filteredAccrualTransactions.map(t => (
-                              <tr key={t.id} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'} ${selectedAccrualIds.has(t.id) ? (theme === 'light' ? 'bg-indigo-50' : 'bg-indigo-500/10') : ''} hover:${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg/50'}`}>
+                              <tr key={t.id} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'} ${selectedAccrualIds.has(t.id) ? (theme === 'light' ? 'bg-blue-50' : 'bg-blue-700/10') : ''} hover:${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg/50'}`}>
                                 <td className="py-3">
                                   <input 
                                     type="checkbox" 
@@ -6415,7 +6415,7 @@ const handleQuickAdd = useCallback(async () => {
                                     <td className={`py-3 text-sm ${textMuted}`}>{t.vendor || '-'}</td>
                                     <td className="py-3 text-center">
                                       <div className="flex items-center justify-center gap-1">
-                                        <button onClick={() => startEditAccrual(t)} className="p-1.5 text-zinc-400 hover:text-indigo-500 hover:bg-indigo-500/10 rounded" title="Inline edit">
+                                        <button onClick={() => startEditAccrual(t)} className="p-1.5 text-zinc-400 hover:text-blue-700 hover:bg-blue-700/10 rounded" title="Inline edit">
                                           <Edit2 className="w-4 h-4" />
                                         </button>
                                         <button onClick={() => openEditAccrualModal(t)} className="p-1.5 text-zinc-400 hover:text-accent-primary hover:bg-accent-primary/10 rounded" title="Edit in modal">
@@ -6450,7 +6450,7 @@ const handleQuickAdd = useCallback(async () => {
                       <div className="flex gap-3 justify-center">
                         <button 
                           onClick={openAddAccrualModal}
-                          className="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 flex items-center gap-2"
+                          className="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 flex items-center gap-2"
                         >
                           <Plus className="w-4 h-4" />
                           Add Manually
@@ -6541,19 +6541,19 @@ const handleQuickAdd = useCallback(async () => {
 
                 {/* Accrual/Invoice Upload */}
                 <div className={`rounded-xl p-6 border-2 border-dashed transition-all ${
-                  theme === 'light' ? 'border-indigo-200 hover:border-indigo-300' : 'border-indigo-500/30 hover:border-indigo-500/50'
+                  theme === 'light' ? 'border-blue-200 hover:border-blue-300' : 'border-blue-700/30 hover:border-blue-700/50'
                 }`}
                   onDragOver={(e) => { e.preventDefault() }}
                   onDrop={(e) => { e.preventDefault(); const file = e.dataTransfer.files[0]; if (file) handleAccrualUpload(file) }}
                 >
                   <div className="text-center">
-                    <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-indigo-500/10 flex items-center justify-center">
-                      <FileText className="w-6 h-6 text-indigo-500" />
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-blue-700/10 flex items-center justify-center">
+                      <FileText className="w-6 h-6 text-blue-700" />
                     </div>
                     <h3 className="text-lg font-semibold mb-1">📊 Accrual Data (Invoices)</h3>
                     <p className={`text-sm mb-4 ${textMuted}`}>Invoices issued & received (for GM)</p>
                     <input type="file" accept=".csv" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleAccrualUpload(file) }} className="hidden" id="accrual-file-upload" />
-                    <label htmlFor="accrual-file-upload" className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-500 text-white rounded-lg cursor-pointer hover:bg-indigo-500/90">
+                    <label htmlFor="accrual-file-upload" className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-700 text-white rounded-lg cursor-pointer hover:bg-blue-700/90">
                       <Upload className="w-4 h-4" />
                       Upload Invoice Data
                     </label>
@@ -6577,7 +6577,7 @@ const handleQuickAdd = useCallback(async () => {
                 </div>
                 
                 <div className={`rounded-xl p-4 border ${cardClasses}`}>
-                  <h4 className="font-semibold mb-3 text-indigo-500">Accrual/Invoice Format</h4>
+                  <h4 className="font-semibold mb-3 text-blue-700">Accrual/Invoice Format</h4>
                   <div className={`rounded-lg p-3 font-mono text-xs overflow-x-auto ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
                     <div className={textMuted}>date,type,description,amount,project,vendor</div>
                     <div className="text-accent-primary">2024-01-15,revenue,Invoice #1001,50000,Alpha,Client ABC</div>
@@ -6592,8 +6592,8 @@ const handleQuickAdd = useCallback(async () => {
               {/* AI Categorization */}
               <div className={`rounded-xl p-6 border ${cardClasses}`}>
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
-                    <Sparkles className="w-5 h-5 text-purple-500" />
+                  <div className="w-10 h-10 rounded-full bg-blue-600/10 flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-blue-500" />
                   </div>
                   <div>
                     <h3 className="font-semibold">AI-Powered Categorization</h3>
@@ -6648,7 +6648,7 @@ const handleQuickAdd = useCallback(async () => {
                       className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg cursor-pointer font-medium text-sm transition-all ${
                         aiLoading 
                           ? 'bg-gray-400 cursor-not-allowed' 
-                          : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600'
+                          : 'bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-700 hover:to-blue-600'
                       }`}
                     >
                       {aiLoading && uploadType === 'cash' ? (
@@ -6669,7 +6669,7 @@ const handleQuickAdd = useCallback(async () => {
                   <div className={`p-4 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
                     <div className="flex items-center justify-between mb-3">
                       <span className="font-medium text-sm">Accrual/Invoices</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full bg-blue-700/10 text-blue-400`}>
                         AI Ready
                       </span>
                     </div>
@@ -6712,7 +6712,7 @@ const handleQuickAdd = useCallback(async () => {
                       className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg cursor-pointer font-medium text-sm transition-all ${
                         aiLoading 
                           ? 'bg-gray-400 cursor-not-allowed' 
-                          : 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white hover:from-indigo-600 hover:to-purple-600'
+                          : 'bg-gradient-to-r from-blue-700 to-blue-600 text-white hover:from-blue-800 hover:to-blue-700'
                       }`}
                     >
                       {aiLoading && uploadType === 'accrual' ? (
@@ -6730,7 +6730,7 @@ const handleQuickAdd = useCallback(async () => {
                   </div>
                 </div>
                 
-                <div className={`mt-4 p-3 rounded-lg text-sm ${theme === 'light' ? 'bg-purple-50 text-purple-700' : 'bg-purple-500/10 text-purple-300'}`}>
+                <div className={`mt-4 p-3 rounded-lg text-sm ${theme === 'light' ? 'bg-blue-50 text-blue-700' : 'bg-blue-600/10 text-blue-300'}`}>
                   <strong>How it works:</strong> Upload a CSV and AI will analyze each transaction description to suggest categories and projects. You can review, edit, and approve suggestions before importing.
                 </div>
               </div>
@@ -6877,7 +6877,7 @@ const handleQuickAdd = useCallback(async () => {
                     }
                   }} 
                   disabled={!accrualTransactions.length} 
-                  className="flex items-center gap-2 px-5 py-2.5 bg-indigo-500/10 text-indigo-500 rounded-lg disabled:opacity-50 hover:bg-indigo-500/20"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-700/10 text-blue-700 rounded-lg disabled:opacity-50 hover:bg-blue-700/20"
                 >
                   <Trash2 className="w-4 h-4" />
                   Clear Accrual
@@ -7176,8 +7176,8 @@ const handleQuickAdd = useCallback(async () => {
                     <ComposedChart data={projectionData.months}>
                       <defs>
                         <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                          <stop offset="5%" stopColor="#1d4ed8" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#1d4ed8" stopOpacity={0}/>
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#374151'} />
@@ -7191,7 +7191,7 @@ const handleQuickAdd = useCallback(async () => {
                       <Legend />
                       <ReferenceLine yAxisId="left" y={0} stroke="#ef4444" strokeDasharray="3 3" />
                       <Bar yAxisId="left" dataKey="netCash" name="Net Cash" fill={theme === 'light' ? '#10b981' : '#34d399'} radius={[4, 4, 0, 0]} />
-                      <Area yAxisId="right" type="monotone" dataKey="balance" name="Balance" stroke="#6366f1" fill="url(#balanceGradient)" strokeWidth={2} />
+                      <Area yAxisId="right" type="monotone" dataKey="balance" name="Balance" stroke="#1d4ed8" fill="url(#balanceGradient)" strokeWidth={2} />
                     </ComposedChart>
                   </ResponsiveContainer>
                 ) : (
@@ -7232,7 +7232,7 @@ const handleQuickAdd = useCallback(async () => {
                             <td className={`py-3 text-right font-mono font-medium ${m.netCash >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
                               {formatCurrency(m.netCash)}
                             </td>
-                            <td className={`py-3 text-right font-mono font-medium ${m.balance >= 0 ? 'text-indigo-500' : 'text-accent-danger'}`}>
+                            <td className={`py-3 text-right font-mono font-medium ${m.balance >= 0 ? 'text-blue-700' : 'text-accent-danger'}`}>
                               {formatCurrency(m.balance)}
                             </td>
                           </tr>
@@ -7249,12 +7249,12 @@ const handleQuickAdd = useCallback(async () => {
 
               {/* Assumptions Applied Notice */}
               {activeAssumptions.length > 0 && (
-                <div className={`rounded-xl p-4 border ${theme === 'light' ? 'bg-indigo-50 border-indigo-200' : 'bg-indigo-500/10 border-indigo-500/30'}`}>
-                  <div className="flex items-center gap-2 text-indigo-500 font-medium">
+                <div className={`rounded-xl p-4 border ${theme === 'light' ? 'bg-blue-50 border-blue-200' : 'bg-blue-700/10 border-blue-700/30'}`}>
+                  <div className="flex items-center gap-2 text-blue-700 font-medium">
                     <Info className="w-4 h-4" />
                     {activeAssumptions.length} assumption{activeAssumptions.length > 1 ? 's' : ''} applied to this projection
                   </div>
-                  <p className={`text-sm mt-1 ${theme === 'light' ? 'text-indigo-600' : 'text-indigo-400'}`}>
+                  <p className={`text-sm mt-1 ${theme === 'light' ? 'text-blue-800' : 'text-blue-400'}`}>
                     Edit assumptions in the Assumptions tab to adjust the forecast.
                   </p>
                 </div>
@@ -7552,7 +7552,7 @@ const handleQuickAdd = useCallback(async () => {
                         style={{ colorScheme: theme }}
                       />
                       <button
-                        onClick={() => setBranding(prev => ({ ...prev, brandColor: '#3b82f6' }))}
+                        onClick={() => setBranding(prev => ({ ...prev, brandColor: '#1d4ed8' }))}
                         className={`px-3 py-2 text-sm rounded-lg border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'}`}
                       >
                         Reset
@@ -7693,7 +7693,7 @@ const handleQuickAdd = useCallback(async () => {
                       <input
                         type="color"
                         id="new-category-color"
-                        defaultValue="#6366f1"
+                        defaultValue="#1d4ed8"
                         className="w-full h-10 rounded-lg cursor-pointer border-0"
                       />
                     </div>
