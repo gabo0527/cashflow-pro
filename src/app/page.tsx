@@ -16,7 +16,8 @@ import {
   FolderPlus, Copy, FileText, Bell, Repeat, Lock, Users, Image, Palette,
   Shield, Eye, EyeOff, HardDrive, CloudOff, ExternalLink, Clock, Target,
   Sparkles, AlertCircle, CheckCircle, Info, MessageSquare, Gauge, List, Tag,
-  BarChart3, LogOut, User, Menu, ChevronDown, ChevronRight, PanelLeftClose, PanelLeft
+  BarChart3, LogOut, User, Menu, ChevronDown, ChevronRight, PanelLeftClose, PanelLeft,
+  Send, Bot
 } from 'lucide-react'
 import { 
   supabase, signOut, getCurrentUser, getCurrentProfile,
@@ -477,6 +478,12 @@ export default function CashFlowPro() {
   const [showStatementPreview, setShowStatementPreview] = useState(false)
   const [statementInfo, setStatementInfo] = useState<any>(null)
   const [statementError, setStatementError] = useState<string | null>(null)
+  
+  // AI Chat state
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
   
   // Branding state
   const [branding, setBranding] = useState<BrandingSettings>({
@@ -1206,6 +1213,94 @@ export default function CashFlowPro() {
     a.click()
     URL.revokeObjectURL(url)
   }, [accrualTransactions])
+
+  // AI Chat Function
+  const sendChatMessage = useCallback(async () => {
+    if (!chatInput.trim() || chatLoading) return
+    
+    const userMessage = chatInput.trim()
+    setChatInput('')
+    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }])
+    setChatLoading(true)
+    
+    try {
+      // Build context from current data
+      const projectStats = projectList.map(projectName => {
+        const projectTransactions = accrualTransactions.filter(t => 
+          t.project.toLowerCase() === projectName.toLowerCase()
+        )
+        const revenue = projectTransactions
+          .filter(t => t.type === 'revenue')
+          .reduce((sum, t) => sum + t.amount, 0)
+        const costs = projectTransactions
+          .filter(t => t.type === 'direct_cost')
+          .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+        const grossProfit = revenue - costs
+        const grossMargin = revenue > 0 ? ((grossProfit / revenue) * 100).toFixed(1) : '0'
+        
+        return {
+          name: projectName,
+          revenue,
+          costs,
+          grossProfit,
+          grossMargin
+        }
+      })
+      
+      const totalRevenue = transactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0)
+      const totalExpenses = transactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0)
+      const netCashFlow = totalRevenue - totalExpenses
+      const currentBalance = transactions.reduce((sum, t) => sum + t.amount, 0)
+      
+      const accrualRevenue = accrualTransactions.filter(t => t.type === 'revenue').reduce((sum, t) => sum + t.amount, 0)
+      const accrualCosts = accrualTransactions.filter(t => t.type === 'direct_cost').reduce((sum, t) => sum + Math.abs(t.amount), 0)
+      
+      const context = {
+        summary: `This is a project-based business with ${projectList.length} active projects and ${transactions.length} cash transactions.`,
+        projects: projectStats,
+        recentTransactions: transactions.slice(0, 10).map(t => ({
+          date: t.date,
+          description: t.description,
+          amount: t.amount,
+          category: t.category
+        })),
+        metrics: {
+          totalRevenue,
+          totalExpenses,
+          netCashFlow,
+          currentBalance,
+          grossMargin: totalRevenue > 0 ? ((netCashFlow / totalRevenue) * 100).toFixed(1) : 0,
+          runway: netCashFlow < 0 ? Math.abs(currentBalance / (netCashFlow / 12)).toFixed(1) : 'Positive cash flow'
+        },
+        accrual: {
+          totalInvoiced: accrualRevenue,
+          totalDirectCosts: accrualCosts,
+          grossProfit: accrualRevenue - accrualCosts
+        }
+      }
+      
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMessage, context })
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to get response')
+      }
+      
+      const data = await response.json()
+      setChatMessages(prev => [...prev, { role: 'assistant', content: data.message }])
+    } catch (error) {
+      console.error('Chat error:', error)
+      setChatMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'Sorry, I encountered an error. Please try again.' 
+      }])
+    } finally {
+      setChatLoading(false)
+    }
+  }, [chatInput, chatLoading, transactions, accrualTransactions, projectList])
 
   // AI Categorization
   const categorizeWithAI = useCallback(async (data: any[], type: 'cash' | 'accrual') => {
@@ -7948,6 +8043,154 @@ const handleQuickAdd = useCallback(async () => {
             </div>
           </footer>
         </div>
+      </div>
+
+      {/* Floating AI Chat Button */}
+      <div className="fixed bottom-6 right-6 z-50 print:hidden">
+        <AnimatePresence>
+          {chatOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              className={`absolute bottom-16 right-0 w-96 rounded-xl shadow-2xl border overflow-hidden ${
+                theme === 'light' 
+                  ? 'bg-white border-gray-200' 
+                  : 'bg-[#141c2e] border-[#2a3a55]'
+              }`}
+            >
+              {/* Chat Header */}
+              <div className={`px-4 py-3 border-b flex items-center justify-between ${
+                theme === 'light' ? 'border-gray-200 bg-gray-50' : 'border-[#2a3a55] bg-[#0c1222]'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-[#00d4aa]/20 flex items-center justify-center">
+                    <Bot className="w-4 h-4 text-[#00d4aa]" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-sm">Vantage AI</h4>
+                    <p className={`text-xs ${textMuted}`}>Ask about your finances</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setChatOpen(false)}
+                  className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-[#2a3a55]'}`}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              
+              {/* Chat Messages */}
+              <div className={`h-80 overflow-y-auto p-4 space-y-3 ${
+                theme === 'light' ? 'bg-white' : 'bg-[#141c2e]'
+              }`}>
+                {chatMessages.length === 0 ? (
+                  <div className={`text-center py-8 ${textMuted}`}>
+                    <Bot className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                    <p className="text-sm font-medium mb-2">How can I help?</p>
+                    <div className="space-y-2 text-xs">
+                      <button 
+                        onClick={() => setChatInput("What's my gross margin this year?")}
+                        className={`block w-full text-left px-3 py-2 rounded-lg ${
+                          theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-[#1c2740] hover:bg-[#2a3a55]'
+                        }`}
+                      >
+                        💰 What's my gross margin this year?
+                      </button>
+                      <button 
+                        onClick={() => setChatInput("Which project is most profitable?")}
+                        className={`block w-full text-left px-3 py-2 rounded-lg ${
+                          theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-[#1c2740] hover:bg-[#2a3a55]'
+                        }`}
+                      >
+                        📊 Which project is most profitable?
+                      </button>
+                      <button 
+                        onClick={() => setChatInput("Summarize my cash flow")}
+                        className={`block w-full text-left px-3 py-2 rounded-lg ${
+                          theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-[#1c2740] hover:bg-[#2a3a55]'
+                        }`}
+                      >
+                        📈 Summarize my cash flow
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  chatMessages.map((msg, idx) => (
+                    <div 
+                      key={idx} 
+                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                        msg.role === 'user'
+                          ? 'bg-[#00d4aa] text-[#0c1222]'
+                          : theme === 'light' 
+                            ? 'bg-gray-100 text-gray-800' 
+                            : 'bg-[#1c2740] text-[#f1f5f9]'
+                      }`}>
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+                {chatLoading && (
+                  <div className="flex justify-start">
+                    <div className={`rounded-lg px-3 py-2 ${
+                      theme === 'light' ? 'bg-gray-100' : 'bg-[#1c2740]'
+                    }`}>
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 bg-[#00d4aa] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <div className="w-2 h-2 bg-[#00d4aa] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <div className="w-2 h-2 bg-[#00d4aa] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Chat Input */}
+              <div className={`p-3 border-t ${
+                theme === 'light' ? 'border-gray-200 bg-gray-50' : 'border-[#2a3a55] bg-[#0c1222]'
+              }`}>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
+                    placeholder="Ask about your data..."
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm border ${
+                      theme === 'light' 
+                        ? 'bg-white border-gray-300 focus:border-[#00d4aa]' 
+                        : 'bg-[#141c2e] border-[#2a3a55] focus:border-[#00d4aa]'
+                    } outline-none`}
+                  />
+                  <button
+                    onClick={sendChatMessage}
+                    disabled={!chatInput.trim() || chatLoading}
+                    className="px-3 py-2 bg-[#00d4aa] text-[#0c1222] rounded-lg hover:bg-[#00c49a] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        
+        {/* Chat Toggle Button */}
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setChatOpen(!chatOpen)}
+          className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-colors ${
+            chatOpen 
+              ? 'bg-[#2a3a55] text-white' 
+              : 'bg-[#00d4aa] text-[#0c1222] hover:bg-[#00c49a]'
+          }`}
+        >
+          {chatOpen ? <X className="w-6 h-6" /> : <MessageSquare className="w-6 h-6" />}
+        </motion.button>
       </div>
 
       {/* Print styles */}
