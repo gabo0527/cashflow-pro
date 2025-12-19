@@ -37,11 +37,11 @@ import {
 // Vantage Logo Component
 const VantageLogo = ({ size = 48, className = "" }: { size?: number, className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-    <circle cx="24" cy="24" r="22" stroke="#3d8a96" strokeWidth="2.5" fill="none"/>
-    <rect x="12" y="28" width="5" height="10" rx="1" fill="#7cc5cf"/>
-    <rect x="19" y="22" width="5" height="16" rx="1" fill="#4da8b5"/>
-    <rect x="26" y="14" width="5" height="24" rx="1" fill="#2d8a96"/>
-    <path d="M10 32L18 26L25 20L38 12" stroke="#2d6b78" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <circle cx="24" cy="24" r="22" stroke="#3b82f6" strokeWidth="2.5" fill="none"/>
+    <rect x="12" y="28" width="5" height="10" rx="1" fill="#93c5fd"/>
+    <rect x="19" y="22" width="5" height="16" rx="1" fill="#60a5fa"/>
+    <rect x="26" y="14" width="5" height="24" rx="1" fill="#3b82f6"/>
+    <path d="M10 32L18 26L25 20L38 12" stroke="#1d4ed8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 )
 
@@ -216,7 +216,7 @@ const getMonthLabel = (monthStr: string): string => {
   return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
 }
 
-const PROJECT_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316']
+const PROJECT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316']
 
 // Sample data generator
 const generateSampleData = (): { transactions: Transaction[], projects: Project[] } => {
@@ -368,7 +368,7 @@ const STORAGE_KEYS = {
 
 // Default categories
 const DEFAULT_CATEGORIES: Category[] = [
-  { id: 'revenue', name: 'Revenue', type: 'income', color: '#14b8a6', isDefault: true },
+  { id: 'revenue', name: 'Revenue', type: 'income', color: '#10b981', isDefault: true },
   { id: 'opex', name: 'OpEx', type: 'expense', color: '#ef4444', isDefault: true },
   { id: 'overhead', name: 'Overhead', type: 'expense', color: '#f59e0b', isDefault: true },
   { id: 'investment', name: 'Investment', type: 'expense', color: '#6366f1', isDefault: true },
@@ -482,7 +482,7 @@ export default function CashFlowPro() {
   const [branding, setBranding] = useState<BrandingSettings>({
     companyName: 'Vantage',
     companyLogo: null,
-    brandColor: '#14b8a6'
+    brandColor: '#3b82f6'
   })
   
   // Chart filter state
@@ -3036,12 +3036,12 @@ const handleQuickAdd = useCallback(async () => {
   // Auth loading screen
   if (authLoading || dataLoading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
+      <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-teal-500/20 to-cyan-500/20 flex items-center justify-center mx-auto mb-4">
+          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 flex items-center justify-center mx-auto mb-4">
             <VantageLogo size={40} />
           </div>
-          <div className="text-teal-400 animate-pulse">
+          <div className="text-blue-400 animate-pulse">
             {authLoading ? 'Authenticating...' : 'Loading data...'}
           </div>
         </div>
@@ -3075,9 +3075,9 @@ const handleQuickAdd = useCallback(async () => {
           border-r flex flex-col
         `}>
           {/* Sidebar Header */}
-          <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
-            <div className={`flex items-center ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
-              <div className={`flex items-center ${sidebarOpen ? 'gap-3' : 'flex-col'}`}>
+          <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'} relative`}>
+            <div className={`flex items-center ${sidebarOpen ? 'justify-between' : 'flex-col gap-3'}`}>
+              <div className={`flex items-center ${sidebarOpen ? 'gap-3' : 'justify-center w-full'}`}>
                 {branding.companyLogo ? (
                   <img 
                     src={branding.companyLogo} 
@@ -3085,7 +3085,7 @@ const handleQuickAdd = useCallback(async () => {
                     className={`rounded-lg object-contain ${sidebarOpen ? 'w-9 h-9' : 'w-10 h-10'}`}
                   />
                 ) : (
-                  <VantageLogo size={sidebarOpen ? 36 : 44} />
+                  <VantageLogo size={sidebarOpen ? 36 : 40} />
                 )}
                 {sidebarOpen && (
                   <div>
@@ -3094,25 +3094,24 @@ const handleQuickAdd = useCallback(async () => {
                   </div>
                 )}
               </div>
-              {sidebarOpen && (
+              {sidebarOpen ? (
                 <button
-                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  onClick={() => setSidebarOpen(false)}
                   className={`hidden lg:flex p-1.5 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-bg'}`}
                 >
                   <PanelLeftClose className="w-4 h-4" />
                 </button>
-              )}
-              {!sidebarOpen && (
+              ) : (
                 <button
                   onClick={() => setSidebarOpen(true)}
-                  className={`hidden lg:flex absolute top-4 right-2 p-1.5 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-bg'}`}
+                  className={`hidden lg:flex p-1.5 rounded-lg transition-all w-full justify-center ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-bg'}`}
                 >
                   <PanelLeft className="w-4 h-4" />
                 </button>
               )}
               <button
                 onClick={() => setSidebarMobileOpen(false)}
-                className={`lg:hidden p-1.5 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-bg'}`}
+                className={`lg:hidden p-1.5 rounded-lg transition-all absolute top-4 right-4 ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-bg'}`}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -3172,8 +3171,8 @@ const handleQuickAdd = useCallback(async () => {
           <div className={`p-3 border-t ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
             {user && (
               <div className={`flex items-center ${sidebarOpen ? 'gap-3' : 'justify-center'}`}>
-                <div className="w-8 h-8 rounded-full bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-                  <User className="w-4 h-4 text-teal-400" />
+                <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                  <User className="w-4 h-4 text-blue-400" />
                 </div>
                 {sidebarOpen && (
                   <div className="flex-1 min-w-0">
@@ -5478,7 +5477,7 @@ const handleQuickAdd = useCallback(async () => {
                                   contentStyle={{ background: theme === 'light' ? 'white' : '#1f2937', border: 'none', borderRadius: '8px' }}
                                 />
                                 <Legend />
-                                <Bar yAxisId="left" dataKey="revenue" name="Revenue" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+                                <Bar yAxisId="left" dataKey="revenue" name="Revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
                                 <Bar yAxisId="left" dataKey="directCosts" name="Direct Costs" fill="#ef4444" radius={[4, 4, 0, 0]} />
                                 <Line yAxisId="right" type="monotone" dataKey="grossMarginPct" name="GM %" stroke="#6366f1" strokeWidth={3} dot={{ r: 4 }} />
                               </ComposedChart>
@@ -5945,7 +5944,7 @@ const handleQuickAdd = useCallback(async () => {
                             />
                             <Legend />
                             <Bar dataKey="invoiced" name="Invoiced (Accrual)" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="collected" name="Collected (Cash)" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="collected" name="Collected (Cash)" fill="#10b981" radius={[4, 4, 0, 0]} />
                             <ReferenceLine y={0} stroke="#6b7280" />
                           </ComposedChart>
                         </ResponsiveContainer>
@@ -7553,7 +7552,7 @@ const handleQuickAdd = useCallback(async () => {
                         style={{ colorScheme: theme }}
                       />
                       <button
-                        onClick={() => setBranding(prev => ({ ...prev, brandColor: '#10b981' }))}
+                        onClick={() => setBranding(prev => ({ ...prev, brandColor: '#3b82f6' }))}
                         className={`px-3 py-2 text-sm rounded-lg border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'}`}
                       >
                         Reset
