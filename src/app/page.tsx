@@ -3076,16 +3076,16 @@ const handleQuickAdd = useCallback(async () => {
         `}>
           {/* Sidebar Header */}
           <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className={`flex items-center ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
+              <div className={`flex items-center ${sidebarOpen ? 'gap-3' : 'flex-col'}`}>
                 {branding.companyLogo ? (
                   <img 
                     src={branding.companyLogo} 
                     alt={branding.companyName} 
-                    className="w-9 h-9 rounded-lg object-contain"
+                    className={`rounded-lg object-contain ${sidebarOpen ? 'w-9 h-9' : 'w-10 h-10'}`}
                   />
                 ) : (
-                  <VantageLogo size={36} />
+                  <VantageLogo size={sidebarOpen ? 36 : 44} />
                 )}
                 {sidebarOpen && (
                   <div>
@@ -3094,12 +3094,22 @@ const handleQuickAdd = useCallback(async () => {
                   </div>
                 )}
               </div>
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className={`hidden lg:flex p-1.5 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-bg'}`}
-              >
-                {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
-              </button>
+              {sidebarOpen && (
+                <button
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className={`hidden lg:flex p-1.5 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-bg'}`}
+                >
+                  <PanelLeftClose className="w-4 h-4" />
+                </button>
+              )}
+              {!sidebarOpen && (
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className={`hidden lg:flex absolute top-4 right-2 p-1.5 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-bg'}`}
+                >
+                  <PanelLeft className="w-4 h-4" />
+                </button>
+              )}
               <button
                 onClick={() => setSidebarMobileOpen(false)}
                 className={`lg:hidden p-1.5 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-bg'}`}
@@ -6092,13 +6102,13 @@ const handleQuickAdd = useCallback(async () => {
                         <table className="w-full text-sm">
                           <thead className={tableHeaderBg}>
                             <tr className={`border-b ${tableBorder} text-left ${textMuted}`}>
-                              <th className="pb-3 font-medium">Date</th>
-                              <th className="pb-3 font-medium">Category</th>
+                              <th className="pb-3 font-medium w-28">Date</th>
+                              <th className="pb-3 font-medium w-28">Category</th>
                               <th className="pb-3 font-medium">Description</th>
-                              <th className="pb-3 font-medium text-right">Amount</th>
-                              <th className="pb-3 font-medium">Project</th>
-                              <th className="pb-3 font-medium">Type</th>
-                              <th className="pb-3 font-medium text-center">Actions</th>
+                              <th className="pb-3 font-medium text-right w-32">Amount</th>
+                              <th className="pb-3 font-medium w-28">Project</th>
+                              <th className="pb-3 font-medium w-20">Type</th>
+                              <th className="pb-3 font-medium text-center w-24">Actions</th>
                             </tr>
                           </thead>
                           <tbody>
