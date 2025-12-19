@@ -1,126 +1,331 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@600;700;800&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Professional Fintech Color Scheme */
 :root {
-  --terminal-bg: #0a0a0f;
-  --terminal-surface: #12121a;
-  --terminal-border: #1e1e2e;
-  --terminal-muted: #3a3a4a;
-  --accent-primary: #10b981;
-  --accent-secondary: #6366f1;
-  --accent-warning: #f59e0b;
-  --accent-danger: #ef4444;
+  /* Primary Blues */
+  --color-primary: #3b82f6;
+  --color-primary-hover: #2563eb;
+  --color-primary-muted: #3b82f620;
+  
+  /* Slate backgrounds (Dark Mode) */
+  --color-bg-dark: #0f172a;
+  --color-surface-dark: #1e293b;
+  --color-border-dark: #334155;
+  
+  /* Light Mode */
+  --color-bg-light: #f8fafc;
+  --color-surface-light: #ffffff;
+  --color-border-light: #e2e8f0;
+  
+  /* Semantic Colors */
+  --color-success: #10b981;
+  --color-danger: #ef4444;
+  --color-warning: #f59e0b;
+  --color-info: #06b6d4;
+  
+  /* Text Colors */
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+  
+  /* Accent Colors for Charts/Categories */
+  --color-revenue: #10b981;
+  --color-expense: #ef4444;
+  --color-overhead: #f59e0b;
+  --color-investment: #8b5cf6;
+  --color-payroll: #ec4899;
+  --color-opex: #f97316;
 }
 
-* {
-  box-sizing: border-box;
+/* Tailwind Custom Colors */
+@layer base {
+  :root {
+    /* Accent colors used throughout the app */
+    --accent-primary: 59 130 246; /* #3b82f6 - Royal Blue */
+    --accent-secondary: 148 163 184; /* #94a3b8 - Slate */
+    --accent-success: 16 185 129; /* #10b981 - Emerald */
+    --accent-danger: 239 68 68; /* #ef4444 - Red */
+    --accent-warning: 245 158 11; /* #f59e0b - Amber */
+    
+    /* Terminal/Dark theme colors */
+    --terminal-bg: 15 23 42; /* #0f172a - Slate 900 */
+    --terminal-surface: 30 41 59; /* #1e293b - Slate 800 */
+    --terminal-border: 51 65 85; /* #334155 - Slate 700 */
+  }
 }
 
-html {
-  scroll-behavior: smooth;
-}
-
+/* Dark mode default */
 body {
-  background: var(--terminal-bg);
-  color: #e4e4e7;
-  font-family: 'IBM Plex Sans', sans-serif;
+  @apply bg-slate-900 text-slate-100;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
-/* Custom scrollbar */
+/* Light mode */
+body.light-mode,
+.light-mode {
+  @apply bg-slate-50 text-slate-900;
+}
+
+/* Custom scrollbar for dark mode */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--terminal-surface);
+  @apply bg-slate-800;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--terminal-muted);
-  border-radius: 3px;
+  @apply bg-slate-600 rounded-full;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-primary);
+  @apply bg-slate-500;
 }
 
-/* Glow effects */
-.glow-green {
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+/* Light mode scrollbar */
+.light-mode ::-webkit-scrollbar-track {
+  @apply bg-slate-100;
 }
 
-.glow-blue {
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+.light-mode ::-webkit-scrollbar-thumb {
+  @apply bg-slate-300;
 }
 
-.glow-text {
-  text-shadow: 0 0 10px currentColor;
+.light-mode ::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-400;
 }
 
-/* Grid pattern background */
-.grid-pattern {
-  background-image: 
-    linear-gradient(rgba(16, 185, 129, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(16, 185, 129, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
+/* Focus states */
+*:focus-visible {
+  @apply outline-none ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-900;
 }
 
-/* Noise texture overlay */
-.noise-overlay::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-  opacity: 0.03;
-  pointer-events: none;
+.light-mode *:focus-visible {
+  @apply ring-offset-white;
 }
 
-/* Chart animations */
+/* Professional card styles */
+.card-professional {
+  @apply bg-slate-800 border border-slate-700 rounded-xl shadow-lg;
+}
+
+.light-mode .card-professional {
+  @apply bg-white border-slate-200 shadow-sm;
+}
+
+/* Gradient accents */
+.gradient-primary {
+  @apply bg-gradient-to-r from-blue-600 to-blue-500;
+}
+
+.gradient-success {
+  @apply bg-gradient-to-r from-emerald-600 to-emerald-500;
+}
+
+.gradient-danger {
+  @apply bg-gradient-to-r from-red-600 to-red-500;
+}
+
+/* Number/Currency styling */
+.font-mono-numbers {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Smooth transitions */
+* {
+  @apply transition-colors duration-150;
+}
+
+/* Button base styles */
+.btn-primary {
+  @apply px-4 py-2 bg-blue-600 text-white rounded-lg font-medium 
+         hover:bg-blue-700 active:bg-blue-800 
+         transition-all duration-150 ease-in-out
+         focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900;
+}
+
+.light-mode .btn-primary {
+  @apply focus:ring-offset-white;
+}
+
+.btn-secondary {
+  @apply px-4 py-2 bg-slate-700 text-slate-200 rounded-lg font-medium
+         hover:bg-slate-600 active:bg-slate-500
+         border border-slate-600;
+}
+
+.light-mode .btn-secondary {
+  @apply bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200;
+}
+
+/* Table styles */
+.table-professional {
+  @apply w-full text-sm;
+}
+
+.table-professional thead {
+  @apply bg-slate-800/50;
+}
+
+.light-mode .table-professional thead {
+  @apply bg-slate-50;
+}
+
+.table-professional th {
+  @apply px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider;
+}
+
+.light-mode .table-professional th {
+  @apply text-slate-500;
+}
+
+.table-professional td {
+  @apply px-4 py-3 border-t border-slate-700/50;
+}
+
+.light-mode .table-professional td {
+  @apply border-slate-200;
+}
+
+/* KPI Card styles */
+.kpi-card {
+  @apply p-5 rounded-xl bg-slate-800 border border-slate-700;
+}
+
+.light-mode .kpi-card {
+  @apply bg-white border-slate-200 shadow-sm;
+}
+
+.kpi-value {
+  @apply text-2xl font-bold font-mono tracking-tight;
+}
+
+.kpi-label {
+  @apply text-sm text-slate-400 font-medium;
+}
+
+.light-mode .kpi-label {
+  @apply text-slate-500;
+}
+
+/* Chart container */
+.chart-container {
+  @apply p-6 rounded-xl bg-slate-800 border border-slate-700;
+}
+
+.light-mode .chart-container {
+  @apply bg-white border-slate-200;
+}
+
+/* Status badges */
+.badge {
+  @apply px-2 py-1 rounded-md text-xs font-medium;
+}
+
+.badge-success {
+  @apply bg-emerald-500/15 text-emerald-400;
+}
+
+.badge-danger {
+  @apply bg-red-500/15 text-red-400;
+}
+
+.badge-warning {
+  @apply bg-amber-500/15 text-amber-400;
+}
+
+.badge-info {
+  @apply bg-blue-500/15 text-blue-400;
+}
+
+.light-mode .badge-success {
+  @apply bg-emerald-100 text-emerald-700;
+}
+
+.light-mode .badge-danger {
+  @apply bg-red-100 text-red-700;
+}
+
+.light-mode .badge-warning {
+  @apply bg-amber-100 text-amber-700;
+}
+
+.light-mode .badge-info {
+  @apply bg-blue-100 text-blue-700;
+}
+
+/* Sidebar styles */
+.sidebar-item {
+  @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+         text-slate-400 hover:text-slate-100 hover:bg-slate-800
+         transition-all duration-150;
+}
+
+.sidebar-item.active {
+  @apply bg-blue-600/15 text-blue-400;
+}
+
+.light-mode .sidebar-item {
+  @apply text-slate-600 hover:text-slate-900 hover:bg-slate-100;
+}
+
+.light-mode .sidebar-item.active {
+  @apply bg-blue-50 text-blue-600;
+}
+
+/* Input styles */
+.input-professional {
+  @apply w-full px-3 py-2 rounded-lg text-sm
+         bg-slate-800 border border-slate-600 text-slate-100
+         placeholder:text-slate-500
+         focus:border-blue-500 focus:ring-1 focus:ring-blue-500;
+}
+
+.light-mode .input-professional {
+  @apply bg-white border-slate-300 text-slate-900
+         placeholder:text-slate-400;
+}
+
+/* Dropdown/Select styles */
+select.input-professional {
+  @apply appearance-none cursor-pointer
+         bg-no-repeat bg-right pr-10;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-size: 1.5em 1.5em;
+}
+
+/* Animation utilities */
 @keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.chart-animate {
-  animation: fadeIn 0.5s ease-out;
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
 }
 
-/* Status indicator pulse */
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
 }
 
-.pulse-dot {
-  animation: pulse-dot 2s ease-in-out infinite;
-}
-
-/* Input focus styles */
-input:focus, select:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
-}
-
-/* Button hover transitions */
-button {
-  transition: all 0.2s ease;
-}
-
-/* Table row hover */
-tbody tr:hover {
-  background-color: rgba(16, 185, 129, 0.02);
-}
-
-/* Card hover effect */
-.card-hover:hover {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
+/* Print styles */
+@media print {
+  body {
+    @apply bg-white text-black;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
 }
