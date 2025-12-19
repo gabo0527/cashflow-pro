@@ -14,33 +14,45 @@ const config: Config = {
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       colors: {
-        // Professional Fintech Primary - Deep Blue
-        'accent-primary': '#1d4ed8',
-        'accent-secondary': '#64748b',
-        'accent-success': '#10b981',
-        'accent-danger': '#dc2626',
-        'accent-warning': '#d97706',
+        // Professional Fintech - Muted Gold Accent
+        'accent-primary': '#C9A44D',
+        'accent-secondary': '#9AA1A9',
+        'accent-success': '#1F7A5B',
+        'accent-danger': '#8C2F2F',
+        'accent-warning': '#C9A44D',
         
-        // Dark Theme - Deep charcoal/navy
-        'terminal-bg': '#0a0f1a',
-        'terminal-surface': '#111827',
-        'terminal-border': '#1f2937',
+        // Dark Theme - Charcoal/Graphite
+        'terminal-bg': '#0F1113',
+        'terminal-surface': '#161A1D',
+        'terminal-border': '#2A3036',
         
-        // Chart colors - NO purple
+        // Extended palette
+        'charcoal': '#0F1113',
+        'graphite': '#161A1D',
+        'dark-slate': '#1E2328',
+        'muted-steel': '#2A3036',
+        'soft-white': '#E6E8EB',
+        'cool-gray': '#9AA1A9',
+        'steel-gray': '#5F6A72',
+        'muted-gold': '#C9A44D',
+        'deep-green': '#1F7A5B',
+        'brick-red': '#8C2F2F',
+        'muted-olive': '#6E7F4E',
+        
+        // Chart colors
         'chart': {
-          revenue: '#10b981',
-          expense: '#dc2626',
-          overhead: '#d97706',
-          investment: '#0891b2',
-          payroll: '#0d9488',
-          opex: '#ea580c',
-          net: '#0ea5e9',
+          revenue: '#1F7A5B',
+          expense: '#8C2F2F',
+          overhead: '#C9A44D',
+          investment: '#6E7F4E',
+          neutral: '#5F6A72',
+          line: '#9AA1A9',
         },
       },
       boxShadow: {
-        'glow-sm': '0 0 15px -3px rgba(29, 78, 216, 0.3)',
-        'glow': '0 0 25px -5px rgba(29, 78, 216, 0.4)',
-        'glow-lg': '0 0 35px -5px rgba(29, 78, 216, 0.5)',
+        'glow-sm': '0 0 15px -3px rgba(201, 164, 77, 0.2)',
+        'glow': '0 0 25px -5px rgba(201, 164, 77, 0.3)',
+        'glow-lg': '0 0 35px -5px rgba(201, 164, 77, 0.4)',
       },
       animation: {
         'fade-in': 'fadeIn 0.2s ease-out',
