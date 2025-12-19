@@ -8045,153 +8045,222 @@ const handleQuickAdd = useCallback(async () => {
         </div>
       </div>
 
-      {/* Floating AI Chat Button */}
-      <div className="fixed bottom-6 right-6 z-50 print:hidden">
-        <AnimatePresence>
-          {chatOpen && (
+      {/* AI Chat Side Panel */}
+      <AnimatePresence>
+        {chatOpen && (
+          <>
+            {/* Backdrop */}
             <motion.div
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              className={`absolute bottom-16 right-0 w-96 rounded-xl shadow-2xl border overflow-hidden ${
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setChatOpen(false)}
+              className="fixed inset-0 bg-black/30 z-50 lg:hidden"
+            />
+            
+            {/* Chat Panel */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className={`fixed top-0 right-0 h-full w-full sm:w-[420px] z-50 flex flex-col shadow-2xl ${
                 theme === 'light' 
-                  ? 'bg-white border-gray-200' 
-                  : 'bg-[#141c2e] border-[#2a3a55]'
+                  ? 'bg-white border-l border-gray-200' 
+                  : 'bg-[#0c1222] border-l border-[#2a3a55]'
               }`}
             >
-              {/* Chat Header */}
-              <div className={`px-4 py-3 border-b flex items-center justify-between ${
-                theme === 'light' ? 'border-gray-200 bg-gray-50' : 'border-[#2a3a55] bg-[#0c1222]'
+              {/* Panel Header */}
+              <div className={`px-5 py-4 border-b ${
+                theme === 'light' ? 'border-gray-200' : 'border-[#2a3a55]'
               }`}>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-[#00d4aa]/20 flex items-center justify-center">
-                    <Bot className="w-4 h-4 text-[#00d4aa]" />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00d4aa] to-[#22c55e] flex items-center justify-center shadow-lg">
+                      <Sparkles className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">Vantage AI</h3>
+                      <p className={`text-xs ${textMuted}`}>Your financial assistant</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-semibold text-sm">Vantage AI</h4>
-                    <p className={`text-xs ${textMuted}`}>Ask about your finances</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setChatMessages([])}
+                      className={`p-2 rounded-lg text-sm ${
+                        theme === 'light' ? 'hover:bg-gray-100 text-gray-500' : 'hover:bg-[#1c2740] text-[#94a3b8]'
+                      }`}
+                      title="Clear chat"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => setChatOpen(false)}
+                      className={`p-2 rounded-lg ${
+                        theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-[#1c2740]'
+                      }`}
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
                   </div>
                 </div>
-                <button 
-                  onClick={() => setChatOpen(false)}
-                  className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-[#2a3a55]'}`}
-                >
-                  <X className="w-4 h-4" />
-                </button>
               </div>
               
-              {/* Chat Messages */}
-              <div className={`h-80 overflow-y-auto p-4 space-y-3 ${
-                theme === 'light' ? 'bg-white' : 'bg-[#141c2e]'
+              {/* Chat Messages Area */}
+              <div className={`flex-1 overflow-y-auto p-5 space-y-4 ${
+                theme === 'light' ? 'bg-gray-50' : 'bg-[#0c1222]'
               }`}>
                 {chatMessages.length === 0 ? (
-                  <div className={`text-center py-8 ${textMuted}`}>
-                    <Bot className="w-10 h-10 mx-auto mb-3 opacity-50" />
-                    <p className="text-sm font-medium mb-2">How can I help?</p>
-                    <div className="space-y-2 text-xs">
-                      <button 
-                        onClick={() => setChatInput("What's my gross margin this year?")}
-                        className={`block w-full text-left px-3 py-2 rounded-lg ${
-                          theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-[#1c2740] hover:bg-[#2a3a55]'
-                        }`}
-                      >
-                        💰 What's my gross margin this year?
-                      </button>
-                      <button 
-                        onClick={() => setChatInput("Which project is most profitable?")}
-                        className={`block w-full text-left px-3 py-2 rounded-lg ${
-                          theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-[#1c2740] hover:bg-[#2a3a55]'
-                        }`}
-                      >
-                        📊 Which project is most profitable?
-                      </button>
-                      <button 
-                        onClick={() => setChatInput("Summarize my cash flow")}
-                        className={`block w-full text-left px-3 py-2 rounded-lg ${
-                          theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-[#1c2740] hover:bg-[#2a3a55]'
-                        }`}
-                      >
-                        📈 Summarize my cash flow
-                      </button>
+                  <div className="h-full flex flex-col">
+                    {/* Welcome Message */}
+                    <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#00d4aa] to-[#22c55e] flex items-center justify-center mb-4 shadow-lg">
+                        <Sparkles className="w-8 h-8 text-white" />
+                      </div>
+                      <h4 className="text-lg font-semibold mb-2">Hi! I'm Vantage AI</h4>
+                      <p className={`text-sm mb-6 ${textMuted}`}>
+                        I can help you understand your financial data, analyze projects, and answer questions about your business.
+                      </p>
+                      
+                      {/* Quick Actions */}
+                      <div className="w-full space-y-2">
+                        <p className={`text-xs font-medium uppercase tracking-wider mb-3 ${textMuted}`}>
+                          Try asking
+                        </p>
+                        {[
+                          { icon: '📊', text: "What's my overall gross margin?" },
+                          { icon: '🏆', text: "Which project is most profitable?" },
+                          { icon: '💰', text: "Summarize my cash position" },
+                          { icon: '📈', text: "How's revenue trending this year?" },
+                          { icon: '⚠️', text: "Any projects losing money?" },
+                        ].map((suggestion, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              setChatInput(suggestion.text)
+                              setTimeout(() => sendChatMessage(), 100)
+                            }}
+                            className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${
+                              theme === 'light' 
+                                ? 'bg-white hover:bg-gray-100 border border-gray-200 hover:border-[#00d4aa]/50' 
+                                : 'bg-[#141c2e] hover:bg-[#1c2740] border border-[#2a3a55] hover:border-[#00d4aa]/50'
+                            }`}
+                          >
+                            <span className="mr-2">{suggestion.icon}</span>
+                            {suggestion.text}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 ) : (
-                  chatMessages.map((msg, idx) => (
-                    <div 
-                      key={idx} 
-                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                        msg.role === 'user'
-                          ? 'bg-[#00d4aa] text-[#0c1222]'
-                          : theme === 'light' 
-                            ? 'bg-gray-100 text-gray-800' 
-                            : 'bg-[#1c2740] text-[#f1f5f9]'
-                      }`}>
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                  <>
+                    {chatMessages.map((msg, idx) => (
+                      <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                        {/* Avatar */}
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
+                          msg.role === 'user'
+                            ? 'bg-[#00d4aa]'
+                            : 'bg-gradient-to-br from-[#00d4aa] to-[#22c55e]'
+                        }`}>
+                          {msg.role === 'user' 
+                            ? <User className="w-4 h-4 text-[#0c1222]" />
+                            : <Sparkles className="w-4 h-4 text-white" />
+                          }
+                        </div>
+                        
+                        {/* Message Bubble */}
+                        <div className={`max-w-[80%] ${msg.role === 'user' ? 'text-right' : ''}`}>
+                          <div className={`inline-block rounded-2xl px-4 py-3 text-sm ${
+                            msg.role === 'user'
+                              ? 'bg-[#00d4aa] text-[#0c1222] rounded-tr-md'
+                              : theme === 'light' 
+                                ? 'bg-white text-gray-800 border border-gray-200 rounded-tl-md' 
+                                : 'bg-[#141c2e] text-[#f1f5f9] border border-[#2a3a55] rounded-tl-md'
+                          }`}>
+                            <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                          </div>
+                          <p className={`text-xs mt-1 ${textMuted}`}>
+                            {msg.role === 'user' ? 'You' : 'Vantage AI'}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))
-                )}
-                {chatLoading && (
-                  <div className="flex justify-start">
-                    <div className={`rounded-lg px-3 py-2 ${
-                      theme === 'light' ? 'bg-gray-100' : 'bg-[#1c2740]'
-                    }`}>
-                      <div className="flex items-center gap-1">
-                        <div className="w-2 h-2 bg-[#00d4aa] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <div className="w-2 h-2 bg-[#00d4aa] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <div className="w-2 h-2 bg-[#00d4aa] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    ))}
+                    
+                    {/* Loading Indicator */}
+                    {chatLoading && (
+                      <div className="flex gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-[#00d4aa] to-[#22c55e] flex items-center justify-center">
+                          <Sparkles className="w-4 h-4 text-white" />
+                        </div>
+                        <div className={`rounded-2xl rounded-tl-md px-4 py-3 ${
+                          theme === 'light' ? 'bg-white border border-gray-200' : 'bg-[#141c2e] border border-[#2a3a55]'
+                        }`}>
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 bg-[#00d4aa] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <div className="w-2 h-2 bg-[#00d4aa] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <div className="w-2 h-2 bg-[#00d4aa] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    )}
+                  </>
                 )}
               </div>
               
-              {/* Chat Input */}
-              <div className={`p-3 border-t ${
-                theme === 'light' ? 'border-gray-200 bg-gray-50' : 'border-[#2a3a55] bg-[#0c1222]'
+              {/* Input Area */}
+              <div className={`p-4 border-t ${
+                theme === 'light' ? 'border-gray-200 bg-white' : 'border-[#2a3a55] bg-[#141c2e]'
               }`}>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
+                <div className={`flex items-end gap-3 rounded-xl p-2 ${
+                  theme === 'light' ? 'bg-gray-100' : 'bg-[#0c1222]'
+                }`}>
+                  <textarea
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
-                    placeholder="Ask about your data..."
-                    className={`flex-1 px-3 py-2 rounded-lg text-sm border ${
-                      theme === 'light' 
-                        ? 'bg-white border-gray-300 focus:border-[#00d4aa]' 
-                        : 'bg-[#141c2e] border-[#2a3a55] focus:border-[#00d4aa]'
-                    } outline-none`}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        sendChatMessage()
+                      }
+                    }}
+                    placeholder="Ask me anything about your finances..."
+                    rows={1}
+                    className={`flex-1 px-3 py-2 bg-transparent resize-none text-sm outline-none max-h-32 ${
+                      theme === 'light' ? 'placeholder:text-gray-400' : 'placeholder:text-[#64748b]'
+                    }`}
+                    style={{ minHeight: '40px' }}
                   />
                   <button
                     onClick={sendChatMessage}
                     disabled={!chatInput.trim() || chatLoading}
-                    className="px-3 py-2 bg-[#00d4aa] text-[#0c1222] rounded-lg hover:bg-[#00c49a] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-2.5 bg-[#00d4aa] text-[#0c1222] rounded-lg hover:bg-[#00c49a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <Send className="w-4 h-4" />
                   </button>
                 </div>
+                <p className={`text-xs mt-2 text-center ${textMuted}`}>
+                  Vantage AI analyzes your data to provide insights
+                </p>
               </div>
             </motion.div>
-          )}
-        </AnimatePresence>
-        
-        {/* Chat Toggle Button */}
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setChatOpen(!chatOpen)}
-          className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-colors ${
-            chatOpen 
-              ? 'bg-[#2a3a55] text-white' 
-              : 'bg-[#00d4aa] text-[#0c1222] hover:bg-[#00c49a]'
-          }`}
-        >
-          {chatOpen ? <X className="w-6 h-6" /> : <MessageSquare className="w-6 h-6" />}
-        </motion.button>
-      </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Chat Toggle Button - Floating */}
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => setChatOpen(!chatOpen)}
+        className={`fixed bottom-6 right-6 z-40 print:hidden w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all ${
+          chatOpen 
+            ? 'bg-[#2a3a55] text-white scale-0 opacity-0' 
+            : 'bg-gradient-to-br from-[#00d4aa] to-[#22c55e] text-white hover:shadow-xl hover:shadow-[#00d4aa]/20 scale-100 opacity-100'
+        }`}
+      >
+        <MessageSquare className="w-6 h-6" />
+      </motion.button>
 
       {/* Print styles */}
       <style jsx global>{`
