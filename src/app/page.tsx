@@ -471,6 +471,13 @@ export default function CashFlowPro() {
   const [pendingUploadData, setPendingUploadData] = useState<any[]>([])
   const [uploadType, setUploadType] = useState<'cash' | 'accrual'>('cash')
   
+  // Bank Statement Parsing state
+  const [statementLoading, setStatementLoading] = useState(false)
+  const [statementData, setStatementData] = useState<any[]>([])
+  const [showStatementPreview, setShowStatementPreview] = useState(false)
+  const [statementInfo, setStatementInfo] = useState<any>(null)
+  const [statementError, setStatementError] = useState<string | null>(null)
+  
   // Branding state
   const [branding, setBranding] = useState<BrandingSettings>({
     companyName: 'Vantage',
@@ -4567,6 +4574,228 @@ const handleQuickAdd = useCallback(async () => {
         )}
       </AnimatePresence>
 
+      {/* Bank Statement Preview Modal */}
+      <AnimatePresence>
+        {showStatementPreview && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowStatementPreview(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-5xl max-h-[85vh] rounded-xl border overflow-hidden flex flex-col ${cardClasses}`}
+            >
+              {/* Header */}
+              <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-5 h-5 text-cyan-500" />
+                    <h3 className="text-lg font-semibold">Bank Statement Extraction</h3>
+                    <span className={`text-sm px-2 py-0.5 rounded-full ${theme === 'light' ? 'bg-cyan-50 text-cyan-600' : 'bg-cyan-500/20 text-cyan-400'}`}>
+                      {statementData.length} transactions found
+                    </span>
+                  </div>
+                  <button onClick={() => setShowStatementPreview(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                {statementInfo && (statementInfo.bank_name || statementInfo.account_ending) && (
+                  <div className={`mt-2 text-sm ${textMuted}`}>
+                    {statementInfo.bank_name && <span>{statementInfo.bank_name}</span>}
+                    {statementInfo.account_ending && <span> • Account ending {statementInfo.account_ending}</span>}
+                    {statementInfo.statement_period && <span> • {statementInfo.statement_period}</span>}
+                  </div>
+                )}
+              </div>
+              
+              {/* Table */}
+              <div className="flex-1 overflow-auto p-4">
+                <table className="w-full text-sm">
+                  <thead className={`sticky top-0 ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-surface'}`}>
+                    <tr className={`border-b ${tableBorder} text-left ${textMuted}`}>
+                      <th className="pb-3 px-2">
+                        <input
+                          type="checkbox"
+                          checked={statementData.every(s => s.accepted !== false)}
+                          onChange={(e) => setStatementData(prev => prev.map(s => ({ ...s, accepted: e.target.checked })))}
+                          className="rounded"
+                        />
+                      </th>
+                      <th className="pb-3 px-2 font-medium">Date</th>
+                      <th className="pb-3 px-2 font-medium">Description</th>
+                      <th className="pb-3 px-2 font-medium">Vendor</th>
+                      <th className="pb-3 px-2 font-medium text-right">Amount</th>
+                      <th className="pb-3 px-2 font-medium">Type</th>
+                      <th className="pb-3 px-2 font-medium">Category</th>
+                      <th className="pb-3 px-2 font-medium">Project</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {statementData.map((tx, index) => (
+                      <tr 
+                        key={tx.id || index} 
+                        className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'} ${tx.accepted === false ? 'opacity-50' : ''}`}
+                      >
+                        <td className="py-3 px-2">
+                          <input
+                            type="checkbox"
+                            checked={tx.accepted !== false}
+                            onChange={() => setStatementData(prev => prev.map((s, i) => i === index ? { ...s, accepted: s.accepted === false ? true : false } : s))}
+                            className="rounded"
+                          />
+                        </td>
+                        <td className="py-3 px-2 font-mono text-xs">
+                          <input
+                            type="date"
+                            value={tx.date}
+                            onChange={(e) => setStatementData(prev => prev.map((s, i) => i === index ? { ...s, date: e.target.value } : s))}
+                            className={`w-28 px-1 py-0.5 rounded text-xs border ${inputClasses}`}
+                            style={{ colorScheme: theme }}
+                          />
+                        </td>
+                        <td className="py-3 px-2 max-w-xs">
+                          <input
+                            type="text"
+                            value={tx.description}
+                            onChange={(e) => setStatementData(prev => prev.map((s, i) => i === index ? { ...s, description: e.target.value } : s))}
+                            className={`w-full px-2 py-0.5 rounded text-xs border ${inputClasses}`}
+                            style={{ colorScheme: theme }}
+                          />
+                        </td>
+                        <td className="py-3 px-2">
+                          <input
+                            type="text"
+                            value={tx.vendor || ''}
+                            onChange={(e) => setStatementData(prev => prev.map((s, i) => i === index ? { ...s, vendor: e.target.value } : s))}
+                            className={`w-24 px-2 py-0.5 rounded text-xs border ${inputClasses}`}
+                            style={{ colorScheme: theme }}
+                            placeholder="Vendor"
+                          />
+                        </td>
+                        <td className={`py-3 px-2 text-right`}>
+                          <input
+                            type="number"
+                            value={tx.amount}
+                            onChange={(e) => setStatementData(prev => prev.map((s, i) => i === index ? { ...s, amount: parseFloat(e.target.value) || 0 } : s))}
+                            className={`w-24 px-2 py-0.5 rounded text-xs border text-right font-mono ${inputClasses} ${tx.type === 'credit' ? 'text-accent-primary' : 'text-accent-danger'}`}
+                            style={{ colorScheme: theme }}
+                          />
+                        </td>
+                        <td className="py-3 px-2">
+                          <select
+                            value={tx.type}
+                            onChange={(e) => setStatementData(prev => prev.map((s, i) => i === index ? { ...s, type: e.target.value } : s))}
+                            className={`w-20 px-1 py-0.5 rounded text-xs border ${inputClasses}`}
+                            style={{ colorScheme: theme }}
+                          >
+                            <option value="credit">Credit</option>
+                            <option value="debit">Debit</option>
+                          </select>
+                        </td>
+                        <td className="py-3 px-2">
+                          <select
+                            value={tx.category_suggestion || 'opex'}
+                            onChange={(e) => setStatementData(prev => prev.map((s, i) => i === index ? { ...s, category_suggestion: e.target.value } : s))}
+                            className={`w-24 px-1 py-0.5 rounded text-xs border ${inputClasses}`}
+                            style={{ colorScheme: theme }}
+                          >
+                            {categories.map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-3 px-2">
+                          <select
+                            value={tx.project || ''}
+                            onChange={(e) => setStatementData(prev => prev.map((s, i) => i === index ? { ...s, project: e.target.value } : s))}
+                            className={`w-24 px-1 py-0.5 rounded text-xs border ${inputClasses}`}
+                            style={{ colorScheme: theme }}
+                          >
+                            <option value="">No project</option>
+                            {projectList.map(p => (
+                              <option key={p} value={p}>{p}</option>
+                            ))}
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Footer */}
+              <div className={`p-4 border-t ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'} flex items-center justify-between`}>
+                <div className={`text-sm ${textMuted}`}>
+                  {statementData.filter(s => s.accepted !== false).length} transactions will be imported to Cash Flow
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowStatementPreview(false)
+                      setStatementData([])
+                    }}
+                    className={`px-4 py-2 rounded-lg font-medium ${theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-terminal-bg hover:bg-terminal-surface'}`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const toImport = statementData.filter(s => s.accepted !== false)
+                      if (toImport.length === 0) {
+                        alert('No transactions selected')
+                        return
+                      }
+                      
+                      // Convert to Cash Flow transaction format
+                      const newTransactions = toImport.map(tx => ({
+                        id: generateId(),
+                        date: tx.date,
+                        category: tx.category_suggestion || 'opex',
+                        description: tx.description,
+                        amount: tx.type === 'credit' ? Math.abs(tx.amount) : -Math.abs(tx.amount),
+                        type: 'actual' as const,
+                        project: tx.project || ''
+                      }))
+                      
+                      // Add to transactions (Supabase)
+                      if (currentUser && currentCompanyId) {
+                        try {
+                          await bulkInsertTransactions(newTransactions, currentCompanyId, currentUser.id)
+                          setTransactions(prev => [...prev, ...newTransactions])
+                          setShowStatementPreview(false)
+                          setStatementData([])
+                          alert(`Successfully imported ${newTransactions.length} transactions!`)
+                        } catch (error) {
+                          console.error('Error importing transactions:', error)
+                          alert('Error importing transactions. Please try again.')
+                        }
+                      } else {
+                        // Fallback to local storage
+                        setTransactions(prev => [...prev, ...newTransactions])
+                        setShowStatementPreview(false)
+                        setStatementData([])
+                        alert(`Successfully imported ${newTransactions.length} transactions!`)
+                      }
+                    }}
+                    disabled={statementData.filter(s => s.accepted !== false).length === 0}
+                    className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg font-medium hover:from-cyan-600 hover:to-blue-600 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <Check className="w-4 h-4" />
+                    Import {statementData.filter(s => s.accepted !== false).length} to Cash Flow
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
           {/* Main Content */}
           <main className="flex-1 px-4 sm:px-6 py-4 sm:py-6 overflow-auto">
         <AnimatePresence mode="wait">
@@ -6494,6 +6723,98 @@ const handleQuickAdd = useCallback(async () => {
                 
                 <div className={`mt-4 p-3 rounded-lg text-sm ${theme === 'light' ? 'bg-purple-50 text-purple-700' : 'bg-purple-500/10 text-purple-300'}`}>
                   <strong>How it works:</strong> Upload a CSV and AI will analyze each transaction description to suggest categories and projects. You can review, edit, and approve suggestions before importing.
+                </div>
+              </div>
+
+              {/* Bank Statement PDF/Image Upload */}
+              <div className={`rounded-xl p-6 border ${cardClasses}`}>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">📄 Bank Statement Upload</h3>
+                    <p className={`text-sm ${textMuted}`}>Upload PDF or image - AI extracts all transactions</p>
+                  </div>
+                  <span className={`ml-auto text-xs px-2 py-1 rounded-full bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-400 font-medium`}>
+                    ✨ AI Powered
+                  </span>
+                </div>
+                
+                <div className={`p-6 rounded-lg border-2 border-dashed text-center ${
+                  theme === 'light' ? 'border-cyan-200 bg-cyan-50/50' : 'border-cyan-500/30 bg-cyan-500/5'
+                }`}>
+                  <input 
+                    type="file" 
+                    accept=".pdf,image/*"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      
+                      setStatementLoading(true)
+                      setStatementError(null)
+                      
+                      try {
+                        const formData = new FormData()
+                        formData.append('file', file)
+                        
+                        const response = await fetch('/api/parse-statement', {
+                          method: 'POST',
+                          body: formData
+                        })
+                        
+                        const result = await response.json()
+                        
+                        if (result.error) {
+                          setStatementError(result.error)
+                          alert('Error: ' + result.error)
+                        } else if (result.transactions && result.transactions.length > 0) {
+                          setStatementData(result.transactions)
+                          setStatementInfo(result.account_info)
+                          setShowStatementPreview(true)
+                        } else {
+                          setStatementError('No transactions found in statement')
+                          alert('No transactions found in the statement')
+                        }
+                      } catch (err) {
+                        setStatementError('Failed to process statement')
+                        alert('Failed to process statement. Please try again.')
+                      }
+                      
+                      setStatementLoading(false)
+                      e.target.value = ''
+                    }}
+                    className="hidden" 
+                    id="statement-upload" 
+                    disabled={statementLoading}
+                  />
+                  <label 
+                    htmlFor="statement-upload" 
+                    className={`inline-flex items-center gap-2 px-6 py-3 rounded-lg cursor-pointer font-medium transition-all ${
+                      statementLoading 
+                        ? 'bg-gray-400 cursor-not-allowed' 
+                        : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600'
+                    }`}
+                  >
+                    {statementLoading ? (
+                      <>
+                        <RefreshCw className="w-5 h-5 animate-spin" />
+                        Extracting Transactions...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-5 h-5" />
+                        Upload Bank Statement
+                      </>
+                    )}
+                  </label>
+                  <p className={`mt-3 text-sm ${textMuted}`}>
+                    Supports PDF and images (PNG, JPG) • AI will extract dates, descriptions, amounts
+                  </p>
+                </div>
+                
+                <div className={`mt-4 p-3 rounded-lg text-sm ${theme === 'light' ? 'bg-cyan-50 text-cyan-700' : 'bg-cyan-500/10 text-cyan-300'}`}>
+                  <strong>How it works:</strong> Upload your bank statement (PDF or screenshot) and Claude AI will read it, extract every transaction, and categorize them automatically. You'll review before importing to Cash Flow.
                 </div>
               </div>
 
