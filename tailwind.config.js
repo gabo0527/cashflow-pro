@@ -14,51 +14,37 @@ const config: Config = {
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       colors: {
-        // Professional Fintech Primary - Royal Blue
-        'accent-primary': '#3b82f6',
-        'accent-secondary': '#94a3b8',
+        // Professional Fintech Primary - Deep Blue
+        'accent-primary': '#1d4ed8',
+        'accent-secondary': '#64748b',
         'accent-success': '#10b981',
-        'accent-danger': '#ef4444',
-        'accent-warning': '#f59e0b',
+        'accent-danger': '#dc2626',
+        'accent-warning': '#d97706',
         
-        // Dark Theme - Slate tones for sophisticated look
-        'terminal-bg': '#0f172a',      // Slate 900 - Deep navy
-        'terminal-surface': '#1e293b', // Slate 800 - Card background
-        'terminal-border': '#334155',  // Slate 700 - Borders
+        // Dark Theme - Deep charcoal/navy
+        'terminal-bg': '#0a0f1a',
+        'terminal-surface': '#111827',
+        'terminal-border': '#1f2937',
         
-        // Extended palette
-        'slate': {
-          850: '#1a2234',
-          950: '#0a0f1a',
-        },
-        
-        // Chart colors
+        // Chart colors - NO purple
         'chart': {
           revenue: '#10b981',
-          expense: '#ef4444',
-          overhead: '#f59e0b',
-          investment: '#8b5cf6',
-          payroll: '#ec4899',
-          opex: '#f97316',
-          net: '#06b6d4',
+          expense: '#dc2626',
+          overhead: '#d97706',
+          investment: '#0891b2',
+          payroll: '#0d9488',
+          opex: '#ea580c',
+          net: '#0ea5e9',
         },
       },
       boxShadow: {
-        'glow-sm': '0 0 15px -3px rgba(59, 130, 246, 0.3)',
-        'glow': '0 0 25px -5px rgba(59, 130, 246, 0.4)',
-        'glow-lg': '0 0 35px -5px rgba(59, 130, 246, 0.5)',
-        'inner-glow': 'inset 0 1px 0 0 rgba(255, 255, 255, 0.05)',
-      },
-      backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-conic': 'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
-        'gradient-shine': 'linear-gradient(110deg, transparent 25%, rgba(255,255,255,0.05) 50%, transparent 75%)',
+        'glow-sm': '0 0 15px -3px rgba(29, 78, 216, 0.3)',
+        'glow': '0 0 25px -5px rgba(29, 78, 216, 0.4)',
+        'glow-lg': '0 0 35px -5px rgba(29, 78, 216, 0.5)',
       },
       animation: {
         'fade-in': 'fadeIn 0.2s ease-out',
         'slide-up': 'slideUp 0.3s ease-out',
-        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'shimmer': 'shimmer 2s linear infinite',
       },
       keyframes: {
         fadeIn: {
@@ -69,13 +55,6 @@ const config: Config = {
           '0%': { opacity: '0', transform: 'translateY(10px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
-        shimmer: {
-          '0%': { backgroundPosition: '-200% 0' },
-          '100%': { backgroundPosition: '200% 0' },
-        },
-      },
-      borderRadius: {
-        '4xl': '2rem',
       },
     },
   },
