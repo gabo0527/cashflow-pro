@@ -14,45 +14,41 @@ const config: Config = {
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       colors: {
-        // Professional Fintech - Muted Gold Accent
-        'accent-primary': '#C9A44D',
-        'accent-secondary': '#9AA1A9',
-        'accent-success': '#1F7A5B',
-        'accent-danger': '#8C2F2F',
-        'accent-warning': '#C9A44D',
+        // Modern Enterprise - Electric Green Accent
+        'accent-primary': '#00d4aa',
+        'accent-secondary': '#94a3b8',
+        'accent-success': '#22c55e',
+        'accent-danger': '#ef4444',
+        'accent-warning': '#f59e0b',
         
-        // Dark Theme - Charcoal/Graphite
-        'terminal-bg': '#0F1113',
-        'terminal-surface': '#161A1D',
-        'terminal-border': '#2A3036',
+        // Dark Theme - Deep Navy
+        'terminal-bg': '#0c1222',
+        'terminal-surface': '#141c2e',
+        'terminal-border': '#2a3a55',
         
         // Extended palette
-        'charcoal': '#0F1113',
-        'graphite': '#161A1D',
-        'dark-slate': '#1E2328',
-        'muted-steel': '#2A3036',
-        'soft-white': '#E6E8EB',
-        'cool-gray': '#9AA1A9',
-        'steel-gray': '#5F6A72',
-        'muted-gold': '#C9A44D',
-        'deep-green': '#1F7A5B',
-        'brick-red': '#8C2F2F',
-        'muted-olive': '#6E7F4E',
+        'navy': {
+          900: '#0c1222',
+          800: '#141c2e',
+          700: '#1c2740',
+          600: '#2a3a55',
+          500: '#3a4a65',
+        },
         
         // Chart colors
         'chart': {
-          revenue: '#1F7A5B',
-          expense: '#8C2F2F',
-          overhead: '#C9A44D',
-          investment: '#6E7F4E',
-          neutral: '#5F6A72',
-          line: '#9AA1A9',
+          revenue: '#22c55e',
+          expense: '#ef4444',
+          overhead: '#f59e0b',
+          investment: '#3b82f6',
+          primary: '#00d4aa',
+          secondary: '#94a3b8',
         },
       },
       boxShadow: {
-        'glow-sm': '0 0 15px -3px rgba(201, 164, 77, 0.2)',
-        'glow': '0 0 25px -5px rgba(201, 164, 77, 0.3)',
-        'glow-lg': '0 0 35px -5px rgba(201, 164, 77, 0.4)',
+        'glow-sm': '0 0 15px -3px rgba(0, 212, 170, 0.2)',
+        'glow': '0 0 25px -5px rgba(0, 212, 170, 0.3)',
+        'glow-lg': '0 0 35px -5px rgba(0, 212, 170, 0.4)',
       },
       animation: {
         'fade-in': 'fadeIn 0.2s ease-out',
