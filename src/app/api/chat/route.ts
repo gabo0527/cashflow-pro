@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     ) || []
     
     // Combine search terms and quoted phrases
-    const allSearchTerms = [...new Set([...searchTerms, ...quotedPhrases])]
+    const allSearchTerms = Array.from(new Set([...searchTerms, ...quotedPhrases]))
     
     let matchingTransactions: any[] = []
     let stats = { total: 0, uncategorized: 0, unassignedProject: 0 }
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
         })
         
         // Remove duplicates
-        const uniqueConditions = [...new Set(searchConditions)].join(',')
+        const uniqueConditions = Array.from(new Set(searchConditions)).join(',')
         
         const { data: cashMatches } = await supabase
           .from('transactions')
