@@ -2647,13 +2647,25 @@ const handleQuickAdd = useCallback(async () => {
       }
     })
     
+    // Only count CATEGORIZED transactions
+    const validCategories = ['revenue', 'opex', 'overhead', 'investment']
+    const categorizedTransactions = recentTransactions.filter(t => validCategories.includes(t.category))
+    const totalRecentCount = recentTransactions.length
+    const categorizedCount = categorizedTransactions.length
+    const categorizedPercent = totalRecentCount > 0 ? Math.round((categorizedCount / totalRecentCount) * 100) : 0
+    
     let totalRevenue = 0
     let totalExpenses = 0
     
-    recentTransactions.forEach(t => {
+    categorizedTransactions.forEach(t => {
       const amount = typeof t.amount === 'number' && !isNaN(t.amount) ? t.amount : 0
-      if (t.category === 'revenue') totalRevenue += amount
-      else totalExpenses += Math.abs(amount)
+      
+      if (t.category === 'revenue') {
+        totalRevenue += Math.abs(amount)
+      } else {
+        // opex, overhead, investment are all expenses
+        totalExpenses += Math.abs(amount)
+      }
     })
     
     const monthsOfData = Math.max(1, Math.min(3, 
@@ -2662,7 +2674,7 @@ const handleQuickAdd = useCallback(async () => {
     
     const avgMonthlyRevenue = totalRevenue / monthsOfData
     const avgMonthlyExpenses = totalExpenses / monthsOfData
-    const avgMonthlyBurn = avgMonthlyExpenses - avgMonthlyRevenue
+    const avgMonthlyNet = avgMonthlyRevenue - avgMonthlyExpenses  // Net cash flow (positive = good)
     
     // Current balance from chart data - with safe access
     let currentBalance = beginningBalance
@@ -2673,18 +2685,22 @@ const handleQuickAdd = useCallback(async () => {
       }
     }
     
-    // Runway in months (only if burning cash)
-    const runwayMonths = avgMonthlyBurn > 0 
-      ? currentBalance / avgMonthlyBurn 
+    // Runway in months (only if burning cash, i.e., net is negative)
+    const runwayMonths = avgMonthlyNet < 0 
+      ? currentBalance / Math.abs(avgMonthlyNet) 
       : Infinity
     
     return {
       currentBalance,
       avgMonthlyRevenue,
       avgMonthlyExpenses,
-      avgMonthlyBurn,
+      avgMonthlyBurn: avgMonthlyNet,  // Represents NET cash flow (positive = profitable)
       runwayMonths: isFinite(runwayMonths) ? runwayMonths : Infinity,
-      status: runwayMonths === Infinity || !isFinite(runwayMonths) ? 'profitable' : runwayMonths < 3 ? 'critical' : runwayMonths < 6 ? 'warning' : 'healthy'
+      status: avgMonthlyNet >= 0 ? 'profitable' : runwayMonths < 3 ? 'critical' : runwayMonths < 6 ? 'warning' : 'healthy',
+      // New: categorization stats
+      categorizedCount,
+      totalRecentCount,
+      categorizedPercent
     }
   }, [transactions, chartData, beginningBalance])
 
@@ -3221,11 +3237,11 @@ const handleQuickAdd = useCallback(async () => {
     }
     
     // Positive cash flow
-    if (runwayData.status === 'profitable' && runwayData.avgMonthlyBurn < 0) {
+    if (runwayData.avgMonthlyBurn > 0) {
       result.push({
         type: 'positive',
         title: 'Cash Positive',
-        message: `Generating ${formatCurrency(Math.abs(runwayData.avgMonthlyBurn))}/mo net cash`
+        message: `Generating ${formatCurrency(runwayData.avgMonthlyBurn)}/mo net cash`
       })
     }
     
@@ -5271,12 +5287,12 @@ const handleQuickAdd = useCallback(async () => {
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
                 {/* Monthly Cash Flow Card */}
                 <div className={`rounded-xl p-4 sm:p-5 border-2 ${
-                  runwayData.status === 'critical' 
+                  runwayData.avgMonthlyBurn >= 0
+                    ? 'border-accent-primary bg-accent-primary/5'
+                    : runwayData.status === 'critical' 
                     ? 'border-accent-danger bg-accent-danger/5' 
                     : runwayData.status === 'warning'
                     ? 'border-accent-warning bg-accent-warning/5'
-                    : runwayData.status === 'profitable'
-                    ? 'border-accent-primary bg-accent-primary/5'
                     : `border-accent-secondary/50 ${theme === 'light' ? 'bg-white' : 'bg-terminal-surface'}`
                 } col-span-2 lg:col-span-1`}>
                   <div className={`flex items-center gap-2 text-xs sm:text-sm mb-2 ${textMuted}`}>
@@ -5284,23 +5300,29 @@ const handleQuickAdd = useCallback(async () => {
                     Monthly Cash Flow
                   </div>
                   <div className={`text-xl sm:text-2xl font-mono font-bold ${
-                    runwayData.status === 'profitable' ? 'text-accent-primary' :
+                    runwayData.avgMonthlyBurn >= 0 ? 'text-accent-primary' :
                     runwayData.status === 'critical' ? 'text-accent-danger' :
-                    runwayData.status === 'warning' ? 'text-accent-warning' : 'text-accent-secondary'
+                    runwayData.status === 'warning' ? 'text-accent-warning' : 'text-accent-danger'
                   }`}>
-                    {runwayData.status === 'profitable' 
-                      ? `+${formatCurrency(Math.abs(runwayData.avgMonthlyBurn))}`
-                      : `-${formatCurrency(Math.abs(runwayData.avgMonthlyBurn))}`}
+                    {runwayData.avgMonthlyBurn >= 0 
+                      ? `+${formatCurrency(runwayData.avgMonthlyBurn)}`
+                      : formatCurrency(runwayData.avgMonthlyBurn)}
                   </div>
                   <div className={`text-xs mt-1 flex items-center gap-1 ${
-                    runwayData.status === 'profitable' ? 'text-accent-primary' :
+                    runwayData.avgMonthlyBurn >= 0 ? 'text-accent-primary' :
                     runwayData.status === 'critical' ? 'text-accent-danger' :
                     runwayData.status === 'warning' ? 'text-accent-warning' : textSubtle
                   }`}>
-                    {runwayData.status === 'profitable' 
+                    {runwayData.avgMonthlyBurn >= 0 
                       ? <span className="flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Cash Positive</span>
                       : `${runwayData.runwayMonths.toFixed(1)} months runway`}
                   </div>
+                  {/* Categorization indicator */}
+                  {runwayData.categorizedPercent < 100 && runwayData.totalRecentCount > 0 && (
+                    <div className={`text-[10px] mt-2 pt-2 border-t ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'} ${textMuted}`}>
+                      Based on {runwayData.categorizedPercent}% categorized ({runwayData.categorizedCount}/{runwayData.totalRecentCount})
+                    </div>
+                  )}
                 </div>
 
                 <div className={`rounded-xl p-4 sm:p-5 border ${cardClasses}`}>
