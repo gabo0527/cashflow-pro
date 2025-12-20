@@ -1864,7 +1864,7 @@ const handleQuickAdd = useCallback(async () => {
     const projectData = {
       name: newProjectName.trim(),
       color: PROJECT_COLORS[projects.length % PROJECT_COLORS.length],
-      status: 'active',
+      status: 'active' as const,
       budget: newProjectBudget !== '' ? Number(newProjectBudget) : undefined,
       budgetAlertThreshold: 80,
       clientId: newProjectClientId || undefined
@@ -7640,7 +7640,7 @@ const handleQuickAdd = useCallback(async () => {
                                     const projectData = {
                                       name: projectName,
                                       color: projectColor,
-                                      status: 'active',
+                                      status: 'active' as const,
                                       clientId
                                     }
                                     
