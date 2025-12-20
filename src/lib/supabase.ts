@@ -257,7 +257,30 @@ export const fetchCompanySettings = async (companyId?: string) => {
   return { data, error }
 }
 
-export const updateCompanySettings = async (settings: any) => {
-  const { data, error } = await supabase.from('company_settings').upsert(settings).select().single()
-  return { data, error }
+export const updateCompanySettings = async (companyId: string, settings: any) => {
+  // First try to get existing settings
+  const { data: existing } = await supabase
+    .from('company_settings')
+    .select('id')
+    .eq('company_id', companyId)
+    .single()
+  
+  if (existing?.id) {
+    // Update existing record
+    const { data, error } = await supabase
+      .from('company_settings')
+      .update(settings)
+      .eq('id', existing.id)
+      .select()
+      .single()
+    return { data, error }
+  } else {
+    // Insert new record
+    const { data, error } = await supabase
+      .from('company_settings')
+      .insert({ company_id: companyId, ...settings })
+      .select()
+      .single()
+    return { data, error }
+  }
 }
