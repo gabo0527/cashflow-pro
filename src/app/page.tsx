@@ -482,9 +482,46 @@ export default function CashFlowPro() {
   
   // AI Chat state
   const [chatOpen, setChatOpen] = useState(false)
-  const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([])
+  const [chatMessages, setChatMessages] = useState<Array<{
+    role: 'user' | 'assistant', 
+    content: string,
+    action?: {
+      action: string
+      type: 'cash' | 'accrual'
+      updates: Array<{
+        id: string
+        changes: { category?: string; project?: string }
+        preview: {
+          description: string
+          amount: number
+          currentCategory?: string
+          currentProject?: string
+          newCategory?: string
+          newProject?: string
+        }
+      }>
+      summary: string
+    }
+  }>>([])
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
+  const [pendingChatAction, setPendingChatAction] = useState<{
+    action: string
+    type: 'cash' | 'accrual'
+    updates: Array<{
+      id: string
+      changes: { category?: string; project?: string }
+      preview: {
+        description: string
+        amount: number
+        currentCategory?: string
+        currentProject?: string
+        newCategory?: string
+        newProject?: string
+      }
+    }>
+    summary: string
+  } | null>(null)
   
   // Branding state
   const [branding, setBranding] = useState<BrandingSettings>({
@@ -1242,6 +1279,7 @@ export default function CashFlowPro() {
     setChatInput('')
     setChatMessages(prev => [...prev, { role: 'user', content: userMessage }])
     setChatLoading(true)
+    setPendingChatAction(null) // Clear any pending action
     
     try {
       // Build context from current data
@@ -1278,6 +1316,16 @@ export default function CashFlowPro() {
       const context = {
         summary: `This is a project-based business with ${projectList.length} active projects and ${transactions.length} cash transactions.`,
         projects: projectStats,
+        existingProjects: projectList,
+        // Send ALL transactions for action mode
+        allTransactions: transactions.map(t => ({
+          id: t.id,
+          date: t.date,
+          description: t.description,
+          amount: t.amount,
+          category: t.category,
+          project: t.project || 'none'
+        })),
         recentTransactions: transactions.slice(0, 10).map(t => ({
           date: t.date,
           description: t.description,
@@ -1310,7 +1358,18 @@ export default function CashFlowPro() {
       }
       
       const data = await response.json()
-      setChatMessages(prev => [...prev, { role: 'assistant', content: data.message }])
+      
+      // Check if response includes an action
+      if (data.action) {
+        setPendingChatAction(data.action)
+        setChatMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: data.message,
+          action: data.action
+        }])
+      } else {
+        setChatMessages(prev => [...prev, { role: 'assistant', content: data.message }])
+      }
     } catch (error) {
       console.error('Chat error:', error)
       setChatMessages(prev => [...prev, { 
@@ -1322,7 +1381,101 @@ export default function CashFlowPro() {
     }
   }, [chatInput, chatLoading, transactions, accrualTransactions, projectList])
 
-  // AI Categorization
+  // Execute pending chat action (bulk updates)
+  const executeChatAction = useCallback(async () => {
+    if (!pendingChatAction) return
+    
+    const { type, updates } = pendingChatAction
+    let successCount = 0
+    let errorCount = 0
+    
+    try {
+      for (const update of updates) {
+        const { id, changes } = update
+        
+        if (type === 'cash') {
+          // Update cash transaction
+          const transaction = transactions.find(t => t.id === id)
+          if (transaction) {
+            const updateData: any = {}
+            if (changes.category) updateData.category = changes.category
+            if (changes.project !== undefined) updateData.project = changes.project || null
+            
+            // Update local state
+            setTransactions(prev => prev.map(t => 
+              t.id === id ? { ...t, ...updateData } : t
+            ))
+            
+            // Update Supabase
+            if (companyId) {
+              const { error } = await supabaseUpdateTransaction(id, updateData)
+              if (error) {
+                console.error('Error updating transaction:', error)
+                errorCount++
+              } else {
+                successCount++
+              }
+            } else {
+              successCount++
+            }
+          }
+        } else if (type === 'accrual') {
+          // Update accrual transaction
+          const transaction = accrualTransactions.find(t => t.id === id)
+          if (transaction) {
+            const updateData: any = {}
+            if (changes.project !== undefined) updateData.project = changes.project || null
+            
+            // Update local state
+            setAccrualTransactions(prev => prev.map(t => 
+              t.id === id ? { ...t, ...updateData } : t
+            ))
+            
+            // Update Supabase
+            if (companyId) {
+              const { error } = await supabaseUpdateAccrualTransaction(id, updateData)
+              if (error) {
+                console.error('Error updating accrual transaction:', error)
+                errorCount++
+              } else {
+                successCount++
+              }
+            } else {
+              successCount++
+            }
+          }
+        }
+      }
+      
+      // Add confirmation message
+      const resultMessage = errorCount > 0 
+        ? `✅ Updated ${successCount} transactions. ⚠️ ${errorCount} failed.`
+        : `✅ Successfully updated ${successCount} transactions!`
+      
+      setChatMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: resultMessage 
+      }])
+      
+    } catch (error) {
+      console.error('Error executing chat action:', error)
+      setChatMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: '❌ Failed to apply changes. Please try again.' 
+      }])
+    } finally {
+      setPendingChatAction(null)
+    }
+  }, [pendingChatAction, transactions, accrualTransactions, companyId])
+
+  // Cancel pending chat action
+  const cancelChatAction = useCallback(() => {
+    setPendingChatAction(null)
+    setChatMessages(prev => [...prev, { 
+      role: 'assistant', 
+      content: '🚫 Changes cancelled. No updates were made.' 
+    }])
+  }, [])
   const categorizeWithAI = useCallback(async (data: any[], type: 'cash' | 'accrual') => {
     setAiLoading(true)
     setAiError(null)
@@ -8218,14 +8371,12 @@ const handleQuickAdd = useCallback(async () => {
                       {/* Quick Actions */}
                       <div className="w-full space-y-2">
                         <p className={`text-xs font-medium uppercase tracking-wider mb-3 ${textMuted}`}>
-                          Try asking
+                          Ask Questions
                         </p>
                         {[
                           { icon: '📊', text: "What's my overall gross margin?" },
                           { icon: '🏆', text: "Which project is most profitable?" },
                           { icon: '💰', text: "Summarize my cash position" },
-                          { icon: '📈', text: "How's revenue trending this year?" },
-                          { icon: '⚠️', text: "Any projects losing money?" },
                         ].map((suggestion, idx) => (
                           <button
                             key={idx}
@@ -8237,6 +8388,30 @@ const handleQuickAdd = useCallback(async () => {
                               theme === 'light' 
                                 ? 'bg-white hover:bg-gray-100 border border-gray-200 hover:border-[#00d4aa]/50' 
                                 : 'bg-[#141c2e] hover:bg-[#1c2740] border border-[#2a3a55] hover:border-[#00d4aa]/50'
+                            }`}
+                          >
+                            <span className="mr-2">{suggestion.icon}</span>
+                            {suggestion.text}
+                          </button>
+                        ))}
+                        
+                        <p className={`text-xs font-medium uppercase tracking-wider mb-3 mt-4 ${textMuted}`}>
+                          Take Action
+                        </p>
+                        {[
+                          { icon: '🏷️', text: "Categorize all uncategorized transactions" },
+                          { icon: '📁', text: "Assign all Google transactions to Google project" },
+                        ].map((suggestion, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              setChatInput(suggestion.text)
+                              setTimeout(() => sendChatMessage(), 100)
+                            }}
+                            className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${
+                              theme === 'light' 
+                                ? 'bg-white hover:bg-gray-100 border border-gray-200 hover:border-blue-500/50' 
+                                : 'bg-[#141c2e] hover:bg-[#1c2740] border border-[#2a3a55] hover:border-blue-500/50'
                             }`}
                           >
                             <span className="mr-2">{suggestion.icon}</span>
@@ -8263,7 +8438,7 @@ const handleQuickAdd = useCallback(async () => {
                         </div>
                         
                         {/* Message Bubble */}
-                        <div className={`max-w-[80%] ${msg.role === 'user' ? 'text-right' : ''}`}>
+                        <div className={`max-w-[85%] ${msg.role === 'user' ? 'text-right' : ''}`}>
                           <div className={`inline-block rounded-2xl px-4 py-3 text-sm ${
                             msg.role === 'user'
                               ? 'bg-[#00d4aa] text-[#0c1222] rounded-tr-md'
@@ -8272,6 +8447,75 @@ const handleQuickAdd = useCallback(async () => {
                                 : 'bg-[#141c2e] text-[#f1f5f9] border border-[#2a3a55] rounded-tl-md'
                           }`}>
                             <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                            
+                            {/* Action Preview */}
+                            {msg.action && msg.action.updates && msg.action.updates.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-[#2a3a55]">
+                                <p className="text-xs font-semibold mb-2 text-[#00d4aa]">
+                                  📋 {msg.action.summary}
+                                </p>
+                                <div className="max-h-48 overflow-y-auto">
+                                  <table className="w-full text-xs">
+                                    <thead>
+                                      <tr className="border-b border-[#2a3a55]">
+                                        <th className="py-1 text-left">Description</th>
+                                        <th className="py-1 text-right">Amount</th>
+                                        <th className="py-1 text-left">Change</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {msg.action.updates.slice(0, 10).map((update, i) => (
+                                        <tr key={i} className="border-b border-[#2a3a55]/30">
+                                          <td className="py-1.5 truncate max-w-[120px]" title={update.preview.description}>
+                                            {update.preview.description.slice(0, 25)}{update.preview.description.length > 25 ? '...' : ''}
+                                          </td>
+                                          <td className="py-1.5 text-right font-mono">
+                                            {formatCurrency(update.preview.amount)}
+                                          </td>
+                                          <td className="py-1.5">
+                                            {update.preview.newCategory && (
+                                              <span className="inline-block px-1.5 py-0.5 rounded bg-[#00d4aa]/20 text-[#00d4aa] mr-1">
+                                                → {update.preview.newCategory}
+                                              </span>
+                                            )}
+                                            {update.preview.newProject && (
+                                              <span className="inline-block px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                                                → {update.preview.newProject}
+                                              </span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                  {msg.action.updates.length > 10 && (
+                                    <p className="text-xs text-center mt-2 opacity-70">
+                                      ... and {msg.action.updates.length - 10} more
+                                    </p>
+                                  )}
+                                </div>
+                                
+                                {/* Action Buttons - only show if this is the pending action */}
+                                {pendingChatAction && idx === chatMessages.length - 1 && (
+                                  <div className="flex gap-2 mt-3">
+                                    <button
+                                      onClick={executeChatAction}
+                                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-[#00d4aa] text-[#0c1222] rounded-lg text-xs font-semibold hover:bg-[#00c49a] transition-colors"
+                                    >
+                                      <Check className="w-3.5 h-3.5" />
+                                      Apply {msg.action.updates.length} Changes
+                                    </button>
+                                    <button
+                                      onClick={cancelChatAction}
+                                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/20 text-red-400 rounded-lg text-xs font-semibold hover:bg-red-500/30 transition-colors"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                      Cancel
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <p className={`text-xs mt-1 ${textMuted}`}>
                             {msg.role === 'user' ? 'You' : 'Vantage AI'}
@@ -8317,7 +8561,7 @@ const handleQuickAdd = useCallback(async () => {
                         sendChatMessage()
                       }
                     }}
-                    placeholder="Ask me anything about your finances..."
+                    placeholder="Ask questions or request changes..."
                     rows={1}
                     className={`flex-1 px-3 py-2 bg-transparent resize-none text-sm outline-none max-h-32 ${
                       theme === 'light' ? 'placeholder:text-gray-400' : 'placeholder:text-[#64748b]'
@@ -8333,7 +8577,7 @@ const handleQuickAdd = useCallback(async () => {
                   </button>
                 </div>
                 <p className={`text-xs mt-2 text-center ${textMuted}`}>
-                  Vantage AI analyzes your data to provide insights
+                  Vantage AI can answer questions and make bulk updates
                 </p>
               </div>
             </motion.div>
