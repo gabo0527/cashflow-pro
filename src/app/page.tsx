@@ -32,7 +32,8 @@ import {
   deleteAssumption as supabaseDeleteAssumption,
   fetchCategories, fetchCompanySettings, updateCompanySettings,
   updateCategory as supabaseUpdateCategory, insertCategory as supabaseInsertCategory, deleteCategory as supabaseDeleteCategory,
-  fetchClients, insertClient as supabaseInsertClient, updateClient as supabaseUpdateClient, deleteClient as supabaseDeleteClient
+  fetchClients, insertClient as supabaseInsertClient, updateClient as supabaseUpdateClient, deleteClient as supabaseDeleteClient,
+  fetchProjects, insertProject as supabaseInsertProject, updateProject as supabaseUpdateProject, deleteProject as supabaseDeleteProject
 } from '../lib/supabase'
 
 // Vantage Logo Component
@@ -593,14 +594,16 @@ export default function CashFlowPro() {
             assumptionsRes, 
             categoriesRes,
             settingsRes,
-            clientsRes
+            clientsRes,
+            projectsRes
           ] = await Promise.all([
             fetchTransactions(profile.company_id),
             fetchAccrualTransactions(profile.company_id),
             fetchAssumptions(profile.company_id),
             fetchCategories(profile.company_id),
             fetchCompanySettings(profile.company_id),
-            fetchClients(profile.company_id)
+            fetchClients(profile.company_id),
+            fetchProjects(profile.company_id)
           ])
           
           if (transactionsRes.data) {
@@ -687,6 +690,23 @@ export default function CashFlowPro() {
               createdAt: c.created_at
             }))
             setClients(mapped)
+          }
+          
+          if (projectsRes.data) {
+            const mapped = projectsRes.data.map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              color: p.color || '#00d4aa',
+              status: p.status || 'active',
+              budget: p.budget,
+              budgetAlertThreshold: p.budget_alert_threshold || 80,
+              clientId: p.client_id,
+              targetGrossMargin: p.target_gross_margin,
+              startDate: p.start_date,
+              endDate: p.end_date,
+              createdAt: p.created_at
+            }))
+            setProjects(mapped)
           }
           
           // Load UI preferences from localStorage (these stay local)
@@ -1838,34 +1858,83 @@ const handleQuickAdd = useCallback(async () => {
   }, [quickAddForm, normalizeTransaction, companyId, user])
 
   // Project Management
-  const addProject = useCallback(() => {
-    if (newProjectName.trim()) {
+  const addProject = useCallback(async () => {
+    if (!newProjectName.trim()) return
+    
+    const projectData = {
+      name: newProjectName.trim(),
+      color: PROJECT_COLORS[projects.length % PROJECT_COLORS.length],
+      status: 'active',
+      budget: newProjectBudget !== '' ? Number(newProjectBudget) : undefined,
+      budgetAlertThreshold: 80,
+      clientId: newProjectClientId || undefined
+    }
+    
+    if (companyId && user) {
+      const { data, error } = await supabaseInsertProject(projectData, companyId, user.id)
+      if (error) {
+        alert(`Error creating project: ${error.message}`)
+        return
+      }
+      if (data) {
+        const newProject: Project = {
+          id: data.id,
+          name: data.name,
+          color: data.color,
+          status: data.status,
+          budget: data.budget,
+          budgetAlertThreshold: data.budget_alert_threshold,
+          clientId: data.client_id,
+          targetGrossMargin: data.target_gross_margin,
+          startDate: data.start_date,
+          endDate: data.end_date,
+          createdAt: data.created_at
+        }
+        setProjects(prev => [...prev, newProject])
+      }
+    } else {
+      // Fallback for local mode
       const newProject: Project = {
         id: generateId(),
-        name: newProjectName.trim(),
-        color: PROJECT_COLORS[projects.length % PROJECT_COLORS.length],
-        status: 'active',
-        budget: newProjectBudget !== '' ? Number(newProjectBudget) : undefined,
-        budgetAlertThreshold: 80,
-        clientId: newProjectClientId || undefined,
+        ...projectData,
         createdAt: new Date().toISOString()
       }
       setProjects(prev => [...prev, newProject])
-      setNewProjectName('')
-      setNewProjectBudget('')
-      setNewProjectClientId('')
-      setShowProjectModal(false)
     }
-  }, [newProjectName, newProjectBudget, newProjectClientId, projects.length])
+    
+    setNewProjectName('')
+    setNewProjectBudget('')
+    setNewProjectClientId('')
+    setShowProjectModal(false)
+  }, [newProjectName, newProjectBudget, newProjectClientId, projects.length, companyId, user])
 
-  const updateProject = useCallback((id: string, updates: Partial<Project>) => {
+  const updateProject = useCallback(async (id: string, updates: Partial<Project>) => {
+    // Update local state immediately for responsiveness
     setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
     setEditingProject(null)
-  }, [])
+    
+    // Save to Supabase
+    if (companyId) {
+      const { error } = await supabaseUpdateProject(id, updates)
+      if (error) {
+        console.error('Error updating project:', error)
+        // Could revert the local state here if needed
+      }
+    }
+  }, [companyId])
 
-  const deleteProject = useCallback((id: string) => {
+  const deleteProject = useCallback(async (id: string) => {
+    // Update local state immediately
     setProjects(prev => prev.filter(p => p.id !== id))
-  }, [])
+    
+    // Delete from Supabase
+    if (companyId) {
+      const { error } = await supabaseDeleteProject(id)
+      if (error) {
+        console.error('Error deleting project:', error)
+      }
+    }
+  }, [companyId])
 
   // Client Management
   const addClient = useCallback(async () => {
@@ -7561,22 +7630,46 @@ const handleQuickAdd = useCallback(async () => {
                             <td className="py-2">
                               <select
                                 value={existingProject?.clientId || ''}
-                                onChange={(e) => {
+                                onChange={async (e) => {
                                   const clientId = e.target.value || undefined
                                   if (existingProject) {
                                     // Update existing project
                                     updateProject(existingProject.id, { clientId })
                                   } else {
                                     // Create new project with client assignment
-                                    const newProject: Project = {
-                                      id: generateId(),
+                                    const projectData = {
                                       name: projectName,
                                       color: projectColor,
                                       status: 'active',
-                                      clientId,
-                                      createdAt: new Date().toISOString()
+                                      clientId
                                     }
-                                    setProjects(prev => [...prev, newProject])
+                                    
+                                    if (companyId && user) {
+                                      const { data, error } = await supabaseInsertProject(projectData, companyId, user.id)
+                                      if (error) {
+                                        console.error('Error creating project:', error)
+                                        return
+                                      }
+                                      if (data) {
+                                        const newProject: Project = {
+                                          id: data.id,
+                                          name: data.name,
+                                          color: data.color,
+                                          status: data.status,
+                                          clientId: data.client_id,
+                                          createdAt: data.created_at
+                                        }
+                                        setProjects(prev => [...prev, newProject])
+                                      }
+                                    } else {
+                                      // Fallback for local mode
+                                      const newProject: Project = {
+                                        id: generateId(),
+                                        ...projectData,
+                                        createdAt: new Date().toISOString()
+                                      }
+                                      setProjects(prev => [...prev, newProject])
+                                    }
                                   }
                                 }}
                                 className={`w-full max-w-[200px] px-2 py-1 rounded text-sm border ${inputClasses}`}
