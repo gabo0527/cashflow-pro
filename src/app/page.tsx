@@ -706,6 +706,12 @@ export default function CashFlowPro() {
             if (settingsRes.data.beginning_balance) {
               setBeginningBalance(parseFloat(settingsRes.data.beginning_balance))
             }
+            if (settingsRes.data.cutoff_date) {
+              setCutoffDate(settingsRes.data.cutoff_date)
+            }
+            if (settingsRes.data.balance_alert_threshold) {
+              setBalanceAlertThreshold(parseFloat(settingsRes.data.balance_alert_threshold))
+            }
             
            if (settingsRes.data.company_logo) {
   setBranding(prev => ({ ...prev, companyLogo: settingsRes.data.company_logo }))
@@ -2009,6 +2015,42 @@ const handleQuickAdd = useCallback(async () => {
     })
     setShowQuickAdd(false)
   }, [quickAddForm, normalizeTransaction, companyId, user])
+
+  // Company Settings Management
+  const saveCompanySetting = useCallback(async (key: string, value: any) => {
+    if (!companyId) return
+    
+    const settings: any = {
+      company_id: companyId
+    }
+    settings[key] = value
+    
+    const { error } = await updateCompanySettings(settings)
+    if (error) {
+      console.error(`Error saving ${key}:`, error)
+    }
+  }, [companyId])
+
+  const handleBeginningBalanceChange = useCallback((value: number) => {
+    setBeginningBalance(value)
+  }, [])
+
+  const handleBeginningBalanceBlur = useCallback(() => {
+    saveCompanySetting('beginning_balance', beginningBalance)
+  }, [saveCompanySetting, beginningBalance])
+
+  const handleCutoffDateChange = useCallback((value: string) => {
+    setCutoffDate(value)
+    saveCompanySetting('cutoff_date', value)
+  }, [saveCompanySetting])
+
+  const handleBalanceAlertChange = useCallback((value: number) => {
+    setBalanceAlertThreshold(value)
+  }, [])
+
+  const handleBalanceAlertBlur = useCallback(() => {
+    saveCompanySetting('balance_alert_threshold', balanceAlertThreshold)
+  }, [saveCompanySetting, balanceAlertThreshold])
 
   // Project Management
   const addProject = useCallback(async () => {
@@ -6829,7 +6871,8 @@ const handleQuickAdd = useCallback(async () => {
                       <input
                         type="number"
                         value={beginningBalance}
-                        onChange={(e) => setBeginningBalance(parseFloat(e.target.value) || 0)}
+                        onChange={(e) => handleBeginningBalanceChange(parseFloat(e.target.value) || 0)}
+                        onBlur={handleBeginningBalanceBlur}
                         className={`pl-9 pr-4 py-2.5 rounded-lg font-mono w-full border ${inputClasses}`}
                         style={{ colorScheme: theme }}
                       />
@@ -6840,7 +6883,7 @@ const handleQuickAdd = useCallback(async () => {
                     <input
                       type="month"
                       value={cutoffDate}
-                      onChange={(e) => setCutoffDate(e.target.value)}
+                      onChange={(e) => handleCutoffDateChange(e.target.value)}
                       className={`px-4 py-2.5 rounded-lg font-mono w-full border ${inputClasses}`}
                       style={{ colorScheme: theme }}
                     />
@@ -8125,7 +8168,8 @@ const handleQuickAdd = useCallback(async () => {
                     <input
                       type="number"
                       value={balanceAlertThreshold}
-                      onChange={(e) => setBalanceAlertThreshold(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => handleBalanceAlertChange(parseFloat(e.target.value) || 0)}
+                      onBlur={handleBalanceAlertBlur}
                       className={`pl-10 pr-4 py-3 rounded-lg font-mono w-full border ${inputClasses}`}
                       style={{ colorScheme: theme }}
                       placeholder="0 = disabled"
