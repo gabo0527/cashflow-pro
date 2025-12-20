@@ -2020,14 +2020,14 @@ const handleQuickAdd = useCallback(async () => {
   const saveCompanySetting = useCallback(async (key: string, value: any) => {
     if (!companyId) return
     
-    const settings: any = {
-      company_id: companyId
-    }
+    const settings: any = {}
     settings[key] = value
     
-    const { error } = await updateCompanySettings(settings)
+    const { error } = await updateCompanySettings(companyId, settings)
     if (error) {
       console.error(`Error saving ${key}:`, error)
+    } else {
+      console.log(`Saved ${key}:`, value)
     }
   }, [companyId])
 
@@ -6908,7 +6908,7 @@ const handleQuickAdd = useCallback(async () => {
                     <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-accent-primary/10 flex items-center justify-center">
                       <DollarSign className="w-6 h-6 text-accent-primary" />
                     </div>
-                    <h3 className="text-lg font-semibold mb-1">💵 Cash Flow Data</h3>
+                    <h3 className="text-lg font-semibold mb-1">Cash Flow Data</h3>
                     <p className={`text-sm mb-4 ${textMuted}`}>Bank transactions, actual payments</p>
                     <input type="file" accept=".csv" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleFileUpload(file) }} className="hidden" id="cash-file-upload" />
                     <label htmlFor="cash-file-upload" className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent-primary text-white rounded-lg cursor-pointer hover:bg-accent-primary/90">
@@ -6932,7 +6932,7 @@ const handleQuickAdd = useCallback(async () => {
                     <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-[#00d4aa]/10 flex items-center justify-center">
                       <FileText className="w-6 h-6 text-[#00d4aa]" />
                     </div>
-                    <h3 className="text-lg font-semibold mb-1">📊 Accrual Data (Invoices)</h3>
+                    <h3 className="text-lg font-semibold mb-1">Accrual Data (Invoices)</h3>
                     <p className={`text-sm mb-4 ${textMuted}`}>Invoices issued & received (for GM)</p>
                     <input type="file" accept=".csv" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleAccrualUpload(file) }} className="hidden" id="accrual-file-upload" />
                     <label htmlFor="accrual-file-upload" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#00d4aa] text-white rounded-lg cursor-pointer hover:bg-[#00d4aa]/90">
