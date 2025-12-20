@@ -1350,7 +1350,7 @@ export default function CashFlowPro() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage, context })
+        body: JSON.stringify({ message: userMessage, context, companyId })
       })
       
       if (!response.ok) {
@@ -1379,7 +1379,7 @@ export default function CashFlowPro() {
     } finally {
       setChatLoading(false)
     }
-  }, [chatInput, chatLoading, transactions, accrualTransactions, projectList])
+  }, [chatInput, chatLoading, transactions, accrualTransactions, projectList, companyId])
 
   // Execute pending chat action (bulk updates)
   const executeChatAction = useCallback(async () => {
