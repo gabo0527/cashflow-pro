@@ -48,125 +48,183 @@ export async function POST(request: NextRequest) {
     let existingProjects: string[] = context?.existingProjects || []
 
     // Search database if we have a companyId
-    if (companyId) {
-      // Search for matching transactions with flexible matching
-      if (allSearchTerms.length > 0) {
-        // Build flexible search conditions:
-        // 1. Full term match (ILIKE %term%)
-        // 2. For longer terms (5+ chars), also match first 4 chars (catches variations)
-        // 3. Match with spaces/dashes variations
-        const searchConditions: string[] = []
-        
-        allSearchTerms.forEach((term: string) => {
-          // Full term match (case-insensitive)
-          searchConditions.push(`description.ilike.%${term}%`)
+    if (companyId && supabaseUrl && supabaseServiceKey) {
+      try {
+        // Search for matching transactions with flexible matching
+        if (allSearchTerms.length > 0) {
+          // Build flexible search conditions:
+          // 1. Full term match (ILIKE %term%)
+          // 2. For longer terms (5+ chars), also match first 4 chars (catches variations)
+          // 3. Match with spaces/dashes variations
+          const searchConditions: string[] = []
           
-          // For terms 5+ characters, also search partial prefix (catches "AIRTABLE INC" from "airtable")
-          if (term.length >= 5) {
-            const prefix = term.slice(0, 4)
-            searchConditions.push(`description.ilike.%${prefix}%`)
-          }
-          
-          // Handle potential word breaks (e.g., "airtable" also finds "air table" or "air-table")
-          if (term.length >= 6 && !term.includes(' ')) {
-            // Try splitting at common break points
-            const midpoint = Math.floor(term.length / 2)
-            const part1 = term.slice(0, midpoint)
-            const part2 = term.slice(midpoint)
-            if (part1.length >= 3 && part2.length >= 3) {
-              searchConditions.push(`description.ilike.%${part1}%${part2}%`)
+          allSearchTerms.forEach((term: string) => {
+            // Full term match (case-insensitive)
+            searchConditions.push(`description.ilike.%${term}%`)
+            
+            // For terms 5+ characters, also search partial prefix (catches "AIRTABLE INC" from "airtable")
+            if (term.length >= 5) {
+              const prefix = term.slice(0, 4)
+              searchConditions.push(`description.ilike.%${prefix}%`)
             }
-          }
-        })
-        
-        // Remove duplicates
-        const uniqueConditions = Array.from(new Set(searchConditions)).join(',')
-        
-        const { data: cashMatches } = await supabase
-          .from('transactions')
-          .select('*')
-          .eq('company_id', companyId)
-          .or(uniqueConditions)
-          .order('date', { ascending: false })
-          .limit(200)
+            
+            // Handle potential word breaks (e.g., "airtable" also finds "air table" or "air-table")
+            if (term.length >= 6 && !term.includes(' ')) {
+              // Try splitting at common break points
+              const midpoint = Math.floor(term.length / 2)
+              const part1 = term.slice(0, midpoint)
+              const part2 = term.slice(midpoint)
+              if (part1.length >= 3 && part2.length >= 3) {
+                searchConditions.push(`description.ilike.%${part1}%${part2}%`)
+              }
+            }
+          })
+          
+          // Remove duplicates
+          const uniqueConditions = Array.from(new Set(searchConditions)).join(',')
+          
+          const { data: cashMatches, error: searchError } = await supabase
+            .from('transactions')
+            .select('*')
+            .eq('company_id', companyId)
+            .or(uniqueConditions)
+            .order('date', { ascending: false })
+            .limit(200)
 
-        matchingTransactions = (cashMatches || []).map(t => ({
+          if (searchError) {
+            console.error('Supabase search error:', searchError)
+          } else {
+            matchingTransactions = (cashMatches || []).map(t => ({
+              id: t.id,
+              date: t.date,
+              description: t.description,
+              amount: parseFloat(t.amount),
+              category: t.category || 'unassigned',
+              project: t.project || 'none',
+              type: t.type
+            }))
+          }
+        }
+
+        // Check for "uncategorized" request
+        if (message.toLowerCase().includes('uncategorized') || message.toLowerCase().includes('unassigned')) {
+          const { data: uncatMatches, error: uncatError } = await supabase
+            .from('transactions')
+            .select('*')
+            .eq('company_id', companyId)
+            .or('category.is.null,category.eq.unassigned,category.eq.')
+            .order('date', { ascending: false })
+            .limit(200)
+
+          if (!uncatError && uncatMatches && uncatMatches.length > 0) {
+            const uncatFormatted = uncatMatches.map(t => ({
+              id: t.id,
+              date: t.date,
+              description: t.description,
+              amount: parseFloat(t.amount),
+              category: t.category || 'unassigned',
+              project: t.project || 'none',
+              type: t.type
+            }))
+            // Merge with existing matches, avoiding duplicates
+            const existingIds = new Set(matchingTransactions.map(t => t.id))
+            uncatFormatted.forEach(t => {
+              if (!existingIds.has(t.id)) {
+                matchingTransactions.push(t)
+              }
+            })
+          }
+        }
+
+        // Get stats
+        const { count: totalCount } = await supabase
+          .from('transactions')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', companyId)
+
+        const { count: uncatCount } = await supabase
+          .from('transactions')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', companyId)
+          .or('category.is.null,category.eq.unassigned,category.eq.')
+
+        const { count: unassignedCount } = await supabase
+          .from('transactions')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', companyId)
+          .is('project', null)
+
+        stats = {
+          total: totalCount || 0,
+          uncategorized: uncatCount || 0,
+          unassignedProject: unassignedCount || 0
+        }
+
+        // Get projects
+        const { data: projects } = await supabase
+          .from('projects')
+          .select('name')
+          .eq('company_id', companyId)
+
+        if (projects) {
+          existingProjects = projects.map(p => p.name)
+        }
+      } catch (dbError) {
+        console.error('Database query error:', dbError)
+        // Will fall through to context fallback
+      }
+    }
+    
+    // Fallback to context data if database query returned nothing
+    if (matchingTransactions.length === 0 && stats.total === 0 && context?.allTransactions?.length > 0) {
+      console.log('Falling back to context data, transactions:', context.allTransactions.length)
+      const allTransactions = context.allTransactions || []
+      
+      // Search in context data
+      if (allSearchTerms.length > 0) {
+        matchingTransactions = allTransactions.filter((t: any) => {
+          const desc = (t.description || '').toLowerCase()
+          return allSearchTerms.some((term: string) => desc.includes(term))
+        }).map((t: any) => ({
           id: t.id,
           date: t.date,
           description: t.description,
-          amount: parseFloat(t.amount),
+          amount: t.amount,
           category: t.category || 'unassigned',
           project: t.project || 'none',
-          type: t.type
+          type: t.type || 'actual'
         }))
       }
-
-      // Check for "uncategorized" request
+      
+      // Check for uncategorized in context
       if (message.toLowerCase().includes('uncategorized') || message.toLowerCase().includes('unassigned')) {
-        const { data: uncatMatches } = await supabase
-          .from('transactions')
-          .select('*')
-          .eq('company_id', companyId)
-          .or('category.is.null,category.eq.unassigned,category.eq.')
-          .order('date', { ascending: false })
-          .limit(200)
-
-        if (uncatMatches && uncatMatches.length > 0) {
-          const uncatFormatted = uncatMatches.map(t => ({
-            id: t.id,
-            date: t.date,
-            description: t.description,
-            amount: parseFloat(t.amount),
-            category: t.category || 'unassigned',
-            project: t.project || 'none',
-            type: t.type
-          }))
-          // Merge with existing matches, avoiding duplicates
-          const existingIds = new Set(matchingTransactions.map(t => t.id))
-          uncatFormatted.forEach(t => {
-            if (!existingIds.has(t.id)) {
-              matchingTransactions.push(t)
-            }
-          })
-        }
+        const uncatFromContext = allTransactions.filter((t: any) => 
+          !t.category || t.category === 'unassigned' || t.category === ''
+        ).map((t: any) => ({
+          id: t.id,
+          date: t.date,
+          description: t.description,
+          amount: t.amount,
+          category: 'unassigned',
+          project: t.project || 'none',
+          type: t.type || 'actual'
+        }))
+        
+        const existingIds = new Set(matchingTransactions.map(t => t.id))
+        uncatFromContext.forEach((t: any) => {
+          if (!existingIds.has(t.id)) {
+            matchingTransactions.push(t)
+          }
+        })
       }
-
-      // Get stats
-      const { count: totalCount } = await supabase
-        .from('transactions')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', companyId)
-
-      const { count: uncatCount } = await supabase
-        .from('transactions')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', companyId)
-        .or('category.is.null,category.eq.unassigned,category.eq.')
-
-      const { count: unassignedCount } = await supabase
-        .from('transactions')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', companyId)
-        .is('project', null)
-
+      
       stats = {
-        total: totalCount || 0,
-        uncategorized: uncatCount || 0,
-        unassignedProject: unassignedCount || 0
+        total: allTransactions.length,
+        uncategorized: allTransactions.filter((t: any) => !t.category || t.category === 'unassigned').length,
+        unassignedProject: allTransactions.filter((t: any) => !t.project).length
       }
-
-      // Get projects
-      const { data: projects } = await supabase
-        .from('projects')
-        .select('name')
-        .eq('company_id', companyId)
-
-      if (projects) {
-        existingProjects = projects.map(p => p.name)
-      }
-    } else {
-      // Fallback to context if no companyId (shouldn't happen normally)
-      matchingTransactions = context?.allTransactions?.slice(0, 100) || []
+      
+      existingProjects = context.existingProjects || []
     }
 
     // Format transactions for AI
