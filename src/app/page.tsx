@@ -1302,7 +1302,8 @@ export default function CashFlowPro() {
     
     try {
       // Build context from current data
-      const projectStats = projectList.map(projectName => {
+      // Accrual-based project stats (for gross margin)
+      const accrualProjectStats = projectList.map(projectName => {
         const projectTransactions = accrualTransactions.filter(t => 
           t.project.toLowerCase() === projectName.toLowerCase()
         )
@@ -1324,6 +1325,28 @@ export default function CashFlowPro() {
         }
       })
       
+      // Cash-based project stats (for actual cash flow)
+      const cashProjectStats = projectList.map(projectName => {
+        const projectTransactions = transactions.filter(t => 
+          t.project && t.project.toLowerCase() === projectName.toLowerCase()
+        )
+        const inflows = projectTransactions
+          .filter(t => t.category === 'revenue')
+          .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+        const outflows = projectTransactions
+          .filter(t => t.category === 'opex' || t.category === 'overhead' || t.category === 'investment')
+          .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+        const netCash = inflows - outflows
+        
+        return {
+          name: projectName,
+          inflows,
+          outflows,
+          netCash,
+          transactionCount: projectTransactions.length
+        }
+      })
+      
       const totalRevenue = transactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0)
       const totalExpenses = transactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0)
       const netCashFlow = totalRevenue - totalExpenses
@@ -1334,7 +1357,8 @@ export default function CashFlowPro() {
       
       const context = {
         summary: `This is a project-based business with ${projectList.length} active projects and ${transactions.length} cash transactions.`,
-        projects: projectStats,
+        projects: accrualProjectStats,
+        cashProjects: cashProjectStats,
         existingProjects: projectList,
         // Send ALL transactions for action mode
         allTransactions: transactions.map(t => ({
