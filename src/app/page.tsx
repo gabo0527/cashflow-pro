@@ -380,7 +380,8 @@ const DEFAULT_CATEGORIES: Category[] = [
 // Branding interface
 interface BrandingSettings {
   companyName: string
-  companyLogo: string | null
+  companyLogo: string | null  // For dark mode
+  companyLogoLight: string | null  // For light mode
   brandColor: string
 }
 
@@ -535,6 +536,7 @@ export default function CashFlowPro() {
   const [branding, setBranding] = useState<BrandingSettings>({
     companyName: 'Vantage',
     companyLogo: null,
+    companyLogoLight: null,
     brandColor: '#00d4aa'
   })
   
@@ -724,6 +726,9 @@ export default function CashFlowPro() {
            if (settingsRes.data.company_logo) {
   setBranding(prev => ({ ...prev, companyLogo: settingsRes.data.company_logo }))
 }
+            if (settingsRes.data.company_logo_light) {
+              setBranding(prev => ({ ...prev, companyLogoLight: settingsRes.data.company_logo_light }))
+            }
             if (settingsRes.data.brand_color) {
               setBranding(prev => ({ ...prev, brandColor: settingsRes.data.brand_color }))
             }
@@ -3555,9 +3560,9 @@ const handleQuickAdd = useCallback(async () => {
           <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'} relative`}>
             <div className={`flex items-center ${sidebarOpen ? 'justify-between' : 'flex-col gap-3'}`}>
               <div className={`flex items-center ${sidebarOpen ? 'gap-3' : 'justify-center w-full'}`}>
-                {branding.companyLogo ? (
+                {(branding.companyLogo || branding.companyLogoLight) ? (
                   <img 
-                    src={branding.companyLogo} 
+                    src={theme === 'light' ? (branding.companyLogoLight || branding.companyLogo) : (branding.companyLogo || branding.companyLogoLight)} 
                     alt={branding.companyName} 
                     className={`rounded-lg object-contain ${sidebarOpen ? 'w-9 h-9' : 'w-10 h-10'}`}
                   />
@@ -8071,46 +8076,97 @@ const handleQuickAdd = useCallback(async () => {
                   <div>
                     <label className={`block text-sm mb-2 ${textMuted}`}>Company Logo</label>
                     <div className="flex items-center gap-4">
-                      {branding.companyLogo ? (
-                        <div className="relative">
-                          <img src={branding.companyLogo} alt="Logo" className="w-16 h-16 rounded-lg object-contain border border-dashed" />
-                          <button
-                            onClick={() => setBranding(prev => ({ ...prev, companyLogo: null }))}
-                            className="absolute -top-2 -right-2 w-5 h-5 bg-accent-danger text-white rounded-full flex items-center justify-center"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className={`w-16 h-16 rounded-lg border-2 border-dashed flex items-center justify-center ${theme === 'light' ? 'border-gray-300' : 'border-terminal-border'}`}>
-                          <Image className={`w-6 h-6 ${textMuted}`} />
-                        </div>
-                      )}
-                      <div>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) {
-                              const reader = new FileReader()
-                              reader.onload = (ev) => {
-                                setBranding(prev => ({ ...prev, companyLogo: ev.target?.result as string }))
+                      {/* Dark Mode Logo */}
+                        <div>
+                          <p className={`text-xs mb-2 ${textMuted}`}>Dark Mode</p>
+                          {branding.companyLogo ? (
+                            <div className="relative inline-block">
+                              <img src={branding.companyLogo} alt="Logo" className="w-16 h-16 rounded-lg object-contain border border-dashed bg-[#0c1222]" />
+                              <button
+                                onClick={() => { setBranding(prev => ({ ...prev, companyLogo: null })); saveCompanySetting('company_logo', null) }}
+                                className="absolute -top-2 -right-2 w-5 h-5 bg-accent-danger text-white rounded-full flex items-center justify-center"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className={`w-16 h-16 rounded-lg border-2 border-dashed flex items-center justify-center bg-[#0c1222] ${theme === 'light' ? 'border-gray-300' : 'border-terminal-border'}`}>
+                              <Image className={`w-6 h-6 ${textMuted}`} />
+                            </div>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) {
+                                const reader = new FileReader()
+                                reader.onload = (ev) => {
+                                  const logoData = ev.target?.result as string
+                                  setBranding(prev => ({ ...prev, companyLogo: logoData }))
+                                  saveCompanySetting('company_logo', logoData)
+                                }
+                                reader.readAsDataURL(file)
                               }
-                              reader.readAsDataURL(file)
-                            }
-                          }}
-                          className="hidden"
-                          id="logo-upload"
-                        />
-                        <label
-                          htmlFor="logo-upload"
-                          className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'}`}
-                        >
-                          <Upload className="w-4 h-4" />
-                          Upload Logo
-                        </label>
-                        <p className={`text-xs mt-1 ${textSubtle}`}>PNG, JPG up to 500KB</p>
+                            }}
+                            className="hidden"
+                            id="logo-upload-dark"
+                          />
+                          <label
+                            htmlFor="logo-upload-dark"
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 mt-2 rounded-lg cursor-pointer border text-xs ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                          >
+                            <Upload className="w-3 h-3" />
+                            Upload
+                          </label>
+                        </div>
+                        
+                        {/* Light Mode Logo */}
+                        <div>
+                          <p className={`text-xs mb-2 ${textMuted}`}>Light Mode</p>
+                          {branding.companyLogoLight ? (
+                            <div className="relative inline-block">
+                              <img src={branding.companyLogoLight} alt="Logo Light" className="w-16 h-16 rounded-lg object-contain border border-dashed bg-white" />
+                              <button
+                                onClick={() => { setBranding(prev => ({ ...prev, companyLogoLight: null })); saveCompanySetting('company_logo_light', null) }}
+                                className="absolute -top-2 -right-2 w-5 h-5 bg-accent-danger text-white rounded-full flex items-center justify-center"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className={`w-16 h-16 rounded-lg border-2 border-dashed flex items-center justify-center bg-white ${theme === 'light' ? 'border-gray-300' : 'border-terminal-border'}`}>
+                              <Image className={`w-6 h-6 text-gray-400`} />
+                            </div>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) {
+                                const reader = new FileReader()
+                                reader.onload = (ev) => {
+                                  const logoData = ev.target?.result as string
+                                  setBranding(prev => ({ ...prev, companyLogoLight: logoData }))
+                                  saveCompanySetting('company_logo_light', logoData)
+                                }
+                                reader.readAsDataURL(file)
+                              }
+                            }}
+                            className="hidden"
+                            id="logo-upload-light"
+                          />
+                          <label
+                            htmlFor="logo-upload-light"
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 mt-2 rounded-lg cursor-pointer border text-xs ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                          >
+                            <Upload className="w-3 h-3" />
+                            Upload
+                          </label>
+                        </div>
+                      </div>
+                      <p className={`text-xs mt-2 ${textSubtle}`}>PNG, JPG up to 500KB</p>
                       </div>
                     </div>
                   </div>
@@ -8614,7 +8670,7 @@ const handleQuickAdd = useCallback(async () => {
                                 ? 'bg-white text-gray-800 border border-gray-200 rounded-tl-md' 
                                 : 'bg-[#141c2e] text-[#f1f5f9] border border-[#2a3a55] rounded-tl-md'
                           }`}>
-                            <p className={`whitespace-pre-wrap leading-relaxed ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>{msg.content}</p>
+                            <p className="whitespace-pre-wrap leading-relaxed text-left">{msg.content}</p>
                             
                             {/* Action Preview */}
                             {msg.action && msg.action.updates && msg.action.updates.length > 0 && (
