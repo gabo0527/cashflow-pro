@@ -1366,15 +1366,58 @@ export default function CashFlowPro() {
       const data = await response.json()
       
       // Check if response includes an action
-      if (data.action) {
-        setPendingChatAction(data.action)
+      let actionData = data.action
+      let messageContent = data.message
+      
+      // Frontend fallback: if no action but message contains vantage-action, parse it here
+      if (!actionData && messageContent && messageContent.includes('vantage-action')) {
+        try {
+          // Find the JSON in the message
+          const jsonStart = messageContent.indexOf('{')
+          if (jsonStart !== -1) {
+            let braceCount = 0
+            let jsonEnd = -1
+            for (let i = jsonStart; i < messageContent.length; i++) {
+              if (messageContent[i] === '{') braceCount++
+              if (messageContent[i] === '}') braceCount--
+              if (braceCount === 0) {
+                jsonEnd = i + 1
+                break
+              }
+            }
+            if (jsonEnd !== -1) {
+              const jsonStr = messageContent.substring(jsonStart, jsonEnd)
+              actionData = JSON.parse(jsonStr)
+              // Clean the message - remove everything from vantage-action onwards
+              const actionIdx = messageContent.indexOf('vantage-action')
+              if (actionIdx !== -1) {
+                // Find the start of the code block (look for ``` or ` before vantage-action)
+                let blockStart = actionIdx
+                for (let i = actionIdx - 1; i >= 0; i--) {
+                  if (messageContent[i] === '`') {
+                    blockStart = i
+                  } else if (messageContent[i] !== '`' && messageContent[i] !== '\n' && messageContent[i] !== ' ') {
+                    break
+                  }
+                }
+                messageContent = messageContent.substring(0, blockStart).trim()
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Frontend fallback parsing failed:', e)
+        }
+      }
+      
+      if (actionData) {
+        setPendingChatAction(actionData)
         setChatMessages(prev => [...prev, { 
           role: 'assistant', 
-          content: data.message,
-          action: data.action
+          content: messageContent,
+          action: actionData
         }])
       } else {
-        setChatMessages(prev => [...prev, { role: 'assistant', content: data.message }])
+        setChatMessages(prev => [...prev, { role: 'assistant', content: messageContent }])
       }
     } catch (error) {
       console.error('Chat error:', error)
