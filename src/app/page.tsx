@@ -8167,11 +8167,9 @@ const handleQuickAdd = useCallback(async () => {
                         </div>
                       </div>
                       <p className={`text-xs mt-2 ${textSubtle}`}>PNG, JPG up to 500KB</p>
-                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
               {/* Category Manager */}
               <div className={`rounded-xl p-6 border ${cardClasses}`}>
