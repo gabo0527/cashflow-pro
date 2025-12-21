@@ -339,17 +339,19 @@ For questions that don't need changes, respond with insights. Be concise.`
     const data = await response.json()
     const assistantMessage = data.content[0]?.text || 'Sorry, I could not generate a response.'
 
-    // Parse action block if present
-    const actionMatch = assistantMessage.match(/```vantage-action\n([\s\S]*?)\n```/)
+    // Parse action block if present - more flexible regex
+    const actionMatch = assistantMessage.match(/```vantage-action\s*([\s\S]*?)\s*```/)
     let actionData = null
     let cleanMessage = assistantMessage
 
     if (actionMatch) {
       try {
-        actionData = JSON.parse(actionMatch[1])
-        cleanMessage = assistantMessage.replace(/```vantage-action\n[\s\S]*?\n```/, '').trim()
+        actionData = JSON.parse(actionMatch[1].trim())
+        cleanMessage = assistantMessage.replace(/```vantage-action\s*[\s\S]*?\s*```/, '').trim()
       } catch (e) {
         console.error('Failed to parse action JSON:', e)
+        // Still try to remove the malformed block from display
+        cleanMessage = assistantMessage.replace(/```vantage-action\s*[\s\S]*?\s*```/, '').trim()
       }
     }
 
