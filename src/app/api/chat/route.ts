@@ -339,19 +339,67 @@ For questions that don't need changes, respond with insights. Be concise.`
     const data = await response.json()
     const assistantMessage = data.content[0]?.text || 'Sorry, I could not generate a response.'
 
-    // Parse action block if present - more flexible regex
-    const actionMatch = assistantMessage.match(/```vantage-action\s*([\s\S]*?)\s*```/)
+    // Parse action block if present - try multiple patterns
     let actionData = null
     let cleanMessage = assistantMessage
 
-    if (actionMatch) {
+    // Try to find and parse vantage-action block
+    // Pattern 1: Standard markdown code block
+    let actionMatch = assistantMessage.match(/```vantage-action\s*([\s\S]*?)```/)
+    
+    // Pattern 2: With newlines
+    if (!actionMatch) {
+      actionMatch = assistantMessage.match(/```vantage-action\n([\s\S]*?)\n```/)
+    }
+    
+    // Pattern 3: Look for the JSON structure after vantage-action
+    if (!actionMatch) {
+      const startIdx = assistantMessage.indexOf('vantage-action')
+      if (startIdx !== -1) {
+        const afterMarker = assistantMessage.substring(startIdx + 14)
+        const jsonStart = afterMarker.indexOf('{')
+        if (jsonStart !== -1) {
+          // Find matching closing brace
+          let braceCount = 0
+          let jsonEnd = -1
+          for (let i = jsonStart; i < afterMarker.length; i++) {
+            if (afterMarker[i] === '{') braceCount++
+            if (afterMarker[i] === '}') braceCount--
+            if (braceCount === 0) {
+              jsonEnd = i + 1
+              break
+            }
+          }
+          if (jsonEnd !== -1) {
+            actionMatch = [null, afterMarker.substring(jsonStart, jsonEnd)]
+          }
+        }
+      }
+    }
+
+    if (actionMatch && actionMatch[1]) {
       try {
-        actionData = JSON.parse(actionMatch[1].trim())
-        cleanMessage = assistantMessage.replace(/```vantage-action\s*[\s\S]*?\s*```/, '').trim()
+        const jsonStr = actionMatch[1].trim()
+        actionData = JSON.parse(jsonStr)
+        console.log('Parsed action data successfully:', actionData.summary)
+        
+        // Remove the entire code block from message
+        cleanMessage = assistantMessage
+          .replace(/```vantage-action[\s\S]*?```/g, '')
+          .replace(/`{3}vantage-action[\s\S]*?`{3}/g, '')
+          .trim()
+        
+        // If still contains JSON, try to remove it
+        if (cleanMessage.includes('"action"') && cleanMessage.includes('"bulk_update"')) {
+          const jsonStartIdx = cleanMessage.indexOf('{')
+          const jsonEndIdx = cleanMessage.lastIndexOf('}')
+          if (jsonStartIdx !== -1 && jsonEndIdx !== -1) {
+            cleanMessage = cleanMessage.substring(0, jsonStartIdx).trim()
+          }
+        }
       } catch (e) {
         console.error('Failed to parse action JSON:', e)
-        // Still try to remove the malformed block from display
-        cleanMessage = assistantMessage.replace(/```vantage-action\s*[\s\S]*?\s*```/, '').trim()
+        console.error('Raw match:', actionMatch[1]?.substring(0, 200))
       }
     }
 
@@ -362,7 +410,8 @@ For questions that don't need changes, respond with insights. Be concise.`
       debug: {
         searchTerms,
         matchCount: matchingTransactions.length,
-        stats
+        stats,
+        hadActionBlock: !!actionMatch
       }
     })
 
