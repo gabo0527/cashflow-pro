@@ -3562,7 +3562,7 @@ const handleQuickAdd = useCallback(async () => {
               <div className={`flex items-center ${sidebarOpen ? 'gap-3' : 'justify-center w-full'}`}>
                 {(branding.companyLogo || branding.companyLogoLight) ? (
                   <img 
-                    src={theme === 'light' ? (branding.companyLogoLight || branding.companyLogo) : (branding.companyLogo || branding.companyLogoLight)} 
+                    src={theme === 'light' ? (branding.companyLogoLight || branding.companyLogo)! : (branding.companyLogo || branding.companyLogoLight)!} 
                     alt={branding.companyName} 
                     className={`rounded-lg object-contain ${sidebarOpen ? 'w-9 h-9' : 'w-10 h-10'}`}
                   />
