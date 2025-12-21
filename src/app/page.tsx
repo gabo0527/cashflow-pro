@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   LineChart, Line, BarChart, Bar, AreaChart, Area,
@@ -522,6 +522,14 @@ export default function CashFlowPro() {
     }>
     summary: string
   } | null>(null)
+  const chatMessagesEndRef = useRef<HTMLDivElement>(null)
+  
+  // Auto-scroll chat to bottom when new messages arrive
+  useEffect(() => {
+    if (chatMessagesEndRef.current) {
+      chatMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [chatMessages])
   
   // Branding state
   const [branding, setBranding] = useState<BrandingSettings>({
@@ -8606,7 +8614,7 @@ const handleQuickAdd = useCallback(async () => {
                                 ? 'bg-white text-gray-800 border border-gray-200 rounded-tl-md' 
                                 : 'bg-[#141c2e] text-[#f1f5f9] border border-[#2a3a55] rounded-tl-md'
                           }`}>
-                            <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                            <p className={`whitespace-pre-wrap leading-relaxed ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>{msg.content}</p>
                             
                             {/* Action Preview */}
                             {msg.action && msg.action.updates && msg.action.updates.length > 0 && (
@@ -8703,6 +8711,8 @@ const handleQuickAdd = useCallback(async () => {
                     )}
                   </>
                 )}
+                {/* Scroll anchor */}
+                <div ref={chatMessagesEndRef} />
               </div>
               
               {/* Input Area */}
