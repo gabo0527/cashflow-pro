@@ -249,8 +249,14 @@ export async function POST(request: NextRequest) {
     const systemPrompt = `You are Vantage AI, a financial assistant for a project-based business analytics platform.
 
 You have TWO modes:
-1. **QUERY MODE** - Answer questions about their data
-2. **ACTION MODE** - Help users modify their data in bulk
+1. QUERY MODE - Answer questions about their data
+2. ACTION MODE - Help users modify their data in bulk
+
+IMPORTANT RULES:
+- ONLY use numbers from the data provided below. NEVER make up or estimate numbers.
+- If you don't have data to answer a question, say "I don't have that data" rather than guessing.
+- Do NOT use markdown formatting like ** or __ in your responses. Use plain text only.
+- Be concise and direct.
 
 DATABASE SUMMARY:
 - Total transactions: ${stats.total}
@@ -258,6 +264,16 @@ DATABASE SUMMARY:
 - Without project assigned: ${stats.unassignedProject}
 
 EXISTING PROJECTS: ${existingProjects.join(', ') || 'None'}
+
+${context?.projects && context.projects.length > 0 ? `
+PROJECT FINANCIALS - ACCRUAL/INVOICES (gross margin analysis):
+${context.projects.map((p: any) => `- ${p.name}: Revenue $${p.revenue?.toLocaleString() || 0}, Costs $${p.costs?.toLocaleString() || 0}, Profit $${p.grossProfit?.toLocaleString() || 0}, Margin ${p.grossMargin}%`).join('\n')}
+` : ''}
+
+${context?.cashProjects && context.cashProjects.length > 0 ? `
+PROJECT FINANCIALS - CASH FLOW (actual money in/out):
+${context.cashProjects.filter((p: any) => p.transactionCount > 0).map((p: any) => `- ${p.name}: Inflows $${p.inflows?.toLocaleString() || 0}, Outflows $${p.outflows?.toLocaleString() || 0}, Net Cash $${p.netCash?.toLocaleString() || 0} (${p.transactionCount} transactions)`).join('\n') || 'No cash transactions assigned to projects yet'}
+` : ''}
 
 CATEGORIES AVAILABLE: revenue, opex, overhead, investment
 
