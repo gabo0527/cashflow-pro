@@ -1365,16 +1365,21 @@ export default function CashFlowPro() {
       
       const data = await response.json()
       
+      console.log('Chat response received:', { hasAction: !!data.action, messageLength: data.message?.length })
+      
       // Check if response includes an action
       let actionData = data.action
       let messageContent = data.message
       
       // Frontend fallback: if no action but message contains vantage-action, parse it here
       if (!actionData && messageContent && messageContent.includes('vantage-action')) {
+        console.log('Frontend fallback: attempting to parse action from message')
         try {
           // Find the JSON in the message
           const jsonStart = messageContent.indexOf('{')
           if (jsonStart !== -1) {
+            // Try to find the end by looking for the summary field which comes last
+            // Or find matching braces
             let braceCount = 0
             let jsonEnd = -1
             for (let i = jsonStart; i < messageContent.length; i++) {
@@ -1385,13 +1390,46 @@ export default function CashFlowPro() {
                 break
               }
             }
-            if (jsonEnd !== -1) {
+            
+            // If we didn't find a matching end, try to fix truncated JSON
+            if (jsonEnd === -1) {
+              console.log('JSON appears truncated, attempting to fix...')
+              // Find the updates array and try to parse what we have
+              const updatesMatch = messageContent.match(/"updates"\s*:\s*\[/)
+              if (updatesMatch) {
+                // Find all complete update objects
+                const allUpdates: any[] = []
+                const updateRegex = /\{\s*"id"\s*:\s*"([^"]+)"\s*,\s*"changes"\s*:\s*\{[^}]+\}\s*,\s*"preview"\s*:\s*\{[^}]+\}\s*\}/g
+                let match
+                while ((match = updateRegex.exec(messageContent)) !== null) {
+                  try {
+                    const updateObj = JSON.parse(match[0])
+                    allUpdates.push(updateObj)
+                  } catch (e) {
+                    // Skip malformed updates
+                  }
+                }
+                
+                if (allUpdates.length > 0) {
+                  actionData = {
+                    action: 'bulk_update',
+                    type: 'cash',
+                    updates: allUpdates,
+                    summary: `Update ${allUpdates.length} transactions`
+                  }
+                  console.log('Recovered', allUpdates.length, 'updates from truncated JSON')
+                }
+              }
+            } else {
               const jsonStr = messageContent.substring(jsonStart, jsonEnd)
               actionData = JSON.parse(jsonStr)
-              // Clean the message - remove everything from vantage-action onwards
+              console.log('Parsed complete JSON successfully')
+            }
+            
+            // Clean the message - remove everything from vantage-action onwards
+            if (actionData) {
               const actionIdx = messageContent.indexOf('vantage-action')
               if (actionIdx !== -1) {
-                // Find the start of the code block (look for ``` or ` before vantage-action)
                 let blockStart = actionIdx
                 for (let i = actionIdx - 1; i >= 0; i--) {
                   if (messageContent[i] === '`') {
@@ -1410,6 +1448,7 @@ export default function CashFlowPro() {
       }
       
       if (actionData) {
+        console.log('Action data ready:', actionData.summary, '- Updates:', actionData.updates?.length)
         setPendingChatAction(actionData)
         setChatMessages(prev => [...prev, { 
           role: 'assistant', 
