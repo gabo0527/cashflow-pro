@@ -2673,26 +2673,33 @@ const handleQuickAdd = useCallback(async () => {
       })
   }, [filteredTransactions])
 
-  // Runway calculation
+  // Runway calculation - based on selected date range
   const runwayData = useMemo(() => {
-    // Get last 3 months of actual data for average burn
-    const threeMonthsAgo = new Date()
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
-    
-    const recentTransactions = transactions.filter(t => {
-      try {
-        if (!t.date || t.type !== 'actual') return false
-        const txDate = new Date(t.date)
-        return !isNaN(txDate.getTime()) && txDate >= threeMonthsAgo
-      } catch (e) {
-        return false
-      }
+    // Filter transactions by the active date range
+    const filteredByDateRange = transactions.filter(t => {
+      if (!t.date || t.type !== 'actual') return false
+      const monthKey = t.date.slice(0, 7)
+      return monthKey >= activeDateRange.start && monthKey <= activeDateRange.end
     })
+    
+    if (filteredByDateRange.length === 0) {
+      return {
+        currentBalance: beginningBalance,
+        avgMonthlyRevenue: 0,
+        avgMonthlyExpenses: 0,
+        avgMonthlyBurn: 0,
+        runwayMonths: Infinity,
+        status: 'healthy',
+        categorizedCount: 0,
+        totalRecentCount: 0,
+        categorizedPercent: 100
+      }
+    }
     
     // Only count CATEGORIZED transactions
     const validCategories = ['revenue', 'opex', 'overhead', 'investment']
-    const categorizedTransactions = recentTransactions.filter(t => validCategories.includes(t.category))
-    const totalRecentCount = recentTransactions.length
+    const categorizedTransactions = filteredByDateRange.filter(t => validCategories.includes(t.category))
+    const totalRecentCount = filteredByDateRange.length
     const categorizedCount = categorizedTransactions.length
     const categorizedPercent = totalRecentCount > 0 ? Math.round((categorizedCount / totalRecentCount) * 100) : 0
     
@@ -2710,12 +2717,16 @@ const handleQuickAdd = useCallback(async () => {
       }
     })
     
-    const monthsOfData = Math.max(1, Math.min(3, 
-      (Date.now() - threeMonthsAgo.getTime()) / (30 * 24 * 60 * 60 * 1000)
-    ))
+    // Calculate months in the selected date range
+    const startDate = new Date(activeDateRange.start + '-01')
+    const endDate = new Date(activeDateRange.end + '-01')
+    const monthsInRange = Math.max(1, 
+      (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+      (endDate.getMonth() - startDate.getMonth()) + 1
+    )
     
-    const avgMonthlyRevenue = totalRevenue / monthsOfData
-    const avgMonthlyExpenses = totalExpenses / monthsOfData
+    const avgMonthlyRevenue = totalRevenue / monthsInRange
+    const avgMonthlyExpenses = totalExpenses / monthsInRange
     const avgMonthlyNet = avgMonthlyRevenue - avgMonthlyExpenses  // Net cash flow (positive = good)
     
     // Current balance from chart data - with safe access
@@ -2742,9 +2753,10 @@ const handleQuickAdd = useCallback(async () => {
       // New: categorization stats
       categorizedCount,
       totalRecentCount,
-      categorizedPercent
+      categorizedPercent,
+      monthsInRange
     }
-  }, [transactions, chartData, beginningBalance])
+  }, [transactions, chartData, beginningBalance, activeDateRange])
 
   // Accrual monthly data
   const accrualMonthlyData = useMemo(() => {
