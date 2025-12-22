@@ -5,9 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 
 const QBO_CLIENT_ID = process.env.QBO_CLIENT_ID
 const QBO_CLIENT_SECRET = process.env.QBO_CLIENT_SECRET
-const REDIRECT_URI = process.env.VERCEL_URL 
-  ? `https://${process.env.VERCEL_URL}/api/qbo/callback`
-  : 'https://cashflow-pro-jet.vercel.app/api/qbo/callback'
+const REDIRECT_URI = process.env.QBO_REDIRECT_URI || 'https://cashflow-pro-jet.vercel.app/api/qbo/callback'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
