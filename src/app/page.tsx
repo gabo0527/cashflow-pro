@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   LineChart, Line, BarChart, Bar, AreaChart, Area,
@@ -69,6 +69,8 @@ interface Transaction {
   recurringId?: string
   notes?: string
   expectedPaymentDate?: string // For AR/AP timing
+  source?: 'qbo' | 'csv' | 'manual' // Data source
+  qbo_transaction_id?: string // QuickBooks transaction ID
 }
 
 // Accrual transactions (invoices) - separate from cash
@@ -82,6 +84,8 @@ interface AccrualTransaction {
   vendor?: string  // Client name or Contractor name
   invoiceNumber?: string
   notes?: string
+  source?: 'qbo' | 'csv' | 'manual' // Data source
+  qbo_invoice_id?: string // QuickBooks invoice ID
 }
 
 // Dashboard view mode
@@ -474,6 +478,14 @@ export default function CashFlowPro() {
   const [pendingUploadData, setPendingUploadData] = useState<any[]>([])
   const [uploadType, setUploadType] = useState<'cash' | 'accrual'>('cash')
   
+  // Enhanced Transaction UI state
+  const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set())
+  const [expandedTransaction, setExpandedTransaction] = useState<string | null>(null)
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'qbo' | 'csv' | 'manual'>('all')
+  const [showBulkCategorize, setShowBulkCategorize] = useState(false)
+  const [bulkCategory, setBulkCategory] = useState('')
+  const [bulkProject, setBulkProject] = useState('')
+  
   // Bank Statement Parsing state
   const [statementLoading, setStatementLoading] = useState(false)
   const [statementData, setStatementData] = useState<any[]>([])
@@ -669,7 +681,9 @@ export default function CashFlowPro() {
               amount: parseFloat(t.amount),
               type: t.type,
               project: t.project,
-              notes: t.notes
+              notes: t.notes,
+              source: t.source || 'manual',
+              qbo_transaction_id: t.qbo_transaction_id
             }))
             setTransactions(mapped)
           }
@@ -684,7 +698,9 @@ export default function CashFlowPro() {
               project: t.project,
               vendor: t.vendor,
               invoiceNumber: t.invoice_number,
-              notes: t.notes
+              notes: t.notes,
+              source: t.source || 'manual',
+              qbo_invoice_id: t.qbo_invoice_id
             }))
             setAccrualTransactions(mapped)
           }
@@ -1841,6 +1857,89 @@ export default function CashFlowPro() {
     }
   }, [editingId, editForm, normalizeTransaction])
 
+  // Quick inline categorization (no modal)
+  const quickCategorize = useCallback(async (transactionId: string, category: string, project?: string) => {
+    const updates: any = { category }
+    if (project !== undefined) updates.project = project
+    
+    const { error } = await supabaseUpdateTransaction(transactionId, updates)
+    if (!error) {
+      setTransactions(prev => prev.map(t => 
+        t.id === transactionId ? { ...t, ...updates } : t
+      ))
+      setExpandedTransaction(null)
+    }
+  }, [])
+
+  // Bulk categorize selected transactions
+  const bulkCategorizeSelected = useCallback(async () => {
+    if (selectedTransactions.size === 0) return
+    
+    const updates: any = {}
+    if (bulkCategory) updates.category = bulkCategory
+    if (bulkProject) updates.project = bulkProject
+    
+    if (Object.keys(updates).length === 0) return
+    
+    // Update all selected transactions
+    const promises = Array.from(selectedTransactions).map(id => 
+      supabaseUpdateTransaction(id, updates)
+    )
+    
+    await Promise.all(promises)
+    
+    // Update local state
+    setTransactions(prev => prev.map(t => 
+      selectedTransactions.has(t.id) ? { ...t, ...updates } : t
+    ))
+    
+    // Clear selection
+    setSelectedTransactions(new Set())
+    setShowBulkCategorize(false)
+    setBulkCategory('')
+    setBulkProject('')
+  }, [selectedTransactions, bulkCategory, bulkProject])
+
+  // Toggle transaction selection
+  const toggleTransactionSelection = useCallback((id: string) => {
+    setSelectedTransactions(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }, [])
+
+  // Select all visible transactions
+  const selectAllTransactions = useCallback((transactionIds: string[]) => {
+    if (selectedTransactions.size === transactionIds.length) {
+      setSelectedTransactions(new Set())
+    } else {
+      setSelectedTransactions(new Set(transactionIds))
+    }
+  }, [selectedTransactions.size])
+
+  // Find similar transactions by description pattern
+  const findSimilarTransactions = useCallback((description: string) => {
+    // Extract key words (remove numbers, dates, special chars)
+    const keywords = description
+      .replace(/[0-9]/g, '')
+      .replace(/[^a-zA-Z\s]/g, '')
+      .split(/\s+/)
+      .filter(word => word.length > 3)
+      .slice(0, 3)
+    
+    if (keywords.length === 0) return []
+    
+    return transactions.filter(t => {
+      const descLower = t.description.toLowerCase()
+      return keywords.some(kw => descLower.includes(kw.toLowerCase())) && !t.category
+    })
+  }, [transactions])
+
   const cancelEdit = useCallback(() => {
     setEditingId(null)
     setEditForm({})
@@ -2507,16 +2606,27 @@ const handleQuickAdd = useCallback(async () => {
     )
     
     if (selectedProject !== 'all') {
-      result = result.filter(t => normalizeProjectName(t.project) === normalizeProjectName(selectedProject))
+      if (selectedProject === 'unassigned') {
+        result = result.filter(t => !t.project || t.project === '')
+      } else {
+        result = result.filter(t => normalizeProjectName(t.project) === normalizeProjectName(selectedProject))
+      }
     }
     if (transactionMonthFilter !== 'all') {
       result = result.filter(t => t.date.slice(0, 7) === transactionMonthFilter)
     }
     if (transactionCategoryFilter !== 'all') {
-      result = result.filter(t => t.category === transactionCategoryFilter)
+      if (transactionCategoryFilter === 'unassigned') {
+        result = result.filter(t => !t.category || t.category === 'unassigned' || t.category === '')
+      } else {
+        result = result.filter(t => t.category === transactionCategoryFilter)
+      }
+    }
+    if (sourceFilter !== 'all') {
+      result = result.filter(t => (t as any).source === sourceFilter)
     }
     return result
-  }, [transactions, selectedProject, transactionMonthFilter, transactionCategoryFilter])
+  }, [transactions, selectedProject, transactionMonthFilter, transactionCategoryFilter, sourceFilter])
 
   // Filter assumptions by scenario
   const activeAssumptions = useMemo(() => {
@@ -6612,6 +6722,83 @@ const handleQuickAdd = useCallback(async () => {
               {/* Cash Transactions View */}
               {transactionViewType === 'cash' && (
                 <>
+                  {/* Uncategorized Alert Banner */}
+                  {transactions.filter(t => !t.category || t.category === 'unassigned').length > 0 && (
+                    <div className={`rounded-xl p-4 border-2 border-amber-500/50 ${theme === 'light' ? 'bg-amber-50' : 'bg-amber-900/20'}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <AlertTriangle className="w-5 h-5 text-amber-500" />
+                          <div>
+                            <p className="font-medium text-amber-600">
+                              {transactions.filter(t => !t.category || t.category === 'unassigned').length} transactions need categorization
+                            </p>
+                            <p className={`text-sm ${textMuted}`}>
+                              Categorize to improve your financial insights
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setTransactionCategoryFilter('unassigned')
+                          }}
+                          className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-sm font-medium"
+                        >
+                          Review Now
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bulk Actions Bar - Shows when items selected */}
+                  {selectedTransactions.size > 0 && (
+                    <div className={`rounded-xl p-4 border-2 border-[#00d4aa] ${theme === 'light' ? 'bg-[#00d4aa]/10' : 'bg-[#00d4aa]/20'}`}>
+                      <div className="flex items-center justify-between flex-wrap gap-3">
+                        <div className="flex items-center gap-3">
+                          <Check className="w-5 h-5 text-[#00d4aa]" />
+                          <span className="font-medium">{selectedTransactions.size} transactions selected</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <select
+                            value={bulkCategory}
+                            onChange={(e) => setBulkCategory(e.target.value)}
+                            className={`rounded-lg px-3 py-2 text-sm border ${inputClasses}`}
+                            style={{ colorScheme: theme }}
+                          >
+                            <option value="">Set Category...</option>
+                            <option value="revenue">Revenue</option>
+                            <option value="opex">OpEx</option>
+                            <option value="overhead">Overhead</option>
+                            <option value="investment">Investment</option>
+                          </select>
+                          <select
+                            value={bulkProject}
+                            onChange={(e) => setBulkProject(e.target.value)}
+                            className={`rounded-lg px-3 py-2 text-sm border ${inputClasses}`}
+                            style={{ colorScheme: theme }}
+                          >
+                            <option value="">Set Project...</option>
+                            {projectList.map(p => (
+                              <option key={p} value={p}>{p}</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={bulkCategorizeSelected}
+                            disabled={!bulkCategory && !bulkProject}
+                            className="px-4 py-2 bg-[#00d4aa] text-[#0c1222] rounded-lg hover:bg-[#00c49a] text-sm font-medium disabled:opacity-50"
+                          >
+                            Apply to Selected
+                          </button>
+                          <button
+                            onClick={() => setSelectedTransactions(new Set())}
+                            className={`px-3 py-2 rounded-lg text-sm ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-bg'}`}
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Filters Bar */}
                   <div className={`rounded-xl p-4 border ${cardClasses}`}>
                     <div className="flex flex-wrap items-center justify-between gap-4">
@@ -6635,10 +6822,9 @@ const handleQuickAdd = useCallback(async () => {
                           style={{ colorScheme: theme }}
                         >
                           <option value="all">All Categories</option>
-                          {categories.map(cat => (
-                            <option key={cat.id} value={cat.id}>
-                              {cat.id === 'unassigned' ? '⚠️ ' : ''}{cat.name}
-                            </option>
+                          <option value="unassigned">⚠️ Uncategorized</option>
+                          {categories.filter(c => c.id !== 'unassigned').map(cat => (
+                            <option key={cat.id} value={cat.id}>{cat.name}</option>
                           ))}
                         </select>
                         <select
@@ -6648,9 +6834,21 @@ const handleQuickAdd = useCallback(async () => {
                           style={{ colorScheme: theme }}
                         >
                           <option value="all">All Projects</option>
+                          <option value="unassigned">⚠️ No Project</option>
                           {projectList.map(p => (
                             <option key={p} value={p}>{p}</option>
                           ))}
+                        </select>
+                        <select
+                          value={sourceFilter}
+                          onChange={(e) => setSourceFilter(e.target.value as any)}
+                          className={`rounded-lg px-3 py-2 text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                        >
+                          <option value="all">All Sources</option>
+                          <option value="qbo">QuickBooks</option>
+                          <option value="csv">CSV Import</option>
+                          <option value="manual">Manual</option>
                         </select>
                       </div>
                       <div className="flex gap-2">
@@ -6678,80 +6876,172 @@ const handleQuickAdd = useCallback(async () => {
                         <table className="w-full text-sm">
                           <thead className={tableHeaderBg}>
                             <tr className={`border-b ${tableBorder} text-left ${textMuted}`}>
-                              <th className="pb-3 font-medium w-28">Date</th>
+                              <th className="pb-3 font-medium w-10">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedTransactions.size === filteredTransactions.length && filteredTransactions.length > 0}
+                                  onChange={() => selectAllTransactions(filteredTransactions.map(t => t.id))}
+                                  className="rounded border-gray-300"
+                                />
+                              </th>
+                              <th className="pb-3 font-medium w-24">Date</th>
+                              <th className="pb-3 font-medium w-24">Source</th>
                               <th className="pb-3 font-medium w-28">Category</th>
                               <th className="pb-3 font-medium">Description</th>
-                              <th className="pb-3 font-medium text-right w-32">Amount</th>
+                              <th className="pb-3 font-medium text-right w-28">Amount</th>
                               <th className="pb-3 font-medium w-28">Project</th>
-                              <th className="pb-3 font-medium w-20">Type</th>
-                              <th className="pb-3 font-medium text-center w-24">Actions</th>
+                              <th className="pb-3 font-medium text-center w-20">Actions</th>
                             </tr>
                           </thead>
                           <tbody>
                             {filteredTransactions.map(t => {
                               const cat = getCategoryById(t.category)
+                              const isExpanded = expandedTransaction === t.id
+                              const source = (t as any).source || 'manual'
                               return (
-                                <tr key={t.id} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'} hover:${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg/50'}`}>
-                                  <td className="py-3 text-sm">{t.date}</td>
-                                  <td className="py-3">
-                                    <span 
-                                      className="px-2 py-1 rounded text-xs font-medium"
-                                      style={{ 
-                                        backgroundColor: `${cat?.color || '#6b7280'}15`,
-                                        color: cat?.color || '#6b7280'
-                                      }}
-                                    >
-                                      {cat?.name || t.category}
-                                    </span>
-                                  </td>
-                                  <td className="py-3 text-sm">
-                                    <div className="flex items-center gap-2 max-w-xs">
-                                      <span className="truncate">{t.description}</span>
-                                      {t.notes && (
-                                        <button 
-                                          onClick={() => setExpandedNotes(prev => {
-                                            const next = new Set(prev)
-                                            if (next.has(t.id)) next.delete(t.id)
-                                            else next.add(t.id)
-                                            return next
-                                          })}
-                                          className="p-0.5 text-accent-secondary hover:text-accent-primary flex-shrink-0"
-                                          title={t.notes}
+                                <React.Fragment key={t.id}>
+                                  <tr 
+                                    className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'} ${
+                                      isExpanded ? (theme === 'light' ? 'bg-blue-50' : 'bg-blue-900/20') : ''
+                                    } hover:${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg/50'} cursor-pointer`}
+                                    onClick={() => setExpandedTransaction(isExpanded ? null : t.id)}
+                                  >
+                                    <td className="py-3" onClick={(e) => e.stopPropagation()}>
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedTransactions.has(t.id)}
+                                        onChange={() => toggleTransactionSelection(t.id)}
+                                        className="rounded border-gray-300"
+                                      />
+                                    </td>
+                                    <td className="py-3 text-sm">{t.date}</td>
+                                    <td className="py-3">
+                                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                        source === 'qbo' 
+                                          ? 'bg-green-100 text-green-700' 
+                                          : source === 'csv'
+                                          ? 'bg-blue-100 text-blue-700'
+                                          : 'bg-gray-100 text-gray-600'
+                                      }`}>
+                                        {source === 'qbo' ? 'QBO' : source === 'csv' ? 'CSV' : 'Manual'}
+                                      </span>
+                                    </td>
+                                    <td className="py-3">
+                                      {t.category && t.category !== 'unassigned' ? (
+                                        <span 
+                                          className="px-2 py-1 rounded text-xs font-medium"
+                                          style={{ 
+                                            backgroundColor: `${cat?.color || '#6b7280'}15`,
+                                            color: cat?.color || '#6b7280'
+                                          }}
                                         >
-                                          <MessageSquare className="w-3 h-3" />
-                                        </button>
+                                          {cat?.name || t.category}
+                                        </span>
+                                      ) : (
+                                        <span className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                                          ⚠️ Uncategorized
+                                        </span>
                                       )}
-                                    </div>
-                                    {t.notes && expandedNotes.has(t.id) && (
-                                      <div className={`text-xs mt-1 p-2 rounded ${theme === 'light' ? 'bg-gray-100 text-gray-600' : 'bg-terminal-bg text-zinc-400'}`}>
-                                        {t.notes}
+                                    </td>
+                                    <td className="py-3 text-sm">
+                                      <div className="flex items-center gap-2 max-w-xs">
+                                        <span className="truncate">{t.description}</span>
+                                        {t.notes && (
+                                          <button 
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              setExpandedNotes(prev => {
+                                                const next = new Set(prev)
+                                                if (next.has(t.id)) next.delete(t.id)
+                                                else next.add(t.id)
+                                                return next
+                                              })
+                                            }}
+                                            className="p-0.5 text-accent-secondary hover:text-accent-primary flex-shrink-0"
+                                            title={t.notes}
+                                          >
+                                            <MessageSquare className="w-3 h-3" />
+                                          </button>
+                                        )}
                                       </div>
-                                    )}
-                                  </td>
-                                  <td className={`py-3 text-right font-mono text-sm ${t.amount >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
-                                    {formatCurrency(t.amount)}
-                                  </td>
-                                  <td className={`py-3 text-sm ${textMuted}`}>{t.project || '-'}</td>
-                                  <td className="py-3">
-                                    <span className={`px-2 py-0.5 rounded text-xs ${
-                                      t.type === 'actual' 
-                                        ? 'bg-accent-primary/10 text-accent-primary' 
-                                        : 'bg-accent-warning/10 text-accent-warning'
-                                    }`}>
-                                      {t.type}
-                                    </span>
-                                  </td>
-                                  <td className="py-3 text-center">
-                                    <div className="flex items-center justify-center gap-2">
-                                      <button onClick={() => startEdit(t)} className="p-1.5 text-zinc-400 hover:text-accent-primary hover:bg-accent-primary/10 rounded">
-                                        <Edit2 className="w-4 h-4" />
-                                      </button>
-                                      <button onClick={() => deleteTransaction(t.id)} className="p-1.5 text-zinc-400 hover:text-accent-danger hover:bg-accent-danger/10 rounded">
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
+                                      {t.notes && expandedNotes.has(t.id) && (
+                                        <div className={`text-xs mt-1 p-2 rounded ${theme === 'light' ? 'bg-gray-100 text-gray-600' : 'bg-terminal-bg text-zinc-400'}`}>
+                                          {t.notes}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className={`py-3 text-right font-mono text-sm ${t.amount >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
+                                      {formatCurrency(t.amount)}
+                                    </td>
+                                    <td className={`py-3 text-sm ${t.project ? '' : textMuted}`}>
+                                      {t.project || <span className="text-amber-600">—</span>}
+                                    </td>
+                                    <td className="py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                      <div className="flex items-center justify-center gap-1">
+                                        <button onClick={() => startEdit(t)} className="p-1.5 text-zinc-400 hover:text-accent-primary hover:bg-accent-primary/10 rounded">
+                                          <Edit2 className="w-4 h-4" />
+                                        </button>
+                                        <button onClick={() => deleteTransaction(t.id)} className="p-1.5 text-zinc-400 hover:text-accent-danger hover:bg-accent-danger/10 rounded">
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  {/* Expanded Quick Categorize Row */}
+                                  {isExpanded && (
+                                    <tr className={theme === 'light' ? 'bg-blue-50' : 'bg-blue-900/20'}>
+                                      <td colSpan={8} className="py-4 px-4">
+                                        <div className="flex flex-wrap items-center gap-4">
+                                          <div>
+                                            <p className={`text-xs font-medium mb-2 ${textMuted}`}>Quick Category:</p>
+                                            <div className="flex flex-wrap gap-2">
+                                              {['revenue', 'opex', 'overhead', 'investment'].map(catId => {
+                                                const catInfo = getCategoryById(catId)
+                                                return (
+                                                  <button
+                                                    key={catId}
+                                                    onClick={() => quickCategorize(t.id, catId)}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                                      t.category === catId 
+                                                        ? 'ring-2 ring-offset-2 ring-[#00d4aa]' 
+                                                        : 'hover:opacity-80'
+                                                    }`}
+                                                    style={{ 
+                                                      backgroundColor: `${catInfo?.color || '#6b7280'}20`,
+                                                      color: catInfo?.color || '#6b7280'
+                                                    }}
+                                                  >
+                                                    {catInfo?.name || catId}
+                                                  </button>
+                                                )
+                                              })}
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <p className={`text-xs font-medium mb-2 ${textMuted}`}>Assign Project:</p>
+                                            <select
+                                              value={t.project || ''}
+                                              onChange={(e) => quickCategorize(t.id, t.category || 'unassigned', e.target.value)}
+                                              className={`rounded-lg px-3 py-1.5 text-sm border ${inputClasses}`}
+                                              style={{ colorScheme: theme }}
+                                            >
+                                              <option value="">No Project</option>
+                                              {projectList.map(p => (
+                                                <option key={p} value={p}>{p}</option>
+                                              ))}
+                                            </select>
+                                          </div>
+                                          <button
+                                            onClick={() => setExpandedTransaction(null)}
+                                            className={`ml-auto px-3 py-1.5 rounded-lg text-xs ${theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-terminal-bg'}`}
+                                          >
+                                            Close
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
                               )
                             })}
                           </tbody>
@@ -6759,6 +7049,7 @@ const handleQuickAdd = useCallback(async () => {
                       </div>
                       <p className={`text-sm mt-4 text-center ${textMuted}`}>
                         Showing {filteredTransactions.length} of {transactions.length} transactions
+                        {selectedTransactions.size > 0 && ` • ${selectedTransactions.size} selected`}
                       </p>
                     </div>
                   ) : (
