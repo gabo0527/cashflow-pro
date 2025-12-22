@@ -5,7 +5,10 @@ import { createClient } from '@supabase/supabase-js'
 
 const QBO_CLIENT_ID = process.env.QBO_CLIENT_ID
 const QBO_CLIENT_SECRET = process.env.QBO_CLIENT_SECRET
-const REDIRECT_URI = process.env.QBO_REDIRECT_URI || 'https://cashflow-pro-jet.vercel.app/api/qbo/callback'
+
+// HARDCODED - must match exactly what's in Intuit Developer portal
+const REDIRECT_URI = 'https://cashflow-pro-jet.vercel.app/api/qbo/callback'
+const BASE_URL = 'https://cashflow-pro-jet.vercel.app'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -20,13 +23,13 @@ export async function GET(request: Request) {
   // Handle user denial
   if (error) {
     return NextResponse.redirect(
-      `${getBaseUrl()}/settings?qbo_error=${encodeURIComponent(error)}`
+      `${BASE_URL}/?tab=settings&qbo_error=${encodeURIComponent(error)}`
     )
   }
   
   if (!code || !state || !realmId) {
     return NextResponse.redirect(
-      `${getBaseUrl()}/settings?qbo_error=missing_params`
+      `${BASE_URL}/?tab=settings&qbo_error=missing_params`
     )
   }
   
@@ -54,7 +57,7 @@ export async function GET(request: Request) {
       const errorText = await tokenResponse.text()
       console.error('Token exchange failed:', errorText)
       return NextResponse.redirect(
-        `${getBaseUrl()}/settings?qbo_error=token_exchange_failed`
+        `${BASE_URL}/?tab=settings&qbo_error=token_exchange_failed`
       )
     }
     
@@ -91,20 +94,13 @@ export async function GET(request: Request) {
     
     // Redirect back to app with success
     return NextResponse.redirect(
-      `${getBaseUrl()}/?tab=settings&qbo_connected=true`
+      `${BASE_URL}/?tab=settings&qbo_connected=true`
     )
     
   } catch (err) {
     console.error('QBO callback error:', err)
     return NextResponse.redirect(
-      `${getBaseUrl()}/settings?qbo_error=unknown`
+      `${BASE_URL}/?tab=settings&qbo_error=unknown`
     )
   }
-}
-
-function getBaseUrl() {
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`
-  }
-  return 'https://cashflow-pro-jet.vercel.app'
 }
