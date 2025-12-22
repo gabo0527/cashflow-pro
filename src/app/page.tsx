@@ -540,6 +540,12 @@ export default function CashFlowPro() {
     brandColor: '#00d4aa'
   })
   
+  // QuickBooks integration state
+  const [qboConnected, setQboConnected] = useState(false)
+  const [qboConnectedAt, setQboConnectedAt] = useState<string | null>(null)
+  const [qboSyncing, setQboSyncing] = useState(false)
+  const [qboLastSync, setQboLastSync] = useState<string | null>(null)
+  
   // Chart filter state
   const [chartFilters, setChartFilters] = useState<ChartFilters>({
     revenue: true,
@@ -731,6 +737,11 @@ export default function CashFlowPro() {
             }
             if (settingsRes.data.brand_color) {
               setBranding(prev => ({ ...prev, brandColor: settingsRes.data.brand_color }))
+            }
+            // Load QBO connection status
+            if (settingsRes.data.qbo_connected_at) {
+              setQboConnected(true)
+              setQboConnectedAt(settingsRes.data.qbo_connected_at)
             }
           }
           
@@ -2170,6 +2181,60 @@ const handleQuickAdd = useCallback(async () => {
   const handleBalanceAlertBlur = useCallback(() => {
     saveCompanySetting('balance_alert_threshold', balanceAlertThreshold)
   }, [saveCompanySetting, balanceAlertThreshold])
+
+  // QuickBooks Integration
+  const connectQuickBooks = useCallback(() => {
+    if (!companyId) {
+      alert('Company not loaded yet. Please try again.')
+      return
+    }
+    // Redirect to QBO OAuth flow
+    window.location.href = `/api/qbo/connect?companyId=${companyId}`
+  }, [companyId])
+
+  const syncQuickBooks = useCallback(async (syncType: 'all' | 'transactions' | 'invoices' = 'all') => {
+    if (!companyId) return
+    
+    setQboSyncing(true)
+    try {
+      const response = await fetch('/api/qbo/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId, syncType })
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        setQboLastSync(new Date().toISOString())
+        alert(`Sync complete! ${data.message}`)
+        // Reload transactions
+        window.location.reload()
+      } else {
+        alert(`Sync failed: ${data.error}`)
+      }
+    } catch (err) {
+      console.error('QBO sync error:', err)
+      alert('Sync failed. Please try again.')
+    } finally {
+      setQboSyncing(false)
+    }
+  }, [companyId])
+
+  const disconnectQuickBooks = useCallback(async () => {
+    if (!companyId) return
+    if (!confirm('Are you sure you want to disconnect QuickBooks? This will not delete any synced data.')) return
+    
+    try {
+      await saveCompanySetting('qbo_access_token', null)
+      await saveCompanySetting('qbo_refresh_token', null)
+      await saveCompanySetting('qbo_connected_at', null)
+      setQboConnected(false)
+      setQboConnectedAt(null)
+    } catch (err) {
+      console.error('Disconnect error:', err)
+    }
+  }, [companyId, saveCompanySetting])
 
   // Project Management
   const addProject = useCallback(async () => {
@@ -8194,6 +8259,93 @@ const handleQuickAdd = useCallback(async () => {
                     </div>
                   </div>
                 </div>
+
+              {/* QuickBooks Integration */}
+              <div className={`rounded-xl p-6 border ${cardClasses}`}>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <RefreshCw className="w-5 h-5" />
+                  QuickBooks Integration
+                </h3>
+                <p className={`text-sm mb-4 ${textMuted}`}>Connect to QuickBooks Online to automatically sync bank transactions and invoices</p>
+                
+                {qboConnected ? (
+                  <div className="space-y-4">
+                    <div className={`flex items-center gap-3 p-4 rounded-lg ${theme === 'light' ? 'bg-green-50 border border-green-200' : 'bg-green-900/20 border border-green-800'}`}>
+                      <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
+                        <Check className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-green-600">Connected to QuickBooks</p>
+                        {qboConnectedAt && (
+                          <p className={`text-xs ${textMuted}`}>
+                            Connected {new Date(qboConnectedAt).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={() => syncQuickBooks('all')}
+                        disabled={qboSyncing}
+                        className="flex items-center gap-2 px-4 py-2 bg-[#00d4aa] text-[#0c1222] rounded-lg font-medium hover:bg-[#00c49a] disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${qboSyncing ? 'animate-spin' : ''}`} />
+                        {qboSyncing ? 'Syncing...' : 'Sync All'}
+                      </button>
+                      <button
+                        onClick={() => syncQuickBooks('transactions')}
+                        disabled={qboSyncing}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                      >
+                        Bank Transactions Only
+                      </button>
+                      <button
+                        onClick={() => syncQuickBooks('invoices')}
+                        disabled={qboSyncing}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                      >
+                        Invoices Only
+                      </button>
+                    </div>
+                    
+                    {qboLastSync && (
+                      <p className={`text-xs ${textMuted}`}>
+                        Last synced: {new Date(qboLastSync).toLocaleString()}
+                      </p>
+                    )}
+                    
+                    <button
+                      onClick={disconnectQuickBooks}
+                      className="text-sm text-red-500 hover:text-red-600"
+                    >
+                      Disconnect QuickBooks
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className={`p-4 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                      <p className={`text-sm ${textMuted} mb-3`}>
+                        Connecting QuickBooks will allow you to:
+                      </p>
+                      <ul className={`text-sm ${textMuted} space-y-1 ml-4 list-disc`}>
+                        <li>Import bank transactions automatically</li>
+                        <li>Sync invoices to the Accrual tab</li>
+                        <li>Avoid duplicate data entry</li>
+                      </ul>
+                    </div>
+                    <button
+                      onClick={connectQuickBooks}
+                      className="flex items-center gap-2 px-6 py-3 bg-[#2CA01C] text-white rounded-lg font-medium hover:bg-[#248a17] transition-colors"
+                    >
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                      </svg>
+                      Connect to QuickBooks
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {/* Category Manager */}
               <div className={`rounded-xl p-6 border ${cardClasses}`}>
