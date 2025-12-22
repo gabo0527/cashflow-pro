@@ -3,9 +3,9 @@
 import { NextResponse } from 'next/server'
 
 const QBO_CLIENT_ID = process.env.QBO_CLIENT_ID
-const REDIRECT_URI = process.env.VERCEL_URL 
-  ? `https://${process.env.VERCEL_URL}/api/qbo/callback`
-  : 'https://cashflow-pro-jet.vercel.app/api/qbo/callback'
+
+// HARDCODED - must match exactly what's in Intuit Developer portal
+const REDIRECT_URI = 'https://cashflow-pro-jet.vercel.app/api/qbo/callback'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
