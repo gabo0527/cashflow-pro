@@ -10,6 +10,9 @@ const QBO_CLIENT_SECRET = process.env.QBO_CLIENT_SECRET
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+// Date filter - adjust as needed
+const SYNC_START_DATE = '2023-01-01'
+
 export async function POST(request: Request) {
   try {
     const { companyId, syncType } = await request.json()
@@ -54,8 +57,8 @@ export async function POST(request: Request) {
     const baseUrl = `https://quickbooks.api.intuit.com/v3/company/${realmId}`
     
     const results = {
-      transactions: { added: 0, skipped: 0 },
-      invoices: { added: 0, skipped: 0 }
+      transactions: { added: 0, skipped: 0, errors: [] as string[] },
+      invoices: { added: 0, skipped: 0, errors: [] as string[] }
     }
     
     // Sync bank transactions
@@ -128,6 +131,24 @@ async function refreshToken(
   }
 }
 
+async function queryQBO(baseUrl: string, accessToken: string, query: string) {
+  const encodedQuery = encodeURIComponent(query)
+  const response = await fetch(`${baseUrl}/query?query=${encodedQuery}`, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Accept': 'application/json'
+    }
+  })
+  
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error(`QBO query failed: ${query}`, errorText)
+    return null
+  }
+  
+  return response.json()
+}
+
 async function syncBankTransactions(
   baseUrl: string, 
   accessToken: string, 
@@ -136,66 +157,58 @@ async function syncBankTransactions(
 ) {
   let added = 0
   let skipped = 0
+  const errors: string[] = []
   
   try {
-    // Query purchases (expenses/payments)
-    const purchaseQuery = encodeURIComponent("SELECT * FROM Purchase WHERE TxnDate > '2024-01-01' MAXRESULTS 500")
-    const purchaseResponse = await fetch(`${baseUrl}/query?query=${purchaseQuery}`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'application/json'
-      }
-    })
+    // 1. Query Purchases (expenses, checks, credit card charges)
+    console.log('Querying Purchases...')
+    const purchaseData = await queryQBO(baseUrl, accessToken, 
+      `SELECT * FROM Purchase WHERE TxnDate >= '${SYNC_START_DATE}' MAXRESULTS 1000`)
     
-    if (purchaseResponse.ok) {
-      const data = await purchaseResponse.json()
-      const purchases = data.QueryResponse?.Purchase || []
+    if (purchaseData?.QueryResponse?.Purchase) {
+      const purchases = purchaseData.QueryResponse.Purchase
+      console.log(`Found ${purchases.length} purchases`)
       
       for (const purchase of purchases) {
         const txData = {
           company_id: companyId,
-          qbo_id: purchase.Id,
+          qbo_id: `purchase_${purchase.Id}`,
           date: purchase.TxnDate,
-          description: purchase.PrivateNote || purchase.DocNumber || 'Purchase',
-          amount: -Math.abs(purchase.TotalAmt), // Expenses are negative
+          description: purchase.PrivateNote || purchase.DocNumber || purchase.EntityRef?.name || 'Purchase',
+          amount: -Math.abs(purchase.TotalAmt),
           type: 'expense',
           category: purchase.AccountRef?.name || 'Uncategorized',
           source: 'quickbooks'
         }
         
-        // Upsert (insert or update if exists)
         const { error } = await supabase
           .from('transactions')
           .upsert(txData, { onConflict: 'company_id,qbo_id' })
         
-        if (!error) {
-          added++
-        } else {
+        if (!error) added++
+        else {
           skipped++
+          errors.push(`Purchase ${purchase.Id}: ${error.message}`)
         }
       }
     }
     
-    // Query deposits/sales receipts (income)
-    const depositQuery = encodeURIComponent("SELECT * FROM Deposit WHERE TxnDate > '2024-01-01' MAXRESULTS 500")
-    const depositResponse = await fetch(`${baseUrl}/query?query=${depositQuery}`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'application/json'
-      }
-    })
+    // 2. Query Deposits (bank deposits)
+    console.log('Querying Deposits...')
+    const depositData = await queryQBO(baseUrl, accessToken,
+      `SELECT * FROM Deposit WHERE TxnDate >= '${SYNC_START_DATE}' MAXRESULTS 1000`)
     
-    if (depositResponse.ok) {
-      const data = await depositResponse.json()
-      const deposits = data.QueryResponse?.Deposit || []
+    if (depositData?.QueryResponse?.Deposit) {
+      const deposits = depositData.QueryResponse.Deposit
+      console.log(`Found ${deposits.length} deposits`)
       
       for (const deposit of deposits) {
         const txData = {
           company_id: companyId,
-          qbo_id: deposit.Id,
+          qbo_id: `deposit_${deposit.Id}`,
           date: deposit.TxnDate,
           description: deposit.PrivateNote || 'Deposit',
-          amount: Math.abs(deposit.TotalAmt), // Income is positive
+          amount: Math.abs(deposit.TotalAmt),
           type: 'income',
           category: 'Revenue',
           source: 'quickbooks'
@@ -205,19 +218,161 @@ async function syncBankTransactions(
           .from('transactions')
           .upsert(txData, { onConflict: 'company_id,qbo_id' })
         
-        if (!error) {
-          added++
-        } else {
+        if (!error) added++
+        else {
           skipped++
+          errors.push(`Deposit ${deposit.Id}: ${error.message}`)
         }
       }
     }
     
+    // 3. Query Sales Receipts (direct sales/payments received)
+    console.log('Querying Sales Receipts...')
+    const salesData = await queryQBO(baseUrl, accessToken,
+      `SELECT * FROM SalesReceipt WHERE TxnDate >= '${SYNC_START_DATE}' MAXRESULTS 1000`)
+    
+    if (salesData?.QueryResponse?.SalesReceipt) {
+      const receipts = salesData.QueryResponse.SalesReceipt
+      console.log(`Found ${receipts.length} sales receipts`)
+      
+      for (const receipt of receipts) {
+        const txData = {
+          company_id: companyId,
+          qbo_id: `salesreceipt_${receipt.Id}`,
+          date: receipt.TxnDate,
+          description: receipt.CustomerRef?.name || receipt.DocNumber || 'Sales Receipt',
+          amount: Math.abs(receipt.TotalAmt),
+          type: 'income',
+          category: 'Revenue',
+          source: 'quickbooks'
+        }
+        
+        const { error } = await supabase
+          .from('transactions')
+          .upsert(txData, { onConflict: 'company_id,qbo_id' })
+        
+        if (!error) added++
+        else {
+          skipped++
+          errors.push(`SalesReceipt ${receipt.Id}: ${error.message}`)
+        }
+      }
+    }
+    
+    // 4. Query Payments (customer payments on invoices)
+    console.log('Querying Payments...')
+    const paymentData = await queryQBO(baseUrl, accessToken,
+      `SELECT * FROM Payment WHERE TxnDate >= '${SYNC_START_DATE}' MAXRESULTS 1000`)
+    
+    if (paymentData?.QueryResponse?.Payment) {
+      const payments = paymentData.QueryResponse.Payment
+      console.log(`Found ${payments.length} payments`)
+      
+      for (const payment of payments) {
+        const txData = {
+          company_id: companyId,
+          qbo_id: `payment_${payment.Id}`,
+          date: payment.TxnDate,
+          description: payment.CustomerRef?.name || 'Payment Received',
+          amount: Math.abs(payment.TotalAmt),
+          type: 'income',
+          category: 'Revenue',
+          source: 'quickbooks'
+        }
+        
+        const { error } = await supabase
+          .from('transactions')
+          .upsert(txData, { onConflict: 'company_id,qbo_id' })
+        
+        if (!error) added++
+        else {
+          skipped++
+          errors.push(`Payment ${payment.Id}: ${error.message}`)
+        }
+      }
+    }
+    
+    // 5. Query Bills (accounts payable)
+    console.log('Querying Bills...')
+    const billData = await queryQBO(baseUrl, accessToken,
+      `SELECT * FROM Bill WHERE TxnDate >= '${SYNC_START_DATE}' MAXRESULTS 1000`)
+    
+    if (billData?.QueryResponse?.Bill) {
+      const bills = billData.QueryResponse.Bill
+      console.log(`Found ${bills.length} bills`)
+      
+      for (const bill of bills) {
+        const txData = {
+          company_id: companyId,
+          qbo_id: `bill_${bill.Id}`,
+          date: bill.TxnDate,
+          description: bill.VendorRef?.name || bill.DocNumber || 'Bill',
+          amount: -Math.abs(bill.TotalAmt),
+          type: 'expense',
+          category: 'Accounts Payable',
+          source: 'quickbooks'
+        }
+        
+        const { error } = await supabase
+          .from('transactions')
+          .upsert(txData, { onConflict: 'company_id,qbo_id' })
+        
+        if (!error) added++
+        else {
+          skipped++
+          errors.push(`Bill ${bill.Id}: ${error.message}`)
+        }
+      }
+    }
+    
+    // 6. Query Bill Payments (payments made to vendors)
+    console.log('Querying Bill Payments...')
+    const billPaymentData = await queryQBO(baseUrl, accessToken,
+      `SELECT * FROM BillPayment WHERE TxnDate >= '${SYNC_START_DATE}' MAXRESULTS 1000`)
+    
+    if (billPaymentData?.QueryResponse?.BillPayment) {
+      const billPayments = billPaymentData.QueryResponse.BillPayment
+      console.log(`Found ${billPayments.length} bill payments`)
+      
+      for (const bp of billPayments) {
+        const txData = {
+          company_id: companyId,
+          qbo_id: `billpayment_${bp.Id}`,
+          date: bp.TxnDate,
+          description: bp.VendorRef?.name || 'Bill Payment',
+          amount: -Math.abs(bp.TotalAmt),
+          type: 'expense',
+          category: 'Bill Payment',
+          source: 'quickbooks'
+        }
+        
+        const { error } = await supabase
+          .from('transactions')
+          .upsert(txData, { onConflict: 'company_id,qbo_id' })
+        
+        if (!error) added++
+        else {
+          skipped++
+          errors.push(`BillPayment ${bp.Id}: ${error.message}`)
+        }
+      }
+    }
+    
+    // 7. Query Expenses (direct expenses)
+    console.log('Querying Expenses...')
+    const expenseData = await queryQBO(baseUrl, accessToken,
+      `SELECT * FROM Purchase WHERE PaymentType = 'Cash' AND TxnDate >= '${SYNC_START_DATE}' MAXRESULTS 1000`)
+    
+    // Note: Expenses in QBO are stored as Purchase with PaymentType
+    // Already captured in Purchase query above
+    
   } catch (err) {
     console.error('Sync transactions error:', err)
+    errors.push(`General error: ${err}`)
   }
   
-  return { added, skipped }
+  console.log(`Transaction sync complete: ${added} added, ${skipped} skipped`)
+  return { added, skipped, errors }
 }
 
 async function syncInvoices(
@@ -228,19 +383,16 @@ async function syncInvoices(
 ) {
   let added = 0
   let skipped = 0
+  const errors: string[] = []
   
   try {
-    const invoiceQuery = encodeURIComponent("SELECT * FROM Invoice WHERE TxnDate > '2024-01-01' MAXRESULTS 500")
-    const response = await fetch(`${baseUrl}/query?query=${invoiceQuery}`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'application/json'
-      }
-    })
+    console.log('Querying Invoices...')
+    const invoiceData = await queryQBO(baseUrl, accessToken,
+      `SELECT * FROM Invoice WHERE TxnDate >= '${SYNC_START_DATE}' MAXRESULTS 1000`)
     
-    if (response.ok) {
-      const data = await response.json()
-      const invoices = data.QueryResponse?.Invoice || []
+    if (invoiceData?.QueryResponse?.Invoice) {
+      const invoices = invoiceData.QueryResponse.Invoice
+      console.log(`Found ${invoices.length} invoices`)
       
       for (const invoice of invoices) {
         const invData = {
@@ -260,17 +412,19 @@ async function syncInvoices(
           .from('invoices')
           .upsert(invData, { onConflict: 'company_id,qbo_id' })
         
-        if (!error) {
-          added++
-        } else {
+        if (!error) added++
+        else {
           skipped++
+          errors.push(`Invoice ${invoice.Id}: ${error.message}`)
         }
       }
     }
     
   } catch (err) {
     console.error('Sync invoices error:', err)
+    errors.push(`General error: ${err}`)
   }
   
-  return { added, skipped }
+  console.log(`Invoice sync complete: ${added} added, ${skipped} skipped`)
+  return { added, skipped, errors }
 }
