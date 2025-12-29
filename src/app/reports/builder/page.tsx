@@ -463,6 +463,7 @@ export default function ReportBuilder() {
   const borderColor = theme === 'light' ? 'border-gray-200' : 'border-[#333]'
   const textPrimary = theme === 'light' ? 'text-slate-900' : 'text-white'
   const textMuted = theme === 'light' ? 'text-slate-500' : 'text-neutral-400'
+  const inputClasses = `${surfaceColor} ${borderColor} ${textPrimary} focus:ring-2 focus:ring-orange-500 focus:border-orange-500`
 
   const selectedComponentData = components.find(c => c.id === selectedComponent)
 
@@ -740,25 +741,36 @@ export default function ReportBuilder() {
                 </div>
 
                 {/* Component Content */}
-                <div className="p-3 h-[calc(100%-40px)] overflow-hidden">
+                <div className="p-3 h-[calc(100%-40px)] overflow-auto">
                   {component.type === 'kpi' && (
-                    <div className="h-full flex flex-col justify-center">
+                    <div className="h-full flex flex-col justify-center items-center text-center">
                       <p className={`text-xs ${textMuted} mb-1`}>
                         {METRICS.find(m => m.id === component.config.metric)?.label || 'Metric'}
-                        {component.config.dateRange?.start && component.config.dateRange?.end && (
-                          <span className="ml-1 opacity-70">
-                            ({component.config.dateRange.start.slice(5)}-{component.config.dateRange.end.slice(5)}/{component.config.dateRange.start.slice(0,4)})
-                          </span>
-                        )}
                       </p>
-                      <p className="text-2xl font-bold" style={{ color: METRICS.find(m => m.id === component.config.metric)?.color }}>
+                      <p 
+                        className="font-bold leading-tight"
+                        style={{ 
+                          color: METRICS.find(m => m.id === component.config.metric)?.color,
+                          fontSize: component.width > 250 ? '2rem' : component.width > 180 ? '1.5rem' : '1.25rem'
+                        }}
+                      >
                         {component.config.metric === 'gross-margin' 
                           ? `${calculateMetric(component.config.metric || 'revenue', component.config).toFixed(1)}%`
                           : formatCurrency(calculateMetric(component.config.metric || 'revenue', component.config))
                         }
                       </p>
+                      {component.config.dateRange?.start && component.config.dateRange?.end && (
+                        <p className={`text-xs ${textMuted} mt-1`}>
+                          {component.config.dateRange.start} to {component.config.dateRange.end}
+                        </p>
+                      )}
+                      {component.config.projectFilter && component.config.projectFilter !== 'all' && (
+                        <p className={`text-xs ${textMuted} mt-0.5`}>
+                          {component.config.projectFilter}
+                        </p>
+                      )}
                       {component.config.dataSource === 'accrual' && (
-                        <p className={`text-xs ${textMuted} mt-1`}>Accrual basis</p>
+                        <p className={`text-xs ${textMuted} mt-0.5 italic`}>Accrual basis</p>
                       )}
                     </div>
                   )}
@@ -905,7 +917,7 @@ export default function ReportBuilder() {
                     type="text"
                     value={selectedComponentData.config.title || ''}
                     onChange={(e) => updateComponentConfig(selectedComponentData.id, { title: e.target.value })}
-                    className={`w-full px-3 py-2 rounded-lg border text-sm ${surfaceColor} ${borderColor}`}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm ${inputClasses}`}
                   />
                 </div>
 
@@ -916,7 +928,7 @@ export default function ReportBuilder() {
                     <select
                       value={selectedComponentData.config.metric || 'revenue'}
                       onChange={(e) => updateComponentConfig(selectedComponentData.id, { metric: e.target.value })}
-                      className={`w-full px-3 py-2 rounded-lg border text-sm ${surfaceColor} ${borderColor}`}
+                      className={`w-full px-3 py-2 rounded-lg border text-sm ${inputClasses}`}
                     >
                       {METRICS.map(m => (
                         <option key={m.id} value={m.id}>{m.label}</option>
@@ -931,7 +943,7 @@ export default function ReportBuilder() {
                   <select
                     value={selectedComponentData.config.dataSource || 'cash'}
                     onChange={(e) => updateComponentConfig(selectedComponentData.id, { dataSource: e.target.value as 'cash' | 'accrual' })}
-                    className={`w-full px-3 py-2 rounded-lg border text-sm ${surfaceColor} ${borderColor}`}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm ${inputClasses}`}
                   >
                     <option value="cash">Cash Transactions</option>
                     <option value="accrual">Accrual (Invoices)</option>
@@ -953,7 +965,7 @@ export default function ReportBuilder() {
                             end: selectedComponentData.config.dateRange?.end || `${new Date().getFullYear()}-12`
                           } 
                         })}
-                        className={`w-full px-2 py-1.5 rounded-lg border text-sm ${surfaceColor} ${borderColor}`}
+                        className={`w-full px-2 py-1.5 rounded-lg border text-sm ${inputClasses}`}
                       />
                     </div>
                     <div>
@@ -967,7 +979,7 @@ export default function ReportBuilder() {
                             end: e.target.value 
                           } 
                         })}
-                        className={`w-full px-2 py-1.5 rounded-lg border text-sm ${surfaceColor} ${borderColor}`}
+                        className={`w-full px-2 py-1.5 rounded-lg border text-sm ${inputClasses}`}
                       />
                     </div>
                   </div>
@@ -998,7 +1010,7 @@ export default function ReportBuilder() {
                   <select
                     value={selectedComponentData.config.projectFilter || 'all'}
                     onChange={(e) => updateComponentConfig(selectedComponentData.id, { projectFilter: e.target.value })}
-                    className={`w-full px-3 py-2 rounded-lg border text-sm ${surfaceColor} ${borderColor}`}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm ${inputClasses}`}
                   >
                     <option value="all">All Projects</option>
                     {projects.map(p => (
@@ -1036,7 +1048,7 @@ export default function ReportBuilder() {
                         onChange={(e) => setComponents(prev => prev.map(c => 
                           c.id === selectedComponentData.id ? { ...c, width: Number(e.target.value) } : c
                         ))}
-                        className={`w-full px-3 py-2 rounded-lg border text-sm ${surfaceColor} ${borderColor}`}
+                        className={`w-full px-3 py-2 rounded-lg border text-sm ${inputClasses}`}
                       />
                     </div>
                     <div>
@@ -1047,9 +1059,31 @@ export default function ReportBuilder() {
                         onChange={(e) => setComponents(prev => prev.map(c => 
                           c.id === selectedComponentData.id ? { ...c, height: Number(e.target.value) } : c
                         ))}
-                        className={`w-full px-3 py-2 rounded-lg border text-sm ${surfaceColor} ${borderColor}`}
+                        className={`w-full px-3 py-2 rounded-lg border text-sm ${inputClasses}`}
                       />
                     </div>
+                  </div>
+                  {/* Size Presets */}
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {[
+                      { label: 'S', w: 150, h: 100 },
+                      { label: 'M', w: 200, h: 120 },
+                      { label: 'L', w: 280, h: 150 },
+                      { label: 'Wide', w: 350, h: 120 },
+                      { label: 'Tall', w: 200, h: 200 },
+                    ].map(preset => (
+                      <button
+                        key={preset.label}
+                        onClick={() => setComponents(prev => prev.map(c => 
+                          c.id === selectedComponentData.id ? { ...c, width: preset.w, height: preset.h } : c
+                        ))}
+                        className={`px-2 py-1 text-xs rounded ${
+                          theme === 'light' ? 'bg-slate-100 hover:bg-slate-200' : 'bg-neutral-800 hover:bg-neutral-700'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
