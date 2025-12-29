@@ -36,7 +36,7 @@
   --color-expense-light: rgba(251, 113, 133, 0.15);
   
   /* Overhead - Soft Purple */
-  --color-overhead: #a78bfa;
+  --color-overhead: #fbbf24;
   --color-overhead-light: rgba(167, 139, 250, 0.15);
   
   /* Investment - Soft Blue */
@@ -83,7 +83,7 @@ body:not(.light-mode) {
   --color-expense: #fb923c;
   --color-expense-light: rgba(251, 146, 60, 0.2);
   
-  --color-overhead: #c4b5fd;
+  --color-overhead: #fcd34d;
   --color-overhead-light: rgba(196, 181, 253, 0.2);
   
   --color-investment: #93c5fd;
