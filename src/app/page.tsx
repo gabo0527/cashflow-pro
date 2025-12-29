@@ -9038,7 +9038,7 @@ const handleQuickAdd = useCallback(async () => {
               </div>
 
               {/* Data Source Info */}
-              <div className={`p-4 rounded-xl border ${borderColor} ${theme === 'light' ? 'bg-blue-50' : 'bg-blue-500/10'}`}>
+              <div className={`p-4 rounded-xl border ${tableBorder} ${theme === 'light' ? 'bg-blue-50' : 'bg-blue-500/10'}`}>
                 <div className="flex items-start gap-3">
                   <Info className="w-5 h-5 text-blue-500 mt-0.5" />
                   <div className="text-sm">
