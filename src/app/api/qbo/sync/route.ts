@@ -67,9 +67,9 @@ export async function POST(request: Request) {
       results.transactions = txResult
     }
     
-    // Sync invoices
+    // Sync invoices to accrual_transactions
     if (!syncType || syncType === 'invoices' || syncType === 'all') {
-      const invResult = await syncInvoices(baseUrl, accessToken, companyId, supabase)
+      const invResult = await syncInvoicesToAccrual(baseUrl, accessToken, companyId, supabase)
       results.invoices = invResult
     }
     
@@ -226,73 +226,7 @@ async function syncBankTransactions(
       }
     }
     
-    // 3. Query Sales Receipts (direct sales/payments received)
-    console.log('Querying Sales Receipts...')
-    const salesData = await queryQBO(baseUrl, accessToken,
-      `SELECT * FROM SalesReceipt WHERE TxnDate >= '${SYNC_START_DATE}' MAXRESULTS 1000`)
-    
-    if (salesData?.QueryResponse?.SalesReceipt) {
-      const receipts = salesData.QueryResponse.SalesReceipt
-      console.log(`Found ${receipts.length} sales receipts`)
-      
-      for (const receipt of receipts) {
-        const txData = {
-          company_id: companyId,
-          qbo_id: `salesreceipt_${receipt.Id}`,
-          date: receipt.TxnDate,
-          description: receipt.CustomerRef?.name || receipt.DocNumber || 'Sales Receipt',
-          amount: Math.abs(receipt.TotalAmt),
-          type: 'income',
-          category: 'Revenue',
-          source: 'quickbooks'
-        }
-        
-        const { error } = await supabase
-          .from('transactions')
-          .upsert(txData, { onConflict: 'company_id,qbo_id' })
-        
-        if (!error) added++
-        else {
-          skipped++
-          errors.push(`SalesReceipt ${receipt.Id}: ${error.message}`)
-        }
-      }
-    }
-    
-    // 4. Query Payments (customer payments on invoices)
-    console.log('Querying Payments...')
-    const paymentData = await queryQBO(baseUrl, accessToken,
-      `SELECT * FROM Payment WHERE TxnDate >= '${SYNC_START_DATE}' MAXRESULTS 1000`)
-    
-    if (paymentData?.QueryResponse?.Payment) {
-      const payments = paymentData.QueryResponse.Payment
-      console.log(`Found ${payments.length} payments`)
-      
-      for (const payment of payments) {
-        const txData = {
-          company_id: companyId,
-          qbo_id: `payment_${payment.Id}`,
-          date: payment.TxnDate,
-          description: payment.CustomerRef?.name || 'Payment Received',
-          amount: Math.abs(payment.TotalAmt),
-          type: 'income',
-          category: 'Revenue',
-          source: 'quickbooks'
-        }
-        
-        const { error } = await supabase
-          .from('transactions')
-          .upsert(txData, { onConflict: 'company_id,qbo_id' })
-        
-        if (!error) added++
-        else {
-          skipped++
-          errors.push(`Payment ${payment.Id}: ${error.message}`)
-        }
-      }
-    }
-    
-    // 5. Query Bills (accounts payable)
+    // 3. Query Bills (accounts payable - expenses)
     console.log('Querying Bills...')
     const billData = await queryQBO(baseUrl, accessToken,
       `SELECT * FROM Bill WHERE TxnDate >= '${SYNC_START_DATE}' MAXRESULTS 1000`)
@@ -325,47 +259,6 @@ async function syncBankTransactions(
       }
     }
     
-    // 6. Query Bill Payments (payments made to vendors)
-    console.log('Querying Bill Payments...')
-    const billPaymentData = await queryQBO(baseUrl, accessToken,
-      `SELECT * FROM BillPayment WHERE TxnDate >= '${SYNC_START_DATE}' MAXRESULTS 1000`)
-    
-    if (billPaymentData?.QueryResponse?.BillPayment) {
-      const billPayments = billPaymentData.QueryResponse.BillPayment
-      console.log(`Found ${billPayments.length} bill payments`)
-      
-      for (const bp of billPayments) {
-        const txData = {
-          company_id: companyId,
-          qbo_id: `billpayment_${bp.Id}`,
-          date: bp.TxnDate,
-          description: bp.VendorRef?.name || 'Bill Payment',
-          amount: -Math.abs(bp.TotalAmt),
-          type: 'expense',
-          category: 'Bill Payment',
-          source: 'quickbooks'
-        }
-        
-        const { error } = await supabase
-          .from('transactions')
-          .upsert(txData, { onConflict: 'company_id,qbo_id' })
-        
-        if (!error) added++
-        else {
-          skipped++
-          errors.push(`BillPayment ${bp.Id}: ${error.message}`)
-        }
-      }
-    }
-    
-    // 7. Query Expenses (direct expenses)
-    console.log('Querying Expenses...')
-    const expenseData = await queryQBO(baseUrl, accessToken,
-      `SELECT * FROM Purchase WHERE PaymentType = 'Cash' AND TxnDate >= '${SYNC_START_DATE}' MAXRESULTS 1000`)
-    
-    // Note: Expenses in QBO are stored as Purchase with PaymentType
-    // Already captured in Purchase query above
-    
   } catch (err) {
     console.error('Sync transactions error:', err)
     errors.push(`General error: ${err}`)
@@ -375,7 +268,7 @@ async function syncBankTransactions(
   return { added, skipped, errors }
 }
 
-async function syncInvoices(
+async function syncInvoicesToAccrual(
   baseUrl: string, 
   accessToken: string, 
   companyId: string, 
@@ -386,7 +279,7 @@ async function syncInvoices(
   const errors: string[] = []
   
   try {
-    console.log('Querying Invoices...')
+    console.log('Querying Invoices for accrual_transactions...')
     const invoiceData = await queryQBO(baseUrl, accessToken,
       `SELECT * FROM Invoice WHERE TxnDate >= '${SYNC_START_DATE}' MAXRESULTS 1000`)
     
@@ -395,36 +288,80 @@ async function syncInvoices(
       console.log(`Found ${invoices.length} invoices`)
       
       for (const invoice of invoices) {
-        const invData = {
+        // Extract project from CustomerRef name or line items
+        // Common pattern: "Customer Name - Project" or use Class if available
+        const customerName = invoice.CustomerRef?.name || 'Unknown'
+        
+        // Try to extract project from customer name (if format is "Client - Project")
+        let project = ''
+        let description = customerName
+        
+        if (customerName.includes(' - ')) {
+          const parts = customerName.split(' - ')
+          description = parts[0].trim()
+          project = parts.slice(1).join(' - ').trim()
+        } else {
+          // Use customer name as description, leave project for manual assignment
+          description = customerName
+          project = ''
+        }
+        
+        // Determine type based on amount (positive = revenue)
+        const type = invoice.TotalAmt >= 0 ? 'revenue' : 'direct_cost'
+        
+        const accrualData = {
           company_id: companyId,
-          qbo_id: invoice.Id,
-          invoice_number: invoice.DocNumber,
-          customer_name: invoice.CustomerRef?.name || 'Unknown',
+          qbo_invoice_id: invoice.Id,
           date: invoice.TxnDate,
-          due_date: invoice.DueDate,
+          type: type,
+          description: description,
           amount: invoice.TotalAmt,
-          balance: invoice.Balance,
-          status: invoice.Balance === 0 ? 'paid' : (new Date(invoice.DueDate) < new Date() ? 'overdue' : 'pending'),
+          project: project || null,
+          invoice_number: invoice.DocNumber || null,
+          notes: invoice.CustomerMemo?.value || null,
           source: 'quickbooks'
         }
         
-        const { error } = await supabase
-          .from('invoices')
-          .upsert(invData, { onConflict: 'company_id,qbo_id' })
+        // Check if this invoice already exists
+        const { data: existing } = await supabase
+          .from('accrual_transactions')
+          .select('id')
+          .eq('company_id', companyId)
+          .eq('qbo_invoice_id', invoice.Id)
+          .single()
         
-        if (!error) added++
-        else {
-          skipped++
-          errors.push(`Invoice ${invoice.Id}: ${error.message}`)
+        if (existing) {
+          // Update existing record
+          const { error } = await supabase
+            .from('accrual_transactions')
+            .update(accrualData)
+            .eq('id', existing.id)
+          
+          if (!error) added++
+          else {
+            skipped++
+            errors.push(`Invoice ${invoice.Id} update: ${error.message}`)
+          }
+        } else {
+          // Insert new record
+          const { error } = await supabase
+            .from('accrual_transactions')
+            .insert(accrualData)
+          
+          if (!error) added++
+          else {
+            skipped++
+            errors.push(`Invoice ${invoice.Id} insert: ${error.message}`)
+          }
         }
       }
     }
     
   } catch (err) {
-    console.error('Sync invoices error:', err)
+    console.error('Sync invoices to accrual error:', err)
     errors.push(`General error: ${err}`)
   }
   
-  console.log(`Invoice sync complete: ${added} added, ${skipped} skipped`)
+  console.log(`Invoice sync to accrual complete: ${added} added, ${skipped} skipped`)
   return { added, skipped, errors }
 }
