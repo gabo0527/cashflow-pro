@@ -9033,7 +9033,22 @@ const handleQuickAdd = useCallback(async () => {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-bold">Standard Reports</h2>
-                  <p className={`text-sm ${textMuted}`}>Pre-built reports for quick insights</p>
+                  <p className={`text-sm ${textMuted}`}>Full-page reports with customizable filters and data sources</p>
+                </div>
+              </div>
+
+              {/* Data Source Info */}
+              <div className={`p-4 rounded-xl border ${borderColor} ${theme === 'light' ? 'bg-blue-50' : 'bg-blue-500/10'}`}>
+                <div className="flex items-start gap-3">
+                  <Info className="w-5 h-5 text-blue-500 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-blue-600 dark:text-blue-400 mb-1">About Data Sources</p>
+                    <p className={textMuted}>
+                      Each report lets you switch between <span className="text-emerald-500 font-medium">Cash</span> (actual bank transactions), 
+                      <span className="text-blue-500 font-medium"> Accrual</span> (invoiced revenue/expenses), or 
+                      <span className="text-purple-500 font-medium"> Combined</span> views.
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -9045,50 +9060,80 @@ const handleQuickAdd = useCallback(async () => {
                     title: 'Monthly P&L', 
                     description: 'Profit & Loss statement by month',
                     icon: BarChart3,
-                    color: '#34d399'
+                    color: '#34d399',
+                    route: '/reports/monthly-pl',
+                    badge: 'Full Page'
                   },
                   { 
                     id: 'project-profitability', 
                     title: 'Project Profitability', 
                     description: 'Revenue, costs, and margins by project',
                     icon: Target,
-                    color: '#f97316'
+                    color: '#f97316',
+                    route: '/reports/project-profitability',
+                    badge: 'Full Page'
                   },
                   { 
                     id: 'client-revenue', 
                     title: 'Client Revenue Report', 
                     description: 'Revenue breakdown by client',
                     icon: Users,
-                    color: '#60a5fa'
+                    color: '#60a5fa',
+                    route: null,
+                    badge: 'Coming Soon'
                   },
                   { 
                     id: 'cash-flow', 
                     title: 'Cash Flow Statement', 
                     description: 'Cash inflows, outflows, and net position',
                     icon: DollarSign,
-                    color: '#2dd4bf'
+                    color: '#2dd4bf',
+                    route: null,
+                    badge: 'Coming Soon'
                   },
                   { 
                     id: 'quarterly-comparison', 
                     title: 'Quarterly Comparison', 
                     description: 'Compare performance across quarters',
                     icon: TrendingUp,
-                    color: '#fbbf24'
+                    color: '#fbbf24',
+                    route: null,
+                    badge: 'Coming Soon'
                   }
                 ].map(report => (
                   <button
                     key={report.id}
-                    onClick={() => setActiveReport(report.id)}
-                    className={`p-5 rounded-xl border text-left transition-all hover:shadow-lg group ${cardClasses}`}
+                    onClick={() => report.route ? router.push(report.route) : null}
+                    disabled={!report.route}
+                    className={`p-5 rounded-xl border text-left transition-all group ${cardClasses} ${
+                      report.route 
+                        ? 'hover:shadow-lg hover:border-orange-300 cursor-pointer' 
+                        : 'opacity-60 cursor-not-allowed'
+                    }`}
                   >
-                    <div 
-                      className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110"
-                      style={{ backgroundColor: `${report.color}20` }}
-                    >
-                      <report.icon className="w-6 h-6" style={{ color: report.color }} />
+                    <div className="flex items-start justify-between mb-4">
+                      <div 
+                        className="w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110"
+                        style={{ backgroundColor: `${report.color}20` }}
+                      >
+                        <report.icon className="w-6 h-6" style={{ color: report.color }} />
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        report.badge === 'Full Page' 
+                          ? 'bg-emerald-500/10 text-emerald-500' 
+                          : 'bg-amber-500/10 text-amber-500'
+                      }`}>
+                        {report.badge}
+                      </span>
                     </div>
                     <h3 className="font-semibold mb-1">{report.title}</h3>
                     <p className={`text-sm ${textMuted}`}>{report.description}</p>
+                    {report.route && (
+                      <div className={`mt-3 flex items-center gap-1 text-sm text-orange-500 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                        <span>Open Report</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
