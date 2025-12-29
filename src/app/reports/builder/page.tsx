@@ -130,17 +130,30 @@ export default function ReportBuilder() {
           return
         }
 
-        const [txData, accrualData, projectData, clientData] = await Promise.all([
-          fetchTransactions(user.id),
-          fetchAccrualTransactions(user.id),
-          fetchProjects(user.id),
-          fetchClients(user.id)
+        // Get company_id from profile first
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('id', user.id)
+          .single()
+
+        if (!profile?.company_id) {
+          console.error('No company found')
+          setLoading(false)
+          return
+        }
+
+        const [txResult, accrualResult, projectResult, clientResult] = await Promise.all([
+          fetchTransactions(profile.company_id),
+          fetchAccrualTransactions(profile.company_id),
+          fetchProjects(profile.company_id),
+          fetchClients(profile.company_id)
         ])
 
-        if (txData) setTransactions(txData)
-        if (accrualData) setAccrualTransactions(accrualData)
-        if (projectData) setProjects(projectData)
-        if (clientData) setClients(clientData)
+        if (txResult?.data) setTransactions(txResult.data)
+        if (accrualResult?.data) setAccrualTransactions(accrualResult.data)
+        if (projectResult?.data) setProjects(projectResult.data)
+        if (clientResult?.data) setClients(clientResult.data)
         
         // Load theme preference
         const savedTheme = localStorage.getItem('vantage_theme')
