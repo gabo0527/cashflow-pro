@@ -410,7 +410,7 @@ export default function CashFlowPro() {
   const [dataLoading, setDataLoading] = useState(false)
   
   // Core state
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'data' | 'assumptions' | 'projections' | 'clients' | 'integrations' | 'settings'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'data' | 'assumptions' | 'projections' | 'clients' | 'reports' | 'integrations' | 'settings'>('dashboard')
   const [beginningBalance, setBeginningBalance] = useState<number>(50000)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [accrualTransactions, setAccrualTransactions] = useState<AccrualTransaction[]>([])
@@ -444,6 +444,12 @@ export default function CashFlowPro() {
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [showProjectModal, setShowProjectModal] = useState(false)
   const [showPdfExport, setShowPdfExport] = useState(false)
+
+  // Reports state
+  const [activeReport, setActiveReport] = useState<string | null>(null)
+  const [reportDateRange, setReportDateRange] = useState({ start: '', end: '' })
+  const [reportProject, setReportProject] = useState<string>('all')
+  const [reportClient, setReportClient] = useState<string>('all')
   const [pdfSections, setPdfSections] = useState({
     kpis: true,
     cashFlowChart: true,
@@ -3672,6 +3678,13 @@ const handleQuickAdd = useCallback(async () => {
       ]
     },
     {
+      id: 'reports-section',
+      label: 'Reports',
+      items: [
+        { id: 'reports', label: 'Standard Reports', icon: FileText }
+      ]
+    },
+    {
       id: 'config',
       label: 'Configuration',
       items: [
@@ -3683,7 +3696,7 @@ const handleQuickAdd = useCallback(async () => {
   // Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['main', 'clients-section', 'data-section', 'forecast', 'config']))
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['main', 'clients-section', 'data-section', 'forecast', 'reports-section', 'config']))
 
   const toggleSection = (sectionId: string) => {
     setExpandedSections(prev => {
@@ -4923,6 +4936,609 @@ const handleQuickAdd = useCallback(async () => {
             </motion.div>
           </motion.div>
         )}
+      </AnimatePresence>
+
+      {/* Report Modals */}
+      <AnimatePresence>
+
+        {/* Monthly P&L Report Modal */}
+        {activeReport === 'monthly-pl' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setActiveReport(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-4xl max-h-[85vh] overflow-hidden rounded-xl border ${cardClasses}`}
+            >
+              <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'} flex items-center justify-between`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-[#34d399]/20 flex items-center justify-center">
+                    <BarChart3 className="w-5 h-5 text-[#34d399]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Monthly P&L Report</h3>
+                    <p className={`text-sm ${textMuted}`}>Profit & Loss by Month</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {/* Export PDF */}}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 ${theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-neutral-800 hover:bg-neutral-700'}`}
+                  >
+                    <Download className="w-4 h-4" />
+                    Export
+                  </button>
+                  <button onClick={() => setActiveReport(null)} className={`p-1.5 rounded-lg ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-800'}`}>
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[calc(85vh-80px)]">
+                {/* Date Range Selector */}
+                <div className="flex items-center gap-4 mb-6">
+                  <select
+                    value={reportDateRange.start || new Date().getFullYear().toString()}
+                    onChange={(e) => setReportDateRange(prev => ({ ...prev, start: e.target.value }))}
+                    className={`px-3 py-2 rounded-lg border text-sm ${inputClasses}`}
+                  >
+                    {[2023, 2024, 2025].map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* P&L Table */}
+                <div className={`rounded-lg border overflow-hidden ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'}`}>
+                  <table className="w-full text-sm">
+                    <thead className={tableHeaderBg}>
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold">Category</th>
+                        {Array.from({ length: 12 }, (_, i) => {
+                          const date = new Date(parseInt(reportDateRange.start) || new Date().getFullYear(), i)
+                          return (
+                            <th key={i} className="px-3 py-3 text-right font-semibold">
+                              {date.toLocaleDateString('en-US', { month: 'short' })}
+                            </th>
+                          )
+                        })}
+                        <th className="px-4 py-3 text-right font-semibold bg-opacity-50">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* Revenue Row */}
+                      <tr className={`border-b ${tableBorder}`}>
+                        <td className="px-4 py-3 font-medium text-[#34d399]">Revenue</td>
+                        {Array.from({ length: 12 }, (_, i) => {
+                          const monthStr = `${parseInt(reportDateRange.start) || new Date().getFullYear()}-${String(i + 1).padStart(2, '0')}`
+                          const monthRevenue = transactions
+                            .filter(t => t.date.startsWith(monthStr) && t.category === 'revenue' && t.type === 'actual')
+                            .reduce((sum, t) => sum + t.amount, 0)
+                          return (
+                            <td key={i} className="px-3 py-3 text-right font-mono">{formatCurrency(monthRevenue)}</td>
+                          )
+                        })}
+                        <td className="px-4 py-3 text-right font-mono font-semibold text-[#34d399]">
+                          {formatCurrency(transactions
+                            .filter(t => t.date.startsWith(String(parseInt(reportDateRange.start) || new Date().getFullYear())) && t.category === 'revenue' && t.type === 'actual')
+                            .reduce((sum, t) => sum + t.amount, 0))}
+                        </td>
+                      </tr>
+                      {/* OpEx Row */}
+                      <tr className={`border-b ${tableBorder}`}>
+                        <td className="px-4 py-3 font-medium text-[#fb7185]">Operating Expenses</td>
+                        {Array.from({ length: 12 }, (_, i) => {
+                          const monthStr = `${parseInt(reportDateRange.start) || new Date().getFullYear()}-${String(i + 1).padStart(2, '0')}`
+                          const monthOpex = transactions
+                            .filter(t => t.date.startsWith(monthStr) && t.category === 'opex' && t.type === 'actual')
+                            .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+                          return (
+                            <td key={i} className="px-3 py-3 text-right font-mono">{formatCurrency(monthOpex)}</td>
+                          )
+                        })}
+                        <td className="px-4 py-3 text-right font-mono font-semibold text-[#fb7185]">
+                          {formatCurrency(Math.abs(transactions
+                            .filter(t => t.date.startsWith(String(parseInt(reportDateRange.start) || new Date().getFullYear())) && t.category === 'opex' && t.type === 'actual')
+                            .reduce((sum, t) => sum + t.amount, 0)))}
+                        </td>
+                      </tr>
+                      {/* Overhead Row */}
+                      <tr className={`border-b ${tableBorder}`}>
+                        <td className="px-4 py-3 font-medium text-[#fbbf24]">Overhead</td>
+                        {Array.from({ length: 12 }, (_, i) => {
+                          const monthStr = `${parseInt(reportDateRange.start) || new Date().getFullYear()}-${String(i + 1).padStart(2, '0')}`
+                          const monthOH = transactions
+                            .filter(t => t.date.startsWith(monthStr) && t.category === 'overhead' && t.type === 'actual')
+                            .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+                          return (
+                            <td key={i} className="px-3 py-3 text-right font-mono">{formatCurrency(monthOH)}</td>
+                          )
+                        })}
+                        <td className="px-4 py-3 text-right font-mono font-semibold text-[#fbbf24]">
+                          {formatCurrency(Math.abs(transactions
+                            .filter(t => t.date.startsWith(String(parseInt(reportDateRange.start) || new Date().getFullYear())) && t.category === 'overhead' && t.type === 'actual')
+                            .reduce((sum, t) => sum + t.amount, 0)))}
+                        </td>
+                      </tr>
+                      {/* Net Income Row */}
+                      <tr className={`${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-800'}`}>
+                        <td className="px-4 py-3 font-semibold">Net Income</td>
+                        {Array.from({ length: 12 }, (_, i) => {
+                          const monthStr = `${parseInt(reportDateRange.start) || new Date().getFullYear()}-${String(i + 1).padStart(2, '0')}`
+                          const monthNet = transactions
+                            .filter(t => t.date.startsWith(monthStr) && t.type === 'actual')
+                            .reduce((sum, t) => sum + t.amount, 0)
+                          return (
+                            <td key={i} className={`px-3 py-3 text-right font-mono font-semibold ${monthNet >= 0 ? 'text-[#34d399]' : 'text-[#fb7185]'}`}>
+                              {formatCurrency(monthNet)}
+                            </td>
+                          )
+                        })}
+                        <td className="px-4 py-3 text-right font-mono font-bold text-[#2dd4bf]">
+                          {formatCurrency(transactions
+                            .filter(t => t.date.startsWith(String(parseInt(reportDateRange.start) || new Date().getFullYear())) && t.type === 'actual')
+                            .reduce((sum, t) => sum + t.amount, 0))}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Project Profitability Report Modal */}
+        {activeReport === 'project-profitability' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setActiveReport(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-4xl max-h-[85vh] overflow-hidden rounded-xl border ${cardClasses}`}
+            >
+              <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'} flex items-center justify-between`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-[#f97316]/20 flex items-center justify-center">
+                    <Target className="w-5 h-5 text-[#f97316]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Project Profitability Report</h3>
+                    <p className={`text-sm ${textMuted}`}>Margins and Performance by Project</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 ${theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-neutral-800 hover:bg-neutral-700'}`}>
+                    <Download className="w-4 h-4" />
+                    Export
+                  </button>
+                  <button onClick={() => setActiveReport(null)} className={`p-1.5 rounded-lg ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-800'}`}>
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[calc(85vh-80px)]">
+                {/* Project Cards */}
+                <div className="space-y-4">
+                  {projects.filter(p => p.status === 'active').map(project => {
+                    const projectRevenue = accrualTransactions
+                      .filter(t => normalizeProjectName(t.project) === normalizeProjectName(project.name) && t.type === 'revenue')
+                      .reduce((sum, t) => sum + t.amount, 0)
+                    const projectCosts = Math.abs(accrualTransactions
+                      .filter(t => normalizeProjectName(t.project) === normalizeProjectName(project.name) && t.type === 'direct_cost')
+                      .reduce((sum, t) => sum + t.amount, 0))
+                    const grossProfit = projectRevenue - projectCosts
+                    const margin = projectRevenue > 0 ? (grossProfit / projectRevenue) * 100 : 0
+
+                    return (
+                      <div key={project.id} className={`p-4 rounded-lg border ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'}`}>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: project.color }} />
+                            <span className="font-semibold">{project.name}</span>
+                          </div>
+                          <span className={`text-lg font-bold ${margin >= 30 ? 'text-[#34d399]' : margin >= 15 ? 'text-[#fbbf24]' : 'text-[#fb7185]'}`}>
+                            {margin.toFixed(1)}% GM
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <p className={`text-xs ${textMuted}`}>Revenue</p>
+                            <p className="text-lg font-semibold text-[#34d399]">{formatCurrency(projectRevenue)}</p>
+                          </div>
+                          <div>
+                            <p className={`text-xs ${textMuted}`}>Costs</p>
+                            <p className="text-lg font-semibold text-[#fb7185]">{formatCurrency(projectCosts)}</p>
+                          </div>
+                          <div>
+                            <p className={`text-xs ${textMuted}`}>Gross Profit</p>
+                            <p className={`text-lg font-semibold ${grossProfit >= 0 ? 'text-[#2dd4bf]' : 'text-[#fb7185]'}`}>{formatCurrency(grossProfit)}</p>
+                          </div>
+                        </div>
+                        {/* Margin Bar */}
+                        <div className={`mt-3 h-2 rounded-full overflow-hidden ${theme === 'light' ? 'bg-gray-200' : 'bg-neutral-700'}`}>
+                          <div 
+                            className="h-full rounded-full transition-all"
+                            style={{ 
+                              width: `${Math.min(margin, 100)}%`,
+                              backgroundColor: margin >= 30 ? '#34d399' : margin >= 15 ? '#fbbf24' : '#fb7185'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {projects.filter(p => p.status === 'active').length === 0 && (
+                    <p className={`text-center py-8 ${textMuted}`}>No active projects found</p>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Client Revenue Report Modal */}
+        {activeReport === 'client-revenue' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setActiveReport(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-4xl max-h-[85vh] overflow-hidden rounded-xl border ${cardClasses}`}
+            >
+              <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'} flex items-center justify-between`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-[#60a5fa]/20 flex items-center justify-center">
+                    <Users className="w-5 h-5 text-[#60a5fa]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Client Revenue Report</h3>
+                    <p className={`text-sm ${textMuted}`}>Revenue by Client</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 ${theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-neutral-800 hover:bg-neutral-700'}`}>
+                    <Download className="w-4 h-4" />
+                    Export
+                  </button>
+                  <button onClick={() => setActiveReport(null)} className={`p-1.5 rounded-lg ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-800'}`}>
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[calc(85vh-80px)]">
+                {/* Client Table */}
+                <div className={`rounded-lg border overflow-hidden ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'}`}>
+                  <table className="w-full text-sm">
+                    <thead className={tableHeaderBg}>
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold">Client</th>
+                        <th className="px-4 py-3 text-right font-semibold">Revenue</th>
+                        <th className="px-4 py-3 text-right font-semibold">Costs</th>
+                        <th className="px-4 py-3 text-right font-semibold">Gross Margin</th>
+                        <th className="px-4 py-3 text-left font-semibold">Projects</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {clients.filter(c => c.status === 'active').map(client => {
+                        const clientProjects = projects.filter(p => p.clientId === client.id)
+                        const clientProjectNames = clientProjects.map(p => normalizeProjectName(p.name))
+                        const clientRevenue = accrualTransactions
+                          .filter(t => clientProjectNames.includes(normalizeProjectName(t.project)) && t.type === 'revenue')
+                          .reduce((sum, t) => sum + t.amount, 0)
+                        const clientCosts = Math.abs(accrualTransactions
+                          .filter(t => clientProjectNames.includes(normalizeProjectName(t.project)) && t.type === 'direct_cost')
+                          .reduce((sum, t) => sum + t.amount, 0))
+                        const margin = clientRevenue > 0 ? ((clientRevenue - clientCosts) / clientRevenue) * 100 : 0
+
+                        return (
+                          <tr key={client.id} className={`border-b ${tableBorder}`}>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-[#60a5fa]/20 flex items-center justify-center text-[#60a5fa] font-semibold text-xs">
+                                  {client.name.charAt(0)}
+                                </div>
+                                <span className="font-medium">{client.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono text-[#34d399]">{formatCurrency(clientRevenue)}</td>
+                            <td className="px-4 py-3 text-right font-mono text-[#fb7185]">{formatCurrency(clientCosts)}</td>
+                            <td className={`px-4 py-3 text-right font-semibold ${margin >= 30 ? 'text-[#34d399]' : margin >= 15 ? 'text-[#fbbf24]' : 'text-[#fb7185]'}`}>
+                              {margin.toFixed(1)}%
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-wrap gap-1">
+                                {clientProjects.slice(0, 3).map(p => (
+                                  <span key={p.id} className={`px-2 py-0.5 rounded text-xs ${theme === 'light' ? 'bg-gray-100' : 'bg-neutral-800'}`}>
+                                    {p.name}
+                                  </span>
+                                ))}
+                                {clientProjects.length > 3 && (
+                                  <span className={`px-2 py-0.5 rounded text-xs ${textMuted}`}>+{clientProjects.length - 3}</span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Cash Flow Statement Modal */}
+        {activeReport === 'cash-flow' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setActiveReport(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-3xl max-h-[85vh] overflow-hidden rounded-xl border ${cardClasses}`}
+            >
+              <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'} flex items-center justify-between`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-[#2dd4bf]/20 flex items-center justify-center">
+                    <DollarSign className="w-5 h-5 text-[#2dd4bf]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Cash Flow Statement</h3>
+                    <p className={`text-sm ${textMuted}`}>Cash Movement Summary</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 ${theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-neutral-800 hover:bg-neutral-700'}`}>
+                    <Download className="w-4 h-4" />
+                    Export
+                  </button>
+                  <button onClick={() => setActiveReport(null)} className={`p-1.5 rounded-lg ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-800'}`}>
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[calc(85vh-80px)]">
+                {(() => {
+                  const actualTxs = transactions.filter(t => t.type === 'actual')
+                  const totalInflows = actualTxs.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0)
+                  const totalOutflows = Math.abs(actualTxs.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0))
+                  const netCashFlow = totalInflows - totalOutflows
+                  const endingBalance = beginningBalance + netCashFlow
+
+                  return (
+                    <div className="space-y-6">
+                      {/* Summary Cards */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className={`p-4 rounded-lg ${theme === 'light' ? 'bg-green-50' : 'bg-[#34d399]/10'}`}>
+                          <p className={`text-sm ${textMuted}`}>Total Inflows</p>
+                          <p className="text-2xl font-bold text-[#34d399]">{formatCurrency(totalInflows)}</p>
+                        </div>
+                        <div className={`p-4 rounded-lg ${theme === 'light' ? 'bg-red-50' : 'bg-[#fb7185]/10'}`}>
+                          <p className={`text-sm ${textMuted}`}>Total Outflows</p>
+                          <p className="text-2xl font-bold text-[#fb7185]">{formatCurrency(totalOutflows)}</p>
+                        </div>
+                      </div>
+
+                      {/* Cash Flow Statement */}
+                      <div className={`rounded-lg border ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'}`}>
+                        <div className={`px-4 py-3 border-b ${theme === 'light' ? 'border-gray-200 bg-gray-50' : 'border-neutral-700 bg-neutral-800'}`}>
+                          <span className="font-semibold">Cash Flow Statement</span>
+                        </div>
+                        <div className="divide-y divide-neutral-700">
+                          <div className="px-4 py-3 flex justify-between">
+                            <span>Beginning Balance</span>
+                            <span className="font-mono font-semibold">{formatCurrency(beginningBalance)}</span>
+                          </div>
+                          <div className="px-4 py-3 flex justify-between text-[#34d399]">
+                            <span>+ Cash Inflows (Revenue)</span>
+                            <span className="font-mono font-semibold">{formatCurrency(totalInflows)}</span>
+                          </div>
+                          <div className="px-4 py-3 flex justify-between text-[#fb7185]">
+                            <span>- Cash Outflows (Expenses)</span>
+                            <span className="font-mono font-semibold">({formatCurrency(totalOutflows)})</span>
+                          </div>
+                          <div className={`px-4 py-3 flex justify-between ${netCashFlow >= 0 ? 'text-[#2dd4bf]' : 'text-[#fb7185]'}`}>
+                            <span className="font-semibold">= Net Cash Flow</span>
+                            <span className="font-mono font-bold">{formatCurrency(netCashFlow)}</span>
+                          </div>
+                          <div className={`px-4 py-3 flex justify-between ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-800'}`}>
+                            <span className="font-semibold">Ending Balance</span>
+                            <span className="font-mono font-bold text-[#60a5fa]">{formatCurrency(endingBalance)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Breakdown by Category */}
+                      <div>
+                        <h4 className="font-semibold mb-3">Outflows by Category</h4>
+                        <div className="space-y-2">
+                          {['opex', 'overhead', 'investment'].map(cat => {
+                            const catTotal = Math.abs(actualTxs.filter(t => t.category === cat && t.amount < 0).reduce((sum, t) => sum + t.amount, 0))
+                            const pct = totalOutflows > 0 ? (catTotal / totalOutflows) * 100 : 0
+                            const colors: Record<string, string> = { opex: '#fb7185', overhead: '#fbbf24', investment: '#60a5fa' }
+                            return (
+                              <div key={cat} className="flex items-center gap-3">
+                                <span className={`w-20 text-sm capitalize ${textMuted}`}>{cat}</span>
+                                <div className={`flex-1 h-3 rounded-full overflow-hidden ${theme === 'light' ? 'bg-gray-200' : 'bg-neutral-700'}`}>
+                                  <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: colors[cat] }} />
+                                </div>
+                                <span className="w-24 text-right font-mono text-sm">{formatCurrency(catTotal)}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Quarterly Comparison Report Modal */}
+        {activeReport === 'quarterly-comparison' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setActiveReport(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-4xl max-h-[85vh] overflow-hidden rounded-xl border ${cardClasses}`}
+            >
+              <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'} flex items-center justify-between`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-[#fbbf24]/20 flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-[#fbbf24]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Quarterly Comparison</h3>
+                    <p className={`text-sm ${textMuted}`}>Compare Performance Across Quarters</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 ${theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-neutral-800 hover:bg-neutral-700'}`}>
+                    <Download className="w-4 h-4" />
+                    Export
+                  </button>
+                  <button onClick={() => setActiveReport(null)} className={`p-1.5 rounded-lg ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-800'}`}>
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[calc(85vh-80px)]">
+                {(() => {
+                  const currentYear = new Date().getFullYear()
+                  const getQuarterData = (year: number, quarter: number) => {
+                    const startMonth = (quarter - 1) * 3 + 1
+                    const months = [startMonth, startMonth + 1, startMonth + 2].map(m => 
+                      `${year}-${String(m).padStart(2, '0')}`
+                    )
+                    const qTxs = transactions.filter(t => 
+                      t.type === 'actual' && months.some(m => t.date.startsWith(m))
+                    )
+                    return {
+                      revenue: qTxs.filter(t => t.category === 'revenue').reduce((s, t) => s + t.amount, 0),
+                      expenses: Math.abs(qTxs.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0)),
+                      net: qTxs.reduce((s, t) => s + t.amount, 0)
+                    }
+                  }
+
+                  const quarters = [
+                    { label: 'Q1 2024', data: getQuarterData(2024, 1) },
+                    { label: 'Q2 2024', data: getQuarterData(2024, 2) },
+                    { label: 'Q3 2024', data: getQuarterData(2024, 3) },
+                    { label: 'Q4 2024', data: getQuarterData(2024, 4) },
+                    { label: 'Q1 2025', data: getQuarterData(2025, 1) },
+                  ]
+
+                  return (
+                    <div>
+                      {/* Comparison Table */}
+                      <div className={`rounded-lg border overflow-hidden ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'}`}>
+                        <table className="w-full text-sm">
+                          <thead className={tableHeaderBg}>
+                            <tr>
+                              <th className="px-4 py-3 text-left font-semibold">Metric</th>
+                              {quarters.map(q => (
+                                <th key={q.label} className="px-4 py-3 text-right font-semibold">{q.label}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className={`border-b ${tableBorder}`}>
+                              <td className="px-4 py-3 font-medium">Revenue</td>
+                              {quarters.map(q => (
+                                <td key={q.label} className="px-4 py-3 text-right font-mono text-[#34d399]">
+                                  {formatCurrency(q.data.revenue)}
+                                </td>
+                              ))}
+                            </tr>
+                            <tr className={`border-b ${tableBorder}`}>
+                              <td className="px-4 py-3 font-medium">Expenses</td>
+                              {quarters.map(q => (
+                                <td key={q.label} className="px-4 py-3 text-right font-mono text-[#fb7185]">
+                                  {formatCurrency(q.data.expenses)}
+                                </td>
+                              ))}
+                            </tr>
+                            <tr className={`${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-800'}`}>
+                              <td className="px-4 py-3 font-semibold">Net Income</td>
+                              {quarters.map(q => (
+                                <td key={q.label} className={`px-4 py-3 text-right font-mono font-semibold ${q.data.net >= 0 ? 'text-[#2dd4bf]' : 'text-[#fb7185]'}`}>
+                                  {formatCurrency(q.data.net)}
+                                </td>
+                              ))}
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Visual Chart */}
+                      <div className="mt-6">
+                        <h4 className="font-semibold mb-4">Revenue vs Expenses Trend</h4>
+                        <div className="h-64">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={quarters.map(q => ({ name: q.label, revenue: q.data.revenue, expenses: q.data.expenses }))}>
+                              <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#333333'} />
+                              <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
+                              <YAxis tick={{ fontSize: 12 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                              <Tooltip 
+                                contentStyle={{ 
+                                  backgroundColor: theme === 'light' ? '#fff' : '#1e1e1e', 
+                                  border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#333333'}`,
+                                  borderRadius: '8px'
+                                }}
+                                formatter={(value: number) => formatCurrency(value)}
+                              />
+                              <Bar dataKey="revenue" name="Revenue" fill="#34d399" radius={[4, 4, 0, 0]} />
+                              <Bar dataKey="expenses" name="Expenses" fill="#fb7185" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
       </AnimatePresence>
 
       {/* Privacy Policy Modal */}
@@ -8398,6 +9014,93 @@ const handleQuickAdd = useCallback(async () => {
                       )}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+
+          {/* Reports Tab */}
+          {activeTab === 'reports' && (
+            <motion.div key="reports" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
+              
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold">Standard Reports</h2>
+                  <p className={`text-sm ${textMuted}`}>Pre-built reports for quick insights</p>
+                </div>
+              </div>
+
+              {/* Reports Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[
+                  { 
+                    id: 'monthly-pl', 
+                    title: 'Monthly P&L', 
+                    description: 'Profit & Loss statement by month',
+                    icon: BarChart3,
+                    color: '#34d399'
+                  },
+                  { 
+                    id: 'project-profitability', 
+                    title: 'Project Profitability', 
+                    description: 'Revenue, costs, and margins by project',
+                    icon: Target,
+                    color: '#f97316'
+                  },
+                  { 
+                    id: 'client-revenue', 
+                    title: 'Client Revenue Report', 
+                    description: 'Revenue breakdown by client',
+                    icon: Users,
+                    color: '#60a5fa'
+                  },
+                  { 
+                    id: 'cash-flow', 
+                    title: 'Cash Flow Statement', 
+                    description: 'Cash inflows, outflows, and net position',
+                    icon: DollarSign,
+                    color: '#2dd4bf'
+                  },
+                  { 
+                    id: 'quarterly-comparison', 
+                    title: 'Quarterly Comparison', 
+                    description: 'Compare performance across quarters',
+                    icon: TrendingUp,
+                    color: '#fbbf24'
+                  }
+                ].map(report => (
+                  <button
+                    key={report.id}
+                    onClick={() => setActiveReport(report.id)}
+                    className={`p-5 rounded-xl border text-left transition-all hover:shadow-lg group ${cardClasses}`}
+                  >
+                    <div 
+                      className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110"
+                      style={{ backgroundColor: `${report.color}20` }}
+                    >
+                      <report.icon className="w-6 h-6" style={{ color: report.color }} />
+                    </div>
+                    <h3 className="font-semibold mb-1">{report.title}</h3>
+                    <p className={`text-sm ${textMuted}`}>{report.description}</p>
+                  </button>
+                ))}
+              </div>
+
+              {/* Coming Soon - Report Builder */}
+              <div className={`rounded-xl p-6 border-2 border-dashed ${theme === 'light' ? 'border-gray-300 bg-gray-50' : 'border-neutral-700 bg-neutral-800/50'}`}>
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#f97316] to-[#fbbf24] flex items-center justify-center">
+                    <Sparkles className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold">Report Builder</h3>
+                    <p className={`text-sm ${textMuted}`}>Create custom reports with drag-and-drop - Coming Soon</p>
+                  </div>
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${theme === 'light' ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/20 text-amber-400'}`}>
+                    Phase 2
+                  </span>
                 </div>
               </div>
             </motion.div>
