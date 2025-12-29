@@ -949,8 +949,8 @@ export default function ReportBuilder() {
                         value={selectedComponentData.config.dateRange?.start || ''}
                         onChange={(e) => updateComponentConfig(selectedComponentData.id, { 
                           dateRange: { 
-                            ...selectedComponentData.config.dateRange, 
-                            start: e.target.value 
+                            start: e.target.value,
+                            end: selectedComponentData.config.dateRange?.end || `${new Date().getFullYear()}-12`
                           } 
                         })}
                         className={`w-full px-2 py-1.5 rounded-lg border text-sm ${surfaceColor} ${borderColor}`}
@@ -963,7 +963,7 @@ export default function ReportBuilder() {
                         value={selectedComponentData.config.dateRange?.end || ''}
                         onChange={(e) => updateComponentConfig(selectedComponentData.id, { 
                           dateRange: { 
-                            ...selectedComponentData.config.dateRange, 
+                            start: selectedComponentData.config.dateRange?.start || `${new Date().getFullYear()}-01`,
                             end: e.target.value 
                           } 
                         })}
