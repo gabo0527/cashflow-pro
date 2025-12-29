@@ -439,7 +439,7 @@ export default function CashFlowPro() {
   const [projectionPeriod, setProjectionPeriod] = useState<'3M' | '6M' | '12M' | '18M' | '24M'>('12M')
   
   // UI state
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+  const [theme, setTheme] = useState<'dark' | 'light'>('light')
   const [balanceAlertThreshold, setBalanceAlertThreshold] = useState<number>(0)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [showProjectModal, setShowProjectModal] = useState(false)
