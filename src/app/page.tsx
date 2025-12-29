@@ -39,11 +39,11 @@ import {
 // Vantage Logo Component
 const VantageLogo = ({ size = 48, className = "" }: { size?: number, className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-    <circle cx="24" cy="24" r="22" stroke="#00d4aa" strokeWidth="2.5" fill="none"/>
-    <rect x="12" y="28" width="5" height="10" rx="1" fill="#2a3a55"/>
-    <rect x="19" y="22" width="5" height="16" rx="1" fill="#94a3b8"/>
-    <rect x="26" y="14" width="5" height="24" rx="1" fill="#00d4aa"/>
-    <path d="M10 32L18 26L25 20L38 12" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <rect width="48" height="48" rx="12" fill="#f97316"/>
+    <rect x="10" y="26" width="7" height="12" rx="2" fill="white" fillOpacity="0.5"/>
+    <rect x="20" y="18" width="7" height="20" rx="2" fill="white" fillOpacity="0.7"/>
+    <rect x="30" y="10" width="7" height="28" rx="2" fill="white"/>
+    
   </svg>
 )
 
@@ -222,7 +222,7 @@ const getMonthLabel = (monthStr: string): string => {
   return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
 }
 
-const PROJECT_COLORS = ['#00d4aa', '#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4']
+const PROJECT_COLORS = ['#f97316', '#34d399', '#60a5fa', '#fbbf24', '#fb7185', '#2dd4bf', '#94a3b8', '#06b6d4']
 
 // Sample data generator
 const generateSampleData = (): { transactions: Transaction[], projects: Project[] } => {
@@ -374,8 +374,8 @@ const STORAGE_KEYS = {
 
 // Default categories
 const DEFAULT_CATEGORIES: Category[] = [
-  { id: 'revenue', name: 'Revenue', type: 'income', color: '#22c55e', isDefault: true },
-  { id: 'opex', name: 'OpEx', type: 'expense', color: '#ef4444', isDefault: true },
+  { id: 'revenue', name: 'Revenue', type: 'income', color: '#34d399', isDefault: true },
+  { id: 'opex', name: 'OpEx', type: 'expense', color: '#fb7185', isDefault: true },
   { id: 'overhead', name: 'Overhead', type: 'expense', color: '#f59e0b', isDefault: true },
   { id: 'investment', name: 'Investment', type: 'expense', color: '#3b82f6', isDefault: true },
   { id: 'unassigned', name: 'Unassigned', type: 'expense', color: '#64748b', isDefault: true },
@@ -549,7 +549,7 @@ export default function CashFlowPro() {
     companyName: 'Vantage',
     companyLogo: null,
     companyLogoLight: null,
-    brandColor: '#00d4aa'
+    brandColor: '#f97316'
   })
   
   // QuickBooks integration state
@@ -779,7 +779,7 @@ export default function CashFlowPro() {
             const mapped = projectsRes.data.map((p: any) => ({
               id: p.id,
               name: p.name,
-              color: p.color || '#00d4aa',
+              color: p.color || '#f97316',
               status: p.status || 'active',
               budget: p.budget,
               budgetAlertThreshold: p.budget_alert_threshold || 80,
@@ -1098,7 +1098,7 @@ export default function CashFlowPro() {
               } else if (rawCategory.includes('tax')) {
                 // Auto-create taxes category if it doesn't exist
                 if (!categories.find(c => c.id === 'taxes')) {
-                  setCategories(prev => [...prev, { id: 'taxes', name: 'Taxes', type: 'expense', color: '#ef4444', isDefault: false }])
+                  setCategories(prev => [...prev, { id: 'taxes', name: 'Taxes', type: 'expense', color: '#fb7185', isDefault: false }])
                 }
                 category = 'taxes'
               } else if (rawCategory !== '') {
@@ -3699,30 +3699,30 @@ const handleQuickAdd = useCallback(async () => {
 
   const themeClasses = theme === 'light' 
     ? 'bg-gray-100 text-gray-900' 
-    : 'bg-terminal-bg text-zinc-100'
+    : 'bg-neutral-900 text-neutral-100'
 
   const cardClasses = theme === 'light'
     ? 'bg-white border-gray-200 shadow-sm'
-    : 'bg-terminal-surface border-terminal-border'
+    : 'bg-neutral-800 border-neutral-700'
 
   const inputClasses = theme === 'light'
     ? 'bg-white border-gray-300 text-gray-900'
-    : 'bg-terminal-bg border-terminal-border text-zinc-100'
+    : 'bg-neutral-900 border-neutral-700 text-neutral-100'
 
-  const tableHeaderBg = theme === 'light' ? 'bg-gray-50' : 'bg-terminal-surface'
-  const tableBorder = theme === 'light' ? 'border-gray-200' : 'border-terminal-border'
-  const textMuted = theme === 'light' ? 'text-gray-500' : 'text-zinc-400'
-  const textSubtle = theme === 'light' ? 'text-gray-400' : 'text-zinc-500'
+  const tableHeaderBg = theme === 'light' ? 'bg-gray-50' : 'bg-neutral-800'
+  const tableBorder = theme === 'light' ? 'border-gray-200' : 'border-neutral-700'
+  const textMuted = theme === 'light' ? 'text-gray-500' : 'text-neutral-400'
+  const textSubtle = theme === 'light' ? 'text-gray-400' : 'text-neutral-500'
 
   // Auth loading screen
   if (authLoading || dataLoading) {
     return (
-      <div className="min-h-screen bg-[#0c1222] flex items-center justify-center">
+      <div className="min-h-screen bg-[#121212] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-14 h-14 rounded-xl bg-[#1c2740] flex items-center justify-center mx-auto mb-4">
+          <div className="w-14 h-14 rounded-xl bg-[#262626] flex items-center justify-center mx-auto mb-4">
             <VantageLogo size={40} />
           </div>
-          <div className="text-[#00d4aa] animate-pulse">
+          <div className="text-[#f97316] animate-pulse">
             {authLoading ? 'Authenticating...' : 'Loading data...'}
           </div>
         </div>
@@ -3752,11 +3752,11 @@ const handleQuickAdd = useCallback(async () => {
           ${sidebarOpen ? 'w-64' : 'w-20'} 
           ${sidebarMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           transition-all duration-300 ease-in-out
-          ${theme === 'light' ? 'bg-white border-gray-200' : 'bg-terminal-surface border-terminal-border'}
+          ${theme === 'light' ? 'bg-white border-gray-200' : 'bg-neutral-800 border-neutral-700'}
           border-r flex flex-col
         `}>
           {/* Sidebar Header */}
-          <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'} relative`}>
+          <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'} relative`}>
             <div className={`flex items-center ${sidebarOpen ? 'justify-between' : 'flex-col gap-3'}`}>
               <div className={`flex items-center ${sidebarOpen ? 'gap-3' : 'justify-center w-full'}`}>
                 {(branding.companyLogo || branding.companyLogoLight) ? (
@@ -3778,21 +3778,21 @@ const handleQuickAdd = useCallback(async () => {
               {sidebarOpen ? (
                 <button
                   onClick={() => setSidebarOpen(false)}
-                  className={`hidden lg:flex p-1.5 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-bg'}`}
+                  className={`hidden lg:flex p-1.5 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-900'}`}
                 >
                   <PanelLeftClose className="w-4 h-4" />
                 </button>
               ) : (
                 <button
                   onClick={() => setSidebarOpen(true)}
-                  className={`hidden lg:flex p-1.5 rounded-lg transition-all w-full justify-center ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-bg'}`}
+                  className={`hidden lg:flex p-1.5 rounded-lg transition-all w-full justify-center ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-900'}`}
                 >
                   <PanelLeft className="w-4 h-4" />
                 </button>
               )}
               <button
                 onClick={() => setSidebarMobileOpen(false)}
-                className={`lg:hidden p-1.5 rounded-lg transition-all absolute top-4 right-4 ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-bg'}`}
+                className={`lg:hidden p-1.5 rounded-lg transition-all absolute top-4 right-4 ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-900'}`}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -3806,7 +3806,7 @@ const handleQuickAdd = useCallback(async () => {
                 {sidebarOpen && (
                   <button
                     onClick={() => toggleSection(section.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider ${textMuted} hover:text-zinc-300`}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider ${textMuted} hover:text-neutral-300`}
                   >
                     <span>{section.label}</span>
                     <ChevronDown className={`w-3 h-3 transition-transform ${expandedSections.has(section.id) ? '' : '-rotate-90'}`} />
@@ -3833,7 +3833,7 @@ const handleQuickAdd = useCallback(async () => {
                               ? 'bg-accent-primary/15 text-accent-primary' 
                               : theme === 'light' 
                                 ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-100' 
-                                : 'text-zinc-400 hover:text-zinc-100 hover:bg-terminal-bg'
+                                : 'text-neutral-400 hover:text-neutral-100 hover:bg-neutral-900'
                           }`}
                           title={!sidebarOpen ? item.label : undefined}
                         >
@@ -3849,11 +3849,11 @@ const handleQuickAdd = useCallback(async () => {
           </nav>
 
           {/* Sidebar Footer */}
-          <div className={`p-3 border-t ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
+          <div className={`p-3 border-t ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'}`}>
             {user && (
               <div className={`flex items-center ${sidebarOpen ? 'gap-3' : 'justify-center'}`}>
-                <div className="w-8 h-8 rounded-full bg-[#00d4aa]/20 flex items-center justify-center flex-shrink-0">
-                  <User className="w-4 h-4 text-[#00d4aa]" />
+                <div className="w-8 h-8 rounded-full bg-[#f97316]/20 flex items-center justify-center flex-shrink-0">
+                  <User className="w-4 h-4 text-[#f97316]" />
                 </div>
                 {sidebarOpen && (
                   <div className="flex-1 min-w-0">
@@ -3864,7 +3864,7 @@ const handleQuickAdd = useCallback(async () => {
                 {sidebarOpen && (
                   <button
                     onClick={handleSignOut}
-                    className={`p-1.5 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100 text-gray-500' : 'hover:bg-terminal-bg text-zinc-400'}`}
+                    className={`p-1.5 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100 text-gray-500' : 'hover:bg-neutral-900 text-neutral-400'}`}
                     title="Sign out"
                   >
                     <LogOut className="w-4 h-4" />
@@ -3878,13 +3878,13 @@ const handleQuickAdd = useCallback(async () => {
         {/* Main Content Area */}
         <div className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ${sidebarOpen ? 'lg:ml-0' : 'lg:ml-0'}`}>
           {/* Top Header Bar */}
-          <header className={`sticky top-0 z-30 border-b backdrop-blur-sm ${theme === 'light' ? 'bg-white/90 border-gray-200' : 'bg-terminal-bg/90 border-terminal-border'}`}>
+          <header className={`sticky top-0 z-30 border-b backdrop-blur-sm ${theme === 'light' ? 'bg-white/90 border-gray-200' : 'bg-neutral-900/90 border-neutral-700'}`}>
             <div className="px-4 sm:px-6 py-3">
               <div className="flex items-center justify-between">
                 {/* Mobile menu button */}
                 <button
                   onClick={() => setSidebarMobileOpen(true)}
-                  className={`lg:hidden p-2 rounded-lg ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-surface'}`}
+                  className={`lg:hidden p-2 rounded-lg ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-800'}`}
                 >
                   <Menu className="w-5 h-5" />
                 </button>
@@ -3912,7 +3912,7 @@ const handleQuickAdd = useCallback(async () => {
                   )}
                   <button
                     onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                    className={`p-2 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-surface'}`}
+                    className={`p-2 rounded-lg transition-all ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-800'}`}
                   >
                     {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                   </button>
@@ -3947,7 +3947,7 @@ const handleQuickAdd = useCallback(async () => {
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Quick Add Transaction</h3>
-                <button onClick={() => setShowQuickAdd(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                <button onClick={() => setShowQuickAdd(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-700'}`}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -3958,7 +3958,7 @@ const handleQuickAdd = useCallback(async () => {
                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                   (quickAddForm as any).targetType !== 'accrual'
                     ? 'bg-accent-primary text-white'
-                    : theme === 'light' ? 'bg-gray-100 text-gray-600' : 'bg-terminal-bg text-zinc-400'
+                    : theme === 'light' ? 'bg-gray-100 text-gray-600' : 'bg-neutral-900 text-neutral-400'
                 }`}
               >
                 <DollarSign className="w-4 h-4" />
@@ -3968,8 +3968,8 @@ const handleQuickAdd = useCallback(async () => {
                 onClick={() => setQuickAddForm(prev => ({ ...prev, targetType: 'accrual' }))}
                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                   (quickAddForm as any).targetType === 'accrual'
-                    ? 'bg-[#00d4aa] text-white'
-                    : theme === 'light' ? 'bg-gray-100 text-gray-600' : 'bg-terminal-bg text-zinc-400'
+                    ? 'bg-[#f97316] text-white'
+                    : theme === 'light' ? 'bg-gray-100 text-gray-600' : 'bg-neutral-900 text-neutral-400'
                 }`}
               >
                 <FileText className="w-4 h-4" />
@@ -4079,7 +4079,7 @@ const handleQuickAdd = useCallback(async () => {
                   <button
                     onClick={() => setShowProjectModal(true)}
                     className={`px-3 py-2 border rounded-lg ${
-                      theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                      theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'
                     }`}
                   >
                     <FolderPlus className="w-5 h-5" />
@@ -4107,12 +4107,12 @@ const handleQuickAdd = useCallback(async () => {
               exit={{ scale: 0.95, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
               className={`w-full max-w-md rounded-xl p-6 shadow-xl ${
-                theme === 'light' ? 'bg-white' : 'bg-terminal-surface border border-terminal-border'
+                theme === 'light' ? 'bg-white' : 'bg-neutral-800 border border-neutral-700'
               }`}
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Edit Transaction</h3>
-                <button onClick={cancelEdit} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                <button onClick={cancelEdit} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-700'}`}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -4218,7 +4218,7 @@ const handleQuickAdd = useCallback(async () => {
                   <button
                     onClick={cancelEdit}
                     className={`px-4 py-2 border rounded-lg ${
-                      theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                      theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'
                     }`}
                   >
                     Cancel
@@ -4249,10 +4249,10 @@ const handleQuickAdd = useCallback(async () => {
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-[#00d4aa]" />
+                  <FileText className="w-5 h-5 text-[#f97316]" />
                   {accrualModalMode === 'add' ? 'Add Accrual Transaction' : 'Edit Accrual Transaction'}
                 </h3>
-                <button onClick={closeAccrualModal} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                <button onClick={closeAccrualModal} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-700'}`}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -4367,14 +4367,14 @@ const handleQuickAdd = useCallback(async () => {
                   <button
                     onClick={saveAccrualModal}
                     disabled={!accrualModalForm.description || !accrualModalForm.project}
-                    className="flex-1 py-2 bg-[#00d4aa] text-white rounded-lg font-medium disabled:opacity-50 hover:bg-[#00c49a]"
+                    className="flex-1 py-2 bg-[#f97316] text-white rounded-lg font-medium disabled:opacity-50 hover:bg-[#ea580c]"
                   >
                     {accrualModalMode === 'add' ? 'Add Transaction' : 'Save Changes'}
                   </button>
                   <button
                     onClick={closeAccrualModal}
                     className={`px-4 py-2 border rounded-lg ${
-                      theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                      theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'
                     }`}
                   >
                     Cancel
@@ -4405,7 +4405,7 @@ const handleQuickAdd = useCallback(async () => {
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">{editingProject ? 'Edit Project' : 'Manage Projects'}</h3>
-                <button onClick={() => { setShowProjectModal(false); setEditingProject(null); }} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                <button onClick={() => { setShowProjectModal(false); setEditingProject(null); }} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-700'}`}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -4413,7 +4413,7 @@ const handleQuickAdd = useCallback(async () => {
               <div className="space-y-4">
                 {/* Add/Edit Project Form */}
                 {editingProject ? (
-                  <div className={`p-4 rounded-lg border ${theme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-terminal-bg border-terminal-border'}`}>
+                  <div className={`p-4 rounded-lg border ${theme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-neutral-900 border-neutral-700'}`}>
                     <div className="space-y-3">
                       <div>
                         <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Project Name</label>
@@ -4488,7 +4488,7 @@ const handleQuickAdd = useCallback(async () => {
                         </button>
                         <button
                           onClick={() => setEditingProject(null)}
-                          className={`px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-100' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                          className={`px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-100' : 'border-neutral-700 hover:bg-neutral-900'}`}
                         >
                           Cancel
                         </button>
@@ -4496,7 +4496,7 @@ const handleQuickAdd = useCallback(async () => {
                     </div>
                   </div>
                 ) : (
-                  <div className={`p-4 rounded-lg border ${theme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-terminal-bg border-terminal-border'}`}>
+                  <div className={`p-4 rounded-lg border ${theme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-neutral-900 border-neutral-700'}`}>
                     <div className="space-y-3">
                       <div>
                         <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Project Name</label>
@@ -4561,22 +4561,22 @@ const handleQuickAdd = useCallback(async () => {
                           const tracking = existingProject ? projectBudgetTracking.find(t => t.id === existingProject.id) : null
                           
                           return (
-                            <div key={projectName} className={`p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                            <div key={projectName} className={`p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900'}`}>
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3 flex-wrap">
                                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: projectColor }} />
                                   <span className="font-medium">{projectName}</span>
                                   {existingProject && (
                                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                      existingProject.status === 'active' ? 'bg-[#22c55e]/20 text-[#22c55e]' :
-                                      existingProject.status === 'completed' ? 'bg-[#00d4aa]/20 text-[#00d4aa]' :
+                                      existingProject.status === 'active' ? 'bg-[#34d399]/20 text-[#34d399]' :
+                                      existingProject.status === 'completed' ? 'bg-[#f97316]/20 text-[#f97316]' :
                                       'bg-yellow-500/20 text-yellow-400'
                                     }`}>
                                       {existingProject.status}
                                     </span>
                                   )}
                                   {clientName && (
-                                    <span className={`text-xs px-2 py-0.5 rounded-full bg-[#00d4aa]/20 text-[#00d4aa]`}>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full bg-[#f97316]/20 text-[#f97316]`}>
                                       {clientName}
                                     </span>
                                   )}
@@ -4615,7 +4615,7 @@ const handleQuickAdd = useCallback(async () => {
                                       {tracking.percentUsed.toFixed(0)}% used
                                     </span>
                                   </div>
-                                  <div className={`h-2 rounded-full ${theme === 'light' ? 'bg-gray-200' : 'bg-terminal-border'}`}>
+                                  <div className={`h-2 rounded-full ${theme === 'light' ? 'bg-gray-200' : 'bg-neutral-700'}`}>
                                     <div 
                                       className={`h-full rounded-full transition-all ${
                                         tracking.isOverBudget ? 'bg-accent-danger' : 
@@ -4663,7 +4663,7 @@ const handleQuickAdd = useCallback(async () => {
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">{editingClient ? 'Edit Client' : 'Add New Client'}</h3>
-                <button onClick={() => { setShowClientModal(false); setEditingClient(null); setNewClientForm({ name: '', status: 'active' }); }} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                <button onClick={() => { setShowClientModal(false); setEditingClient(null); setNewClientForm({ name: '', status: 'active' }); }} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-700'}`}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -4754,7 +4754,7 @@ const handleQuickAdd = useCallback(async () => {
                       </button>
                       <button
                         onClick={() => setEditingClient(null)}
-                        className={`px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-100' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                        className={`px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-100' : 'border-neutral-700 hover:bg-neutral-900'}`}
                       >
                         Cancel
                       </button>
@@ -4869,7 +4869,7 @@ const handleQuickAdd = useCallback(async () => {
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Export PDF Report</h3>
-                <button onClick={() => setShowPdfExport(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                <button onClick={() => setShowPdfExport(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-700'}`}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -4887,7 +4887,7 @@ const handleQuickAdd = useCallback(async () => {
                   { key: 'transactions', label: 'Transaction List', desc: 'Detailed transactions (large)' },
                 ].map(section => (
                   <label key={section.key} className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-all ${
-                    theme === 'light' ? 'hover:bg-gray-50' : 'hover:bg-terminal-bg'
+                    theme === 'light' ? 'hover:bg-gray-50' : 'hover:bg-neutral-900'
                   }`}>
                     <input
                       type="checkbox"
@@ -4907,7 +4907,7 @@ const handleQuickAdd = useCallback(async () => {
                 <button
                   onClick={() => setShowPdfExport(false)}
                   className={`flex-1 py-2 rounded-lg font-medium border ${
-                    theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                    theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'
                   }`}
                 >
                   Cancel
@@ -4947,7 +4947,7 @@ const handleQuickAdd = useCallback(async () => {
                   <Shield className="w-6 h-6" />
                   Privacy Policy
                 </h3>
-                <button onClick={() => setShowPrivacyModal(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                <button onClick={() => setShowPrivacyModal(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-700'}`}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -4996,7 +4996,7 @@ const handleQuickAdd = useCallback(async () => {
                 </p>
               </div>
               
-              <div className="mt-6 pt-4 border-t border-terminal-border">
+              <div className="mt-6 pt-4 border-t border-neutral-700">
                 <button
                   onClick={() => setShowPrivacyModal(false)}
                   className="w-full py-2 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90"
@@ -5031,7 +5031,7 @@ const handleQuickAdd = useCallback(async () => {
                   <FileText className="w-6 h-6" />
                   Terms of Service
                 </h3>
-                <button onClick={() => setShowTermsModal(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                <button onClick={() => setShowTermsModal(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-700'}`}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -5086,7 +5086,7 @@ const handleQuickAdd = useCallback(async () => {
                 </p>
               </div>
               
-              <div className="mt-6 pt-4 border-t border-terminal-border">
+              <div className="mt-6 pt-4 border-t border-neutral-700">
                 <button
                   onClick={() => setShowTermsModal(false)}
                   className="w-full py-2 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90"
@@ -5117,16 +5117,16 @@ const handleQuickAdd = useCallback(async () => {
               className={`w-full max-w-5xl max-h-[85vh] rounded-xl border overflow-hidden flex flex-col ${cardClasses}`}
             >
               {/* Header */}
-              <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
+              <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Sparkles className="w-5 h-5 text-accent-primary" />
                     <h3 className="text-lg font-semibold">AI Categorization Preview</h3>
-                    <span className={`text-sm px-2 py-0.5 rounded-full ${theme === 'light' ? 'bg-gray-100' : 'bg-terminal-bg'} ${textMuted}`}>
+                    <span className={`text-sm px-2 py-0.5 rounded-full ${theme === 'light' ? 'bg-gray-100' : 'bg-neutral-900'} ${textMuted}`}>
                       {aiSuggestions.filter(s => s.accepted).length} of {aiSuggestions.length} selected
                     </span>
                   </div>
-                  <button onClick={() => setShowAiPreview(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                  <button onClick={() => setShowAiPreview(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-700'}`}>
                     <X className="w-5 h-5" />
                   </button>
                 </div>
@@ -5141,7 +5141,7 @@ const handleQuickAdd = useCallback(async () => {
               {/* Table */}
               <div className="flex-1 overflow-auto p-4">
                 <table className="w-full text-sm">
-                  <thead className={`sticky top-0 ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-surface'}`}>
+                  <thead className={`sticky top-0 ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-800'}`}>
                     <tr className={`border-b ${tableBorder} text-left ${textMuted}`}>
                       <th className="pb-3 px-2">
                         <input
@@ -5163,7 +5163,7 @@ const handleQuickAdd = useCallback(async () => {
                     {aiSuggestions.map(suggestion => (
                       <tr 
                         key={suggestion.id} 
-                        className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'} ${!suggestion.accepted ? 'opacity-50' : ''}`}
+                        className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-neutral-700/50'} ${!suggestion.accepted ? 'opacity-50' : ''}`}
                       >
                         <td className="py-3 px-2">
                           <input
@@ -5218,9 +5218,9 @@ const handleQuickAdd = useCallback(async () => {
                         </td>
                         <td className="py-3 px-2 text-center">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
-                            suggestion.confidence >= 80 ? 'bg-[#22c55e]/20 text-[#22c55e]' :
+                            suggestion.confidence >= 80 ? 'bg-[#34d399]/20 text-[#34d399]' :
                             suggestion.confidence >= 60 ? 'bg-yellow-500/20 text-yellow-400' :
-                            'bg-[#ef4444]/20 text-[#ef4444]'
+                            'bg-[#fb7185]/20 text-[#fb7185]'
                           }`}>
                             {suggestion.confidence}%
                           </span>
@@ -5237,7 +5237,7 @@ const handleQuickAdd = useCallback(async () => {
               </div>
               
               {/* Footer */}
-              <div className={`p-4 border-t ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'} flex items-center justify-between`}>
+              <div className={`p-4 border-t ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'} flex items-center justify-between`}>
                 <div className={`text-sm ${textMuted}`}>
                   <Sparkles className="w-4 h-4 inline mr-1" />
                   AI suggestions - review and adjust before importing
@@ -5245,7 +5245,7 @@ const handleQuickAdd = useCallback(async () => {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setShowAiPreview(false)}
-                    className={`px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-100' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                    className={`px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-100' : 'border-neutral-700 hover:bg-neutral-900'}`}
                   >
                     Cancel
                   </button>
@@ -5282,16 +5282,16 @@ const handleQuickAdd = useCallback(async () => {
               className={`w-full max-w-5xl max-h-[85vh] rounded-xl border overflow-hidden flex flex-col ${cardClasses}`}
             >
               {/* Header */}
-              <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
+              <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <FileText className="w-5 h-5 text-[#64748b]" />
                     <h3 className="text-lg font-semibold">Bank Statement Extraction</h3>
-                    <span className={`text-sm px-2 py-0.5 rounded-full ${theme === 'light' ? 'bg-[#1c2740] text-[#00d4aa]' : 'bg-[#64748b]/20 text-[#00d4aa]'}`}>
+                    <span className={`text-sm px-2 py-0.5 rounded-full ${theme === 'light' ? 'bg-[#262626] text-[#f97316]' : 'bg-[#64748b]/20 text-[#f97316]'}`}>
                       {statementData.length} transactions found
                     </span>
                   </div>
-                  <button onClick={() => setShowStatementPreview(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-zinc-700'}`}>
+                  <button onClick={() => setShowStatementPreview(false)} className={`p-1 rounded ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-700'}`}>
                     <X className="w-5 h-5" />
                   </button>
                 </div>
@@ -5307,7 +5307,7 @@ const handleQuickAdd = useCallback(async () => {
               {/* Table */}
               <div className="flex-1 overflow-auto p-4">
                 <table className="w-full text-sm">
-                  <thead className={`sticky top-0 ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-surface'}`}>
+                  <thead className={`sticky top-0 ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-800'}`}>
                     <tr className={`border-b ${tableBorder} text-left ${textMuted}`}>
                       <th className="pb-3 px-2">
                         <input
@@ -5330,7 +5330,7 @@ const handleQuickAdd = useCallback(async () => {
                     {statementData.map((tx, index) => (
                       <tr 
                         key={tx.id || index} 
-                        className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'} ${tx.accepted === false ? 'opacity-50' : ''}`}
+                        className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-neutral-700/50'} ${tx.accepted === false ? 'opacity-50' : ''}`}
                       >
                         <td className="py-3 px-2">
                           <input
@@ -5420,7 +5420,7 @@ const handleQuickAdd = useCallback(async () => {
               </div>
               
               {/* Footer */}
-              <div className={`p-4 border-t ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'} flex items-center justify-between`}>
+              <div className={`p-4 border-t ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'} flex items-center justify-between`}>
                 <div className={`text-sm ${textMuted}`}>
                   {statementData.filter(s => s.accepted !== false).length} transactions will be imported to Cash Flow
                 </div>
@@ -5430,7 +5430,7 @@ const handleQuickAdd = useCallback(async () => {
                       setShowStatementPreview(false)
                       setStatementData([])
                     }}
-                    className={`px-4 py-2 rounded-lg font-medium ${theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-terminal-bg hover:bg-terminal-surface'}`}
+                    className={`px-4 py-2 rounded-lg font-medium ${theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-neutral-900 hover:bg-neutral-800'}`}
                   >
                     Cancel
                   </button>
@@ -5474,7 +5474,7 @@ const handleQuickAdd = useCallback(async () => {
                       }
                     }}
                     disabled={statementData.filter(s => s.accepted !== false).length === 0}
-                    className="px-4 py-2 bg-gradient-to-r from-[#00d4aa] to-[#00c49a] text-white rounded-lg font-medium hover:from-[#00c49a] hover:to-[#00b48a] disabled:opacity-50 flex items-center gap-2"
+                    className="px-4 py-2 bg-gradient-to-r from-[#f97316] to-[#ea580c] text-white rounded-lg font-medium hover:from-[#ea580c] hover:to-[#c2410c] disabled:opacity-50 flex items-center gap-2"
                   >
                     <Check className="w-4 h-4" />
                     Import {statementData.filter(s => s.accepted !== false).length} to Cash Flow
@@ -5508,8 +5508,8 @@ const handleQuickAdd = useCallback(async () => {
                     dashboardView === 'cash' 
                       ? 'bg-accent-primary/10 text-accent-primary border-accent-primary/30' 
                       : dashboardView === 'accrual'
-                        ? 'bg-[#00d4aa]/10 text-[#00d4aa] border-[#00d4aa]/30'
-                        : 'bg-[#00d4aa]/10 text-[#00d4aa] border-amber-500/30'
+                        ? 'bg-[#f97316]/10 text-[#f97316] border-[#f97316]/30'
+                        : 'bg-[#f97316]/10 text-[#f97316] border-amber-500/30'
                   }`}
                   style={{ colorScheme: theme }}
                 >
@@ -5518,7 +5518,7 @@ const handleQuickAdd = useCallback(async () => {
                   <option value="comparison">Comparison</option>
                 </select>
                 
-                <div className={`hidden sm:block w-px h-6 ${theme === 'light' ? 'bg-gray-300' : 'bg-terminal-border'}`} />
+                <div className={`hidden sm:block w-px h-6 ${theme === 'light' ? 'bg-gray-300' : 'bg-neutral-700'}`} />
                 
                 <div className="flex items-center gap-2">
                   <Building2 className={`w-4 h-4 sm:w-5 sm:h-5 ${textMuted}`} />
@@ -5536,7 +5536,7 @@ const handleQuickAdd = useCallback(async () => {
                   <button
                     onClick={() => setShowProjectModal(true)}
                     className={`p-1.5 border rounded-lg ${
-                      theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                      theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'
                     }`}
                     title="Manage Projects"
                   >
@@ -5544,7 +5544,7 @@ const handleQuickAdd = useCallback(async () => {
                   </button>
                 </div>
                 
-                <div className={`hidden sm:block w-px h-6 ${theme === 'light' ? 'bg-gray-300' : 'bg-terminal-border'}`} />
+                <div className={`hidden sm:block w-px h-6 ${theme === 'light' ? 'bg-gray-300' : 'bg-neutral-700'}`} />
                 
                 <div className="flex gap-1 sm:gap-2 flex-wrap items-center">
                   {datePresets.map(preset => (
@@ -5559,7 +5559,7 @@ const handleQuickAdd = useCallback(async () => {
                           ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/30'
                           : theme === 'light' 
                             ? 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200' 
-                            : 'bg-terminal-bg text-zinc-400 hover:text-zinc-200 border border-terminal-border'
+                            : 'bg-neutral-900 text-neutral-400 hover:text-neutral-200 border border-neutral-700'
                       }`}
                     >
                       {preset.label}
@@ -5568,7 +5568,7 @@ const handleQuickAdd = useCallback(async () => {
                   
                   {/* Custom Date Range Inputs */}
                   {dateRangePreset === 'custom' && (
-                    <div className="flex items-center gap-2 ml-2 pl-2 border-l border-terminal-border">
+                    <div className="flex items-center gap-2 ml-2 pl-2 border-l border-neutral-700">
                       <input
                         type="month"
                         value={customStartDate}
@@ -5641,7 +5641,7 @@ const handleQuickAdd = useCallback(async () => {
                     ? 'border-accent-danger bg-accent-danger/5' 
                     : runwayData.status === 'warning'
                     ? 'border-accent-warning bg-accent-warning/5'
-                    : `border-accent-secondary/50 ${theme === 'light' ? 'bg-white' : 'bg-terminal-surface'}`
+                    : `border-accent-secondary/50 ${theme === 'light' ? 'bg-white' : 'bg-neutral-800'}`
                 } col-span-2 lg:col-span-1`}>
                   <div className={`flex items-center gap-2 text-xs sm:text-sm mb-2 ${textMuted}`}>
                     <TrendingUp className="w-4 h-4" />
@@ -5667,7 +5667,7 @@ const handleQuickAdd = useCallback(async () => {
                   </div>
                   {/* Categorization indicator */}
                   {runwayData.categorizedPercent < 100 && runwayData.totalRecentCount > 0 && (
-                    <div className={`text-[10px] mt-2 pt-2 border-t ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'} ${textMuted}`}>
+                    <div className={`text-[10px] mt-2 pt-2 border-t ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'} ${textMuted}`}>
                       Based on {runwayData.categorizedPercent}% categorized ({runwayData.categorizedCount}/{runwayData.totalRecentCount})
                     </div>
                   )}
@@ -5741,13 +5741,13 @@ const handleQuickAdd = useCallback(async () => {
                     <div className="flex items-center gap-3">
                       <h3 className="text-base sm:text-lg font-semibold">Cash Flow Trend</h3>
                       {/* Weekly/Monthly Toggle */}
-                      <div className={`flex rounded-lg overflow-hidden border ${theme === 'light' ? 'border-gray-300' : 'border-terminal-border'}`}>
+                      <div className={`flex rounded-lg overflow-hidden border ${theme === 'light' ? 'border-gray-300' : 'border-neutral-700'}`}>
                         <button
                           onClick={() => setTimeView('monthly')}
                           className={`px-2 py-1 text-xs font-medium transition-all ${
                             timeView === 'monthly'
                               ? 'bg-accent-primary text-white'
-                              : theme === 'light' ? 'bg-gray-50 text-gray-600' : 'bg-terminal-bg text-zinc-400'
+                              : theme === 'light' ? 'bg-gray-50 text-gray-600' : 'bg-neutral-900 text-neutral-400'
                           }`}
                         >
                           Monthly
@@ -5757,7 +5757,7 @@ const handleQuickAdd = useCallback(async () => {
                           className={`px-2 py-1 text-xs font-medium transition-all ${
                             timeView === 'weekly'
                               ? 'bg-accent-primary text-white'
-                              : theme === 'light' ? 'bg-gray-50 text-gray-600' : 'bg-terminal-bg text-zinc-400'
+                              : theme === 'light' ? 'bg-gray-50 text-gray-600' : 'bg-neutral-900 text-neutral-400'
                           }`}
                         >
                           Weekly
@@ -5766,9 +5766,9 @@ const handleQuickAdd = useCallback(async () => {
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {[
-                        { key: 'revenue', label: 'Rev', color: '#22c55e' },
-                        { key: 'opex', label: 'OpEx', color: '#ef4444' },
-                        { key: 'overhead', label: 'OH', color: '#00d4aa' },
+                        { key: 'revenue', label: 'Rev', color: '#34d399' },
+                        { key: 'opex', label: 'OpEx', color: '#fb7185' },
+                        { key: 'overhead', label: 'OH', color: '#f97316' },
                         { key: 'investment', label: 'Inv', color: '#64748b' },
                         { key: 'net', label: 'Net', color: '#22d3ee' },
                       ].map(f => (
@@ -5778,7 +5778,7 @@ const handleQuickAdd = useCallback(async () => {
                           className={`px-2 py-1 rounded text-xs font-medium transition-all border ${
                             chartFilters[f.key as keyof ChartFilters]
                               ? 'border-transparent text-white'
-                              : theme === 'light' ? 'border-gray-300 text-gray-400 bg-transparent' : 'border-terminal-border text-zinc-500 bg-transparent'
+                              : theme === 'light' ? 'border-gray-300 text-gray-400 bg-transparent' : 'border-neutral-700 text-neutral-500 bg-transparent'
                           }`}
                           style={{ 
                             backgroundColor: chartFilters[f.key as keyof ChartFilters] ? f.color : 'transparent'
@@ -5791,11 +5791,11 @@ const handleQuickAdd = useCallback(async () => {
                   </div>
                   <ResponsiveContainer width="100%" height={280}>
                     <ComposedChart data={timeView === 'weekly' ? weeklyData : chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#1e1e2e'} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#333333'} />
                       <XAxis dataKey="name" stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} />
                       <YAxis stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} tickFormatter={(v) => `$${v/1000}k`} />
                       <Tooltip 
-                        contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#12121a', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#1e1e2e'}`, borderRadius: '8px', fontSize: '12px' }}
+                        contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#1e1e1e', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#333333'}`, borderRadius: '8px', fontSize: '12px' }}
                         formatter={(value: number, name: string) => [formatCurrency(value), name]}
                       />
                       <Legend wrapperStyle={{ fontSize: '12px' }} />
@@ -5814,22 +5814,22 @@ const handleQuickAdd = useCallback(async () => {
                     <AreaChart data={chartData}>
                       <defs>
                         <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                          <stop offset="5%" stopColor="#34d399" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#34d399" stopOpacity={0}/>
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#1e1e2e'} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#333333'} />
                       <XAxis dataKey="name" stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} />
                       <YAxis stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} tickFormatter={(v) => `$${v/1000}k`} />
                       <Tooltip 
-                        contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#12121a', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#1e1e2e'}`, borderRadius: '8px', fontSize: '12px' }}
+                        contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#1e1e1e', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#333333'}`, borderRadius: '8px', fontSize: '12px' }}
                         formatter={(value: number) => formatCurrency(value)}
                       />
                       {balanceAlertThreshold > 0 && (
-                        <ReferenceLine y={balanceAlertThreshold} stroke="#ef4444" strokeDasharray="5 5" label={{ value: 'Alert', fill: '#ef4444', fontSize: 10 }} />
+                        <ReferenceLine y={balanceAlertThreshold} stroke="#fb7185" strokeDasharray="5 5" label={{ value: 'Alert', fill: '#fb7185', fontSize: 10 }} />
                       )}
-                      <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" />
-                      <Area type="monotone" dataKey="balance" stroke="#22c55e" fill="url(#balanceGradient)" strokeWidth={2} />
+                      <ReferenceLine y={0} stroke="#fb7185" strokeDasharray="3 3" />
+                      <Area type="monotone" dataKey="balance" stroke="#34d399" fill="url(#balanceGradient)" strokeWidth={2} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -5855,7 +5855,7 @@ const handleQuickAdd = useCallback(async () => {
                           ))}
                         </Pie>
                         <Tooltip 
-                          contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#12121a', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#1e1e2e'}`, borderRadius: '8px', fontSize: '12px' }}
+                          contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#1e1e1e', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#333333'}`, borderRadius: '8px', fontSize: '12px' }}
                           formatter={(value: number) => formatCurrency(value)}
                         />
                       </PieChart>
@@ -5916,12 +5916,12 @@ const handleQuickAdd = useCallback(async () => {
                   <h3 className="text-base sm:text-lg font-semibold mb-4">Project Margins</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {projectMarginData.slice(0, 4).map(p => (
-                      <div key={p.name} className={`rounded-lg p-3 ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                      <div key={p.name} className={`rounded-lg p-3 ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900'}`}>
                         <div className={`text-sm truncate ${textMuted}`}>{p.name}</div>
                         <div className={`text-lg font-mono ${p.margin >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
                           {p.margin.toFixed(1)}%
                         </div>
-                        <div className="text-xs text-zinc-500">
+                        <div className="text-xs text-neutral-500">
                           {formatCurrency(p.revenue)} rev
                         </div>
                       </div>
@@ -5952,7 +5952,7 @@ const handleQuickAdd = useCallback(async () => {
                         className={`px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
                           comparisonView === view.key
                             ? 'bg-accent-primary text-white'
-                            : theme === 'light' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-terminal-bg text-zinc-400 hover:text-zinc-200'
+                            : theme === 'light' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-neutral-900 text-neutral-400 hover:text-neutral-200'
                         }`}
                       >
                         {view.label}
@@ -5964,11 +5964,11 @@ const handleQuickAdd = useCallback(async () => {
                 <ResponsiveContainer width="100%" height={300}>
                   {comparisonView === 'yoy' && yoyYears.length >= 2 ? (
                     <BarChart data={comparisonData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#1e1e2e'} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#333333'} />
                       <XAxis dataKey="name" stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} />
                       <YAxis stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} tickFormatter={(v) => `$${v/1000}k`} />
                       <Tooltip 
-                        contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#12121a', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#1e1e2e'}`, borderRadius: '8px', fontSize: '12px' }}
+                        contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#1e1e1e', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#333333'}`, borderRadius: '8px', fontSize: '12px' }}
                         formatter={(value: number) => formatCurrency(value)}
                       />
                       <Legend wrapperStyle={{ fontSize: '12px' }} />
@@ -5977,18 +5977,18 @@ const handleQuickAdd = useCallback(async () => {
                           key={`rev${year}`}
                           dataKey={`rev${year}`} 
                           name={`Rev ${year}`} 
-                          fill={idx === 0 ? '#6ee7b7' : '#22c55e'} 
+                          fill={idx === 0 ? '#6ee7b7' : '#34d399'} 
                           radius={[4, 4, 0, 0]} 
                         />
                       ))}
                     </BarChart>
                   ) : (
                     <BarChart data={comparisonData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#1e1e2e'} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#333333'} />
                       <XAxis dataKey="name" stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} />
                       <YAxis stroke={theme === 'light' ? '#6b7280' : '#71717a'} fontSize={11} tickFormatter={(v) => `$${v/1000}k`} />
                       <Tooltip 
-                        contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#12121a', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#1e1e2e'}`, borderRadius: '8px', fontSize: '12px' }}
+                        contentStyle={{ backgroundColor: theme === 'light' ? '#fff' : '#1e1e1e', border: `1px solid ${theme === 'light' ? '#e5e7eb' : '#333333'}`, borderRadius: '8px', fontSize: '12px' }}
                         formatter={(value: number) => formatCurrency(value)}
                       />
                       <Legend wrapperStyle={{ fontSize: '12px' }} />
@@ -6010,7 +6010,7 @@ const handleQuickAdd = useCallback(async () => {
                   <div className="mt-6 overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className={`border-b ${theme === 'light' ? 'border-gray-200 text-gray-500' : 'border-terminal-border text-zinc-400'}`}>
+                        <tr className={`border-b ${theme === 'light' ? 'border-gray-200 text-gray-500' : 'border-neutral-700 text-neutral-400'}`}>
                           <th className="pb-2 text-left font-medium">Quarter</th>
                           <th className="pb-2 text-right font-medium">Revenue</th>
                           <th className="pb-2 text-right font-medium">Rev Δ</th>
@@ -6021,7 +6021,7 @@ const handleQuickAdd = useCallback(async () => {
                       </thead>
                       <tbody>
                         {qoqData.map((q, idx) => (
-                          <tr key={q.name} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
+                          <tr key={q.name} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-neutral-700/50'}`}>
                             <td className="py-2 font-medium">{q.name}</td>
                             <td className="py-2 text-right font-mono text-accent-primary">{formatCurrency(q.revenue)}</td>
                             <td className={`py-2 text-right font-mono ${parseFloat(q.revenueChange) >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
@@ -6050,7 +6050,7 @@ const handleQuickAdd = useCallback(async () => {
                         <span className="text-sm font-medium">{transactions.length} Transactions</span>
                       </div>
                       {transactions.filter(t => t.category === 'unassigned').length > 0 && (
-                        <span className="px-2 py-1 bg-[#00d4aa]/10 text-[#00d4aa] rounded text-xs">
+                        <span className="px-2 py-1 bg-[#f97316]/10 text-[#f97316] rounded text-xs">
                           {transactions.filter(t => t.category === 'unassigned').length} need categorization
                         </span>
                       )}
@@ -6136,7 +6136,7 @@ const handleQuickAdd = useCallback(async () => {
                   <div className={`rounded-xl border ${cardClasses}`}>
                     <button
                       onClick={() => toggleDashboardSection('monthly-gm')}
-                      className={`w-full p-4 sm:p-6 flex items-center justify-between ${collapsedSections.has('monthly-gm') ? '' : 'border-b ' + (theme === 'light' ? 'border-gray-200' : 'border-terminal-border')}`}
+                      className={`w-full p-4 sm:p-6 flex items-center justify-between ${collapsedSections.has('monthly-gm') ? '' : 'border-b ' + (theme === 'light' ? 'border-gray-200' : 'border-neutral-700')}`}
                     >
                       <div className="flex items-center gap-3">
                         <ChevronRight className={`w-5 h-5 transition-transform ${collapsedSections.has('monthly-gm') ? '' : 'rotate-90'}`} />
@@ -6164,8 +6164,8 @@ const handleQuickAdd = useCallback(async () => {
                                   contentStyle={{ background: theme === 'light' ? 'white' : '#1f2937', border: 'none', borderRadius: '8px' }}
                                 />
                                 <Legend />
-                                <Bar yAxisId="left" dataKey="revenue" name="Revenue" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                                <Bar yAxisId="left" dataKey="directCosts" name="Direct Costs" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                                <Bar yAxisId="left" dataKey="revenue" name="Revenue" fill="#34d399" radius={[4, 4, 0, 0]} />
+                                <Bar yAxisId="left" dataKey="directCosts" name="Direct Costs" fill="#fb7185" radius={[4, 4, 0, 0]} />
                                 <Line yAxisId="right" type="monotone" dataKey="grossMarginPct" name="GM %" stroke="#64748b" strokeWidth={3} dot={{ r: 4 }} />
                               </ComposedChart>
                             </ResponsiveContainer>
@@ -6183,7 +6183,7 @@ const handleQuickAdd = useCallback(async () => {
                   <div className={`rounded-xl border ${cardClasses}`}>
                     <button
                       onClick={() => toggleDashboardSection('project-analysis')}
-                      className={`w-full p-4 sm:p-6 flex items-center justify-between ${collapsedSections.has('project-analysis') ? '' : 'border-b ' + (theme === 'light' ? 'border-gray-200' : 'border-terminal-border')}`}
+                      className={`w-full p-4 sm:p-6 flex items-center justify-between ${collapsedSections.has('project-analysis') ? '' : 'border-b ' + (theme === 'light' ? 'border-gray-200' : 'border-neutral-700')}`}
                     >
                       <div className="flex items-center gap-3">
                         <ChevronRight className={`w-5 h-5 transition-transform ${collapsedSections.has('project-analysis') ? '' : 'rotate-90'}`} />
@@ -6199,7 +6199,7 @@ const handleQuickAdd = useCallback(async () => {
                             : datePresets.find(p => p.key === dateRangePreset)?.label || dateRangePreset
                           }
                         </span>
-                        <span className={`text-xs px-2 py-1 rounded ${theme === 'light' ? 'bg-gray-100' : 'bg-terminal-bg'} ${textMuted}`}>
+                        <span className={`text-xs px-2 py-1 rounded ${theme === 'light' ? 'bg-gray-100' : 'bg-neutral-900'} ${textMuted}`}>
                           {accrualMonthlyData.length} month{accrualMonthlyData.length !== 1 ? 's' : ''}
                         </span>
                       </div>
@@ -6224,7 +6224,7 @@ const handleQuickAdd = useCallback(async () => {
                               </thead>
                               <tbody>
                                 {accrualProjectAnalysis.projects.map(p => (
-                                  <tr key={p.project} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
+                                  <tr key={p.project} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-neutral-700/50'}`}>
                                     <td className="py-3 font-medium">{p.project}</td>
                                     <td className="py-3 text-right font-mono text-accent-primary">{formatCurrency(p.revenue)}</td>
                                     <td className="py-3 text-right font-mono text-accent-danger">{formatCurrency(p.directCosts)}</td>
@@ -6244,7 +6244,7 @@ const handleQuickAdd = useCallback(async () => {
                                     </td>
                                   </tr>
                                 ))}
-                                <tr className={`font-bold ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                                <tr className={`font-bold ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900'}`}>
                                   <td className="py-3">TOTAL</td>
                                   <td className="py-3 text-right font-mono text-accent-primary">{formatCurrency(accrualProjectAnalysis.totals.revenue)}</td>
                                   <td className="py-3 text-right font-mono text-accent-danger">{formatCurrency(accrualProjectAnalysis.totals.directCosts)}</td>
@@ -6284,7 +6284,7 @@ const handleQuickAdd = useCallback(async () => {
                     <div className={`rounded-xl border ${cardClasses}`}>
                       <button
                         onClick={() => toggleDashboardSection('budget-tracking')}
-                        className={`w-full p-4 sm:p-6 flex items-center justify-between ${collapsedSections.has('budget-tracking') ? '' : 'border-b ' + (theme === 'light' ? 'border-gray-200' : 'border-terminal-border')}`}
+                        className={`w-full p-4 sm:p-6 flex items-center justify-between ${collapsedSections.has('budget-tracking') ? '' : 'border-b ' + (theme === 'light' ? 'border-gray-200' : 'border-neutral-700')}`}
                       >
                         <div className="flex items-center gap-3">
                           <ChevronRight className={`w-5 h-5 transition-transform ${collapsedSections.has('budget-tracking') ? '' : 'rotate-90'}`} />
@@ -6308,7 +6308,7 @@ const handleQuickAdd = useCallback(async () => {
                         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => setShowProjectModal(true)}
-                            className={`text-sm px-3 py-1.5 rounded-lg ${theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-terminal-bg hover:bg-terminal-surface'}`}
+                            className={`text-sm px-3 py-1.5 rounded-lg ${theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-neutral-900 hover:bg-neutral-800'}`}
                           >
                             Manage Budgets
                           </button>
@@ -6319,7 +6319,7 @@ const handleQuickAdd = useCallback(async () => {
                         <div className="p-4 sm:p-6 pt-0 sm:pt-0">
                           <div className="space-y-4">
                             {projectBudgetTracking.map(p => (
-                              <div key={p.id} className={`p-4 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                              <div key={p.id} className={`p-4 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900'}`}>
                                 <div className="flex items-center justify-between mb-2">
                                   <div className="flex items-center gap-3">
                                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
@@ -6347,7 +6347,7 @@ const handleQuickAdd = useCallback(async () => {
                                 
                                 {p.budget > 0 && (
                                   <>
-                                    <div className={`h-3 rounded-full overflow-hidden ${theme === 'light' ? 'bg-gray-200' : 'bg-terminal-border'}`}>
+                                    <div className={`h-3 rounded-full overflow-hidden ${theme === 'light' ? 'bg-gray-200' : 'bg-neutral-700'}`}>
                                       <div 
                                         className={`h-full rounded-full transition-all ${
                                           p.isOverBudget ? 'bg-accent-danger' : 
@@ -6372,7 +6372,7 @@ const handleQuickAdd = useCallback(async () => {
                                 )}
                                 
                                 {/* Project metrics row */}
-                                <div className={`flex gap-4 mt-3 pt-3 border-t text-xs ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
+                                <div className={`flex gap-4 mt-3 pt-3 border-t text-xs ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'}`}>
                                   <div>
                                     <span className={textMuted}>Revenue: </span>
                                     <span className="font-mono text-accent-primary">{formatCurrency(p.revenue)}</span>
@@ -6413,7 +6413,7 @@ const handleQuickAdd = useCallback(async () => {
                   <div className={`rounded-xl border ${cardClasses}`}>
                     <button
                       onClick={() => toggleDashboardSection('period-comparison')}
-                      className={`w-full p-4 sm:p-6 flex items-center justify-between ${collapsedSections.has('period-comparison') ? '' : 'border-b ' + (theme === 'light' ? 'border-gray-200' : 'border-terminal-border')}`}
+                      className={`w-full p-4 sm:p-6 flex items-center justify-between ${collapsedSections.has('period-comparison') ? '' : 'border-b ' + (theme === 'light' ? 'border-gray-200' : 'border-neutral-700')}`}
                     >
                       <div className="flex items-center gap-3">
                         <ChevronRight className={`w-5 h-5 transition-transform ${collapsedSections.has('period-comparison') ? '' : 'rotate-90'}`} />
@@ -6429,8 +6429,8 @@ const handleQuickAdd = useCallback(async () => {
                             onClick={() => setComparisonView(view)}
                             className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
                               comparisonView === view
-                                ? 'bg-[#00d4aa] text-white'
-                                : theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-terminal-bg hover:bg-terminal-surface'
+                                ? 'bg-[#f97316] text-white'
+                                : theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-neutral-900 hover:bg-neutral-800'
                             }`}
                           >
                             {view === 'mom' ? 'MoM' : view === 'qoq' ? 'QoQ' : 'YoY'}
@@ -6457,7 +6457,7 @@ const handleQuickAdd = useCallback(async () => {
                           </thead>
                           <tbody>
                             {accrualPeriodComparison.mom.map(row => (
-                              <tr key={row.period} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
+                              <tr key={row.period} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-neutral-700/50'}`}>
                                 <td className="py-3 font-medium">{row.period}</td>
                                 <td className="py-3 text-right font-mono">{formatCurrency(row.currentRevenue)}</td>
                                 <td className={`py-3 text-right font-mono ${row.revenueChange === null ? textMuted : row.revenueChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
@@ -6492,7 +6492,7 @@ const handleQuickAdd = useCallback(async () => {
                           </thead>
                           <tbody>
                             {accrualPeriodComparison.qoq.map(row => (
-                              <tr key={row.period} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
+                              <tr key={row.period} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-neutral-700/50'}`}>
                                 <td className="py-3 font-medium">{row.period}</td>
                                 <td className="py-3 text-right font-mono">{formatCurrency(row.currentRevenue)}</td>
                                 <td className={`py-3 text-right font-mono ${row.revenueChange === null ? textMuted : row.revenueChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
@@ -6527,7 +6527,7 @@ const handleQuickAdd = useCallback(async () => {
                           </thead>
                           <tbody>
                             {accrualPeriodComparison.yoy.map(row => (
-                              <tr key={row.period} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
+                              <tr key={row.period} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-neutral-700/50'}`}>
                                 <td className="py-3 font-medium">{row.period}</td>
                                 <td className="py-3 text-right font-mono">{formatCurrency(row.currentRevenue)}</td>
                                 <td className={`py-3 text-right font-mono ${row.revenueChange >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
@@ -6570,7 +6570,7 @@ const handleQuickAdd = useCallback(async () => {
                         <FileText className="w-4 h-4" />
                         Total Invoiced
                       </div>
-                      <div className="text-2xl font-bold text-[#00d4aa] mt-1">
+                      <div className="text-2xl font-bold text-[#f97316] mt-1">
                         {formatCurrency(cashVsAccrualData.reduce((sum, m) => sum + m.invoiced, 0))}
                       </div>
                       <div className={`text-xs ${textMuted}`}>Accrual basis</div>
@@ -6630,8 +6630,8 @@ const handleQuickAdd = useCallback(async () => {
                               contentStyle={{ background: theme === 'light' ? 'white' : '#1f2937', border: 'none', borderRadius: '8px' }}
                             />
                             <Legend />
-                            <Bar dataKey="invoiced" name="Invoiced (Accrual)" fill="#00d4aa" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="collected" name="Collected (Cash)" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="invoiced" name="Invoiced (Accrual)" fill="#f97316" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="collected" name="Collected (Cash)" fill="#34d399" radius={[4, 4, 0, 0]} />
                             <ReferenceLine y={0} stroke="#6b7280" />
                           </ComposedChart>
                         </ResponsiveContainer>
@@ -6660,9 +6660,9 @@ const handleQuickAdd = useCallback(async () => {
                           </thead>
                           <tbody>
                             {cashVsAccrualData.map(row => (
-                              <tr key={row.month} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
+                              <tr key={row.month} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-neutral-700/50'}`}>
                                 <td className="py-3 font-medium">{row.month}</td>
-                                <td className="py-3 text-right font-mono text-[#00d4aa]">{formatCurrency(row.invoiced)}</td>
+                                <td className="py-3 text-right font-mono text-[#f97316]">{formatCurrency(row.invoiced)}</td>
                                 <td className="py-3 text-right font-mono text-accent-primary">{formatCurrency(row.collected)}</td>
                                 <td className={`py-3 text-right font-mono font-medium ${row.delta >= 0 ? 'text-accent-primary' : 'text-accent-warning'}`}>
                                   {row.delta >= 0 ? '+' : ''}{formatCurrency(row.delta)}
@@ -6698,7 +6698,7 @@ const handleQuickAdd = useCallback(async () => {
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
                         transactionViewType === 'cash'
                           ? 'bg-accent-primary text-white'
-                          : theme === 'light' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-terminal-bg text-zinc-400 hover:bg-terminal-surface'
+                          : theme === 'light' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-neutral-900 text-neutral-400 hover:bg-neutral-800'
                       }`}
                     >
                       <DollarSign className="w-4 h-4" />
@@ -6708,8 +6708,8 @@ const handleQuickAdd = useCallback(async () => {
                       onClick={() => setTransactionViewType('accrual')}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
                         transactionViewType === 'accrual'
-                          ? 'bg-[#00d4aa] text-white'
-                          : theme === 'light' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-terminal-bg text-zinc-400 hover:bg-terminal-surface'
+                          ? 'bg-[#f97316] text-white'
+                          : theme === 'light' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-neutral-900 text-neutral-400 hover:bg-neutral-800'
                       }`}
                     >
                       <FileText className="w-4 h-4" />
@@ -6751,10 +6751,10 @@ const handleQuickAdd = useCallback(async () => {
 
                   {/* Bulk Actions Bar - Shows when items selected */}
                   {selectedTransactions.size > 0 && (
-                    <div className={`rounded-xl p-4 border-2 border-[#00d4aa] ${theme === 'light' ? 'bg-[#00d4aa]/10' : 'bg-[#00d4aa]/20'}`}>
+                    <div className={`rounded-xl p-4 border-2 border-[#f97316] ${theme === 'light' ? 'bg-[#f97316]/10' : 'bg-[#f97316]/20'}`}>
                       <div className="flex items-center justify-between flex-wrap gap-3">
                         <div className="flex items-center gap-3">
-                          <Check className="w-5 h-5 text-[#00d4aa]" />
+                          <Check className="w-5 h-5 text-[#f97316]" />
                           <span className="font-medium">{selectedTransactions.size} transactions selected</span>
                         </div>
                         <div className="flex items-center gap-3">
@@ -6784,13 +6784,13 @@ const handleQuickAdd = useCallback(async () => {
                           <button
                             onClick={bulkCategorizeSelected}
                             disabled={!bulkCategory && !bulkProject}
-                            className="px-4 py-2 bg-[#00d4aa] text-[#0c1222] rounded-lg hover:bg-[#00c49a] text-sm font-medium disabled:opacity-50"
+                            className="px-4 py-2 bg-[#f97316] text-[#121212] rounded-lg hover:bg-[#ea580c] text-sm font-medium disabled:opacity-50"
                           >
                             Apply to Selected
                           </button>
                           <button
                             onClick={() => setSelectedTransactions(new Set())}
-                            className={`px-3 py-2 rounded-lg text-sm ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-terminal-bg'}`}
+                            className={`px-3 py-2 rounded-lg text-sm ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-900'}`}
                           >
                             Clear
                           </button>
@@ -6860,7 +6860,7 @@ const handleQuickAdd = useCallback(async () => {
                           Add
                         </button>
                         <button onClick={exportToCSV} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
-                          theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-terminal-bg border-terminal-border'
+                          theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-neutral-900 border-neutral-700'
                         }`}>
                           <Download className="w-4 h-4" />
                           CSV
@@ -6901,9 +6901,9 @@ const handleQuickAdd = useCallback(async () => {
                               return (
                                 <React.Fragment key={t.id}>
                                   <tr 
-                                    className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'} ${
+                                    className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-neutral-700/50'} ${
                                       isExpanded ? (theme === 'light' ? 'bg-blue-50' : 'bg-blue-900/20') : ''
-                                    } hover:${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg/50'} cursor-pointer`}
+                                    } hover:${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900/50'} cursor-pointer`}
                                     onClick={() => setExpandedTransaction(isExpanded ? null : t.id)}
                                   >
                                     <td className="py-3" onClick={(e) => e.stopPropagation()}>
@@ -6965,7 +6965,7 @@ const handleQuickAdd = useCallback(async () => {
                                         )}
                                       </div>
                                       {t.notes && expandedNotes.has(t.id) && (
-                                        <div className={`text-xs mt-1 p-2 rounded ${theme === 'light' ? 'bg-gray-100 text-gray-600' : 'bg-terminal-bg text-zinc-400'}`}>
+                                        <div className={`text-xs mt-1 p-2 rounded ${theme === 'light' ? 'bg-gray-100 text-gray-600' : 'bg-neutral-900 text-neutral-400'}`}>
                                           {t.notes}
                                         </div>
                                       )}
@@ -6978,10 +6978,10 @@ const handleQuickAdd = useCallback(async () => {
                                     </td>
                                     <td className="py-3 text-center" onClick={(e) => e.stopPropagation()}>
                                       <div className="flex items-center justify-center gap-1">
-                                        <button onClick={() => startEdit(t)} className="p-1.5 text-zinc-400 hover:text-accent-primary hover:bg-accent-primary/10 rounded">
+                                        <button onClick={() => startEdit(t)} className="p-1.5 text-neutral-400 hover:text-accent-primary hover:bg-accent-primary/10 rounded">
                                           <Edit2 className="w-4 h-4" />
                                         </button>
-                                        <button onClick={() => deleteTransaction(t.id)} className="p-1.5 text-zinc-400 hover:text-accent-danger hover:bg-accent-danger/10 rounded">
+                                        <button onClick={() => deleteTransaction(t.id)} className="p-1.5 text-neutral-400 hover:text-accent-danger hover:bg-accent-danger/10 rounded">
                                           <Trash2 className="w-4 h-4" />
                                         </button>
                                       </div>
@@ -7003,7 +7003,7 @@ const handleQuickAdd = useCallback(async () => {
                                                     onClick={() => quickCategorize(t.id, catId)}
                                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                                                       t.category === catId 
-                                                        ? 'ring-2 ring-offset-2 ring-[#00d4aa]' 
+                                                        ? 'ring-2 ring-offset-2 ring-[#f97316]' 
                                                         : 'hover:opacity-80'
                                                     }`}
                                                     style={{ 
@@ -7033,7 +7033,7 @@ const handleQuickAdd = useCallback(async () => {
                                           </div>
                                           <button
                                             onClick={() => setExpandedTransaction(null)}
-                                            className={`ml-auto px-3 py-1.5 rounded-lg text-xs ${theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-terminal-bg'}`}
+                                            className={`ml-auto px-3 py-1.5 rounded-lg text-xs ${theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-neutral-900'}`}
                                           >
                                             Close
                                           </button>
@@ -7071,7 +7071,7 @@ const handleQuickAdd = useCallback(async () => {
                         <button 
                           onClick={() => setShowQuickAdd(true)}
                           className={`px-4 py-2 rounded-lg border ${
-                            theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                            theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'
                           }`}
                         >
                           Add Manually
@@ -7126,7 +7126,7 @@ const handleQuickAdd = useCallback(async () => {
                       <div className="flex gap-2">
                         <button 
                           onClick={openAddAccrualModal}
-                          className="flex items-center gap-2 px-4 py-2 bg-[#00d4aa] text-white rounded-lg hover:bg-[#00c49a]"
+                          className="flex items-center gap-2 px-4 py-2 bg-[#f97316] text-white rounded-lg hover:bg-[#ea580c]"
                         >
                           <Plus className="w-4 h-4" />
                           Add
@@ -7150,7 +7150,7 @@ const handleQuickAdd = useCallback(async () => {
                           Clear All
                         </button>
                         <button onClick={exportAccrualToCSV} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
-                          theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-terminal-bg border-terminal-border'
+                          theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-neutral-900 border-neutral-700'
                         }`}>
                           <Download className="w-4 h-4" />
                           CSV
@@ -7185,7 +7185,7 @@ const handleQuickAdd = useCallback(async () => {
                           </thead>
                           <tbody>
                             {filteredAccrualTransactions.map(t => (
-                              <tr key={t.id} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'} ${selectedAccrualIds.has(t.id) ? (theme === 'light' ? 'bg-[#1c2740]' : 'bg-[#00d4aa]/10') : ''} hover:${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg/50'}`}>
+                              <tr key={t.id} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-neutral-700/50'} ${selectedAccrualIds.has(t.id) ? (theme === 'light' ? 'bg-[#262626]' : 'bg-[#f97316]/10') : ''} hover:${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900/50'}`}>
                                 <td className="py-3">
                                   <input 
                                     type="checkbox" 
@@ -7257,7 +7257,7 @@ const handleQuickAdd = useCallback(async () => {
                                         <button onClick={saveEditAccrual} className="p-1.5 text-accent-primary hover:bg-accent-primary/10 rounded">
                                           <Check className="w-4 h-4" />
                                         </button>
-                                        <button onClick={cancelEditAccrual} className="p-1.5 text-zinc-400 hover:bg-zinc-500/10 rounded">
+                                        <button onClick={cancelEditAccrual} className="p-1.5 text-neutral-400 hover:bg-neutral-500/10 rounded">
                                           <X className="w-4 h-4" />
                                         </button>
                                       </div>
@@ -7283,13 +7283,13 @@ const handleQuickAdd = useCallback(async () => {
                                     <td className={`py-3 text-sm ${textMuted}`}>{t.vendor || '-'}</td>
                                     <td className="py-3 text-center">
                                       <div className="flex items-center justify-center gap-1">
-                                        <button onClick={() => startEditAccrual(t)} className="p-1.5 text-zinc-400 hover:text-[#00d4aa] hover:bg-[#00d4aa]/10 rounded" title="Inline edit">
+                                        <button onClick={() => startEditAccrual(t)} className="p-1.5 text-neutral-400 hover:text-[#f97316] hover:bg-[#f97316]/10 rounded" title="Inline edit">
                                           <Edit2 className="w-4 h-4" />
                                         </button>
-                                        <button onClick={() => openEditAccrualModal(t)} className="p-1.5 text-zinc-400 hover:text-accent-primary hover:bg-accent-primary/10 rounded" title="Edit in modal">
+                                        <button onClick={() => openEditAccrualModal(t)} className="p-1.5 text-neutral-400 hover:text-accent-primary hover:bg-accent-primary/10 rounded" title="Edit in modal">
                                           <ExternalLink className="w-4 h-4" />
                                         </button>
-                                        <button onClick={() => deleteAccrualTransaction(t.id)} className="p-1.5 text-zinc-400 hover:text-accent-danger hover:bg-accent-danger/10 rounded" title="Delete">
+                                        <button onClick={() => deleteAccrualTransaction(t.id)} className="p-1.5 text-neutral-400 hover:text-accent-danger hover:bg-accent-danger/10 rounded" title="Delete">
                                           <Trash2 className="w-4 h-4" />
                                         </button>
                                       </div>
@@ -7318,7 +7318,7 @@ const handleQuickAdd = useCallback(async () => {
                       <div className="flex gap-3 justify-center">
                         <button 
                           onClick={openAddAccrualModal}
-                          className="px-4 py-2 bg-[#00d4aa] text-white rounded-lg hover:bg-[#00c49a] flex items-center gap-2"
+                          className="px-4 py-2 bg-[#f97316] text-white rounded-lg hover:bg-[#ea580c] flex items-center gap-2"
                         >
                           <Plus className="w-4 h-4" />
                           Add Manually
@@ -7326,7 +7326,7 @@ const handleQuickAdd = useCallback(async () => {
                         <button 
                           onClick={() => setActiveTab('data')}
                           className={`px-4 py-2 rounded-lg border flex items-center gap-2 ${
-                            theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                            theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'
                           }`}
                         >
                           <Upload className="w-4 h-4" />
@@ -7385,7 +7385,7 @@ const handleQuickAdd = useCallback(async () => {
                 <div className={`rounded-xl p-6 border-2 border-dashed transition-all ${
                   isDragging 
                     ? 'border-accent-primary bg-accent-primary/5' 
-                    : theme === 'light' ? 'border-gray-300' : 'border-terminal-border'
+                    : theme === 'light' ? 'border-gray-300' : 'border-neutral-700'
                 }`}
                   onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
                   onDragLeave={() => setIsDragging(false)}
@@ -7410,19 +7410,19 @@ const handleQuickAdd = useCallback(async () => {
 
                 {/* Accrual/Invoice Upload */}
                 <div className={`rounded-xl p-6 border-2 border-dashed transition-all ${
-                  theme === 'light' ? 'border-[#2a3a55] hover:border-[#64748b]' : 'border-[#00d4aa]/30 hover:border-[#00d4aa]/50'
+                  theme === 'light' ? 'border-[#333333] hover:border-[#64748b]' : 'border-[#f97316]/30 hover:border-[#f97316]/50'
                 }`}
                   onDragOver={(e) => { e.preventDefault() }}
                   onDrop={(e) => { e.preventDefault(); const file = e.dataTransfer.files[0]; if (file) handleAccrualUpload(file) }}
                 >
                   <div className="text-center">
-                    <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-[#00d4aa]/10 flex items-center justify-center">
-                      <FileText className="w-6 h-6 text-[#00d4aa]" />
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-[#f97316]/10 flex items-center justify-center">
+                      <FileText className="w-6 h-6 text-[#f97316]" />
                     </div>
                     <h3 className="text-lg font-semibold mb-1">Accrual Data (Invoices)</h3>
                     <p className={`text-sm mb-4 ${textMuted}`}>Invoices issued & received (for GM)</p>
                     <input type="file" accept=".csv" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleAccrualUpload(file) }} className="hidden" id="accrual-file-upload" />
-                    <label htmlFor="accrual-file-upload" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#00d4aa] text-white rounded-lg cursor-pointer hover:bg-[#00d4aa]/90">
+                    <label htmlFor="accrual-file-upload" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#f97316] text-white rounded-lg cursor-pointer hover:bg-[#f97316]/90">
                       <Upload className="w-4 h-4" />
                       Upload Invoice Data
                     </label>
@@ -7437,7 +7437,7 @@ const handleQuickAdd = useCallback(async () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className={`rounded-xl p-4 border ${cardClasses}`}>
                   <h4 className="font-semibold mb-3 text-accent-primary">Cash Flow Format</h4>
-                  <div className={`rounded-lg p-3 font-mono text-xs overflow-x-auto ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                  <div className={`rounded-lg p-3 font-mono text-xs overflow-x-auto ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900'}`}>
                     <div className={textMuted}>date,category,description,amount,type,project</div>
                     <div className="text-accent-primary">2024-01-15,revenue,Payment received,50000,actual,Alpha</div>
                     <div className="text-accent-danger">2024-01-01,opex,Contractor payment,-15000,actual,Alpha</div>
@@ -7446,8 +7446,8 @@ const handleQuickAdd = useCallback(async () => {
                 </div>
                 
                 <div className={`rounded-xl p-4 border ${cardClasses}`}>
-                  <h4 className="font-semibold mb-3 text-[#00d4aa]">Accrual/Invoice Format</h4>
-                  <div className={`rounded-lg p-3 font-mono text-xs overflow-x-auto ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                  <h4 className="font-semibold mb-3 text-[#f97316]">Accrual/Invoice Format</h4>
+                  <div className={`rounded-lg p-3 font-mono text-xs overflow-x-auto ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900'}`}>
                     <div className={textMuted}>date,type,description,amount,project,vendor</div>
                     <div className="text-accent-primary">2024-01-15,revenue,Invoice #1001,50000,Alpha,Client ABC</div>
                     <div className="text-accent-danger">2024-01-01,direct_cost,Contractor inv,-15000,Alpha,Dev Co</div>
@@ -7461,8 +7461,8 @@ const handleQuickAdd = useCallback(async () => {
               {/* AI Categorization */}
               <div className={`rounded-xl p-6 border ${cardClasses}`}>
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-[#00d4aa]/10 flex items-center justify-center">
-                    <Sparkles className="w-5 h-5 text-[#00d4aa]" />
+                  <div className="w-10 h-10 rounded-full bg-[#f97316]/10 flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-[#f97316]" />
                   </div>
                   <div>
                     <h3 className="font-semibold">AI-Powered Categorization</h3>
@@ -7472,7 +7472,7 @@ const handleQuickAdd = useCallback(async () => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Cash AI Upload */}
-                  <div className={`p-4 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                  <div className={`p-4 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900'}`}>
                     <div className="flex items-center justify-between mb-3">
                       <span className="font-medium text-sm">Cash Transactions</span>
                       <span className={`text-xs px-2 py-0.5 rounded-full bg-accent-primary/10 text-accent-primary`}>
@@ -7517,7 +7517,7 @@ const handleQuickAdd = useCallback(async () => {
                       className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg cursor-pointer font-medium text-sm transition-all ${
                         aiLoading 
                           ? 'bg-gray-400 cursor-not-allowed' 
-                          : 'bg-gradient-to-r from-[#00d4aa] to-[#00c49a] text-white hover:from-[#00c49a] hover:to-[#00b48a]'
+                          : 'bg-gradient-to-r from-[#f97316] to-[#ea580c] text-white hover:from-[#ea580c] hover:to-[#c2410c]'
                       }`}
                     >
                       {aiLoading && uploadType === 'cash' ? (
@@ -7535,10 +7535,10 @@ const handleQuickAdd = useCallback(async () => {
                   </div>
                   
                   {/* Accrual AI Upload */}
-                  <div className={`p-4 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                  <div className={`p-4 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900'}`}>
                     <div className="flex items-center justify-between mb-3">
                       <span className="font-medium text-sm">Accrual/Invoices</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full bg-[#00d4aa]/10 text-[#00d4aa]`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full bg-[#f97316]/10 text-[#f97316]`}>
                         AI Ready
                       </span>
                     </div>
@@ -7581,7 +7581,7 @@ const handleQuickAdd = useCallback(async () => {
                       className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg cursor-pointer font-medium text-sm transition-all ${
                         aiLoading 
                           ? 'bg-gray-400 cursor-not-allowed' 
-                          : 'bg-gradient-to-r from-[#00d4aa] to-[#00c49a] text-white hover:from-[#00c49a] hover:to-[#00b48a]'
+                          : 'bg-gradient-to-r from-[#f97316] to-[#ea580c] text-white hover:from-[#ea580c] hover:to-[#c2410c]'
                       }`}
                     >
                       {aiLoading && uploadType === 'accrual' ? (
@@ -7599,7 +7599,7 @@ const handleQuickAdd = useCallback(async () => {
                   </div>
                 </div>
                 
-                <div className={`mt-4 p-3 rounded-lg text-sm ${theme === 'light' ? 'bg-[#1c2740] text-[#00d4aa]' : 'bg-[#00d4aa]/10 text-[#00d4aa]'}`}>
+                <div className={`mt-4 p-3 rounded-lg text-sm ${theme === 'light' ? 'bg-[#262626] text-[#f97316]' : 'bg-[#f97316]/10 text-[#f97316]'}`}>
                   <strong>How it works:</strong> Upload a CSV and AI will analyze each transaction description to suggest categories and projects. You can review, edit, and approve suggestions before importing.
                 </div>
               </div>
@@ -7607,20 +7607,20 @@ const handleQuickAdd = useCallback(async () => {
               {/* Bank Statement PDF/Image Upload */}
               <div className={`rounded-xl p-6 border ${cardClasses}`}>
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-[#00d4aa] to-[#00c49a] flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-[#f97316] to-[#ea580c] flex items-center justify-center">
                     <FileText className="w-5 h-5 text-white" />
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold">📄 Bank Statement Upload</h3>
                     <p className={`text-sm ${textMuted}`}>Upload PDF or image - AI extracts all transactions</p>
                   </div>
-                  <span className={`ml-auto text-xs px-2 py-1 rounded-full bg-gradient-to-r from-[#00d4aa]/20 to-[#00c49a]/20 text-[#00d4aa] font-medium`}>
+                  <span className={`ml-auto text-xs px-2 py-1 rounded-full bg-gradient-to-r from-[#f97316]/20 to-[#ea580c]/20 text-[#f97316] font-medium`}>
                     ✨ AI Powered
                   </span>
                 </div>
                 
                 <div className={`p-6 rounded-lg border-2 border-dashed text-center ${
-                  theme === 'light' ? 'border-[#2a3a55] bg-[#1c2740]' : 'border-[#64748b]/30 bg-[#64748b]/5'
+                  theme === 'light' ? 'border-[#333333] bg-[#262626]' : 'border-[#64748b]/30 bg-[#64748b]/5'
                 }`}>
                   <input 
                     type="file" 
@@ -7671,7 +7671,7 @@ const handleQuickAdd = useCallback(async () => {
                     className={`inline-flex items-center gap-2 px-6 py-3 rounded-lg cursor-pointer font-medium transition-all ${
                       statementLoading 
                         ? 'bg-gray-400 cursor-not-allowed' 
-                        : 'bg-gradient-to-r from-[#00d4aa] to-[#00c49a] text-white hover:from-[#00c49a] hover:to-[#00b48a]'
+                        : 'bg-gradient-to-r from-[#f97316] to-[#ea580c] text-white hover:from-[#ea580c] hover:to-[#c2410c]'
                     }`}
                   >
                     {statementLoading ? (
@@ -7691,7 +7691,7 @@ const handleQuickAdd = useCallback(async () => {
                   </p>
                 </div>
                 
-                <div className={`mt-4 p-3 rounded-lg text-sm ${theme === 'light' ? 'bg-[#1c2740] text-[#94a3b8]' : 'bg-[#64748b]/10 text-[#94a3b8]'}`}>
+                <div className={`mt-4 p-3 rounded-lg text-sm ${theme === 'light' ? 'bg-[#262626] text-[#94a3b8]' : 'bg-[#64748b]/10 text-[#94a3b8]'}`}>
                   <strong>How it works:</strong> Upload your bank statement (PDF or screenshot) and Claude AI will read it, extract every transaction, and categorize them automatically. You'll review before importing to Cash Flow.
                 </div>
               </div>
@@ -7703,7 +7703,7 @@ const handleQuickAdd = useCallback(async () => {
                   Load Sample
                 </button>
                 <button onClick={exportToCSV} disabled={!transactions.length} className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border disabled:opacity-50 ${
-                  theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-terminal-bg border-terminal-border'
+                  theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-neutral-900 border-neutral-700'
                 }`}>
                   <Download className="w-4 h-4" />
                   Export Cash CSV
@@ -7721,7 +7721,7 @@ const handleQuickAdd = useCallback(async () => {
                   }} 
                   disabled={!accrualTransactions.length} 
                   className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border disabled:opacity-50 ${
-                    theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-terminal-bg border-terminal-border'
+                    theme === 'light' ? 'bg-white border-gray-300 hover:bg-gray-50' : 'bg-neutral-900 border-neutral-700'
                   }`}
                 >
                   <Download className="w-4 h-4" />
@@ -7746,7 +7746,7 @@ const handleQuickAdd = useCallback(async () => {
                     }
                   }} 
                   disabled={!accrualTransactions.length} 
-                  className="flex items-center gap-2 px-5 py-2.5 bg-[#00d4aa]/10 text-[#00d4aa] rounded-lg disabled:opacity-50 hover:bg-[#00d4aa]/20"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-[#f97316]/10 text-[#f97316] rounded-lg disabled:opacity-50 hover:bg-[#f97316]/20"
                 >
                   <Trash2 className="w-4 h-4" />
                   Clear Accrual
@@ -7781,7 +7781,7 @@ const handleQuickAdd = useCallback(async () => {
                         if (name) addScenario(name)
                       }}
                       className={`flex items-center gap-1 px-3 py-1.5 text-sm border rounded-lg ${
-                        theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                        theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'
                       }`}
                     >
                       <Plus className="w-4 h-4" />
@@ -7793,7 +7793,7 @@ const handleQuickAdd = useCallback(async () => {
                         if (name) duplicateScenario(activeScenario, name)
                       }}
                       className={`flex items-center gap-1 px-3 py-1.5 text-sm border rounded-lg ${
-                        theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'
+                        theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'
                       }`}
                     >
                       <Copy className="w-4 h-4" />
@@ -7881,7 +7881,7 @@ const handleQuickAdd = useCallback(async () => {
                 ) : (
                   <div className="space-y-2">
                     {activeAssumptions.map(a => (
-                      <div key={a.id} className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                      <div key={a.id} className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900'}`}>
                         <div className="flex items-center gap-3 flex-wrap">
                           <span 
                             className="px-2 py-0.5 rounded text-xs font-medium"
@@ -7891,7 +7891,7 @@ const handleQuickAdd = useCallback(async () => {
                             }}
                           >{getCategoryById(a.category)?.name || a.category}</span>
                           <span className="font-medium">{a.name}</span>
-                          <span className={`text-xs px-2 py-0.5 rounded ${theme === 'light' ? 'bg-gray-200' : 'bg-terminal-surface'} ${textMuted}`}>
+                          <span className={`text-xs px-2 py-0.5 rounded ${theme === 'light' ? 'bg-gray-200' : 'bg-neutral-800'} ${textMuted}`}>
                             {a.frequency}
                           </span>
                           <span className={`text-xs ${textMuted}`}>
@@ -7951,7 +7951,7 @@ const handleQuickAdd = useCallback(async () => {
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
                           projectionPeriod === period 
                             ? 'bg-accent-primary text-white' 
-                            : theme === 'light' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-terminal-bg hover:bg-terminal-surface'
+                            : theme === 'light' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-neutral-900 hover:bg-neutral-800'
                         }`}
                       >
                         {period}
@@ -8045,8 +8045,8 @@ const handleQuickAdd = useCallback(async () => {
                     <ComposedChart data={projectionData.months}>
                       <defs>
                         <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#00d4aa" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#00d4aa" stopOpacity={0}/>
+                          <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#374151'} />
@@ -8058,9 +8058,9 @@ const handleQuickAdd = useCallback(async () => {
                         formatter={(value: number, name: string) => [formatCurrency(value), name]}
                       />
                       <Legend />
-                      <ReferenceLine yAxisId="left" y={0} stroke="#ef4444" strokeDasharray="3 3" />
-                      <Bar yAxisId="left" dataKey="netCash" name="Net Cash" fill={theme === 'light' ? '#22c55e' : '#22c55e'} radius={[4, 4, 0, 0]} />
-                      <Area yAxisId="right" type="monotone" dataKey="balance" name="Balance" stroke="#00d4aa" fill="url(#balanceGradient)" strokeWidth={2} />
+                      <ReferenceLine yAxisId="left" y={0} stroke="#fb7185" strokeDasharray="3 3" />
+                      <Bar yAxisId="left" dataKey="netCash" name="Net Cash" fill={theme === 'light' ? '#34d399' : '#34d399'} radius={[4, 4, 0, 0]} />
+                      <Area yAxisId="right" type="monotone" dataKey="balance" name="Balance" stroke="#f97316" fill="url(#balanceGradient)" strokeWidth={2} />
                     </ComposedChart>
                   </ResponsiveContainer>
                 ) : (
@@ -8092,7 +8092,7 @@ const handleQuickAdd = useCallback(async () => {
                       </thead>
                       <tbody>
                         {projectionData.months.map((m, idx) => (
-                          <tr key={m.month} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'} ${idx % 2 === 0 ? '' : theme === 'light' ? 'bg-gray-50/50' : 'bg-terminal-bg/50'}`}>
+                          <tr key={m.month} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-neutral-700/50'} ${idx % 2 === 0 ? '' : theme === 'light' ? 'bg-gray-50/50' : 'bg-neutral-900/50'}`}>
                             <td className="py-3 font-medium">{m.monthLabel}</td>
                             <td className="py-3 text-right font-mono text-accent-primary">{formatCurrency(m.revenue)}</td>
                             <td className="py-3 text-right font-mono text-accent-danger">{formatCurrency(m.opex)}</td>
@@ -8101,7 +8101,7 @@ const handleQuickAdd = useCallback(async () => {
                             <td className={`py-3 text-right font-mono font-medium ${m.netCash >= 0 ? 'text-accent-primary' : 'text-accent-danger'}`}>
                               {formatCurrency(m.netCash)}
                             </td>
-                            <td className={`py-3 text-right font-mono font-medium ${m.balance >= 0 ? 'text-[#00d4aa]' : 'text-accent-danger'}`}>
+                            <td className={`py-3 text-right font-mono font-medium ${m.balance >= 0 ? 'text-[#f97316]' : 'text-accent-danger'}`}>
                               {formatCurrency(m.balance)}
                             </td>
                           </tr>
@@ -8118,12 +8118,12 @@ const handleQuickAdd = useCallback(async () => {
 
               {/* Assumptions Applied Notice */}
               {activeAssumptions.length > 0 && (
-                <div className={`rounded-xl p-4 border ${theme === 'light' ? 'bg-[#1c2740] border-[#2a3a55]' : 'bg-[#00d4aa]/10 border-[#00d4aa]/30'}`}>
-                  <div className="flex items-center gap-2 text-[#00d4aa] font-medium">
+                <div className={`rounded-xl p-4 border ${theme === 'light' ? 'bg-[#262626] border-[#333333]' : 'bg-[#f97316]/10 border-[#f97316]/30'}`}>
+                  <div className="flex items-center gap-2 text-[#f97316] font-medium">
                     <Info className="w-4 h-4" />
                     {activeAssumptions.length} assumption{activeAssumptions.length > 1 ? 's' : ''} applied to this projection
                   </div>
-                  <p className={`text-sm mt-1 ${theme === 'light' ? 'text-[#00a47a]' : 'text-[#00d4aa]'}`}>
+                  <p className={`text-sm mt-1 ${theme === 'light' ? 'text-[#00a47a]' : 'text-[#f97316]'}`}>
                     Edit assumptions in the Assumptions tab to adjust the forecast.
                   </p>
                 </div>
@@ -8144,7 +8144,7 @@ const handleQuickAdd = useCallback(async () => {
                 <div className="flex gap-2">
                   <button
                     onClick={() => setShowProjectModal(true)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-100' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-100' : 'border-neutral-700 hover:bg-neutral-900'}`}
                   >
                     <FolderPlus className="w-4 h-4" />
                     Manage Projects
@@ -8186,7 +8186,7 @@ const handleQuickAdd = useCallback(async () => {
 
               {/* Clients Table */}
               <div className={`rounded-xl border overflow-hidden ${cardClasses}`}>
-                <div className={`flex items-center justify-between px-4 py-3 border-b ${theme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-terminal-bg border-terminal-border'}`}>
+                <div className={`flex items-center justify-between px-4 py-3 border-b ${theme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-neutral-900 border-neutral-700'}`}>
                   <h3 className="font-semibold">Clients</h3>
                   <div className="flex gap-1">
                     {['all', 'active', 'inactive', 'prospect'].map(status => (
@@ -8196,7 +8196,7 @@ const handleQuickAdd = useCallback(async () => {
                         className={`px-2 py-1 rounded text-xs font-medium transition-all ${
                           (status === 'all' && selectedClientId === 'all') || selectedClientId === status
                             ? 'bg-accent-primary text-white'
-                            : theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-terminal-surface hover:bg-terminal-border'
+                            : theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-neutral-800 hover:bg-neutral-700'
                         }`}
                       >
                         {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
@@ -8212,8 +8212,8 @@ const handleQuickAdd = useCallback(async () => {
                   </div>
                 ) : (
                   <table className="w-full text-sm">
-                    <thead className={theme === 'light' ? 'bg-gray-50' : 'bg-terminal-surface'}>
-                      <tr className={`border-b ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'} text-left ${textMuted}`}>
+                    <thead className={theme === 'light' ? 'bg-gray-50' : 'bg-neutral-800'}>
+                      <tr className={`border-b ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'} text-left ${textMuted}`}>
                         <th className="px-4 py-3 font-medium">Client</th>
                         <th className="px-4 py-3 font-medium text-right">Revenue</th>
                         <th className="px-4 py-3 font-medium text-right">Costs</th>
@@ -8226,12 +8226,12 @@ const handleQuickAdd = useCallback(async () => {
                       {clientAnalytics
                         .filter(c => selectedClientId === 'all' || c.status === selectedClientId)
                         .map(client => (
-                        <tr key={client.id} className={`border-b ${theme === 'light' ? 'border-gray-100 hover:bg-gray-50' : 'border-terminal-border/50 hover:bg-terminal-bg'}`}>
+                        <tr key={client.id} className={`border-b ${theme === 'light' ? 'border-gray-100 hover:bg-gray-50' : 'border-neutral-700/50 hover:bg-neutral-900'}`}>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                                client.status === 'active' ? 'bg-[#22c55e]/20 text-[#22c55e]' :
-                                client.status === 'prospect' ? 'bg-[#00d4aa]/20 text-[#00d4aa]' :
+                                client.status === 'active' ? 'bg-[#34d399]/20 text-[#34d399]' :
+                                client.status === 'prospect' ? 'bg-[#f97316]/20 text-[#f97316]' :
                                 'bg-gray-500/20 text-gray-400'
                               }`}>
                                 {client.name.charAt(0).toUpperCase()}
@@ -8253,7 +8253,7 @@ const handleQuickAdd = useCallback(async () => {
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap gap-1">
                               {client.projects.slice(0, 3).map(p => (
-                                <span key={p.id} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs ${theme === 'light' ? 'bg-gray-100' : 'bg-terminal-bg'}`}>
+                                <span key={p.id} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs ${theme === 'light' ? 'bg-gray-100' : 'bg-neutral-900'}`}>
                                   <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: p.color }} />
                                   {p.name}
                                 </span>
@@ -8293,7 +8293,7 @@ const handleQuickAdd = useCallback(async () => {
 
               {/* Assign Projects Section */}
               <div className={`rounded-xl border overflow-hidden ${cardClasses}`}>
-                <div className={`px-4 py-3 border-b ${theme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-terminal-bg border-terminal-border'}`}>
+                <div className={`px-4 py-3 border-b ${theme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-neutral-900 border-neutral-700'}`}>
                   <h3 className="font-semibold">Assign Projects to Clients</h3>
                   <p className={`text-xs mt-1 ${textMuted}`}>Link your projects to clients for consolidated reporting</p>
                 </div>
@@ -8301,7 +8301,7 @@ const handleQuickAdd = useCallback(async () => {
                 <div className="p-4">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className={`border-b ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'} text-left ${textMuted}`}>
+                      <tr className={`border-b ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'} text-left ${textMuted}`}>
                         <th className="pb-2 font-medium">Project</th>
                         <th className="pb-2 font-medium text-right">Revenue</th>
                         <th className="pb-2 font-medium text-right">Costs</th>
@@ -8323,7 +8323,7 @@ const handleQuickAdd = useCallback(async () => {
                           .reduce((sum, t) => sum + Math.abs(t.amount), 0)
                         
                         return (
-                          <tr key={projectName} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-terminal-border/50'}`}>
+                          <tr key={projectName} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-neutral-700/50'}`}>
                             <td className="py-2">
                               <div className="flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: projectColor }} />
@@ -8445,8 +8445,8 @@ const handleQuickAdd = useCallback(async () => {
                         style={{ colorScheme: theme }}
                       />
                       <button
-                        onClick={() => setBranding(prev => ({ ...prev, brandColor: '#00d4aa' }))}
-                        className={`px-3 py-2 text-sm rounded-lg border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                        onClick={() => setBranding(prev => ({ ...prev, brandColor: '#f97316' }))}
+                        className={`px-3 py-2 text-sm rounded-lg border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'}`}
                       >
                         Reset
                       </button>
@@ -8461,7 +8461,7 @@ const handleQuickAdd = useCallback(async () => {
                           <p className={`text-xs mb-2 ${textMuted}`}>Dark Mode</p>
                           {branding.companyLogo ? (
                             <div className="relative inline-block">
-                              <img src={branding.companyLogo} alt="Logo" className="w-16 h-16 rounded-lg object-contain border border-dashed bg-[#0c1222]" />
+                              <img src={branding.companyLogo} alt="Logo" className="w-16 h-16 rounded-lg object-contain border border-dashed bg-[#121212]" />
                               <button
                                 onClick={() => { setBranding(prev => ({ ...prev, companyLogo: null })); saveCompanySetting('company_logo', null) }}
                                 className="absolute -top-2 -right-2 w-5 h-5 bg-accent-danger text-white rounded-full flex items-center justify-center"
@@ -8470,7 +8470,7 @@ const handleQuickAdd = useCallback(async () => {
                               </button>
                             </div>
                           ) : (
-                            <div className={`w-16 h-16 rounded-lg border-2 border-dashed flex items-center justify-center bg-[#0c1222] ${theme === 'light' ? 'border-gray-300' : 'border-terminal-border'}`}>
+                            <div className={`w-16 h-16 rounded-lg border-2 border-dashed flex items-center justify-center bg-[#121212] ${theme === 'light' ? 'border-gray-300' : 'border-neutral-700'}`}>
                               <Image className={`w-6 h-6 ${textMuted}`} />
                             </div>
                           )}
@@ -8494,7 +8494,7 @@ const handleQuickAdd = useCallback(async () => {
                           />
                           <label
                             htmlFor="logo-upload-dark"
-                            className={`inline-flex items-center gap-2 px-3 py-1.5 mt-2 rounded-lg cursor-pointer border text-xs ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 mt-2 rounded-lg cursor-pointer border text-xs ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'}`}
                           >
                             <Upload className="w-3 h-3" />
                             Upload
@@ -8515,7 +8515,7 @@ const handleQuickAdd = useCallback(async () => {
                               </button>
                             </div>
                           ) : (
-                            <div className={`w-16 h-16 rounded-lg border-2 border-dashed flex items-center justify-center bg-white ${theme === 'light' ? 'border-gray-300' : 'border-terminal-border'}`}>
+                            <div className={`w-16 h-16 rounded-lg border-2 border-dashed flex items-center justify-center bg-white ${theme === 'light' ? 'border-gray-300' : 'border-neutral-700'}`}>
                               <Image className={`w-6 h-6 text-gray-400`} />
                             </div>
                           )}
@@ -8539,7 +8539,7 @@ const handleQuickAdd = useCallback(async () => {
                           />
                           <label
                             htmlFor="logo-upload-light"
-                            className={`inline-flex items-center gap-2 px-3 py-1.5 mt-2 rounded-lg cursor-pointer border text-xs ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 mt-2 rounded-lg cursor-pointer border text-xs ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'}`}
                           >
                             <Upload className="w-3 h-3" />
                             Upload
@@ -8579,7 +8579,7 @@ const handleQuickAdd = useCallback(async () => {
                       <button
                         onClick={() => syncQuickBooks('all')}
                         disabled={qboSyncing}
-                        className="flex items-center gap-2 px-4 py-2 bg-[#00d4aa] text-[#0c1222] rounded-lg font-medium hover:bg-[#00c49a] disabled:opacity-50"
+                        className="flex items-center gap-2 px-4 py-2 bg-[#f97316] text-[#121212] rounded-lg font-medium hover:bg-[#ea580c] disabled:opacity-50"
                       >
                         <RefreshCw className={`w-4 h-4 ${qboSyncing ? 'animate-spin' : ''}`} />
                         {qboSyncing ? 'Syncing...' : 'Sync All'}
@@ -8587,14 +8587,14 @@ const handleQuickAdd = useCallback(async () => {
                       <button
                         onClick={() => syncQuickBooks('transactions')}
                         disabled={qboSyncing}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'}`}
                       >
                         Bank Transactions Only
                       </button>
                       <button
                         onClick={() => syncQuickBooks('invoices')}
                         disabled={qboSyncing}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'}`}
                       >
                         Invoices Only
                       </button>
@@ -8615,7 +8615,7 @@ const handleQuickAdd = useCallback(async () => {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div className={`p-4 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                    <div className={`p-4 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900'}`}>
                       <p className={`text-sm ${textMuted} mb-3`}>
                         Connecting QuickBooks will allow you to:
                       </p>
@@ -8648,7 +8648,7 @@ const handleQuickAdd = useCallback(async () => {
                 
                 <div className="space-y-3 mb-4">
       {categories.map(cat => (
-  <div key={cat.id} className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+  <div key={cat.id} className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900'}`}>
     <div className="flex items-center gap-3">
       <input
         type="color"
@@ -8668,7 +8668,7 @@ const handleQuickAdd = useCallback(async () => {
         title="Click to change color"
       />
       <span className="font-medium">{cat.name}</span>
-      <span className={`text-xs px-2 py-0.5 rounded ${theme === 'light' ? 'bg-gray-200' : 'bg-terminal-surface'}`}>
+      <span className={`text-xs px-2 py-0.5 rounded ${theme === 'light' ? 'bg-gray-200' : 'bg-neutral-800'}`}>
         {cat.type}
       </span>
       {cat.isDefault && (
@@ -8684,7 +8684,7 @@ const handleQuickAdd = useCallback(async () => {
           }
           setCategories(prev => prev.filter(c => c.id !== cat.id))
         }}
-        className="p-1 text-zinc-400 hover:text-accent-danger"
+        className="p-1 text-neutral-400 hover:text-accent-danger"
       >
         <Trash2 className="w-4 h-4" />
       </button>
@@ -8693,7 +8693,7 @@ const handleQuickAdd = useCallback(async () => {
 ))}
                 </div>
                 
-                <div className={`p-4 rounded-lg border-2 border-dashed ${theme === 'light' ? 'border-gray-300' : 'border-terminal-border'}`}>
+                <div className={`p-4 rounded-lg border-2 border-dashed ${theme === 'light' ? 'border-gray-300' : 'border-neutral-700'}`}>
                   <h4 className={`text-sm font-medium mb-3 ${textMuted}`}>Add New Category</h4>
                   <div className="flex flex-wrap gap-3 items-end">
                     <div className="flex-1 min-w-[150px]">
@@ -8722,7 +8722,7 @@ const handleQuickAdd = useCallback(async () => {
                       <input
                         type="color"
                         id="new-category-color"
-                        defaultValue="#00d4aa"
+                        defaultValue="#f97316"
                         className="w-full h-10 rounded-lg cursor-pointer border-0"
                       />
                     </div>
@@ -8827,7 +8827,7 @@ const handleQuickAdd = useCallback(async () => {
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
                       theme === 'light' 
                         ? 'border-accent-primary bg-accent-primary/10 text-accent-primary' 
-                        : 'border-terminal-border text-zinc-400 hover:bg-terminal-bg'
+                        : 'border-neutral-700 text-neutral-400 hover:bg-neutral-900'
                     }`}
                   >
                     <Sun className="w-4 h-4" />
@@ -8843,12 +8843,12 @@ const handleQuickAdd = useCallback(async () => {
     Your Data
   </h3>
   
-  <div className={`p-4 rounded-lg mb-4 ${theme === 'light' ? 'bg-[#1c2740] border border-[#2a3a55]' : 'bg-accent-secondary/10 border border-accent-secondary/20'}`}>
+  <div className={`p-4 rounded-lg mb-4 ${theme === 'light' ? 'bg-[#262626] border border-[#333333]' : 'bg-accent-secondary/10 border border-accent-secondary/20'}`}>
     <div className="flex items-start gap-3">
       <Shield className="w-5 h-5 text-accent-secondary mt-0.5" />
       <div>
         <p className={`font-medium ${theme === 'light' ? 'text-[#00a47a]' : 'text-accent-secondary'}`}>Secure Cloud Storage</p>
-        <p className={`text-sm mt-1 ${theme === 'light' ? 'text-[#00d4aa]' : 'text-accent-secondary/80'}`}>
+        <p className={`text-sm mt-1 ${theme === 'light' ? 'text-[#f97316]' : 'text-accent-secondary/80'}`}>
           Your data is encrypted and stored securely on Supabase (AWS). Access from any device with your login.
           Team members with the same email domain share data automatically.
         </p>
@@ -8857,35 +8857,35 @@ const handleQuickAdd = useCallback(async () => {
   </div>
   
   <div className="space-y-3">
-    <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+    <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900'}`}>
       <div className="flex items-center gap-3">
         <Database className="w-5 h-5" />
         <div>
-          <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-zinc-200'}`}>Storage Location</p>
+          <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-neutral-200'}`}>Storage Location</p>
           <p className={`text-sm ${textMuted}`}>Supabase Cloud (AWS) • Encrypted</p>
         </div>
       </div>
     </div>
     
-    <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+    <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900'}`}>
       <div className="flex items-center gap-3">
         <Users className="w-5 h-5" />
         <div>
-          <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-zinc-200'}`}>Team Access</p>
+          <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-neutral-200'}`}>Team Access</p>
           <p className={`text-sm ${textMuted}`}>Role: {profile?.role || 'user'} • Company shared data</p>
         </div>
       </div>
     </div>
     
-    <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+    <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900'}`}>
       <div className="flex items-center gap-3">
         <Shield className="w-5 h-5" />
         <div>
-          <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-zinc-200'}`}>Data Ownership</p>
+          <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-neutral-200'}`}>Data Ownership</p>
           <p className={`text-sm ${textMuted}`}>You own 100% of your data. Export anytime.</p>
         </div>
       </div>
-      <button onClick={exportToCSV} className={`px-3 py-1.5 text-sm rounded-lg border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-100' : 'border-terminal-border hover:bg-terminal-bg'}`}>
+      <button onClick={exportToCSV} className={`px-3 py-1.5 text-sm rounded-lg border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-100' : 'border-neutral-700 hover:bg-neutral-900'}`}>
         Export
       </button>
     </div>
@@ -8905,31 +8905,31 @@ const handleQuickAdd = useCallback(async () => {
                   Security & Data (Coming Soon)
                 </h3>
                 <div className={`space-y-4 ${textMuted}`}>
-                  <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                  <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900'}`}>
                     <div className="flex items-center gap-3">
                       <Users className="w-5 h-5" />
                       <div>
-                        <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-zinc-200'}`}>User Authentication</p>
+                        <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-neutral-200'}`}>User Authentication</p>
                         <p className="text-sm">Secure login with SSO</p>
                       </div>
                     </div>
                     <span className="text-xs bg-accent-warning/10 text-accent-warning px-2 py-1 rounded">Planned</span>
                   </div>
-                  <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                  <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900'}`}>
                     <div className="flex items-center gap-3">
                       <Database className="w-5 h-5" />
                       <div>
-                        <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-zinc-200'}`}>Cloud Database</p>
+                        <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-neutral-200'}`}>Cloud Database</p>
                         <p className="text-sm">Encrypted data storage</p>
                       </div>
                     </div>
                     <span className="text-xs bg-accent-warning/10 text-accent-warning px-2 py-1 rounded">Planned</span>
                   </div>
-                  <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-terminal-bg'}`}>
+                  <div className={`flex items-center justify-between p-3 rounded-lg ${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900'}`}>
                     <div className="flex items-center gap-3">
                       <Lock className="w-5 h-5" />
                       <div>
-                        <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-zinc-200'}`}>Role-Based Access</p>
+                        <p className={`font-medium ${theme === 'light' ? 'text-gray-900' : 'text-neutral-200'}`}>Role-Based Access</p>
                         <p className="text-sm">Admin, Editor, Viewer roles</p>
                       </div>
                     </div>
@@ -8947,14 +8947,14 @@ const handleQuickAdd = useCallback(async () => {
                 <div className="flex flex-wrap gap-3">
                   <button
                     onClick={() => setShowPrivacyModal(true)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'}`}
                   >
                     <Shield className="w-4 h-4" />
                     Privacy Policy
                   </button>
                   <button
                     onClick={() => setShowTermsModal(true)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-terminal-border hover:bg-terminal-bg'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'}`}
                   >
                     <FileText className="w-4 h-4" />
                     Terms of Service
@@ -8968,7 +8968,7 @@ const handleQuickAdd = useCallback(async () => {
           </main>
 
           {/* Footer */}
-          <footer className={`border-t py-4 print:hidden ${theme === 'light' ? 'border-gray-200' : 'border-terminal-border'}`}>
+          <footer className={`border-t py-4 print:hidden ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'}`}>
             <div className={`px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs ${textMuted}`}>
               <span>{branding.companyName} • Data secured in cloud</span>
               <div className="flex items-center gap-4">
@@ -9002,16 +9002,16 @@ const handleQuickAdd = useCallback(async () => {
               className={`fixed top-0 right-0 h-full w-full sm:w-[420px] z-50 flex flex-col shadow-2xl ${
                 theme === 'light' 
                   ? 'bg-white border-l border-gray-200' 
-                  : 'bg-[#0c1222] border-l border-[#2a3a55]'
+                  : 'bg-[#121212] border-l border-[#333333]'
               }`}
             >
               {/* Panel Header */}
               <div className={`px-5 py-4 border-b ${
-                theme === 'light' ? 'border-gray-200' : 'border-[#2a3a55]'
+                theme === 'light' ? 'border-gray-200' : 'border-[#333333]'
               }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00d4aa] to-[#22c55e] flex items-center justify-center shadow-lg">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#f97316] to-[#34d399] flex items-center justify-center shadow-lg">
                       <Sparkles className="w-5 h-5 text-white" />
                     </div>
                     <div>
@@ -9023,7 +9023,7 @@ const handleQuickAdd = useCallback(async () => {
                     <button
                       onClick={() => setChatMessages([])}
                       className={`p-2 rounded-lg text-sm ${
-                        theme === 'light' ? 'hover:bg-gray-100 text-gray-500' : 'hover:bg-[#1c2740] text-[#94a3b8]'
+                        theme === 'light' ? 'hover:bg-gray-100 text-gray-500' : 'hover:bg-[#262626] text-[#94a3b8]'
                       }`}
                       title="Clear chat"
                     >
@@ -9032,7 +9032,7 @@ const handleQuickAdd = useCallback(async () => {
                     <button 
                       onClick={() => setChatOpen(false)}
                       className={`p-2 rounded-lg ${
-                        theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-[#1c2740]'
+                        theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-[#262626]'
                       }`}
                     >
                       <X className="w-5 h-5" />
@@ -9043,13 +9043,13 @@ const handleQuickAdd = useCallback(async () => {
               
               {/* Chat Messages Area */}
               <div className={`flex-1 overflow-y-auto p-5 space-y-4 ${
-                theme === 'light' ? 'bg-gray-50' : 'bg-[#0c1222]'
+                theme === 'light' ? 'bg-gray-50' : 'bg-[#121212]'
               }`}>
                 {chatMessages.length === 0 ? (
                   <div className="h-full flex flex-col">
                     {/* Welcome Message */}
                     <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#00d4aa] to-[#22c55e] flex items-center justify-center mb-4 shadow-lg">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#f97316] to-[#34d399] flex items-center justify-center mb-4 shadow-lg">
                         <Sparkles className="w-8 h-8 text-white" />
                       </div>
                       <h4 className="text-lg font-semibold mb-2">Hi! I'm Vantage AI</h4>
@@ -9075,8 +9075,8 @@ const handleQuickAdd = useCallback(async () => {
                             }}
                             className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${
                               theme === 'light' 
-                                ? 'bg-white hover:bg-gray-100 border border-gray-200 hover:border-[#00d4aa]/50' 
-                                : 'bg-[#141c2e] hover:bg-[#1c2740] border border-[#2a3a55] hover:border-[#00d4aa]/50'
+                                ? 'bg-white hover:bg-gray-100 border border-gray-200 hover:border-[#f97316]/50' 
+                                : 'bg-[#1e1e1e] hover:bg-[#262626] border border-[#333333] hover:border-[#f97316]/50'
                             }`}
                           >
                             <span className="mr-2">{suggestion.icon}</span>
@@ -9100,7 +9100,7 @@ const handleQuickAdd = useCallback(async () => {
                             className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${
                               theme === 'light' 
                                 ? 'bg-white hover:bg-gray-100 border border-gray-200 hover:border-blue-500/50' 
-                                : 'bg-[#141c2e] hover:bg-[#1c2740] border border-[#2a3a55] hover:border-blue-500/50'
+                                : 'bg-[#1e1e1e] hover:bg-[#262626] border border-[#333333] hover:border-blue-500/50'
                             }`}
                           >
                             <span className="mr-2">{suggestion.icon}</span>
@@ -9117,11 +9117,11 @@ const handleQuickAdd = useCallback(async () => {
                         {/* Avatar */}
                         <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
                           msg.role === 'user'
-                            ? 'bg-[#00d4aa]'
-                            : 'bg-gradient-to-br from-[#00d4aa] to-[#22c55e]'
+                            ? 'bg-[#f97316]'
+                            : 'bg-gradient-to-br from-[#f97316] to-[#34d399]'
                         }`}>
                           {msg.role === 'user' 
-                            ? <User className="w-4 h-4 text-[#0c1222]" />
+                            ? <User className="w-4 h-4 text-[#121212]" />
                             : <Sparkles className="w-4 h-4 text-white" />
                           }
                         </div>
@@ -9130,23 +9130,23 @@ const handleQuickAdd = useCallback(async () => {
                         <div className={`max-w-[85%] ${msg.role === 'user' ? 'text-right' : ''}`}>
                           <div className={`inline-block rounded-2xl px-4 py-3 text-sm ${
                             msg.role === 'user'
-                              ? 'bg-[#00d4aa] text-[#0c1222] rounded-tr-md'
+                              ? 'bg-[#f97316] text-[#121212] rounded-tr-md'
                               : theme === 'light' 
                                 ? 'bg-white text-gray-800 border border-gray-200 rounded-tl-md' 
-                                : 'bg-[#141c2e] text-[#f1f5f9] border border-[#2a3a55] rounded-tl-md'
+                                : 'bg-[#1e1e1e] text-[#f1f5f9] border border-[#333333] rounded-tl-md'
                           }`}>
                             <p className="whitespace-pre-wrap leading-relaxed text-left">{msg.content}</p>
                             
                             {/* Action Preview */}
                             {msg.action && msg.action.updates && msg.action.updates.length > 0 && (
-                              <div className="mt-3 pt-3 border-t border-[#2a3a55]">
-                                <p className="text-xs font-semibold mb-2 text-[#00d4aa]">
+                              <div className="mt-3 pt-3 border-t border-[#333333]">
+                                <p className="text-xs font-semibold mb-2 text-[#f97316]">
                                   📋 {msg.action.summary}
                                 </p>
                                 <div className="max-h-48 overflow-y-auto">
                                   <table className="w-full text-xs">
                                     <thead>
-                                      <tr className="border-b border-[#2a3a55]">
+                                      <tr className="border-b border-[#333333]">
                                         <th className="py-1 text-left">Description</th>
                                         <th className="py-1 text-right">Amount</th>
                                         <th className="py-1 text-left">Change</th>
@@ -9154,7 +9154,7 @@ const handleQuickAdd = useCallback(async () => {
                                     </thead>
                                     <tbody>
                                       {msg.action.updates.slice(0, 10).map((update, i) => (
-                                        <tr key={i} className="border-b border-[#2a3a55]/30">
+                                        <tr key={i} className="border-b border-[#333333]/30">
                                           <td className="py-1.5 truncate max-w-[120px]" title={update.preview.description}>
                                             {update.preview.description.slice(0, 25)}{update.preview.description.length > 25 ? '...' : ''}
                                           </td>
@@ -9163,7 +9163,7 @@ const handleQuickAdd = useCallback(async () => {
                                           </td>
                                           <td className="py-1.5">
                                             {update.preview.newCategory && (
-                                              <span className="inline-block px-1.5 py-0.5 rounded bg-[#00d4aa]/20 text-[#00d4aa] mr-1">
+                                              <span className="inline-block px-1.5 py-0.5 rounded bg-[#f97316]/20 text-[#f97316] mr-1">
                                                 → {update.preview.newCategory}
                                               </span>
                                             )}
@@ -9189,7 +9189,7 @@ const handleQuickAdd = useCallback(async () => {
                                   <div className="flex gap-2 mt-3">
                                     <button
                                       onClick={executeChatAction}
-                                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-[#00d4aa] text-[#0c1222] rounded-lg text-xs font-semibold hover:bg-[#00c49a] transition-colors"
+                                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-[#f97316] text-[#121212] rounded-lg text-xs font-semibold hover:bg-[#ea580c] transition-colors"
                                     >
                                       <Check className="w-3.5 h-3.5" />
                                       Apply {msg.action.updates.length} Changes
@@ -9216,16 +9216,16 @@ const handleQuickAdd = useCallback(async () => {
                     {/* Loading Indicator */}
                     {chatLoading && (
                       <div className="flex gap-3">
-                        <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-[#00d4aa] to-[#22c55e] flex items-center justify-center">
+                        <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-[#f97316] to-[#34d399] flex items-center justify-center">
                           <Sparkles className="w-4 h-4 text-white" />
                         </div>
                         <div className={`rounded-2xl rounded-tl-md px-4 py-3 ${
-                          theme === 'light' ? 'bg-white border border-gray-200' : 'bg-[#141c2e] border border-[#2a3a55]'
+                          theme === 'light' ? 'bg-white border border-gray-200' : 'bg-[#1e1e1e] border border-[#333333]'
                         }`}>
                           <div className="flex items-center gap-1.5">
-                            <div className="w-2 h-2 bg-[#00d4aa] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                            <div className="w-2 h-2 bg-[#00d4aa] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                            <div className="w-2 h-2 bg-[#00d4aa] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                            <div className="w-2 h-2 bg-[#f97316] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <div className="w-2 h-2 bg-[#f97316] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <div className="w-2 h-2 bg-[#f97316] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                           </div>
                         </div>
                       </div>
@@ -9238,10 +9238,10 @@ const handleQuickAdd = useCallback(async () => {
               
               {/* Input Area */}
               <div className={`p-4 border-t ${
-                theme === 'light' ? 'border-gray-200 bg-white' : 'border-[#2a3a55] bg-[#141c2e]'
+                theme === 'light' ? 'border-gray-200 bg-white' : 'border-[#333333] bg-[#1e1e1e]'
               }`}>
                 <div className={`flex items-end gap-3 rounded-xl p-2 ${
-                  theme === 'light' ? 'bg-gray-100' : 'bg-[#0c1222]'
+                  theme === 'light' ? 'bg-gray-100' : 'bg-[#121212]'
                 }`}>
                   <textarea
                     value={chatInput}
@@ -9262,7 +9262,7 @@ const handleQuickAdd = useCallback(async () => {
                   <button
                     onClick={sendChatMessage}
                     disabled={!chatInput.trim() || chatLoading}
-                    className="p-2.5 bg-[#00d4aa] text-[#0c1222] rounded-lg hover:bg-[#00c49a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="p-2.5 bg-[#f97316] text-[#121212] rounded-lg hover:bg-[#ea580c] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <Send className="w-4 h-4" />
                   </button>
@@ -9283,8 +9283,8 @@ const handleQuickAdd = useCallback(async () => {
         onClick={() => setChatOpen(!chatOpen)}
         className={`fixed bottom-6 right-6 z-40 print:hidden w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all ${
           chatOpen 
-            ? 'bg-[#2a3a55] text-white scale-0 opacity-0' 
-            : 'bg-gradient-to-br from-[#00d4aa] to-[#22c55e] text-white hover:shadow-xl hover:shadow-[#00d4aa]/20 scale-100 opacity-100'
+            ? 'bg-[#333333] text-white scale-0 opacity-0' 
+            : 'bg-gradient-to-br from-[#f97316] to-[#34d399] text-white hover:shadow-xl hover:shadow-[#f97316]/20 scale-100 opacity-100'
         }`}
       >
         <MessageSquare className="w-6 h-6" />
@@ -9294,9 +9294,9 @@ const handleQuickAdd = useCallback(async () => {
       <style jsx global>{`
         @media print {
           body { background: white !important; color: black !important; }
-          .bg-terminal-bg, .bg-terminal-surface { background: white !important; }
-          .text-zinc-100, .text-zinc-200, .text-zinc-300, .text-zinc-400 { color: black !important; }
-          .border-terminal-border { border-color: #e5e5e5 !important; }
+          .bg-neutral-900, .bg-neutral-800 { background: white !important; }
+          .text-neutral-100, .text-neutral-200, .text-neutral-300, .text-neutral-400 { color: black !important; }
+          .border-neutral-700 { border-color: #e5e5e5 !important; }
         }
       `}</style>
     </div>
