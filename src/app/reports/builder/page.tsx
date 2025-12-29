@@ -304,9 +304,20 @@ export default function ReportBuilder() {
   // Calculate metric value
   const calculateMetric = useCallback((metric: string, config: CanvasComponent['config']) => {
     const data = config.dataSource === 'accrual' ? accrualTransactions : transactions
-    const year = new Date().getFullYear()
     
+    // Filter by date range AND project
     const filtered = data.filter(t => {
+      // Date range filter
+      if (config.dateRange?.start && config.dateRange?.end) {
+        const txDate = t.date?.substring(0, 7) // Get YYYY-MM
+        if (txDate) {
+          if (txDate < config.dateRange.start || txDate > config.dateRange.end) {
+            return false
+          }
+        }
+      }
+      
+      // Project filter
       if (config.projectFilter && config.projectFilter !== 'all') {
         if (t.project !== config.projectFilter) return false
       }
@@ -925,6 +936,60 @@ export default function ReportBuilder() {
                     <option value="cash">Cash Transactions</option>
                     <option value="accrual">Accrual (Invoices)</option>
                   </select>
+                </div>
+
+                {/* Date Range */}
+                <div>
+                  <label className={`text-xs font-medium ${textMuted} block mb-1.5`}>Date Range</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className={`text-xs ${textMuted}`}>Start</label>
+                      <input
+                        type="month"
+                        value={selectedComponentData.config.dateRange?.start || ''}
+                        onChange={(e) => updateComponentConfig(selectedComponentData.id, { 
+                          dateRange: { 
+                            ...selectedComponentData.config.dateRange, 
+                            start: e.target.value 
+                          } 
+                        })}
+                        className={`w-full px-2 py-1.5 rounded-lg border text-sm ${surfaceColor} ${borderColor}`}
+                      />
+                    </div>
+                    <div>
+                      <label className={`text-xs ${textMuted}`}>End</label>
+                      <input
+                        type="month"
+                        value={selectedComponentData.config.dateRange?.end || ''}
+                        onChange={(e) => updateComponentConfig(selectedComponentData.id, { 
+                          dateRange: { 
+                            ...selectedComponentData.config.dateRange, 
+                            end: e.target.value 
+                          } 
+                        })}
+                        className={`w-full px-2 py-1.5 rounded-lg border text-sm ${surfaceColor} ${borderColor}`}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {[
+                      { label: 'Q1', start: `${new Date().getFullYear()}-01`, end: `${new Date().getFullYear()}-03` },
+                      { label: 'Q2', start: `${new Date().getFullYear()}-04`, end: `${new Date().getFullYear()}-06` },
+                      { label: 'Q3', start: `${new Date().getFullYear()}-07`, end: `${new Date().getFullYear()}-09` },
+                      { label: 'Q4', start: `${new Date().getFullYear()}-10`, end: `${new Date().getFullYear()}-12` },
+                      { label: 'YTD', start: `${new Date().getFullYear()}-01`, end: `${new Date().getFullYear()}-12` },
+                    ].map(preset => (
+                      <button
+                        key={preset.label}
+                        onClick={() => updateComponentConfig(selectedComponentData.id, { dateRange: { start: preset.start, end: preset.end } })}
+                        className={`px-2 py-1 text-xs rounded ${
+                          theme === 'light' ? 'bg-slate-100 hover:bg-slate-200' : 'bg-neutral-800 hover:bg-neutral-700'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Project Filter */}
