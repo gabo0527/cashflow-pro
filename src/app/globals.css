@@ -2,18 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Modern Enterprise Fintech Palette - Ramp/Brex Style */
+/* Modern Minimalist Design System */
+/* Updated: Orange accent, Light theme default */
+/* Compatible with existing Vantage dashboard */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
 :root {
-  /* Core Backgrounds - Deep Navy */
-  --color-bg: #0c1222;
-  --color-surface: #141c2e;
-  --color-elevated: #1c2740;
-  --color-border: #2a3a55;
+  /* Core Backgrounds - Light Theme (NEW DEFAULT) */
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-elevated: #ffffff;
+  --color-border: #e2e8f0;
   
-  /* Primary Accent - Electric Green */
-  --color-primary: #00d4aa;
-  --color-primary-hover: #00c49a;
-  --color-primary-muted: #00d4aa20;
+  /* Primary Accent - Orange (CHANGED from teal) */
+  --color-primary: #f97316;
+  --color-primary-hover: #ea580c;
+  --color-primary-muted: rgba(249, 115, 22, 0.15);
   
   /* Semantic Colors */
   --color-success: #22c55e;
@@ -21,92 +26,114 @@
   --color-warning: #f59e0b;
   --color-info: #3b82f6;
   
-  /* Text Colors */
-  --color-text-primary: #f1f5f9;
-  --color-text-secondary: #94a3b8;
+  /* Text Colors - Light Theme */
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94a3b8;
+  
+  /* Legacy variable mappings for compatibility */
+  --terminal-bg: 248 250 252;
+  --terminal-surface: 255 255 255;
+  --terminal-border: 226 232 240;
+  
+  /* Chart Colors - Updated Palette */
+  --chart-revenue: #22c55e;
+  --chart-expenses: #f97316;
+  --chart-profit: #14b8a6;
+  --chart-budget: #94a3b8;
+}
+
+/* Dark Mode Variables */
+.dark, 
+body:not(.light-mode) {
+  --color-bg: #0f172a;
+  --color-surface: #1e293b;
+  --color-elevated: #334155;
+  --color-border: #334155;
+  
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #cbd5e1;
   --color-text-muted: #64748b;
   
-  /* Light Mode */
-  --color-bg-light: #f8fafc;
-  --color-surface-light: #ffffff;
-  --color-border-light: #e2e8f0;
+  --terminal-bg: 15 23 42;
+  --terminal-surface: 30 41 59;
+  --terminal-border: 51 65 85;
 }
 
 @layer base {
-  :root {
-    --accent-primary: 0 212 170;
-    --accent-secondary: 148 163 184;
-    --accent-success: 34 197 94;
-    --accent-danger: 239 68 68;
-    --accent-warning: 245 158 11;
-    
-    --terminal-bg: 12 18 34;
-    --terminal-surface: 20 28 46;
-    --terminal-border: 42 58 85;
+  html {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Light mode as default */
+  body {
+    @apply bg-slate-50 text-slate-900;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  
+  /* Dark mode when toggled */
+  body:not(.light-mode),
+  .dark body {
+    @apply bg-[#0f172a] text-slate-100;
+  }
+  
+  /* Light mode explicit */
+  body.light-mode {
+    @apply bg-slate-50 text-slate-900;
   }
 }
 
-/* Dark mode default */
-body {
-  @apply bg-[#0c1222] text-[#f1f5f9];
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-}
+/* Override legacy color classes for orange accent */
+.bg-\[\#00d4aa\] { @apply bg-orange-500 !important; }
+.text-\[\#00d4aa\] { @apply text-orange-500 !important; }
+.border-\[\#00d4aa\] { @apply border-orange-500 !important; }
+.from-\[\#00d4aa\] { @apply from-orange-500 !important; }
+.to-\[\#00d4aa\] { @apply to-orange-500 !important; }
+.ring-\[\#00d4aa\] { @apply ring-orange-500 !important; }
 
-/* Light mode */
-body.light-mode,
-.light-mode {
-  @apply bg-[#f8fafc] text-[#0f172a];
-}
+.hover\:bg-\[\#00c49a\]:hover { @apply bg-orange-600 !important; }
+.hover\:border-\[\#00d4aa\]:hover { @apply border-orange-500 !important; }
 
-/* Light mode text overrides */
-.light-mode .text-zinc-400,
-.light-mode .text-gray-400 {
-  @apply text-slate-500;
-}
-
-.light-mode .text-zinc-500,
-.light-mode .text-gray-500 {
-  @apply text-slate-600;
-}
-
-/* Scrollbar - Dark */
+/* Scrollbar - Adapts to theme */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-[#141c2e];
+  @apply bg-transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-[#2a3a55] rounded-full;
+  @apply bg-slate-300 rounded-full;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-[#3a4a65];
-}
-
-/* Light mode scrollbar */
-.light-mode ::-webkit-scrollbar-track {
-  @apply bg-slate-100;
-}
-
-.light-mode ::-webkit-scrollbar-thumb {
-  @apply bg-slate-300;
-}
-
-.light-mode ::-webkit-scrollbar-thumb:hover {
   @apply bg-slate-400;
 }
 
-/* Focus states */
-*:focus-visible {
-  @apply outline-none ring-2 ring-[#00d4aa] ring-offset-2 ring-offset-[#0c1222];
+/* Dark mode scrollbar */
+body:not(.light-mode) ::-webkit-scrollbar-thumb {
+  @apply bg-slate-600;
 }
 
-.light-mode *:focus-visible {
+body:not(.light-mode) ::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-500;
+}
+
+/* Focus states - Orange */
+*:focus-visible {
+  @apply outline-none ring-2 ring-orange-500 ring-offset-2;
+}
+
+body.light-mode *:focus-visible {
   @apply ring-offset-white;
+}
+
+body:not(.light-mode) *:focus-visible {
+  @apply ring-offset-slate-900;
 }
 
 /* Number/Currency styling */
@@ -120,81 +147,224 @@ body.light-mode,
   @apply transition-colors duration-150;
 }
 
-/* Button styles */
+/* ====================== */
+/* Button Styles - Updated */
+/* ====================== */
+
 .btn-primary {
-  @apply px-4 py-2 bg-[#00d4aa] text-[#0c1222] rounded-lg font-medium 
-         hover:bg-[#00c49a] active:bg-[#00b48a] 
-         transition-all duration-150 ease-in-out;
+  @apply px-4 py-2.5 bg-orange-500 text-white rounded-xl font-semibold
+         hover:bg-orange-600 active:bg-orange-700 
+         transition-all duration-200 shadow-sm;
 }
 
 .btn-secondary {
-  @apply px-4 py-2 bg-[#1c2740] text-[#f1f5f9] rounded-lg font-medium
-         hover:bg-[#2a3a55] border border-[#2a3a55];
+  @apply px-4 py-2.5 rounded-xl font-medium border transition-all;
 }
 
-.light-mode .btn-secondary {
-  @apply bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200;
+body.light-mode .btn-secondary {
+  @apply bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300;
 }
 
-/* Status badges */
+body:not(.light-mode) .btn-secondary {
+  @apply bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700;
+}
+
+/* ====================== */
+/* Status Badges - Updated */
+/* ====================== */
+
 .badge-success {
+  @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+}
+
+body.light-mode .badge-success {
+  @apply bg-emerald-50 text-emerald-700;
+}
+
+body:not(.light-mode) .badge-success {
   @apply bg-emerald-500/15 text-emerald-400;
 }
 
 .badge-danger {
+  @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+}
+
+body.light-mode .badge-danger {
+  @apply bg-red-50 text-red-700;
+}
+
+body:not(.light-mode) .badge-danger {
   @apply bg-red-500/15 text-red-400;
 }
 
 .badge-warning {
+  @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+}
+
+body.light-mode .badge-warning {
+  @apply bg-amber-50 text-amber-700;
+}
+
+body:not(.light-mode) .badge-warning {
   @apply bg-amber-500/15 text-amber-400;
 }
 
 .badge-info {
+  @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+}
+
+body.light-mode .badge-info {
+  @apply bg-blue-50 text-blue-700;
+}
+
+body:not(.light-mode) .badge-info {
   @apply bg-blue-500/15 text-blue-400;
 }
 
-.light-mode .badge-success {
-  @apply bg-emerald-100 text-emerald-700;
-}
+/* ====================== */
+/* Sidebar - Updated */
+/* ====================== */
 
-.light-mode .badge-danger {
-  @apply bg-red-100 text-red-700;
-}
-
-.light-mode .badge-warning {
-  @apply bg-amber-100 text-amber-700;
-}
-
-.light-mode .badge-info {
-  @apply bg-blue-100 text-blue-700;
-}
-
-/* Sidebar active state */
 .sidebar-item.active {
-  @apply bg-[#00d4aa]/15 text-[#00d4aa];
+  @apply font-medium;
 }
 
-.light-mode .sidebar-item.active {
-  @apply bg-emerald-100 text-emerald-700;
+body.light-mode .sidebar-item.active {
+  @apply bg-orange-50 text-orange-600;
 }
 
-/* Card hover effects */
+body:not(.light-mode) .sidebar-item.active {
+  @apply bg-orange-500/15 text-orange-400;
+}
+
+/* ====================== */
+/* Card Styles */
+/* ====================== */
+
 .card-hover {
-  @apply transition-all duration-200 hover:border-[#00d4aa]/30;
+  @apply transition-all duration-200;
 }
 
-/* Gradient accents */
+body.light-mode .card-hover:hover {
+  @apply border-orange-200 shadow-md;
+}
+
+body:not(.light-mode) .card-hover:hover {
+  @apply border-orange-500/30;
+}
+
+/* ====================== */
+/* Gradient Accent - Updated */
+/* ====================== */
+
 .gradient-primary {
-  @apply bg-gradient-to-r from-[#00d4aa] to-[#22c55e];
+  @apply bg-gradient-to-r from-orange-500 to-amber-500;
 }
 
-/* Print styles */
+/* ====================== */
+/* Legacy Terminal Colors - Mapped to new theme */
+/* ====================== */
+
+body.light-mode .bg-terminal-bg { @apply bg-slate-50; }
+body.light-mode .bg-terminal-surface { @apply bg-white; }
+body.light-mode .border-terminal-border { @apply border-slate-200; }
+body.light-mode .text-terminal-text { @apply text-slate-900; }
+
+body:not(.light-mode) .bg-terminal-bg { @apply bg-[#0f172a]; }
+body:not(.light-mode) .bg-terminal-surface { @apply bg-[#1e293b]; }
+body:not(.light-mode) .border-terminal-border { @apply border-[#334155]; }
+body:not(.light-mode) .text-terminal-text { @apply text-slate-100; }
+
+/* ====================== */
+/* Input Styles */
+/* ====================== */
+
+.input {
+  @apply w-full px-4 py-2.5 rounded-xl border text-sm transition-all;
+}
+
+body.light-mode .input {
+  @apply bg-white border-slate-200 text-slate-900 placeholder:text-slate-400
+         focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20;
+}
+
+body:not(.light-mode) .input {
+  @apply bg-slate-800 border-slate-700 text-white placeholder:text-slate-500
+         focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20;
+}
+
+/* ====================== */
+/* Table Styles */
+/* ====================== */
+
+.table-header {
+  @apply text-xs font-semibold uppercase tracking-wider;
+}
+
+body.light-mode .table-header {
+  @apply text-slate-400 bg-slate-50;
+}
+
+body:not(.light-mode) .table-header {
+  @apply text-slate-500 bg-slate-800;
+}
+
+.table-row {
+  @apply border-b transition-colors;
+}
+
+body.light-mode .table-row {
+  @apply border-slate-100 hover:bg-slate-50/50;
+}
+
+body:not(.light-mode) .table-row {
+  @apply border-slate-700 hover:bg-slate-800/50;
+}
+
+/* ====================== */
+/* Modal Styles */
+/* ====================== */
+
+.modal-overlay {
+  @apply fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4;
+}
+
+.modal {
+  @apply rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden;
+}
+
+body.light-mode .modal {
+  @apply bg-white;
+}
+
+body:not(.light-mode) .modal {
+  @apply bg-slate-900 border border-slate-800;
+}
+
+/* ====================== */
+/* Print Styles */
+/* ====================== */
+
 @media print {
   body {
-    @apply bg-white text-black;
+    @apply bg-white text-black !important;
   }
   
   .no-print {
     display: none !important;
+  }
+  
+  .card {
+    @apply shadow-none border-slate-200;
+  }
+}
+
+/* ====================== */
+/* Responsive */
+/* ====================== */
+
+@media (max-width: 640px) {
+  .card {
+    @apply rounded-xl p-4;
   }
 }
