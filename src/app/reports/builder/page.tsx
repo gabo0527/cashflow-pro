@@ -124,7 +124,7 @@ export default function ReportBuilder() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const user = await getCurrentUser()
+        const { user } = await getCurrentUser()
         if (!user) {
           router.push('/login')
           return
