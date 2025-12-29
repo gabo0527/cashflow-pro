@@ -119,6 +119,10 @@ export default function ReportBuilder() {
   const [showComponentPalette, setShowComponentPalette] = useState(true)
   const [showProperties, setShowProperties] = useState(true)
   const [zoom, setZoom] = useState(100)
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [companyId, setCompanyId] = useState<string | null>(null)
 
   // Load data on mount
   useEffect(() => {
@@ -155,6 +159,9 @@ export default function ReportBuilder() {
         if (projectResult?.data) setProjects(projectResult.data)
         if (clientResult?.data) setClients(clientResult.data)
         
+        // Store company_id for saving reports
+        setCompanyId(profile.company_id)
+        
         // Load theme preference
         const savedTheme = localStorage.getItem('vantage_theme')
         if (savedTheme) setTheme(savedTheme as 'light' | 'dark')
@@ -167,9 +174,19 @@ export default function ReportBuilder() {
   }, [router])
 
   // Add component to canvas
-  const addComponent = useCallback((type: string) => {
+  const addComponent = useCallback((type: string, customConfig?: Partial<CanvasComponent['config']>) => {
     const palette = COMPONENT_PALETTE.find(p => p.type === type)
     if (!palette) return
+
+    // Better default titles based on type
+    const defaultTitles: Record<string, string> = {
+      'kpi': 'Revenue',
+      'bar-chart': 'Revenue vs Expenses',
+      'line-chart': 'Revenue Trend',
+      'pie-chart': 'Expense Breakdown',
+      'table': 'Monthly Summary',
+      'text': 'Notes'
+    }
 
     const newComponent: CanvasComponent = {
       id: generateId(),
@@ -179,13 +196,13 @@ export default function ReportBuilder() {
       width: palette.defaultSize.width,
       height: palette.defaultSize.height,
       config: {
-        title: `${palette.label}`,
-        metric: 'revenue',
-        dateRange: { start: `${new Date().getFullYear()}-01`, end: `${new Date().getFullYear()}-12` },
-        projectFilter: 'all',
-        clientFilter: 'all',
+        title: customConfig?.title || defaultTitles[type] || palette.label,
+        metric: customConfig?.metric || 'revenue',
+        dateRange: customConfig?.dateRange || { start: `${new Date().getFullYear()}-01`, end: `${new Date().getFullYear()}-12` },
+        projectFilter: customConfig?.projectFilter || 'all',
+        clientFilter: customConfig?.clientFilter || 'all',
         comparison: 'none',
-        dataSource: 'cash',
+        dataSource: customConfig?.dataSource || 'cash',
         showLegend: true,
         chartColors: ['#34d399', '#fb7185', '#fbbf24', '#60a5fa']
       }
@@ -194,6 +211,23 @@ export default function ReportBuilder() {
     setComponents(prev => [...prev, newComponent])
     setSelectedComponent(newComponent.id)
   }, [components.length])
+
+  // Add quarter-specific component
+  const addQuarterComponent = useCallback((quarter: number) => {
+    const year = new Date().getFullYear()
+    const quarterRanges: Record<number, { start: string; end: string }> = {
+      1: { start: `${year}-01`, end: `${year}-03` },
+      2: { start: `${year}-04`, end: `${year}-06` },
+      3: { start: `${year}-07`, end: `${year}-09` },
+      4: { start: `${year}-10`, end: `${year}-12` }
+    }
+
+    addComponent('kpi', {
+      title: `Q${quarter} ${year} Revenue`,
+      metric: 'revenue',
+      dateRange: quarterRanges[quarter]
+    })
+  }, [addComponent])
 
   // Delete component
   const deleteComponent = useCallback((id: string) => {
@@ -330,6 +364,88 @@ export default function ReportBuilder() {
       }))
   }, [transactions, accrualTransactions])
 
+  // Save report to database
+  const saveReport = useCallback(async () => {
+    if (!companyId) {
+      alert('Error: No company found. Please refresh and try again.')
+      return
+    }
+
+    if (components.length === 0) {
+      alert('Please add at least one component to your report before saving.')
+      return
+    }
+
+    setSaveStatus('saving')
+    
+    try {
+      const reportData = {
+        company_id: companyId,
+        name: reportName,
+        type: 'custom',
+        canvas_config: {
+          components,
+          zoom,
+          theme
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+
+      // For now, save to localStorage (Supabase table can be added later)
+      const savedReports = JSON.parse(localStorage.getItem('vantage_saved_reports') || '[]')
+      const existingIndex = savedReports.findIndex((r: any) => r.name === reportName)
+      
+      if (existingIndex >= 0) {
+        savedReports[existingIndex] = reportData
+      } else {
+        savedReports.push(reportData)
+      }
+      
+      localStorage.setItem('vantage_saved_reports', JSON.stringify(savedReports))
+      
+      setSaveStatus('saved')
+      setShowSaveModal(true)
+      
+      // Reset status after 3 seconds
+      setTimeout(() => setSaveStatus('idle'), 3000)
+    } catch (error) {
+      console.error('Error saving report:', error)
+      setSaveStatus('error')
+      alert('Error saving report. Please try again.')
+    }
+  }, [companyId, reportName, components, zoom, theme])
+
+  // Export report
+  const exportReport = useCallback((format: 'pdf' | 'png' | 'json') => {
+    if (components.length === 0) {
+      alert('Please add at least one component to your report before exporting.')
+      return
+    }
+
+    if (format === 'json') {
+      // Export as JSON
+      const exportData = {
+        name: reportName,
+        exportedAt: new Date().toISOString(),
+        components,
+        config: { zoom, theme }
+      }
+      
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${reportName.replace(/\s+/g, '_')}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      setShowExportModal(false)
+    } else if (format === 'png' || format === 'pdf') {
+      // For PNG/PDF, we'd need html2canvas or similar
+      alert(`${format.toUpperCase()} export coming soon! For now, use your browser's print function (Ctrl/Cmd + P) to save as PDF.`)
+    }
+  }, [reportName, components, zoom, theme])
+
   // Theme classes
   const bgColor = theme === 'light' ? 'bg-slate-100' : 'bg-[#121212]'
   const surfaceColor = theme === 'light' ? 'bg-white' : 'bg-[#1e1e1e]'
@@ -395,13 +511,38 @@ export default function ReportBuilder() {
             <option value={150}>150%</option>
           </select>
           <div className="h-6 w-px bg-slate-200 dark:bg-neutral-700" />
-          <button className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${borderColor} ${theme === 'light' ? 'hover:bg-slate-50' : 'hover:bg-neutral-800'}`}>
+          <button 
+            onClick={() => setShowExportModal(true)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${borderColor} ${theme === 'light' ? 'hover:bg-slate-50' : 'hover:bg-neutral-800'}`}
+          >
             <Download className="w-4 h-4" />
             Export
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600">
-            <Save className="w-4 h-4" />
-            Save Report
+          <button 
+            onClick={saveReport}
+            disabled={saveStatus === 'saving'}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white ${
+              saveStatus === 'saving' ? 'bg-orange-400 cursor-wait' : 
+              saveStatus === 'saved' ? 'bg-green-500' : 
+              'bg-orange-500 hover:bg-orange-600'
+            }`}
+          >
+            {saveStatus === 'saving' ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Saving...
+              </>
+            ) : saveStatus === 'saved' ? (
+              <>
+                <Check className="w-4 h-4" />
+                Saved!
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                Save Report
+              </>
+            )}
           </button>
         </div>
       </header>
@@ -443,22 +584,45 @@ export default function ReportBuilder() {
               
               {/* Time Period Quick Add */}
               <div className="p-4 border-t border-inherit">
-                <h4 className={`text-xs font-medium ${textMuted} mb-2`}>QUICK ADD</h4>
+                <h4 className={`text-xs font-medium ${textMuted} mb-2`}>QUICK ADD QUARTERS</h4>
                 <div className="grid grid-cols-2 gap-2">
-                  {['Q1', 'Q2', 'Q3', 'Q4'].map(q => (
+                  {[1, 2, 3, 4].map(q => (
                     <button
                       key={q}
-                      onClick={() => {
-                        addComponent('kpi')
-                        // Could pre-configure with quarter data
-                      }}
+                      onClick={() => addQuarterComponent(q)}
                       className={`px-3 py-2 rounded-lg text-xs font-medium ${
                         theme === 'light' ? 'bg-slate-100 hover:bg-slate-200' : 'bg-neutral-800 hover:bg-neutral-700'
                       }`}
                     >
-                      {q} {new Date().getFullYear()}
+                      Q{q} {new Date().getFullYear()}
                     </button>
                   ))}
+                </div>
+                <div className="mt-3 grid grid-cols-1 gap-2">
+                  <button
+                    onClick={() => addComponent('kpi', { title: 'YTD Revenue', metric: 'revenue' })}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium ${
+                      theme === 'light' ? 'bg-orange-100 hover:bg-orange-200 text-orange-700' : 'bg-orange-500/20 hover:bg-orange-500/30 text-orange-400'
+                    }`}
+                  >
+                    + YTD Revenue
+                  </button>
+                  <button
+                    onClick={() => addComponent('kpi', { title: 'YTD Expenses', metric: 'expenses' })}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium ${
+                      theme === 'light' ? 'bg-rose-100 hover:bg-rose-200 text-rose-700' : 'bg-rose-500/20 hover:bg-rose-500/30 text-rose-400'
+                    }`}
+                  >
+                    + YTD Expenses
+                  </button>
+                  <button
+                    onClick={() => addComponent('kpi', { title: 'Gross Margin %', metric: 'gross-margin' })}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium ${
+                      theme === 'light' ? 'bg-blue-100 hover:bg-blue-200 text-blue-700' : 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-400'
+                    }`}
+                  >
+                    + Gross Margin %
+                  </button>
                 </div>
               </div>
             </motion.aside>
@@ -539,11 +703,16 @@ export default function ReportBuilder() {
                   className={`flex items-center justify-between px-3 py-2 border-b ${borderColor} cursor-grab active:cursor-grabbing`}
                   onMouseDown={(e) => handleMouseDown(e, component.id)}
                 >
-                  <div className="flex items-center gap-2">
-                    <GripVertical className={`w-4 h-4 ${textMuted}`} />
-                    <span className="text-sm font-medium truncate">{component.config.title}</span>
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <GripVertical className={`w-4 h-4 flex-shrink-0 ${textMuted}`} />
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium truncate block">{component.config.title}</span>
+                      {component.config.projectFilter && component.config.projectFilter !== 'all' && (
+                        <span className={`text-xs ${textMuted} truncate block`}>{component.config.projectFilter}</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 flex-shrink-0">
                     <button
                       onClick={(e) => { e.stopPropagation(); duplicateComponent(component.id) }}
                       className={`p-1 rounded hover:bg-slate-100 dark:hover:bg-neutral-800 ${textMuted}`}
@@ -565,6 +734,11 @@ export default function ReportBuilder() {
                     <div className="h-full flex flex-col justify-center">
                       <p className={`text-xs ${textMuted} mb-1`}>
                         {METRICS.find(m => m.id === component.config.metric)?.label || 'Metric'}
+                        {component.config.dateRange?.start && component.config.dateRange?.end && (
+                          <span className="ml-1 opacity-70">
+                            ({component.config.dateRange.start.slice(5)}-{component.config.dateRange.end.slice(5)}/{component.config.dateRange.start.slice(0,4)})
+                          </span>
+                        )}
                       </p>
                       <p className="text-2xl font-bold" style={{ color: METRICS.find(m => m.id === component.config.metric)?.color }}>
                         {component.config.metric === 'gross-margin' 
@@ -572,57 +746,76 @@ export default function ReportBuilder() {
                           : formatCurrency(calculateMetric(component.config.metric || 'revenue', component.config))
                         }
                       </p>
+                      {component.config.dataSource === 'accrual' && (
+                        <p className={`text-xs ${textMuted} mt-1`}>Accrual basis</p>
+                      )}
                     </div>
                   )}
 
                   {component.type === 'bar-chart' && (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={generateChartData(component.config)}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#333'} />
-                        <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
-                        <YAxis tick={{ fontSize: 10 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                        {component.config.showLegend && <Legend />}
-                        <Bar dataKey="revenue" name="Revenue" fill="#34d399" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="expenses" name="Expenses" fill="#fb7185" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <div className="h-full flex flex-col">
+                      <p className={`text-xs ${textMuted} mb-2`}>Monthly Revenue vs Expenses</p>
+                      <div className="flex-1">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={generateChartData(component.config)}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#333'} />
+                            <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
+                            <YAxis tick={{ fontSize: 10 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                            {component.config.showLegend && <Legend />}
+                            <Bar dataKey="revenue" name="Revenue" fill="#34d399" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="expenses" name="Expenses" fill="#fb7185" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
                   )}
 
                   {component.type === 'line-chart' && (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={generateChartData(component.config)}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#333'} />
-                        <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
-                        <YAxis tick={{ fontSize: 10 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                        {component.config.showLegend && <Legend />}
-                        <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#34d399" strokeWidth={2} dot={false} />
-                        <Line type="monotone" dataKey="net" name="Net" stroke="#60a5fa" strokeWidth={2} dot={false} />
-                      </LineChart>
-                    </ResponsiveContainer>
+                    <div className="h-full flex flex-col">
+                      <p className={`text-xs ${textMuted} mb-2`}>Revenue & Net Income Trend</p>
+                      <div className="flex-1">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={generateChartData(component.config)}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#333'} />
+                            <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} />
+                            <YAxis tick={{ fontSize: 10 }} stroke={theme === 'light' ? '#6b7280' : '#9ca3af'} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                            {component.config.showLegend && <Legend />}
+                            <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#34d399" strokeWidth={2} dot={false} />
+                            <Line type="monotone" dataKey="net" name="Net" stroke="#60a5fa" strokeWidth={2} dot={false} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
                   )}
 
                   {component.type === 'pie-chart' && (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={[
-                            { name: 'OpEx', value: calculateMetric('opex', component.config) },
-                            { name: 'Overhead', value: calculateMetric('overhead', component.config) },
-                          ]}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          dataKey="value"
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        >
-                          <Cell fill="#fb7185" />
-                          <Cell fill="#fbbf24" />
-                        </Pie>
-                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <div className="h-full flex flex-col">
+                      <p className={`text-xs ${textMuted} mb-2 text-center`}>Expense Distribution</p>
+                      <div className="flex-1">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={[
+                                { name: 'Direct Costs (OpEx)', value: calculateMetric('opex', component.config) },
+                                { name: 'Overhead', value: calculateMetric('overhead', component.config) },
+                              ]}
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={70}
+                              dataKey="value"
+                              label={({ name, percent }) => `${name.split(' ')[0]} ${(percent * 100).toFixed(0)}%`}
+                            >
+                              <Cell fill="#fb7185" />
+                              <Cell fill="#fbbf24" />
+                            </Pie>
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
                   )}
 
                   {component.type === 'table' && (
@@ -810,6 +1003,119 @@ export default function ReportBuilder() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Export Modal */}
+      <AnimatePresence>
+        {showExportModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowExportModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-md rounded-xl p-6 ${surfaceColor} border ${borderColor}`}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Export Report</h3>
+                <button 
+                  onClick={() => setShowExportModal(false)} 
+                  className={`p-1 rounded ${theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-neutral-800'}`}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <p className={`text-sm ${textMuted} mb-4`}>Choose an export format for "{reportName}"</p>
+              
+              <div className="space-y-2">
+                <button
+                  onClick={() => exportReport('pdf')}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border ${borderColor} ${theme === 'light' ? 'hover:bg-slate-50' : 'hover:bg-neutral-800'}`}
+                >
+                  <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-500/20 flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium">PDF Document</p>
+                    <p className={`text-xs ${textMuted}`}>Best for printing and sharing</p>
+                  </div>
+                </button>
+                
+                <button
+                  onClick={() => exportReport('png')}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border ${borderColor} ${theme === 'light' ? 'hover:bg-slate-50' : 'hover:bg-neutral-800'}`}
+                >
+                  <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
+                    <Image className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium">PNG Image</p>
+                    <p className={`text-xs ${textMuted}`}>Best for presentations</p>
+                  </div>
+                </button>
+                
+                <button
+                  onClick={() => exportReport('json')}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border ${borderColor} ${theme === 'light' ? 'hover:bg-slate-50' : 'hover:bg-neutral-800'}`}
+                >
+                  <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-500/20 flex items-center justify-center">
+                    <Download className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium">JSON Data</p>
+                    <p className={`text-xs ${textMuted}`}>Export report configuration</p>
+                  </div>
+                </button>
+              </div>
+              
+              <p className={`text-xs ${textMuted} mt-4 text-center`}>
+                Tip: Use Ctrl/Cmd + P to print or save as PDF directly
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Save Confirmation Modal */}
+      <AnimatePresence>
+        {showSaveModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowSaveModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-sm rounded-xl p-6 ${surfaceColor} border ${borderColor} text-center`}
+            >
+              <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-500/20 flex items-center justify-center mx-auto mb-4">
+                <Check className="w-8 h-8 text-green-600 dark:text-green-400" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Report Saved!</h3>
+              <p className={`text-sm ${textMuted} mb-4`}>
+                "{reportName}" has been saved successfully.
+              </p>
+              <button
+                onClick={() => setShowSaveModal(false)}
+                className="w-full py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+              >
+                Continue Editing
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
