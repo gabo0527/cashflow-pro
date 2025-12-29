@@ -3681,7 +3681,8 @@ const handleQuickAdd = useCallback(async () => {
       id: 'reports-section',
       label: 'Reports',
       items: [
-        { id: 'reports', label: 'Standard Reports', icon: FileText }
+        { id: 'reports', label: 'Standard Reports', icon: FileText },
+        { id: 'report-builder', label: 'Report Builder', icon: Sparkles }
       ]
     },
     {
@@ -3838,7 +3839,11 @@ const handleQuickAdd = useCallback(async () => {
                         <button
                           key={item.id}
                           onClick={() => {
-                            setActiveTab(item.id as typeof activeTab)
+                            if (item.id === 'report-builder') {
+                              router.push('/reports/builder')
+                            } else {
+                              setActiveTab(item.id as typeof activeTab)
+                            }
                             setSidebarMobileOpen(false)
                           }}
                           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all mb-1 ${
@@ -9088,21 +9093,26 @@ const handleQuickAdd = useCallback(async () => {
                 ))}
               </div>
 
-              {/* Coming Soon - Report Builder */}
-              <div className={`rounded-xl p-6 border-2 border-dashed ${theme === 'light' ? 'border-gray-300 bg-gray-50' : 'border-neutral-700 bg-neutral-800/50'}`}>
+              {/* Report Builder */}
+              <button
+                onClick={() => router.push('/reports/builder')}
+                className={`w-full rounded-xl p-6 border-2 text-left transition-all hover:shadow-lg ${
+                  theme === 'light' 
+                    ? 'border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 hover:border-orange-300' 
+                    : 'border-orange-500/30 bg-gradient-to-r from-orange-500/10 to-amber-500/10 hover:border-orange-500/50'
+                }`}
+              >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#f97316] to-[#fbbf24] flex items-center justify-center">
                     <Sparkles className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold">Report Builder</h3>
-                    <p className={`text-sm ${textMuted}`}>Create custom reports with drag-and-drop - Coming Soon</p>
+                    <p className={`text-sm ${textMuted}`}>Create custom reports with drag-and-drop canvas</p>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${theme === 'light' ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/20 text-amber-400'}`}>
-                    Phase 2
-                  </span>
+                  <ChevronRight className={`w-5 h-5 ${textMuted}`} />
                 </div>
-              </div>
+              </button>
             </motion.div>
           )}
 
