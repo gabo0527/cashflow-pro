@@ -2,369 +2,271 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Modern Minimalist Design System */
-/* Updated: Orange accent, Light theme default */
-/* Compatible with existing Vantage dashboard */
+/* Vantage Design System v2 */
+/* Light theme default, Charcoal dark mode, Soft pastel data colors */
 
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
 :root {
-  /* Core Backgrounds - Light Theme (NEW DEFAULT) */
+  /* ===== LIGHT THEME (Default) ===== */
   --color-bg: #f8fafc;
+  --color-bg-alt: #f1f5f9;
   --color-surface: #ffffff;
   --color-elevated: #ffffff;
   --color-border: #e2e8f0;
+  --color-border-light: #f1f5f9;
   
-  /* Primary Accent - Orange (CHANGED from teal) */
+  /* Primary Accent - Warm Orange */
   --color-primary: #f97316;
   --color-primary-hover: #ea580c;
-  --color-primary-muted: rgba(249, 115, 22, 0.15);
+  --color-primary-muted: rgba(249, 115, 22, 0.12);
   
-  /* Semantic Colors */
-  --color-success: #22c55e;
-  --color-danger: #ef4444;
-  --color-warning: #f59e0b;
-  --color-info: #3b82f6;
-  
-  /* Text Colors - Light Theme */
-  --color-text-primary: #0f172a;
+  /* Text Colors */
+  --color-text-primary: #1e293b;
   --color-text-secondary: #475569;
   --color-text-muted: #94a3b8;
   
-  /* Legacy variable mappings for compatibility */
-  --terminal-bg: 248 250 252;
-  --terminal-surface: 255 255 255;
-  --terminal-border: 226 232 240;
+  /* ===== DATA VISUALIZATION - Soft Pastels ===== */
+  /* Revenue/Income - Soft Mint Green */
+  --color-revenue: #34d399;
+  --color-revenue-light: rgba(52, 211, 153, 0.15);
   
-  /* Chart Colors - Updated Palette */
-  --chart-revenue: #22c55e;
-  --chart-expenses: #f97316;
-  --chart-profit: #14b8a6;
-  --chart-budget: #94a3b8;
+  /* Expenses/Costs - Soft Coral */
+  --color-expense: #fb7185;
+  --color-expense-light: rgba(251, 113, 133, 0.15);
+  
+  /* Overhead - Soft Purple */
+  --color-overhead: #a78bfa;
+  --color-overhead-light: rgba(167, 139, 250, 0.15);
+  
+  /* Investment - Soft Blue */
+  --color-investment: #60a5fa;
+  --color-investment-light: rgba(96, 165, 250, 0.15);
+  
+  /* Net/Profit - Soft Teal */
+  --color-net: #2dd4bf;
+  --color-net-light: rgba(45, 212, 191, 0.15);
+  
+  /* Budget/Projected - Soft Gray */
+  --color-budget: #94a3b8;
+  --color-budget-light: rgba(148, 163, 184, 0.15);
+  
+  /* Semantic */
+  --color-success: #22c55e;
+  --color-success-light: rgba(34, 197, 94, 0.12);
+  --color-danger: #ef4444;
+  --color-danger-light: rgba(239, 68, 68, 0.12);
+  --color-warning: #f59e0b;
+  --color-warning-light: rgba(245, 158, 11, 0.12);
 }
 
-/* Dark Mode Variables */
-.dark, 
+/* ===== DARK THEME - Charcoal (not navy) ===== */
+.dark,
 body:not(.light-mode) {
-  --color-bg: #0f172a;
-  --color-surface: #1e293b;
-  --color-elevated: #334155;
-  --color-border: #334155;
+  /* Charcoal backgrounds - NOT navy blue */
+  --color-bg: #121212;
+  --color-bg-alt: #1a1a1a;
+  --color-surface: #1e1e1e;
+  --color-elevated: #262626;
+  --color-border: #333333;
+  --color-border-light: #2a2a2a;
   
-  --color-text-primary: #f8fafc;
-  --color-text-secondary: #cbd5e1;
-  --color-text-muted: #64748b;
+  /* Text */
+  --color-text-primary: #f5f5f5;
+  --color-text-secondary: #a3a3a3;
+  --color-text-muted: #737373;
   
-  --terminal-bg: 15 23 42;
-  --terminal-surface: 30 41 59;
-  --terminal-border: 51 65 85;
+  /* Data colors stay the same but slightly more vibrant for dark bg */
+  --color-revenue: #4ade80;
+  --color-revenue-light: rgba(74, 222, 128, 0.2);
+  
+  --color-expense: #fb923c;
+  --color-expense-light: rgba(251, 146, 60, 0.2);
+  
+  --color-overhead: #c4b5fd;
+  --color-overhead-light: rgba(196, 181, 253, 0.2);
+  
+  --color-investment: #93c5fd;
+  --color-investment-light: rgba(147, 197, 253, 0.2);
+  
+  --color-net: #5eead4;
+  --color-net-light: rgba(94, 234, 212, 0.2);
 }
 
 @layer base {
   html {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
   }
   
-  /* Light mode as default */
   body {
-    @apply bg-slate-50 text-slate-900;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    @apply bg-[var(--color-bg)] text-[var(--color-text-primary)];
   }
   
-  /* Dark mode when toggled */
-  body:not(.light-mode),
-  .dark body {
-    @apply bg-[#0f172a] text-slate-100;
-  }
-  
-  /* Light mode explicit */
   body.light-mode {
-    @apply bg-slate-50 text-slate-900;
+    --color-bg: #f8fafc;
+    --color-surface: #ffffff;
+    --color-border: #e2e8f0;
+    --color-text-primary: #1e293b;
+    --color-text-secondary: #475569;
+    --color-text-muted: #94a3b8;
   }
 }
 
-/* Override legacy color classes for orange accent */
+/* ===== Override old navy colors to charcoal ===== */
+.bg-\[\#0c1222\], .bg-\[\#0f172a\] { background-color: #121212 !important; }
+.bg-\[\#141c2e\], .bg-\[\#1e293b\] { background-color: #1e1e1e !important; }
+.bg-\[\#1c2740\], .bg-\[\#334155\] { background-color: #262626 !important; }
+.border-\[\#2a3a55\], .border-\[\#334155\] { border-color: #333333 !important; }
+
+.bg-terminal-bg { background-color: var(--color-bg) !important; }
+.bg-terminal-surface { background-color: var(--color-surface) !important; }
+.border-terminal-border { border-color: var(--color-border) !important; }
+
+/* ===== Override teal accent to orange ===== */
 .bg-\[\#00d4aa\] { @apply bg-orange-500 !important; }
 .text-\[\#00d4aa\] { @apply text-orange-500 !important; }
 .border-\[\#00d4aa\] { @apply border-orange-500 !important; }
 .from-\[\#00d4aa\] { @apply from-orange-500 !important; }
-.to-\[\#00d4aa\] { @apply to-orange-500 !important; }
-.ring-\[\#00d4aa\] { @apply ring-orange-500 !important; }
-
 .hover\:bg-\[\#00c49a\]:hover { @apply bg-orange-600 !important; }
-.hover\:border-\[\#00d4aa\]:hover { @apply border-orange-500 !important; }
 
-/* Scrollbar - Adapts to theme */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { 
+  background: var(--color-border); 
+  border-radius: 3px; 
+}
+::-webkit-scrollbar-thumb:hover { 
+  background: var(--color-text-muted); 
 }
 
-::-webkit-scrollbar-track {
-  @apply bg-transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 rounded-full;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-400;
-}
-
-/* Dark mode scrollbar */
-body:not(.light-mode) ::-webkit-scrollbar-thumb {
-  @apply bg-slate-600;
-}
-
-body:not(.light-mode) ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-500;
-}
-
-/* Focus states - Orange */
+/* ===== Focus States ===== */
 *:focus-visible {
   @apply outline-none ring-2 ring-orange-500 ring-offset-2;
+  ring-offset-color: var(--color-bg);
 }
 
-body.light-mode *:focus-visible {
-  @apply ring-offset-white;
-}
-
-body:not(.light-mode) *:focus-visible {
-  @apply ring-offset-slate-900;
-}
-
-/* Number/Currency styling */
-.font-mono-numbers {
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
-}
-
-/* Smooth transitions */
-* {
-  @apply transition-colors duration-150;
-}
-
-/* ====================== */
-/* Button Styles - Updated */
-/* ====================== */
-
+/* ===== Buttons ===== */
 .btn-primary {
   @apply px-4 py-2.5 bg-orange-500 text-white rounded-xl font-semibold
-         hover:bg-orange-600 active:bg-orange-700 
-         transition-all duration-200 shadow-sm;
+         hover:bg-orange-600 active:scale-[0.98] transition-all shadow-sm;
 }
 
 .btn-secondary {
-  @apply px-4 py-2.5 rounded-xl font-medium border transition-all;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  @apply px-4 py-2.5 rounded-xl font-medium transition-all;
 }
 
-body.light-mode .btn-secondary {
-  @apply bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300;
+.btn-secondary:hover {
+  background: var(--color-bg-alt);
+  border-color: var(--color-text-muted);
 }
 
-body:not(.light-mode) .btn-secondary {
-  @apply bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700;
+/* ===== Tables - Better Spacing ===== */
+.table-cell {
+  @apply px-4 py-3;
 }
 
-/* ====================== */
-/* Status Badges - Updated */
-/* ====================== */
+.table-header th,
+table thead th {
+  @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider;
+  color: var(--color-text-muted);
+  background: var(--color-bg-alt);
+  white-space: nowrap;
+}
 
+table td {
+  @apply px-4 py-3;
+  white-space: nowrap;
+}
+
+/* Ensure minimum column width */
+table th:not(:first-child),
+table td:not(:first-child) {
+  min-width: 100px;
+}
+
+/* ===== Badges ===== */
 .badge-success {
+  background: var(--color-success-light);
+  color: var(--color-success);
   @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
-}
-
-body.light-mode .badge-success {
-  @apply bg-emerald-50 text-emerald-700;
-}
-
-body:not(.light-mode) .badge-success {
-  @apply bg-emerald-500/15 text-emerald-400;
 }
 
 .badge-danger {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
   @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
-}
-
-body.light-mode .badge-danger {
-  @apply bg-red-50 text-red-700;
-}
-
-body:not(.light-mode) .badge-danger {
-  @apply bg-red-500/15 text-red-400;
 }
 
 .badge-warning {
+  background: var(--color-warning-light);
+  color: var(--color-warning);
   @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
 }
 
-body.light-mode .badge-warning {
-  @apply bg-amber-50 text-amber-700;
+/* ===== Cards ===== */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  @apply rounded-2xl p-5;
 }
 
-body:not(.light-mode) .badge-warning {
-  @apply bg-amber-500/15 text-amber-400;
+.card-hover:hover {
+  border-color: var(--color-primary);
+  @apply shadow-lg;
 }
 
-.badge-info {
-  @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
-}
-
-body.light-mode .badge-info {
-  @apply bg-blue-50 text-blue-700;
-}
-
-body:not(.light-mode) .badge-info {
-  @apply bg-blue-500/15 text-blue-400;
-}
-
-/* ====================== */
-/* Sidebar - Updated */
-/* ====================== */
-
+/* ===== Sidebar ===== */
 .sidebar-item.active {
+  background: var(--color-primary-muted);
+  color: var(--color-primary);
   @apply font-medium;
 }
 
-body.light-mode .sidebar-item.active {
-  @apply bg-orange-50 text-orange-600;
+/* ===== Inputs ===== */
+input, select, textarea {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  @apply rounded-xl px-4 py-2.5 text-sm transition-all;
 }
 
-body:not(.light-mode) .sidebar-item.active {
-  @apply bg-orange-500/15 text-orange-400;
+input:focus, select:focus, textarea:focus {
+  border-color: var(--color-primary);
+  @apply ring-2 ring-orange-500/20 outline-none;
 }
 
-/* ====================== */
-/* Card Styles */
-/* ====================== */
-
-.card-hover {
-  @apply transition-all duration-200;
+input::placeholder, textarea::placeholder {
+  color: var(--color-text-muted);
 }
 
-body.light-mode .card-hover:hover {
-  @apply border-orange-200 shadow-md;
-}
+/* ===== Data Color Utilities ===== */
+.text-revenue { color: var(--color-revenue); }
+.bg-revenue { background: var(--color-revenue); }
+.bg-revenue-light { background: var(--color-revenue-light); }
 
-body:not(.light-mode) .card-hover:hover {
-  @apply border-orange-500/30;
-}
+.text-expense { color: var(--color-expense); }
+.bg-expense { background: var(--color-expense); }
+.bg-expense-light { background: var(--color-expense-light); }
 
-/* ====================== */
-/* Gradient Accent - Updated */
-/* ====================== */
+.text-overhead { color: var(--color-overhead); }
+.bg-overhead { background: var(--color-overhead); }
+.bg-overhead-light { background: var(--color-overhead-light); }
 
-.gradient-primary {
-  @apply bg-gradient-to-r from-orange-500 to-amber-500;
-}
+.text-investment { color: var(--color-investment); }
+.bg-investment { background: var(--color-investment); }
+.bg-investment-light { background: var(--color-investment-light); }
 
-/* ====================== */
-/* Legacy Terminal Colors - Mapped to new theme */
-/* ====================== */
+.text-net { color: var(--color-net); }
+.bg-net { background: var(--color-net); }
+.bg-net-light { background: var(--color-net-light); }
 
-body.light-mode .bg-terminal-bg { @apply bg-slate-50; }
-body.light-mode .bg-terminal-surface { @apply bg-white; }
-body.light-mode .border-terminal-border { @apply border-slate-200; }
-body.light-mode .text-terminal-text { @apply text-slate-900; }
-
-body:not(.light-mode) .bg-terminal-bg { @apply bg-[#0f172a]; }
-body:not(.light-mode) .bg-terminal-surface { @apply bg-[#1e293b]; }
-body:not(.light-mode) .border-terminal-border { @apply border-[#334155]; }
-body:not(.light-mode) .text-terminal-text { @apply text-slate-100; }
-
-/* ====================== */
-/* Input Styles */
-/* ====================== */
-
-.input {
-  @apply w-full px-4 py-2.5 rounded-xl border text-sm transition-all;
-}
-
-body.light-mode .input {
-  @apply bg-white border-slate-200 text-slate-900 placeholder:text-slate-400
-         focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20;
-}
-
-body:not(.light-mode) .input {
-  @apply bg-slate-800 border-slate-700 text-white placeholder:text-slate-500
-         focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20;
-}
-
-/* ====================== */
-/* Table Styles */
-/* ====================== */
-
-.table-header {
-  @apply text-xs font-semibold uppercase tracking-wider;
-}
-
-body.light-mode .table-header {
-  @apply text-slate-400 bg-slate-50;
-}
-
-body:not(.light-mode) .table-header {
-  @apply text-slate-500 bg-slate-800;
-}
-
-.table-row {
-  @apply border-b transition-colors;
-}
-
-body.light-mode .table-row {
-  @apply border-slate-100 hover:bg-slate-50/50;
-}
-
-body:not(.light-mode) .table-row {
-  @apply border-slate-700 hover:bg-slate-800/50;
-}
-
-/* ====================== */
-/* Modal Styles */
-/* ====================== */
-
-.modal-overlay {
-  @apply fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4;
-}
-
-.modal {
-  @apply rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden;
-}
-
-body.light-mode .modal {
-  @apply bg-white;
-}
-
-body:not(.light-mode) .modal {
-  @apply bg-slate-900 border border-slate-800;
-}
-
-/* ====================== */
-/* Print Styles */
-/* ====================== */
-
+/* ===== Print ===== */
 @media print {
-  body {
-    @apply bg-white text-black !important;
-  }
-  
-  .no-print {
-    display: none !important;
-  }
-  
-  .card {
-    @apply shadow-none border-slate-200;
-  }
-}
-
-/* ====================== */
-/* Responsive */
-/* ====================== */
-
-@media (max-width: 640px) {
-  .card {
-    @apply rounded-xl p-4;
-  }
+  body { @apply bg-white text-black !important; }
+  .no-print { display: none !important; }
 }
