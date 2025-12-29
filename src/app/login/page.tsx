@@ -1,24 +1,20 @@
 // src/app/login/page.tsx
-// Login page with Vantage branding
+// Modern minimalist login page - Base44/SubTracker inspired
 
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { 
-  TrendingUp, PieChart, BarChart3, Shield, Users,
-  ArrowRight, Zap, LineChart, Target, CheckCircle2
-} from 'lucide-react'
+import { ArrowRight, BarChart3, PieChart, TrendingUp, Shield, Sparkles } from 'lucide-react'
 
-// Vantage Logo Component
-const VantageLogo = ({ size = 48, className = "" }: { size?: number, className?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-    <circle cx="24" cy="24" r="22" stroke="#3d8a96" stroke-width="2.5" fill="none"/>
-    <rect x="12" y="28" width="5" height="10" rx="1" fill="#7cc5cf"/>
-    <rect x="19" y="22" width="5" height="16" rx="1" fill="#4da8b5"/>
-    <rect x="26" y="14" width="5" height="24" rx="1" fill="#2d8a96"/>
-    <path d="M10 32L18 26L25 20L38 12" stroke="#2d6b78" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+// New Vantage Logo - Modern, minimal
+const VantageLogo = ({ size = 40, className = "" }: { size?: number, className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <rect width="40" height="40" rx="10" fill="#f97316"/>
+    <rect x="8" y="22" width="6" height="10" rx="2" fill="white" fillOpacity="0.6"/>
+    <rect x="17" y="16" width="6" height="16" rx="2" fill="white" fillOpacity="0.8"/>
+    <rect x="26" y="10" width="6" height="22" rx="2" fill="white"/>
   </svg>
 )
 
@@ -27,7 +23,6 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  // Check if already authenticated
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -61,136 +56,127 @@ export default function LoginPage() {
 
   const features = [
     { 
-      icon: LineChart, 
-      title: 'Cash Flow Analytics',
-      description: 'Real-time visibility into your business cash position'
+      icon: BarChart3, 
+      title: 'Real-time Analytics',
+      description: 'Track cash flow and project profitability instantly'
     },
     { 
-      icon: Target, 
-      title: 'Project Profitability',
-      description: 'Track margins and costs by project with precision'
+      icon: PieChart, 
+      title: 'Smart Insights',
+      description: 'AI-powered recommendations for your business'
     },
     { 
       icon: TrendingUp, 
-      title: 'Financial Projections',
-      description: 'Forecast up to 3 years with assumptions-based modeling'
+      title: 'Growth Forecasting',
+      description: 'Project up to 3 years with custom assumptions'
     },
   ]
 
-  const stats = [
-    { value: '$2.4M+', label: 'Tracked Monthly' },
-    { value: '99.9%', label: 'Uptime' },
-    { value: '256-bit', label: 'Encryption' },
-  ]
-
   return (
-    <div className="min-h-screen bg-[#0a0a0f] flex">
-      {/* Left Panel - Branding & Features */}
-      <div className="hidden lg:flex lg:w-[55%] relative overflow-hidden">
-        {/* Animated Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-[#0f172a] to-slate-900">
-          {/* Gradient Orbs */}
-          <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-teal-500/20 rounded-full blur-[120px] animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-cyan-500/15 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
-          <div className="absolute top-1/2 left-1/2 w-[300px] h-[300px] bg-teal-400/10 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '2s' }} />
-          
-          {/* Grid Pattern */}
-          <div className="absolute inset-0 opacity-[0.03]" style={{
-            backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-            backgroundSize: '50px 50px'
-          }} />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50/30 flex">
+      {/* Left Panel - Features */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
+        {/* Soft gradient background */}
+        <div className="absolute inset-0">
+          <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-orange-100/50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+          <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-teal-100/40 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
         </div>
         
+        {/* Content */}
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           {/* Header */}
-          <div>
-            {/* Logo */}
-            <div className="flex items-center gap-4 mb-20">
-              <VantageLogo size={52} />
-              <span className="text-2xl font-bold text-white tracking-tight uppercase">Vantage</span>
-            </div>
-            
-            {/* Hero Text */}
-            <div className="max-w-lg">
-              <h1 className="text-5xl font-bold text-white mb-6 leading-[1.1] tracking-tight">
-                Financial clarity for
-                <span className="block mt-2 bg-gradient-to-r from-teal-400 via-cyan-400 to-teal-400 bg-clip-text text-transparent">
-                  growing businesses
-                </span>
-              </h1>
-              <p className="text-slate-400 text-lg leading-relaxed">
-                The modern platform for project-based businesses to track cash flow, 
-                analyze profitability, and make data-driven decisions.
-              </p>
-            </div>
+          <div className="flex items-center gap-3">
+            <VantageLogo size={44} />
+            <span className="text-2xl font-bold text-slate-900 tracking-tight">Vantage</span>
+          </div>
+          
+          {/* Hero Section */}
+          <div className="max-w-md">
+            <h1 className="text-4xl font-bold text-slate-900 leading-tight mb-4">
+              Financial clarity for
+              <span className="block text-orange-500 mt-1">modern businesses</span>
+            </h1>
+            <p className="text-lg text-slate-600 leading-relaxed">
+              The all-in-one platform for project-based businesses to track cash flow, 
+              analyze margins, and make smarter decisions.
+            </p>
           </div>
           
           {/* Features */}
-          <div className="space-y-5 my-12">
+          <div className="space-y-4">
             {features.map((feature, idx) => (
               <div 
                 key={idx} 
-                className="flex items-start gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/[0.05] backdrop-blur-sm hover:bg-white/[0.05] transition-colors group"
+                className="flex items-start gap-4 p-4 rounded-2xl bg-white/60 backdrop-blur-sm border border-slate-200/50 hover:bg-white/80 hover:border-slate-200 transition-all group"
               >
-                <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-teal-500/20 to-cyan-500/20 flex items-center justify-center flex-shrink-0 group-hover:from-teal-500/30 group-hover:to-cyan-500/30 transition-colors">
-                  <feature.icon className="w-5 h-5 text-teal-400" />
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-100 to-orange-50 flex items-center justify-center flex-shrink-0 group-hover:from-orange-200 group-hover:to-orange-100 transition-colors">
+                  <feature.icon className="w-6 h-6 text-orange-500" />
                 </div>
                 <div>
-                  <h3 className="text-white font-semibold mb-1">{feature.title}</h3>
+                  <h3 className="text-slate-900 font-semibold mb-1">{feature.title}</h3>
                   <p className="text-slate-500 text-sm">{feature.description}</p>
                 </div>
               </div>
             ))}
           </div>
           
-          {/* Stats Bar */}
-          <div className="flex items-center gap-8 pt-8 border-t border-white/[0.06]">
-            {stats.map((stat, idx) => (
-              <div key={idx}>
-                <div className="text-2xl font-bold text-white">{stat.value}</div>
-                <div className="text-slate-500 text-sm">{stat.label}</div>
-              </div>
-            ))}
+          {/* Stats */}
+          <div className="flex items-center gap-8 pt-6 border-t border-slate-200/50">
+            <div>
+              <div className="text-2xl font-bold text-slate-900">$50M+</div>
+              <div className="text-sm text-slate-500">Tracked Revenue</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-slate-900">500+</div>
+              <div className="text-sm text-slate-500">Projects Managed</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-slate-900">99.9%</div>
+              <div className="text-sm text-slate-500">Uptime</div>
+            </div>
           </div>
         </div>
       </div>
       
-      {/* Right Panel - Login Form */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-8 bg-[#0a0a0f]">
-        <div className="w-full max-w-[420px]">
+      {/* Right Panel - Login */}
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-8">
+        <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-10">
-            <div className="inline-flex items-center gap-3 mb-3">
-              <VantageLogo size={48} />
-              <span className="text-2xl font-bold text-white uppercase">Vantage</span>
+            <div className="inline-flex items-center gap-3 mb-2">
+              <VantageLogo size={40} />
+              <span className="text-2xl font-bold text-slate-900">Vantage</span>
             </div>
-            <p className="text-slate-500">Project & Cash Flow Analytics</p>
+            <p className="text-slate-500">Financial Analytics Platform</p>
           </div>
 
           {/* Login Card */}
-          <div className="bg-gradient-to-b from-slate-800/50 to-slate-900/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl shadow-black/20">
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-xl shadow-slate-200/50">
+            {/* Header */}
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-teal-500/20 to-cyan-500/20 mb-5">
-                <VantageLogo size={40} />
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-100 to-orange-50 mb-5">
+                <Sparkles className="w-8 h-8 text-orange-500" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Welcome back</h2>
-              <p className="text-slate-400">Sign in to access your dashboard</p>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Welcome back</h2>
+              <p className="text-slate-500">Sign in to access your dashboard</p>
             </div>
 
+            {/* Error */}
             {error && (
-              <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center flex items-center justify-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+              <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm text-center flex items-center justify-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-500" />
                 {error}
               </div>
             )}
 
+            {/* Google Login Button */}
             <button
               onClick={handleGoogleLogin}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-3 px-5 py-4 bg-white hover:bg-gray-50 text-gray-800 font-semibold rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] group"
+              className="w-full flex items-center justify-center gap-3 px-5 py-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-slate-900/20 hover:shadow-xl hover:shadow-slate-900/30 active:scale-[0.98] group"
             >
               {loading ? (
-                <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -201,51 +187,46 @@ export default function LoginPage() {
               )}
               <span>{loading ? 'Signing in...' : 'Continue with Google'}</span>
               {!loading && (
-                <ArrowRight className="w-4 h-4 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
+                <ArrowRight className="w-4 h-4 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
               )}
             </button>
 
-            <div className="mt-6 flex items-center gap-2 justify-center text-slate-500 text-sm">
-              <Users className="w-4 h-4" />
-              <span>Use your company Google Workspace</span>
-            </div>
+            {/* Workspace hint */}
+            <p className="mt-4 text-center text-sm text-slate-400">
+              Use your company Google Workspace
+            </p>
             
             {/* Divider */}
             <div className="my-6 flex items-center gap-4">
-              <div className="flex-1 h-px bg-slate-700/50" />
-              <span className="text-slate-600 text-xs uppercase tracking-wider">Secure</span>
-              <div className="flex-1 h-px bg-slate-700/50" />
+              <div className="flex-1 h-px bg-slate-200" />
+              <span className="text-xs text-slate-400 uppercase tracking-wider">Secure</span>
+              <div className="flex-1 h-px bg-slate-200" />
             </div>
             
             {/* Trust Indicators */}
-            <div className="flex items-center justify-center gap-6 text-slate-500 text-xs">
+            <div className="flex items-center justify-center gap-6 text-slate-400 text-xs">
               <div className="flex items-center gap-1.5">
-                <Shield className="w-3.5 h-3.5 text-teal-500" />
+                <Shield className="w-4 h-4 text-teal-500" />
                 <span>SSO Login</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-teal-500" />
-                <span>SOC 2</span>
+                <Shield className="w-4 h-4 text-teal-500" />
+                <span>256-bit SSL</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Shield className="w-3.5 h-3.5 text-teal-500" />
-                <span>Encrypted</span>
+                <Shield className="w-4 h-4 text-teal-500" />
+                <span>SOC 2</span>
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <p className="mt-8 text-center text-xs text-slate-600">
+          <p className="mt-8 text-center text-xs text-slate-400">
             By signing in, you agree to our{' '}
-            <button className="text-slate-500 hover:text-teal-400 transition-colors underline underline-offset-2">Terms of Service</button>
+            <a href="/terms" className="text-slate-500 hover:text-orange-500 underline underline-offset-2 transition-colors">Terms</a>
             {' '}and{' '}
-            <button className="text-slate-500 hover:text-teal-400 transition-colors underline underline-offset-2">Privacy Policy</button>
+            <a href="/privacy" className="text-slate-500 hover:text-orange-500 underline underline-offset-2 transition-colors">Privacy Policy</a>
           </p>
-          
-          {/* Powered By */}
-          <div className="mt-6 text-center text-xs text-slate-700">
-            Powered by <span className="text-slate-500">Supabase</span> + <span className="text-slate-500">Vercel</span>
-          </div>
         </div>
       </div>
     </div>
