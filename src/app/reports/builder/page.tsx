@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useRef, useEffect } from 'react'
+import React, { useState, useCallback, useRef, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { 
   LineChart, Line, BarChart, Bar, AreaChart, Area,
@@ -88,7 +88,7 @@ const formatCurrency = (value: number): string => {
   }).format(value)
 }
 
-export default function ReportBuilder() {
+function ReportBuilderContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const canvasRef = useRef<HTMLDivElement>(null)
@@ -1249,5 +1249,21 @@ export default function ReportBuilder() {
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+// Wrapper component with Suspense for useSearchParams
+export default function ReportBuilder() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading Report Builder...</p>
+        </div>
+      </div>
+    }>
+      <ReportBuilderContent />
+    </Suspense>
   )
 }
