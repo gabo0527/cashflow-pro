@@ -513,6 +513,7 @@ export default function CashFlowPro() {
   const [showBulkCategorize, setShowBulkCategorize] = useState(false)
   const [bulkCategory, setBulkCategory] = useState('')
   const [bulkProject, setBulkProject] = useState('')
+  const [customSubcategories, setCustomSubcategories] = useState<Record<string, string[]>>({})
   
   // Bank Statement Parsing state
   const [statementLoading, setStatementLoading] = useState(false)
@@ -724,6 +725,7 @@ export default function CashFlowPro() {
               date: t.date,
               type: t.type,
               category: t.category || t.type, // Use category if exists, fallback to type
+              subcategory: t.subcategory,
               description: t.description,
               amount: parseFloat(t.amount),
               project: t.project,
@@ -1937,6 +1939,21 @@ export default function CashFlowPro() {
     }
   }, [])
 
+  // Get all subcategories for a category (default + custom)
+  const getSubcategoriesForCategory = useCallback((category: string): string[] => {
+    const defaults = SUBCATEGORIES[category] || []
+    const custom = customSubcategories[category] || []
+    return [...new Set([...defaults, ...custom])]
+  }, [customSubcategories])
+
+  // Add a custom subcategory
+  const addCustomSubcategory = useCallback((category: string, subcategory: string) => {
+    setCustomSubcategories(prev => ({
+      ...prev,
+      [category]: [...new Set([...(prev[category] || []), subcategory])]
+    }))
+  }, [])
+
   // Quick add project (inline from dropdown)
   const addProjectQuick = useCallback(async (name: string) => {
     if (!name.trim() || !companyId || !user) return
@@ -2088,6 +2105,21 @@ export default function CashFlowPro() {
     setSelectedAccrualIds(new Set())
   }
 }, [selectedAccrualIds])
+
+  // Bulk delete cash transactions
+  const bulkDeleteCashTransactions = useCallback(async () => {
+    if (selectedTransactions.size === 0) return
+    if (confirm(`Delete ${selectedTransactions.size} selected cash transaction(s)?`)) {
+      for (const id of Array.from(selectedTransactions)) {
+        const { error } = await supabaseDeleteTransaction(id)
+        if (error) {
+          console.error('Error deleting transaction:', error)
+        }
+      }
+      setTransactions(prev => prev.filter(t => !selectedTransactions.has(t.id)))
+      setSelectedTransactions(new Set())
+    }
+  }, [selectedTransactions])
 
 const clearAllAccrualTransactions = useCallback(async () => {
   if (confirm('Clear ALL accrual transactions? This cannot be undone.')) {
@@ -7556,6 +7588,13 @@ const handleQuickAdd = useCallback(async () => {
                             Apply to Selected
                           </button>
                           <button
+                            onClick={bulkDeleteCashTransactions}
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium flex items-center gap-2"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Delete ({selectedTransactions.size})
+                          </button>
+                          <button
                             onClick={() => setSelectedTransactions(new Set())}
                             className={`px-3 py-2 rounded-lg text-sm ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-900'}`}
                           >
@@ -7790,12 +7829,23 @@ const handleQuickAdd = useCallback(async () => {
                                             <select
                                               value={t.subcategory || ''}
                                               onClick={(e) => e.stopPropagation()}
-                                              onChange={(e) => quickCategorize(t.id, t.category || 'unassigned', t.project, e.target.value)}
+                                              onChange={(e) => {
+                                                if (e.target.value === '__add_new__') {
+                                                  const newSub = prompt('Enter new subcategory name:')
+                                                  if (newSub && newSub.trim()) {
+                                                    addCustomSubcategory(t.category || 'unassigned', newSub.trim())
+                                                    quickCategorize(t.id, t.category || 'unassigned', t.project, newSub.trim())
+                                                  }
+                                                } else {
+                                                  quickCategorize(t.id, t.category || 'unassigned', t.project, e.target.value)
+                                                }
+                                              }}
                                               className={`rounded-lg px-3 py-1.5 text-sm border ${inputClasses}`}
                                               style={{ colorScheme: theme }}
                                             >
                                               <option value="">No Subcategory</option>
-                                              {(SUBCATEGORIES[t.category || 'unassigned'] || []).map(sub => (
+                                              <option value="__add_new__" className="text-[#f97316] font-medium">+ Add New Subcategory</option>
+                                              {getSubcategoriesForCategory(t.category || 'unassigned').map(sub => (
                                                 <option key={sub} value={sub}>{sub}</option>
                                               ))}
                                             </select>
@@ -8163,6 +8213,43 @@ const handleQuickAdd = useCallback(async () => {
                                                 )
                                               })}
                                             </div>
+                                          </div>
+                                          <div onClick={(e) => e.stopPropagation()}>
+                                            <p className={`text-xs font-medium mb-2 ${textMuted}`}>Subcategory:</p>
+                                            <select
+                                              value={t.subcategory || ''}
+                                              onClick={(e) => e.stopPropagation()}
+                                              onChange={(e) => {
+                                                if (e.target.value === '__add_new__') {
+                                                  const newSub = prompt('Enter new subcategory name:')
+                                                  if (newSub && newSub.trim()) {
+                                                    addCustomSubcategory(t.category || 'unassigned', newSub.trim())
+                                                    // Update subcategory via quickCategorizeAccrual
+                                                    const updates: any = { subcategory: newSub.trim() }
+                                                    supabaseUpdateAccrualTransaction(t.id, updates).then(() => {
+                                                      setAccrualTransactions(prev => prev.map(tr => 
+                                                        tr.id === t.id ? { ...tr, subcategory: newSub.trim() } : tr
+                                                      ))
+                                                    })
+                                                  }
+                                                } else {
+                                                  const updates: any = { subcategory: e.target.value }
+                                                  supabaseUpdateAccrualTransaction(t.id, updates).then(() => {
+                                                    setAccrualTransactions(prev => prev.map(tr => 
+                                                      tr.id === t.id ? { ...tr, subcategory: e.target.value } : tr
+                                                    ))
+                                                  })
+                                                }
+                                              }}
+                                              className={`rounded-lg px-3 py-1.5 text-sm border ${inputClasses}`}
+                                              style={{ colorScheme: theme }}
+                                            >
+                                              <option value="">No Subcategory</option>
+                                              <option value="__add_new__" className="text-[#f97316] font-medium">+ Add New Subcategory</option>
+                                              {getSubcategoriesForCategory(t.category || 'unassigned').map(sub => (
+                                                <option key={sub} value={sub}>{sub}</option>
+                                              ))}
+                                            </select>
                                           </div>
                                           <div onClick={(e) => e.stopPropagation()}>
                                             <p className={`text-xs font-medium mb-2 ${textMuted}`}>Assign Project:</p>
