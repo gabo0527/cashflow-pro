@@ -7759,32 +7759,6 @@ const handleQuickAdd = useCallback(async () => {
                                               ))}
                                             </select>
                                           </div>
-                                          <div onClick={(e) => e.stopPropagation()}>
-                                            <p className={`text-xs font-medium mb-2 ${textMuted}`}>Assign Client:</p>
-                                            <select
-                                              value={t.vendor || ''}
-                                              onClick={(e) => e.stopPropagation()}
-                                              onChange={(e) => {
-                                                if (e.target.value === '__add_new__') {
-                                                  const newClient = prompt('Enter new client name:')
-                                                  if (newClient && newClient.trim()) {
-                                                    addClientQuick(newClient.trim())
-                                                    quickCategorizeWithClient(t.id, t.category || 'unassigned', t.project, newClient.trim())
-                                                  }
-                                                } else {
-                                                  quickCategorizeWithClient(t.id, t.category || 'unassigned', t.project, e.target.value)
-                                                }
-                                              }}
-                                              className={`rounded-lg px-3 py-1.5 text-sm border ${inputClasses}`}
-                                              style={{ colorScheme: theme }}
-                                            >
-                                              <option value="">No Client</option>
-                                              <option value="__add_new__" className="text-[#f97316] font-medium">+ Add New Client</option>
-                                              {clients.map(c => (
-                                                <option key={c.id} value={c.name}>{c.name}</option>
-                                              ))}
-                                            </select>
-                                          </div>
                                           <button
                                             onClick={() => setExpandedTransaction(null)}
                                             className={`ml-auto px-3 py-1.5 rounded-lg text-xs ${theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-neutral-900'}`}
