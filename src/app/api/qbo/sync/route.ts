@@ -82,27 +82,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Company ID required' }, { status: 400 })
     }
 
-    // Get QuickBooks credentials
-    const { data: qbConnection, error: connError } = await supabase
-      .from('quickbooks_connections')
-      .select('*')
+    // Get QuickBooks credentials from company_settings
+    const { data: settings, error: settingsError } = await supabase
+      .from('company_settings')
+      .select('qbo_realm_id, qbo_access_token, qbo_refresh_token, qbo_token_expires_at')
       .eq('company_id', companyId)
       .single()
 
-    if (connError || !qbConnection) {
+    if (settingsError || !settings || !settings.qbo_access_token) {
       return NextResponse.json({ error: 'QuickBooks not connected' }, { status: 400 })
     }
 
+    // Decrypt the access token
+    const { decryptToken } = await import('@/lib/qbo-encryption')
+    let accessToken = decryptToken(settings.qbo_access_token)
+    
     // Check if token needs refresh
-    let accessToken = qbConnection.access_token
-    const tokenExpiry = new Date(qbConnection.token_expires_at)
+    const tokenExpiry = new Date(settings.qbo_token_expires_at)
     
     if (tokenExpiry < new Date()) {
       // Refresh token logic here (implement separately)
       return NextResponse.json({ error: 'Token expired, please reconnect' }, { status: 401 })
     }
 
-    const realmId = qbConnection.realm_id
+    const realmId = settings.qbo_realm_id
     const results = {
       bankTransactions: { synced: 0, skipped: 0, errors: 0 },
       invoices: { synced: 0, skipped: 0, errors: 0 }
