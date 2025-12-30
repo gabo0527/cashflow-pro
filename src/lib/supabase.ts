@@ -24,11 +24,51 @@ export const getCurrentProfile = async () => {
 
 // ============ TRANSACTIONS ============
 
+// Helper to fetch all records with pagination (Supabase default limit is 1000)
+const fetchAllPaginated = async (
+  table: string, 
+  companyId?: string, 
+  orderColumn: string = 'date',
+  ascending: boolean = false
+): Promise<{ data: any[] | null; error: any }> => {
+  const pageSize = 1000
+  let allData: any[] = []
+  let from = 0
+  let hasMore = true
+
+  while (hasMore) {
+    let query = supabase
+      .from(table)
+      .select('*')
+      .order(orderColumn, { ascending })
+      .range(from, from + pageSize - 1)
+    
+    if (companyId) {
+      query = query.eq('company_id', companyId)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    if (data && data.length > 0) {
+      allData = [...allData, ...data]
+      from += pageSize
+      // If we got less than pageSize, we've reached the end
+      hasMore = data.length === pageSize
+    } else {
+      hasMore = false
+    }
+  }
+
+  return { data: allData, error: null }
+}
+
 export const fetchTransactions = async (companyId?: string) => {
-  let query = supabase.from('transactions').select('*').order('date', { ascending: false })
-  if (companyId) query = query.eq('company_id', companyId)
-  const { data, error } = await query
-  return { data, error }
+  // Use pagination to fetch ALL transactions (not limited to 1000)
+  return await fetchAllPaginated('transactions', companyId, 'date', false)
 }
 
 export const insertTransaction = async (transaction: any, companyId?: string, userId?: string) => {
@@ -75,10 +115,8 @@ export const deleteAllTransactions = async (companyId?: string) => {
 // ============ ACCRUAL TRANSACTIONS ============
 
 export const fetchAccrualTransactions = async (companyId?: string) => {
-  let query = supabase.from('accrual_transactions').select('*').order('date', { ascending: false })
-  if (companyId) query = query.eq('company_id', companyId)
-  const { data, error } = await query
-  return { data, error }
+  // Use pagination to fetch ALL accrual transactions (not limited to 1000)
+  return await fetchAllPaginated('accrual_transactions', companyId, 'date', false)
 }
 
 export const insertAccrualTransaction = async (transaction: any, companyId?: string, userId?: string) => {
