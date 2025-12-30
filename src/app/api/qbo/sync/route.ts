@@ -53,6 +53,36 @@ function parseInvoiceStatus(balance: number, dueDate: string | null): { status: 
   return { status: 'pending', statusDetail: `Due in ${Math.abs(diffDays)} days`, daysOverdue: 0 }
 }
 
+// Helper function to fetch from QB API
+async function fetchFromQB(
+  realmId: string,
+  accessToken: string,
+  query: string, 
+  entityName: string
+): Promise<any[]> {
+  console.log(`Fetching ${entityName}...`)
+  
+  const response = await fetch(
+    `${QB_API_BASE}/${realmId}/query?query=${encodeURIComponent(query)}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/json'
+      }
+    }
+  )
+
+  if (!response.ok) {
+    console.error(`QB query failed for ${entityName}:`, await response.text())
+    return []
+  }
+
+  const data = await response.json()
+  const items = data.QueryResponse?.[entityName] || []
+  console.log(`Fetched ${items.length} ${entityName}`)
+  return items
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { companyId, syncType, year } = await request.json()
@@ -79,7 +109,7 @@ export async function POST(request: NextRequest) {
 
     // Decrypt the access token
     const { decryptToken } = await import('@/lib/qbo-encryption')
-    let accessToken = decryptToken(settings.qbo_access_token)
+    const accessToken = decryptToken(settings.qbo_access_token)
     
     // Check if token needs refresh
     const tokenExpiry = new Date(settings.qbo_token_expires_at)
@@ -95,31 +125,6 @@ export async function POST(request: NextRequest) {
       year: syncYear
     }
 
-    // Helper function to fetch from QB with date range
-    async function fetchFromQB(query: string, entityName: string): Promise<any[]> {
-      console.log(`Fetching ${entityName} for ${syncYear}...`)
-      
-      const response = await fetch(
-        `${QB_API_BASE}/${realmId}/query?query=${encodeURIComponent(query)}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json'
-          }
-        }
-      )
-
-      if (!response.ok) {
-        console.error(`QB query failed for ${entityName}:`, await response.text())
-        return []
-      }
-
-      const data = await response.json()
-      const items = data.QueryResponse?.[entityName] || []
-      console.log(`Fetched ${items.length} ${entityName} for ${syncYear}`)
-      return items
-    }
-
     // ========================================
     // SYNC BANK TRANSACTIONS (Cash Basis)
     // Pulls: Purchases, Deposits, Transfers, Payments, SalesReceipts
@@ -129,6 +134,8 @@ export async function POST(request: NextRequest) {
       try {
         // 1. PURCHASES (Expenses - checks, credit cards, etc.)
         const purchases = await fetchFromQB(
+          realmId,
+          accessToken,
           `SELECT * FROM Purchase WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`,
           'Purchase'
         )
@@ -174,6 +181,8 @@ export async function POST(request: NextRequest) {
 
         // 2. DEPOSITS (Income to bank)
         const deposits = await fetchFromQB(
+          realmId,
+          accessToken,
           `SELECT * FROM Deposit WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`,
           'Deposit'
         )
@@ -214,6 +223,8 @@ export async function POST(request: NextRequest) {
 
         // 3. TRANSFERS between accounts
         const transfers = await fetchFromQB(
+          realmId,
+          accessToken,
           `SELECT * FROM Transfer WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`,
           'Transfer'
         )
@@ -245,6 +256,8 @@ export async function POST(request: NextRequest) {
 
         // 4. PAYMENTS received (invoice payments)
         const payments = await fetchFromQB(
+          realmId,
+          accessToken,
           `SELECT * FROM Payment WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`,
           'Payment'
         )
@@ -277,6 +290,8 @@ export async function POST(request: NextRequest) {
 
         // 5. SALES RECEIPTS (direct sales, not invoiced)
         const salesReceipts = await fetchFromQB(
+          realmId,
+          accessToken,
           `SELECT * FROM SalesReceipt WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`,
           'SalesReceipt'
         )
@@ -319,6 +334,8 @@ export async function POST(request: NextRequest) {
     if (!syncType || syncType === 'all' || syncType === 'invoices') {
       try {
         const invoices = await fetchFromQB(
+          realmId,
+          accessToken,
           `SELECT * FROM Invoice WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`,
           'Invoice'
         )
