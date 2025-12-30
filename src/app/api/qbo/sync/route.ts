@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
               payee: payee,
               qb_category: qbCategory,
               category: 'opex',
-              type: 'expense',
+              type: 'actual',
               account_name: purchase.AccountRef?.name || '',
               sync_source: 'quickbooks',
               synced_at: new Date().toISOString()
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
               payee: payee,
               qb_category: 'Income',
               category: 'revenue',
-              type: 'income',
+              type: 'actual',
               account_name: deposit.DepositToAccountRef?.name || '',
               sync_source: 'quickbooks',
               synced_at: new Date().toISOString()
@@ -244,7 +244,7 @@ export async function POST(request: NextRequest) {
               payee: '',
               qb_category: 'Transfer',
               category: 'opex',
-              type: 'transfer',
+              type: 'actual',
               account_name: transfer.FromAccountRef?.name || '',
               sync_source: 'quickbooks',
               synced_at: new Date().toISOString()
@@ -278,7 +278,7 @@ export async function POST(request: NextRequest) {
               payee: customerName,
               qb_category: 'Payment',
               category: 'revenue',
-              type: 'income',
+              type: 'actual',
               account_name: payment.DepositToAccountRef?.name || 'Undeposited Funds',
               sync_source: 'quickbooks',
               synced_at: new Date().toISOString()
@@ -312,7 +312,7 @@ export async function POST(request: NextRequest) {
               payee: customerName,
               qb_category: 'Sales',
               category: 'revenue',
-              type: 'income',
+              type: 'actual',
               account_name: receipt.DepositToAccountRef?.name || '',
               sync_source: 'quickbooks',
               synced_at: new Date().toISOString()
