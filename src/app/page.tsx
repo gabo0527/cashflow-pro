@@ -122,6 +122,7 @@ interface Project {
   targetGrossMargin?: number // KPI goal percentage
   startDate?: string
   endDate?: string
+  year?: number // SOW year for tracking
   createdAt: string
 }
 
@@ -432,7 +433,7 @@ export default function CashFlowPro() {
   const [dataLoading, setDataLoading] = useState(false)
   
   // Core state
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'data' | 'assumptions' | 'projections' | 'clients' | 'reports' | 'integrations' | 'settings'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'data' | 'assumptions' | 'projections' | 'clients' | 'projects' | 'reports' | 'integrations' | 'settings'>('dashboard')
   const [beginningBalance, setBeginningBalance] = useState<number>(50000)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [accrualTransactions, setAccrualTransactions] = useState<AccrualTransaction[]>([])
@@ -653,6 +654,7 @@ export default function CashFlowPro() {
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectBudget, setNewProjectBudget] = useState<number | ''>('')
   const [newProjectClientId, setNewProjectClientId] = useState<string>('')
+  const [newProjectYear, setNewProjectYear] = useState<number | ''>(new Date().getFullYear())
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   
   // Assumption form
@@ -2203,10 +2205,12 @@ const clearAllAccrualTransactions = useCallback(async () => {
     setEditAccrualForm({
       date: transaction.date,
       type: transaction.type,
+      category: transaction.category,
       description: transaction.description,
       amount: transaction.amount,
       project: transaction.project,
       vendor: transaction.vendor,
+      client: transaction.client,
       invoiceNumber: transaction.invoiceNumber,
       notes: transaction.notes
     })
@@ -2214,16 +2218,26 @@ const clearAllAccrualTransactions = useCallback(async () => {
 
   const saveEditAccrual = useCallback(async () => {
   if (editingAccrualId) {
-    const updates = {
+    // Build updates object, filtering out undefined values
+    const rawUpdates: Record<string, any> = {
       date: editAccrualForm.date,
       type: editAccrualForm.type,
+      category: editAccrualForm.category,
       description: editAccrualForm.description,
       amount: editAccrualForm.amount,
       project: editAccrualForm.project,
       vendor: editAccrualForm.vendor,
+      client: editAccrualForm.client,
       invoice_number: editAccrualForm.invoiceNumber,
       notes: editAccrualForm.notes
     }
+    
+    // Remove undefined values to avoid database errors
+    const updates = Object.fromEntries(
+      Object.entries(rawUpdates).filter(([_, v]) => v !== undefined)
+    )
+    
+    console.log('Saving accrual updates:', updates)
     
     const { error } = await supabaseUpdateAccrualTransaction(editingAccrualId, updates)
     if (error) {
@@ -2543,7 +2557,8 @@ const handleQuickAdd = useCallback(async () => {
       status: 'active' as const,
       budget: newProjectBudget !== '' ? Number(newProjectBudget) : undefined,
       budgetAlertThreshold: 80,
-      clientId: newProjectClientId || undefined
+      clientId: newProjectClientId || undefined,
+      year: newProjectYear !== '' ? Number(newProjectYear) : undefined
     }
     
     if (companyId && user) {
@@ -2564,6 +2579,7 @@ const handleQuickAdd = useCallback(async () => {
           targetGrossMargin: data.target_gross_margin,
           startDate: data.start_date,
           endDate: data.end_date,
+          year: data.year,
           createdAt: data.created_at
         }
         setProjects(prev => [...prev, newProject])
@@ -2581,8 +2597,9 @@ const handleQuickAdd = useCallback(async () => {
     setNewProjectName('')
     setNewProjectBudget('')
     setNewProjectClientId('')
+    setNewProjectYear(new Date().getFullYear())
     setShowProjectModal(false)
-  }, [newProjectName, newProjectBudget, newProjectClientId, projects.length, companyId, user])
+  }, [newProjectName, newProjectBudget, newProjectClientId, newProjectYear, projects.length, companyId, user])
 
   const updateProject = useCallback(async (id: string, updates: Partial<Project>) => {
     // Update local state immediately for responsiveness
@@ -3859,6 +3876,7 @@ const handleQuickAdd = useCallback(async () => {
       label: 'Clients & Projects',
       items: [
         { id: 'clients', label: 'Clients', icon: Users },
+        { id: 'projects', label: 'Projects', icon: FolderPlus },
       ]
     },
     {
@@ -4682,6 +4700,21 @@ const handleQuickAdd = useCallback(async () => {
                         </select>
                       </div>
                       <div>
+                        <label className={`block text-xs font-medium mb-1 ${textMuted}`}>SOW Year</label>
+                        <select
+                          value={editingProject.year || ''}
+                          onChange={(e) => setEditingProject({ ...editingProject, year: e.target.value ? Number(e.target.value) : undefined })}
+                          className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                        >
+                          <option value="">No year set</option>
+                          {[...Array(10)].map((_, i) => {
+                            const year = new Date().getFullYear() + 1 - i
+                            return <option key={year} value={year}>{year}</option>
+                          })}
+                        </select>
+                      </div>
+                      <div>
                         <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Client</label>
                         <select
                           value={editingProject.clientId || ''}
@@ -4738,6 +4771,21 @@ const handleQuickAdd = useCallback(async () => {
                           className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
                           style={{ colorScheme: theme }}
                         />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${textMuted}`}>SOW Year</label>
+                        <select
+                          value={newProjectYear}
+                          onChange={(e) => setNewProjectYear(e.target.value ? Number(e.target.value) : '')}
+                          className={`w-full px-3 py-2 rounded-lg text-sm border ${inputClasses}`}
+                          style={{ colorScheme: theme }}
+                        >
+                          <option value="">No year set</option>
+                          {[...Array(10)].map((_, i) => {
+                            const year = new Date().getFullYear() + 1 - i
+                            return <option key={year} value={year}>{year}</option>
+                          })}
+                        </select>
                       </div>
                       <div>
                         <label className={`block text-xs font-medium mb-1 ${textMuted}`}>Client (optional)</label>
@@ -9469,6 +9517,174 @@ const handleQuickAdd = useCallback(async () => {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Projects Tab */}
+          {activeTab === 'projects' && (
+            <motion.div key="projects" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
+              
+              {/* Header */}
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold">Projects</h2>
+                  <p className={`text-sm ${textMuted}`}>Manage projects, SOW years, and track performance</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditingProject(null)
+                    setShowProjectModal(true)
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Project
+                </button>
+              </div>
+
+              {/* Quick Stats */}
+              <div className="grid grid-cols-4 gap-4">
+                <div className={`rounded-lg p-3 border ${cardClasses}`}>
+                  <div className={`text-xs ${textMuted}`}>Total Projects</div>
+                  <div className="text-xl font-bold">{projects.length}</div>
+                </div>
+                <div className={`rounded-lg p-3 border ${cardClasses}`}>
+                  <div className={`text-xs ${textMuted}`}>Active</div>
+                  <div className="text-xl font-bold text-[#f97316]">{projects.filter(p => p.status === 'active').length}</div>
+                </div>
+                <div className={`rounded-lg p-3 border ${cardClasses}`}>
+                  <div className={`text-xs ${textMuted}`}>Completed</div>
+                  <div className="text-xl font-bold text-[#60a5fa]">{projects.filter(p => p.status === 'completed').length}</div>
+                </div>
+                <div className={`rounded-lg p-3 border ${cardClasses}`}>
+                  <div className={`text-xs ${textMuted}`}>On Hold</div>
+                  <div className="text-xl font-bold text-[#fbbf24]">{projects.filter(p => p.status === 'on-hold').length}</div>
+                </div>
+              </div>
+
+              {/* Projects Table */}
+              <div className={`rounded-xl border overflow-hidden ${cardClasses}`}>
+                <div className={`flex items-center justify-between px-4 py-3 border-b ${theme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-neutral-900 border-neutral-700'}`}>
+                  <h3 className="font-semibold">All Projects</h3>
+                  <div className="flex gap-1">
+                    {['all', 'active', 'completed', 'on-hold'].map(status => (
+                      <button
+                        key={status}
+                        onClick={() => setSelectedClientId(status === selectedClientId ? 'all' : status)}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                          (status === 'all' && selectedClientId === 'all') || selectedClientId === status
+                            ? 'bg-accent-primary text-white'
+                            : theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-neutral-800 hover:bg-neutral-700'
+                        }`}
+                      >
+                        {status === 'all' ? 'All' : status === 'on-hold' ? 'On Hold' : status.charAt(0).toUpperCase() + status.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                {projects.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <FolderPlus className={`w-10 h-10 mx-auto mb-3 ${textMuted}`} />
+                    <p className={`text-sm ${textMuted}`}>No projects yet. Add your first project to get started.</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead className={theme === 'light' ? 'bg-gray-50' : 'bg-neutral-800'}>
+                      <tr className={`border-b ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'} text-left ${textMuted}`}>
+                        <th className="px-4 py-3 font-medium">Project</th>
+                        <th className="px-4 py-3 font-medium">Year</th>
+                        <th className="px-4 py-3 font-medium">Status</th>
+                        <th className="px-4 py-3 font-medium">Client</th>
+                        <th className="px-4 py-3 font-medium text-right">Budget</th>
+                        <th className="px-4 py-3 font-medium text-right">Revenue</th>
+                        <th className="px-4 py-3 font-medium text-right">Costs</th>
+                        <th className="px-4 py-3 font-medium w-24"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {projects
+                        .filter(p => selectedClientId === 'all' || p.status === selectedClientId)
+                        .sort((a, b) => (b.year || 0) - (a.year || 0) || a.name.localeCompare(b.name))
+                        .map(project => {
+                          const projectRevenue = accrualTransactions
+                            .filter(t => normalizeProjectName(t.project) === normalizeProjectName(project.name) && t.type === 'revenue')
+                            .reduce((sum, t) => sum + t.amount, 0)
+                          const projectCosts = accrualTransactions
+                            .filter(t => normalizeProjectName(t.project) === normalizeProjectName(project.name) && t.type === 'direct_cost')
+                            .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+                          const assignedClient = clients.find(c => c.id === project.clientId)
+                          
+                          return (
+                            <tr key={project.id} className={`border-b ${theme === 'light' ? 'border-gray-100 hover:bg-gray-50' : 'border-neutral-700/50 hover:bg-neutral-900'}`}>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: project.color }} />
+                                  <span className="font-medium">{project.name}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                  project.year 
+                                    ? (theme === 'light' ? 'bg-blue-100 text-blue-700' : 'bg-blue-500/20 text-blue-400')
+                                    : textMuted
+                                }`}>
+                                  {project.year || '—'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                  project.status === 'active' ? 'bg-[#f97316]/20 text-[#f97316]' :
+                                  project.status === 'completed' ? 'bg-[#60a5fa]/20 text-[#60a5fa]' :
+                                  'bg-[#fbbf24]/20 text-[#fbbf24]'
+                                }`}>
+                                  {project.status === 'on-hold' ? 'On Hold' : project.status.charAt(0).toUpperCase() + project.status.slice(1)}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                {assignedClient ? (
+                                  <span className="font-medium">{assignedClient.name}</span>
+                                ) : (
+                                  <span className={textMuted}>—</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono">
+                                {project.budget ? formatCurrency(project.budget) : <span className={textMuted}>—</span>}
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono text-accent-primary">{formatCurrency(projectRevenue)}</td>
+                              <td className="px-4 py-3 text-right font-mono text-accent-danger">{formatCurrency(projectCosts)}</td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center justify-end gap-1">
+                                  <button
+                                    onClick={() => {
+                                      setEditingProject(project)
+                                      setShowProjectModal(true)
+                                    }}
+                                    className={`p-1.5 rounded hover:bg-accent-primary/10 ${textMuted} hover:text-accent-primary`}
+                                    title="Edit"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (confirm(`Delete project "${project.name}"? This cannot be undone.`)) {
+                                        deleteProject(project.id)
+                                      }
+                                    }}
+                                    className={`p-1.5 rounded hover:bg-accent-danger/10 ${textMuted} hover:text-accent-danger`}
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </motion.div>
           )}
