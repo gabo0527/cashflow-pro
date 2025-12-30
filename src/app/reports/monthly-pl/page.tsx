@@ -210,7 +210,7 @@ export default function MonthlyPLReport() {
     <div className={`min-h-screen ${bgColor} ${textPrimary}`}>
       {/* Header */}
       <header className={`sticky top-0 z-10 ${surfaceColor} border-b ${borderColor}`}>
-        <div className="px-6">
+        <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
               <button
@@ -243,7 +243,7 @@ export default function MonthlyPLReport() {
 
       {/* Filters Bar */}
       <div className={`${surfaceColor} border-b ${borderColor} py-4`}>
-        <div className="px-6">
+        <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-wrap items-center gap-4">
             {/* Data Source Selector */}
             <div className="flex items-center gap-2">
@@ -334,7 +334,7 @@ export default function MonthlyPLReport() {
       </div>
 
       {/* Data Source Badge */}
-      <div className="px-6 py-4">
+      <div className="max-w-7xl mx-auto px-6 py-4">
         <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
           dataSource === 'cash' ? 'bg-emerald-500/10 text-emerald-500' :
           dataSource === 'accrual' ? 'bg-blue-500/10 text-blue-500' :
@@ -345,8 +345,8 @@ export default function MonthlyPLReport() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="px-6 pb-6">
+      {/* Summary Cards - Contained */}
+      <div className="max-w-7xl mx-auto px-6 pb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className={`${surfaceColor} rounded-xl p-4 border ${borderColor}`}>
             <p className={`text-sm ${textMuted} mb-1`}>Total Revenue</p>
@@ -463,8 +463,8 @@ export default function MonthlyPLReport() {
         </div>
       </div>
 
-      {/* Data Source Legend */}
-      <div className="px-6 pb-8">
+      {/* Data Source Legend - Contained */}
+      <div className="max-w-7xl mx-auto px-6 pb-8">
         <div className={`${surfaceColor} rounded-xl p-4 border ${borderColor}`}>
           <h3 className="font-semibold mb-3">Understanding Your Data</h3>
           <div className="grid md:grid-cols-3 gap-4 text-sm">
