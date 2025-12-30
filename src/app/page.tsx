@@ -6707,6 +6707,11 @@ const handleQuickAdd = useCallback(async () => {
                   </div>
                 </div>
                 
+                {comparisonData.length === 0 ? (
+                  <div className="flex items-center justify-center h-[300px]">
+                    <p className={`text-sm ${textMuted}`}>No data available for comparison. Select a different time period.</p>
+                  </div>
+                ) : (
                 <ResponsiveContainer width="100%" height={300}>
                   {comparisonView === 'yoy' && yoyYears.length >= 2 ? (
                     <BarChart data={comparisonData}>
@@ -6743,6 +6748,7 @@ const handleQuickAdd = useCallback(async () => {
                     </BarChart>
                   )}
                 </ResponsiveContainer>
+                )}
                 
                 {/* YoY Note */}
                 {comparisonView === 'yoy' && yoyYears.length < 2 && (
