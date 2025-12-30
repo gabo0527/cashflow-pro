@@ -78,12 +78,15 @@ interface AccrualTransaction {
   id: string
   date: string  // Invoice date (when recognized)
   type: 'revenue' | 'direct_cost'  // Invoice TO client or FROM contractor
+  category?: string  // revenue, opex, overhead, investment
   description: string
   amount: number  // Positive for revenue, negative for costs
   project: string  // Required for accrual - must be project-based
-  vendor?: string  // Client name or Contractor name
+  vendor?: string  // Client name or Contractor name (legacy)
+  client?: string  // Client name (from QB sync)
   invoiceNumber?: string
   notes?: string
+  sync_source?: string  // 'quickbooks' | 'manual'
   source?: 'qbo' | 'csv' | 'manual' // Data source
   qbo_invoice_id?: string // QuickBooks invoice ID
 }
@@ -487,6 +490,7 @@ export default function CashFlowPro() {
   // Enhanced Transaction UI state
   const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set())
   const [expandedTransaction, setExpandedTransaction] = useState<string | null>(null)
+  const [expandedAccrualTransaction, setExpandedAccrualTransaction] = useState<string | null>(null)
   const [sourceFilter, setSourceFilter] = useState<'all' | 'qbo' | 'csv' | 'manual'>('all')
   const [showBulkCategorize, setShowBulkCategorize] = useState(false)
   const [bulkCategory, setBulkCategory] = useState('')
@@ -699,13 +703,15 @@ export default function CashFlowPro() {
               id: t.id,
               date: t.date,
               type: t.type,
+              category: t.category || t.type, // Use category if exists, fallback to type
               description: t.description,
               amount: parseFloat(t.amount),
               project: t.project,
               vendor: t.vendor,
+              client: t.client,
               invoiceNumber: t.invoice_number,
               notes: t.notes,
-              source: t.source || 'manual',
+              sync_source: t.sync_source || 'manual',
               qbo_invoice_id: t.qbo_invoice_id
             }))
             setAccrualTransactions(mapped)
@@ -1874,6 +1880,25 @@ export default function CashFlowPro() {
         t.id === transactionId ? { ...t, ...updates } : t
       ))
       setExpandedTransaction(null)
+    }
+  }, [])
+
+  // Quick categorize accrual transaction
+  const quickCategorizeAccrual = useCallback(async (transactionId: string, type: 'revenue' | 'direct_cost', project?: string, client?: string, category?: string) => {
+    const updates: any = { type }
+    if (project !== undefined) updates.project = project
+    if (client !== undefined) {
+      updates.client = client
+      updates.vendor = client // Also update vendor for compatibility
+    }
+    if (category !== undefined) updates.category = category
+    
+    const { error } = await supabaseUpdateAccrualTransaction(transactionId, updates)
+    if (!error) {
+      setAccrualTransactions(prev => prev.map(t => 
+        t.id === transactionId ? { ...t, ...updates } : t
+      ))
+      setExpandedAccrualTransaction(null)
     }
   }, [])
 
@@ -7796,18 +7821,25 @@ const handleQuickAdd = useCallback(async () => {
                                 />
                               </th>
                               <th className="pb-3 font-medium">Date</th>
-                              <th className="pb-3 font-medium">Type</th>
+                              <th className="pb-3 font-medium">Source</th>
+                              <th className="pb-3 font-medium">Category</th>
                               <th className="pb-3 font-medium">Description</th>
                               <th className="pb-3 font-medium text-right">Amount</th>
                               <th className="pb-3 font-medium">Project</th>
-                              <th className="pb-3 font-medium">Vendor</th>
+                              <th className="pb-3 font-medium">Client</th>
                               <th className="pb-3 font-medium text-center">Actions</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {filteredAccrualTransactions.map(t => (
-                              <tr key={t.id} className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-neutral-700/50'} ${selectedAccrualIds.has(t.id) ? (theme === 'light' ? 'bg-[#262626]' : 'bg-[#f97316]/10') : ''} hover:${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900/50'}`}>
-                                <td className="py-3">
+                            {filteredAccrualTransactions.map(t => {
+                              const isExpanded = expandedAccrualTransaction === t.id
+                              return (
+                                <React.Fragment key={t.id}>
+                              <tr 
+                                className={`border-b ${theme === 'light' ? 'border-gray-100' : 'border-neutral-700/50'} ${selectedAccrualIds.has(t.id) ? (theme === 'light' ? 'bg-[#262626]' : 'bg-[#f97316]/10') : ''} hover:${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-900/50'} cursor-pointer`}
+                                onClick={() => setExpandedAccrualTransaction(isExpanded ? null : t.id)}
+                              >
+                                <td className="py-3" onClick={(e) => e.stopPropagation()}>
                                   <input 
                                     type="checkbox" 
                                     checked={selectedAccrualIds.has(t.id)}
@@ -7817,7 +7849,7 @@ const handleQuickAdd = useCallback(async () => {
                                 </td>
                                 {editingAccrualId === t.id ? (
                                   <>
-                                    <td className="py-2">
+                                    <td className="py-2" onClick={(e) => e.stopPropagation()}>
                                       <input 
                                         type="date" 
                                         value={editAccrualForm.date || ''} 
@@ -7827,17 +7859,28 @@ const handleQuickAdd = useCallback(async () => {
                                       />
                                     </td>
                                     <td className="py-2">
+                                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                        t.sync_source === 'quickbooks'
+                                          ? 'bg-blue-500/10 text-blue-500'
+                                          : 'bg-neutral-500/10 text-neutral-400'
+                                      }`}>
+                                        {t.sync_source === 'quickbooks' ? 'QB' : 'Manual'}
+                                      </span>
+                                    </td>
+                                    <td className="py-2" onClick={(e) => e.stopPropagation()}>
                                       <select 
-                                        value={editAccrualForm.type || 'revenue'} 
-                                        onChange={(e) => setEditAccrualForm(prev => ({ ...prev, type: e.target.value as 'revenue' | 'direct_cost' }))}
+                                        value={editAccrualForm.category || editAccrualForm.type || 'revenue'} 
+                                        onChange={(e) => setEditAccrualForm(prev => ({ ...prev, category: e.target.value }))}
                                         className={`px-2 py-1 text-sm rounded border ${inputClasses}`}
                                         style={{ colorScheme: theme }}
                                       >
                                         <option value="revenue">Revenue</option>
-                                        <option value="direct_cost">Direct Cost</option>
+                                        <option value="opex">OpEx</option>
+                                        <option value="overhead">Overhead</option>
+                                        <option value="investment">Investment</option>
                                       </select>
                                     </td>
-                                    <td className="py-2">
+                                    <td className="py-2" onClick={(e) => e.stopPropagation()}>
                                       <input 
                                         type="text" 
                                         value={editAccrualForm.description || ''} 
@@ -7846,7 +7889,7 @@ const handleQuickAdd = useCallback(async () => {
                                         style={{ colorScheme: theme }}
                                       />
                                     </td>
-                                    <td className="py-2">
+                                    <td className="py-2" onClick={(e) => e.stopPropagation()}>
                                       <input 
                                         type="number" 
                                         value={editAccrualForm.amount || ''} 
@@ -7855,25 +7898,33 @@ const handleQuickAdd = useCallback(async () => {
                                         style={{ colorScheme: theme }}
                                       />
                                     </td>
-                                    <td className="py-2">
-                                      <input 
-                                        type="text" 
-                                        value={editAccrualForm.project || ''} 
+                                    <td className="py-2" onClick={(e) => e.stopPropagation()}>
+                                      <select
+                                        value={editAccrualForm.project || ''}
                                         onChange={(e) => setEditAccrualForm(prev => ({ ...prev, project: e.target.value }))}
                                         className={`w-full px-2 py-1 text-sm rounded border ${inputClasses}`}
                                         style={{ colorScheme: theme }}
-                                      />
+                                      >
+                                        <option value="">No Project</option>
+                                        {projectList.map(p => (
+                                          <option key={p} value={p}>{p}</option>
+                                        ))}
+                                      </select>
                                     </td>
-                                    <td className="py-2">
-                                      <input 
-                                        type="text" 
-                                        value={editAccrualForm.vendor || ''} 
-                                        onChange={(e) => setEditAccrualForm(prev => ({ ...prev, vendor: e.target.value }))}
+                                    <td className="py-2" onClick={(e) => e.stopPropagation()}>
+                                      <select
+                                        value={editAccrualForm.client || editAccrualForm.vendor || ''}
+                                        onChange={(e) => setEditAccrualForm(prev => ({ ...prev, client: e.target.value, vendor: e.target.value }))}
                                         className={`w-full px-2 py-1 text-sm rounded border ${inputClasses}`}
                                         style={{ colorScheme: theme }}
-                                      />
+                                      >
+                                        <option value="">No Client</option>
+                                        {clients.map(c => (
+                                          <option key={c.id} value={c.name}>{c.name}</option>
+                                        ))}
+                                      </select>
                                     </td>
-                                    <td className="py-2 text-center">
+                                    <td className="py-2 text-center" onClick={(e) => e.stopPropagation()}>
                                       <div className="flex items-center justify-center gap-1">
                                         <button onClick={saveEditAccrual} className="p-1.5 text-accent-primary hover:bg-accent-primary/10 rounded">
                                           <Check className="w-4 h-4" />
@@ -7888,21 +7939,37 @@ const handleQuickAdd = useCallback(async () => {
                                   <>
                                     <td className="py-3 text-sm">{t.date}</td>
                                     <td className="py-3">
-                                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                        t.type === 'revenue' 
-                                          ? 'bg-accent-primary/10 text-accent-primary' 
-                                          : 'bg-accent-danger/10 text-accent-danger'
+                                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                        t.sync_source === 'quickbooks'
+                                          ? 'bg-blue-500/10 text-blue-500'
+                                          : 'bg-neutral-500/10 text-neutral-400'
                                       }`}>
-                                        {t.type === 'revenue' ? 'Revenue' : 'Direct Cost'}
+                                        {t.sync_source === 'quickbooks' ? 'QB' : 'Manual'}
                                       </span>
+                                    </td>
+                                    <td className="py-3">
+                                      {(() => {
+                                        const catInfo = getCategoryById(t.category || (t.type === 'revenue' ? 'revenue' : 'opex'))
+                                        return (
+                                          <span 
+                                            className="px-2 py-1 rounded text-xs font-medium"
+                                            style={{ 
+                                              backgroundColor: `${catInfo?.color || '#6b7280'}20`,
+                                              color: catInfo?.color || '#6b7280'
+                                            }}
+                                          >
+                                            {catInfo?.name || t.type}
+                                          </span>
+                                        )
+                                      })()}
                                     </td>
                                     <td className="py-3 text-sm max-w-xs truncate">{t.description}</td>
                                     <td className={`py-3 text-right font-mono text-sm ${t.type === 'revenue' ? 'text-accent-primary' : 'text-accent-danger'}`}>
                                       {formatCurrency(Math.abs(t.amount))}
                                     </td>
-                                    <td className={`py-3 text-sm ${textMuted}`}>{t.project}</td>
-                                    <td className={`py-3 text-sm ${textMuted}`}>{t.vendor || '-'}</td>
-                                    <td className="py-3 text-center">
+                                    <td className={`py-3 text-sm ${t.project ? '' : textMuted}`}>{t.project || <span className="text-amber-600">—</span>}</td>
+                                    <td className={`py-3 text-sm ${textMuted}`}>{t.client || t.vendor || '-'}</td>
+                                    <td className="py-3 text-center" onClick={(e) => e.stopPropagation()}>
                                       <div className="flex items-center justify-center gap-1">
                                         <button onClick={() => startEditAccrual(t)} className="p-1.5 text-neutral-400 hover:text-[#f97316] hover:bg-[#f97316]/10 rounded" title="Inline edit">
                                           <Edit2 className="w-4 h-4" />
@@ -7918,7 +7985,77 @@ const handleQuickAdd = useCallback(async () => {
                                   </>
                                 )}
                               </tr>
-                            ))}
+                                  {/* Expanded Quick Categorize Row for Accrual */}
+                                  {isExpanded && (
+                                    <tr className={theme === 'light' ? 'bg-blue-50' : 'bg-blue-900/20'}>
+                                      <td colSpan={9} className="py-4 px-4">
+                                        <div className="flex flex-wrap items-center gap-4">
+                                          <div>
+                                            <p className={`text-xs font-medium mb-2 ${textMuted}`}>Quick Category:</p>
+                                            <div className="flex flex-wrap gap-2">
+                                              {['revenue', 'opex', 'overhead', 'investment'].map(catId => {
+                                                const catInfo = getCategoryById(catId)
+                                                return (
+                                                  <button
+                                                    key={catId}
+                                                    onClick={() => quickCategorizeAccrual(t.id, catId === 'revenue' ? 'revenue' : 'direct_cost', t.project, t.client || t.vendor, catId)}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                                      t.category === catId 
+                                                        ? 'ring-2 ring-offset-2 ring-[#f97316]' 
+                                                        : 'hover:opacity-80'
+                                                    }`}
+                                                    style={{ 
+                                                      backgroundColor: `${catInfo?.color || '#6b7280'}20`,
+                                                      color: catInfo?.color || '#6b7280'
+                                                    }}
+                                                  >
+                                                    {catInfo?.name || catId}
+                                                  </button>
+                                                )
+                                              })}
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <p className={`text-xs font-medium mb-2 ${textMuted}`}>Assign Project:</p>
+                                            <select
+                                              value={t.project || ''}
+                                              onChange={(e) => quickCategorizeAccrual(t.id, t.type as 'revenue' | 'direct_cost', e.target.value, t.client || t.vendor, t.category)}
+                                              className={`rounded-lg px-3 py-1.5 text-sm border ${inputClasses}`}
+                                              style={{ colorScheme: theme }}
+                                            >
+                                              <option value="">No Project</option>
+                                              {projectList.map(p => (
+                                                <option key={p} value={p}>{p}</option>
+                                              ))}
+                                            </select>
+                                          </div>
+                                          <div>
+                                            <p className={`text-xs font-medium mb-2 ${textMuted}`}>Assign Client:</p>
+                                            <select
+                                              value={t.client || t.vendor || ''}
+                                              onChange={(e) => quickCategorizeAccrual(t.id, t.type as 'revenue' | 'direct_cost', t.project, e.target.value, t.category)}
+                                              className={`rounded-lg px-3 py-1.5 text-sm border ${inputClasses}`}
+                                              style={{ colorScheme: theme }}
+                                            >
+                                              <option value="">No Client</option>
+                                              {clients.map(c => (
+                                                <option key={c.id} value={c.name}>{c.name}</option>
+                                              ))}
+                                            </select>
+                                          </div>
+                                          <button
+                                            onClick={() => setExpandedAccrualTransaction(null)}
+                                            className={`ml-auto px-3 py-1.5 rounded-lg text-xs ${theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-neutral-900'}`}
+                                          >
+                                            Close
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
+                              )
+                            })}
                           </tbody>
                         </table>
                       </div>
