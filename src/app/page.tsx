@@ -165,11 +165,17 @@ interface MonthlyData {
   dataType: 'actual' | 'projected' | 'mixed'
 }
 
-type DateRangePreset = 'thisYear' | 'lastYear' | 'last12' | 'last6' | 'last3' | 'ytd' | 'all' | 'custom'
+type DateRangePreset = 'thisYear' | 'lastYear' | 'last12' | 'last6' | 'last3' | 'ytd' | 'all' | 'custom' | 'year2020' | 'year2021' | 'year2022' | 'year2023' | 'year2024' | 'year2025' | 'year2026'
 
 const getDateRangeFromPreset = (preset: DateRangePreset, customStart?: string, customEnd?: string): { start: string; end: string } => {
   const now = new Date()
   const currentYear = now.getFullYear()
+  
+  // Handle specific year presets (year2020, year2021, etc.)
+  if (preset.startsWith('year')) {
+    const year = parseInt(preset.replace('year', ''))
+    return { start: `${year}-01`, end: `${year}-12` }
+  }
   
   switch (preset) {
     case 'thisYear':
@@ -6263,6 +6269,30 @@ const handleQuickAdd = useCallback(async () => {
                 <div className={`hidden sm:block w-px h-6 ${theme === 'light' ? 'bg-gray-300' : 'bg-neutral-700'}`} />
                 
                 <div className="flex gap-1 sm:gap-2 flex-wrap items-center">
+                  {/* Year Dropdown */}
+                  <select
+                    value={dateRangePreset.startsWith('year') ? dateRangePreset : ''}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setDateRangePreset(e.target.value as DateRangePreset)
+                        setShowDatePicker(false)
+                      }
+                    }}
+                    className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium border ${
+                      dateRangePreset.startsWith('year')
+                        ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/30'
+                        : theme === 'light' 
+                          ? 'bg-gray-100 text-gray-600 border-gray-200' 
+                          : 'bg-neutral-900 text-neutral-400 border-neutral-700'
+                    }`}
+                    style={{ colorScheme: theme }}
+                  >
+                    <option value="">Year</option>
+                    {[2025, 2024, 2023, 2022, 2021, 2020].map(year => (
+                      <option key={year} value={`year${year}`}>{year}</option>
+                    ))}
+                  </select>
+                  
                   {datePresets.map(preset => (
                     <button
                       key={preset.key}
