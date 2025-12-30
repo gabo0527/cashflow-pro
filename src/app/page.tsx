@@ -1300,25 +1300,43 @@ export default function CashFlowPro() {
               // Determine type: revenue (positive invoices to clients) or direct_cost (contractor invoices)
               let type: 'revenue' | 'direct_cost' = 'revenue'
               const rawType = (row.type || '').toLowerCase().trim()
+              const rawCategory = (row.category || '').toLowerCase().trim()
               
-              if (rawType.includes('cost') || rawType.includes('expense') || rawType.includes('contractor') || rawType.includes('direct')) {
+              if (rawType.includes('cost') || rawType.includes('expense') || rawType.includes('contractor') || rawType.includes('direct') || rawType.includes('opex')) {
                 type = 'direct_cost'
               } else if (rawType.includes('revenue') || rawType.includes('income') || rawType.includes('invoice')) {
                 type = 'revenue'
+              } else if (rawCategory.includes('opex') || rawCategory.includes('cost') || rawCategory.includes('expense')) {
+                type = 'direct_cost'
               } else if (amount < 0) {
                 type = 'direct_cost'
+              }
+              
+              // Map category - defaults based on type if not specified
+              let category = rawCategory || (type === 'revenue' ? 'revenue' : 'opex')
+              if (rawCategory.includes('revenue') || rawCategory.includes('income')) {
+                category = 'revenue'
+              } else if (rawCategory.includes('opex') || rawCategory.includes('operating') || rawCategory.includes('direct')) {
+                category = 'opex'
+              } else if (rawCategory.includes('overhead') || rawCategory.includes('admin') || rawCategory.includes('g&a')) {
+                category = 'overhead'
+              } else if (rawCategory.includes('invest') || rawCategory.includes('capex')) {
+                category = 'investment'
               }
               
               const t: AccrualTransaction = {
                 id: generateId(),
                 date: normalizedDate,
                 type,
+                category,
                 description: row.description?.trim() || '',
                 amount: Math.abs(amount) * (type === 'direct_cost' ? -1 : 1),
                 project: row.project?.trim() || 'Unassigned',
-                vendor: row.vendor?.trim() || row.client?.trim() || undefined,
+                vendor: row.vendor?.trim() || undefined,
+                client: row.client?.trim() || row.vendor?.trim() || undefined,
                 invoiceNumber: row.invoice_number?.trim() || row.invoice?.trim() || undefined,
-                notes: row.notes?.trim() || undefined
+                notes: row.notes?.trim() || undefined,
+                source: 'csv'
               }
               return t
             })
@@ -1329,12 +1347,15 @@ export default function CashFlowPro() {
     const toInsert = imported.map(t => ({
       date: t.date,
       type: t.type,
+      category: t.category,
       description: t.description,
       amount: t.amount,
       project: t.project,
       vendor: t.vendor,
+      client: t.client,
       invoice_number: t.invoiceNumber,
-      notes: t.notes
+      notes: t.notes,
+      source: 'csv'
     }))
     
     const { data, error } = await bulkInsertAccrualTransactions(toInsert, companyId, user.id)
@@ -1345,12 +1366,15 @@ export default function CashFlowPro() {
         id: t.id,
         date: t.date,
         type: t.type,
+        category: t.category,
         description: t.description,
         amount: parseFloat(t.amount),
         project: t.project,
         vendor: t.vendor,
+        client: t.client,
         invoiceNumber: t.invoice_number,
-        notes: t.notes
+        notes: t.notes,
+        source: t.source
       }))
       setAccrualTransactions(prev => [...prev, ...mapped])
       const revenueCount = mapped.filter(t => t.type === 'revenue').length
@@ -1358,7 +1382,7 @@ export default function CashFlowPro() {
       alert(`Successfully imported ${mapped.length} accrual entries (${revenueCount} revenue, ${costCount} direct costs)`)
     }
   }          } else {
-            alert('No valid accrual data found. Check column headers: date, type, description, amount, project, vendor')
+            alert('No valid accrual data found. Check column headers: date, type, category, description, amount, project, client, vendor')
           }
         },
         error: (error) => {
