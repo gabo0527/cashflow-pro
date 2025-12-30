@@ -381,7 +381,8 @@ const STORAGE_KEYS = {
   branding: 'cashflow_branding',
   chartFilters: 'cashflow_chart_filters',
   categories: 'cashflow_categories',
-  collapsedSections: 'cashflow_collapsed_sections'
+  collapsedSections: 'cashflow_collapsed_sections',
+  savedReports: 'vantage_saved_reports'
 }
 
 // Default categories
@@ -471,6 +472,9 @@ export default function CashFlowPro() {
   const [reportDateRange, setReportDateRange] = useState({ start: '', end: '' })
   const [reportProject, setReportProject] = useState<string>('all')
   const [reportClient, setReportClient] = useState<string>('all')
+  const [savedReports, setSavedReports] = useState<Array<{ id: string; name: string; createdAt: string; config: any }>>([])
+  const [editingReportId, setEditingReportId] = useState<string | null>(null)
+  const [editingReportName, setEditingReportName] = useState('')
   const [pdfSections, setPdfSections] = useState({
     kpis: true,
     cashFlowChart: true,
@@ -830,9 +834,21 @@ export default function CashFlowPro() {
           const savedTheme = localStorage.getItem(STORAGE_KEYS.theme)
           const savedChartFilters = localStorage.getItem(STORAGE_KEYS.chartFilters)
           const savedCollapsedSections = localStorage.getItem(STORAGE_KEYS.collapsedSections)
+          const savedReportsData = localStorage.getItem(STORAGE_KEYS.savedReports)
           if (savedTheme) setTheme(savedTheme as 'dark' | 'light')
           if (savedChartFilters) setChartFilters(JSON.parse(savedChartFilters))
           if (savedCollapsedSections) setCollapsedSections(new Set(JSON.parse(savedCollapsedSections)))
+          if (savedReportsData) {
+            // Normalize old reports to ensure they have id and createdAt fields
+            const reports = JSON.parse(savedReportsData).map((r: any, idx: number) => ({
+              ...r,
+              id: r.id || `report_legacy_${idx}_${Date.now()}`,
+              createdAt: r.createdAt || r.created_at || new Date().toISOString()
+            }))
+            setSavedReports(reports)
+            // Save normalized data back
+            localStorage.setItem(STORAGE_KEYS.savedReports, JSON.stringify(reports))
+          }
           
         } catch (error) {
           console.error('Error loading data from Supabase:', error)
@@ -874,6 +890,29 @@ export default function CashFlowPro() {
       localStorage.setItem(STORAGE_KEYS.collapsedSections, JSON.stringify(Array.from(collapsedSections)))
     }
   }, [collapsedSections, isLoaded])
+
+  // Saved Reports management functions
+  const deleteSavedReport = useCallback((reportId: string) => {
+    setSavedReports(prev => {
+      const updated = prev.filter(r => r.id !== reportId)
+      localStorage.setItem(STORAGE_KEYS.savedReports, JSON.stringify(updated))
+      return updated
+    })
+  }, [])
+
+  const renameSavedReport = useCallback((reportId: string, newName: string) => {
+    setSavedReports(prev => {
+      const updated = prev.map(r => r.id === reportId ? { ...r, name: newName } : r)
+      localStorage.setItem(STORAGE_KEYS.savedReports, JSON.stringify(updated))
+      return updated
+    })
+    setEditingReportId(null)
+    setEditingReportName('')
+  }, [])
+
+  const openSavedReport = useCallback((reportId: string) => {
+    router.push(`/reports/builder?load=${reportId}`)
+  }, [router])
 
   // Helper to get category by id
   const getCategoryById = useCallback((id: string): Category | undefined => {
@@ -9568,6 +9607,107 @@ const handleQuickAdd = useCallback(async () => {
                   <ChevronRight className={`w-5 h-5 ${textMuted}`} />
                 </div>
               </button>
+
+              {/* My Saved Reports */}
+              {savedReports.length > 0 && (
+                <div className={`rounded-xl p-6 border ${cardClasses}`}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-[#f97316]" />
+                      My Saved Reports
+                    </h3>
+                    <span className={`text-sm ${textMuted}`}>{savedReports.length} report{savedReports.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {savedReports.map(report => (
+                      <div 
+                        key={report.id}
+                        className={`flex items-center justify-between p-4 rounded-lg border transition-all hover:shadow-sm ${
+                          theme === 'light' ? 'border-gray-200 hover:border-gray-300 bg-gray-50' : 'border-neutral-700 hover:border-neutral-600 bg-neutral-800/50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                            theme === 'light' ? 'bg-orange-100' : 'bg-orange-500/20'
+                          }`}>
+                            <FileText className="w-5 h-5 text-[#f97316]" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            {editingReportId === report.id ? (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={editingReportName}
+                                  onChange={(e) => setEditingReportName(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') renameSavedReport(report.id, editingReportName)
+                                    if (e.key === 'Escape') { setEditingReportId(null); setEditingReportName('') }
+                                  }}
+                                  className={`px-2 py-1 text-sm rounded border ${inputClasses}`}
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => renameSavedReport(report.id, editingReportName)}
+                                  className="p-1 text-green-500 hover:bg-green-500/10 rounded"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => { setEditingReportId(null); setEditingReportName('') }}
+                                  className="p-1 text-red-500 hover:bg-red-500/10 rounded"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="font-medium truncate">{report.name}</p>
+                                <p className={`text-xs ${textMuted}`}>
+                                  Created {new Date(report.createdAt || report.created_at).toLocaleDateString()}
+                                </p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        {editingReportId !== report.id && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => openSavedReport(report.id)}
+                              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                                theme === 'light' 
+                                  ? 'bg-orange-100 text-orange-600 hover:bg-orange-200' 
+                                  : 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30'
+                              }`}
+                            >
+                              Open
+                            </button>
+                            <button
+                              onClick={() => { setEditingReportId(report.id); setEditingReportName(report.name) }}
+                              className={`p-2 rounded-lg transition-colors ${
+                                theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-neutral-700'
+                              }`}
+                              title="Rename"
+                            >
+                              <Edit2 className={`w-4 h-4 ${textMuted}`} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (confirm('Delete this report? This cannot be undone.')) {
+                                  deleteSavedReport(report.id)
+                                }
+                              }}
+                              className={`p-2 rounded-lg transition-colors hover:bg-red-500/10`}
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
 
