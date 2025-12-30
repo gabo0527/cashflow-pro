@@ -9663,7 +9663,7 @@ const handleQuickAdd = useCallback(async () => {
                               <>
                                 <p className="font-medium truncate">{report.name}</p>
                                 <p className={`text-xs ${textMuted}`}>
-                                  Created {new Date(report.createdAt || report.created_at).toLocaleDateString()}
+                                  Created {new Date(report.createdAt || report.created_at || new Date().toISOString()).toLocaleDateString()}
                                 </p>
                               </>
                             )}
