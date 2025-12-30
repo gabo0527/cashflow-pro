@@ -1943,15 +1943,20 @@ export default function CashFlowPro() {
   const getSubcategoriesForCategory = useCallback((category: string): string[] => {
     const defaults = SUBCATEGORIES[category] || []
     const custom = customSubcategories[category] || []
-    return [...new Set([...defaults, ...custom])]
+    const combined = [...defaults, ...custom]
+    return Array.from(new Set(combined))
   }, [customSubcategories])
 
   // Add a custom subcategory
   const addCustomSubcategory = useCallback((category: string, subcategory: string) => {
-    setCustomSubcategories(prev => ({
-      ...prev,
-      [category]: [...new Set([...(prev[category] || []), subcategory])]
-    }))
+    setCustomSubcategories(prev => {
+      const existing = prev[category] || []
+      const updated = [...existing, subcategory]
+      return {
+        ...prev,
+        [category]: Array.from(new Set(updated))
+      }
+    })
   }, [])
 
   // Quick add project (inline from dropdown)
