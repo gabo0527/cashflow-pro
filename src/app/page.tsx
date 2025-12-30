@@ -1902,6 +1902,73 @@ export default function CashFlowPro() {
     }
   }, [])
 
+  // Quick categorize with client for cash transactions
+  const quickCategorizeWithClient = useCallback(async (transactionId: string, category: string, project?: string, vendor?: string) => {
+    const updates: any = { category }
+    if (project !== undefined) updates.project = project
+    if (vendor !== undefined) updates.vendor = vendor
+    
+    const { error } = await supabaseUpdateTransaction(transactionId, updates)
+    if (!error) {
+      setTransactions(prev => prev.map(t => 
+        t.id === transactionId ? { ...t, ...updates } : t
+      ))
+    }
+  }, [])
+
+  // Quick add project (inline from dropdown)
+  const addProjectQuick = useCallback(async (name: string) => {
+    if (!name.trim() || !companyId || !user) return
+    
+    const projectData = {
+      name: name.trim(),
+      color: PROJECT_COLORS[projects.length % PROJECT_COLORS.length],
+      status: 'active' as const,
+      budgetAlertThreshold: 80
+    }
+    
+    const { data, error } = await supabaseInsertProject(projectData, companyId, user.id)
+    if (!error && data) {
+      const newProject: Project = {
+        id: data.id,
+        name: data.name,
+        color: data.color,
+        status: data.status,
+        budget: data.budget,
+        budgetAlertThreshold: data.budget_alert_threshold,
+        clientId: data.client_id,
+        targetGrossMargin: data.target_gross_margin,
+        startDate: data.start_date,
+        endDate: data.end_date,
+        createdAt: data.created_at
+      }
+      setProjects(prev => [...prev, newProject])
+    }
+  }, [companyId, user, projects.length])
+
+  // Quick add client (inline from dropdown)
+  const addClientQuick = useCallback(async (name: string) => {
+    if (!name.trim() || !companyId || !user) return
+    
+    const clientData = {
+      name: name.trim(),
+      color: PROJECT_COLORS[clients.length % PROJECT_COLORS.length],
+      status: 'active' as const
+    }
+    
+    const { data, error } = await supabaseInsertClient(clientData, companyId, user.id)
+    if (!error && data) {
+      const newClient: Client = {
+        id: data.id,
+        name: data.name,
+        color: data.color,
+        status: data.status,
+        createdAt: data.created_at
+      }
+      setClients(prev => [...prev, newClient])
+    }
+  }, [companyId, user, clients.length])
+
   // Bulk categorize selected transactions
   const bulkCategorizeSelected = useCallback(async () => {
     if (selectedTransactions.size === 0) return
@@ -7668,17 +7735,55 @@ const handleQuickAdd = useCallback(async () => {
                                               })}
                                             </div>
                                           </div>
-                                          <div>
+                                          <div onClick={(e) => e.stopPropagation()}>
                                             <p className={`text-xs font-medium mb-2 ${textMuted}`}>Assign Project:</p>
                                             <select
                                               value={t.project || ''}
-                                              onChange={(e) => quickCategorize(t.id, t.category || 'unassigned', e.target.value)}
+                                              onClick={(e) => e.stopPropagation()}
+                                              onChange={(e) => {
+                                                if (e.target.value === '__add_new__') {
+                                                  const newProject = prompt('Enter new project name:')
+                                                  if (newProject && newProject.trim()) {
+                                                    addProjectQuick(newProject.trim())
+                                                    quickCategorize(t.id, t.category || 'unassigned', newProject.trim())
+                                                  }
+                                                } else {
+                                                  quickCategorize(t.id, t.category || 'unassigned', e.target.value)
+                                                }
+                                              }}
                                               className={`rounded-lg px-3 py-1.5 text-sm border ${inputClasses}`}
                                               style={{ colorScheme: theme }}
                                             >
                                               <option value="">No Project</option>
+                                              <option value="__add_new__" className="text-[#f97316] font-medium">+ Add New Project</option>
                                               {projectList.map(p => (
                                                 <option key={p} value={p}>{p}</option>
+                                              ))}
+                                            </select>
+                                          </div>
+                                          <div onClick={(e) => e.stopPropagation()}>
+                                            <p className={`text-xs font-medium mb-2 ${textMuted}`}>Assign Client:</p>
+                                            <select
+                                              value={t.vendor || ''}
+                                              onClick={(e) => e.stopPropagation()}
+                                              onChange={(e) => {
+                                                if (e.target.value === '__add_new__') {
+                                                  const newClient = prompt('Enter new client name:')
+                                                  if (newClient && newClient.trim()) {
+                                                    addClientQuick(newClient.trim())
+                                                    quickCategorizeWithClient(t.id, t.category || 'unassigned', t.project, newClient.trim())
+                                                  }
+                                                } else {
+                                                  quickCategorizeWithClient(t.id, t.category || 'unassigned', t.project, e.target.value)
+                                                }
+                                              }}
+                                              className={`rounded-lg px-3 py-1.5 text-sm border ${inputClasses}`}
+                                              style={{ colorScheme: theme }}
+                                            >
+                                              <option value="">No Client</option>
+                                              <option value="__add_new__" className="text-[#f97316] font-medium">+ Add New Client</option>
+                                              {clients.map(c => (
+                                                <option key={c.id} value={c.name}>{c.name}</option>
                                               ))}
                                             </select>
                                           </div>
@@ -8020,29 +8125,53 @@ const handleQuickAdd = useCallback(async () => {
                                               })}
                                             </div>
                                           </div>
-                                          <div>
+                                          <div onClick={(e) => e.stopPropagation()}>
                                             <p className={`text-xs font-medium mb-2 ${textMuted}`}>Assign Project:</p>
                                             <select
                                               value={t.project || ''}
-                                              onChange={(e) => quickCategorizeAccrual(t.id, t.type as 'revenue' | 'direct_cost', e.target.value, t.client || t.vendor, t.category)}
+                                              onClick={(e) => e.stopPropagation()}
+                                              onChange={(e) => {
+                                                if (e.target.value === '__add_new__') {
+                                                  const newProject = prompt('Enter new project name:')
+                                                  if (newProject && newProject.trim()) {
+                                                    addProjectQuick(newProject.trim())
+                                                    quickCategorizeAccrual(t.id, t.type as 'revenue' | 'direct_cost', newProject.trim(), t.client || t.vendor, t.category)
+                                                  }
+                                                } else {
+                                                  quickCategorizeAccrual(t.id, t.type as 'revenue' | 'direct_cost', e.target.value, t.client || t.vendor, t.category)
+                                                }
+                                              }}
                                               className={`rounded-lg px-3 py-1.5 text-sm border ${inputClasses}`}
                                               style={{ colorScheme: theme }}
                                             >
                                               <option value="">No Project</option>
+                                              <option value="__add_new__" className="text-[#f97316] font-medium">+ Add New Project</option>
                                               {projectList.map(p => (
                                                 <option key={p} value={p}>{p}</option>
                                               ))}
                                             </select>
                                           </div>
-                                          <div>
+                                          <div onClick={(e) => e.stopPropagation()}>
                                             <p className={`text-xs font-medium mb-2 ${textMuted}`}>Assign Client:</p>
                                             <select
                                               value={t.client || t.vendor || ''}
-                                              onChange={(e) => quickCategorizeAccrual(t.id, t.type as 'revenue' | 'direct_cost', t.project, e.target.value, t.category)}
+                                              onClick={(e) => e.stopPropagation()}
+                                              onChange={(e) => {
+                                                if (e.target.value === '__add_new__') {
+                                                  const newClient = prompt('Enter new client name:')
+                                                  if (newClient && newClient.trim()) {
+                                                    addClientQuick(newClient.trim())
+                                                    quickCategorizeAccrual(t.id, t.type as 'revenue' | 'direct_cost', t.project, newClient.trim(), t.category)
+                                                  }
+                                                } else {
+                                                  quickCategorizeAccrual(t.id, t.type as 'revenue' | 'direct_cost', t.project, e.target.value, t.category)
+                                                }
+                                              }}
                                               className={`rounded-lg px-3 py-1.5 text-sm border ${inputClasses}`}
                                               style={{ colorScheme: theme }}
                                             >
                                               <option value="">No Client</option>
+                                              <option value="__add_new__" className="text-[#f97316] font-medium">+ Add New Client</option>
                                               {clients.map(c => (
                                                 <option key={c.id} value={c.name}>{c.name}</option>
                                               ))}
