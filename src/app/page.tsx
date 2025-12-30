@@ -472,7 +472,7 @@ export default function CashFlowPro() {
   const [reportDateRange, setReportDateRange] = useState({ start: '', end: '' })
   const [reportProject, setReportProject] = useState<string>('all')
   const [reportClient, setReportClient] = useState<string>('all')
-  const [savedReports, setSavedReports] = useState<Array<{ id: string; name: string; createdAt: string; config: any }>>([])
+  const [savedReports, setSavedReports] = useState<Array<{ id: string; name: string; createdAt: string; created_at?: string; config: any }>>([])
   const [editingReportId, setEditingReportId] = useState<string | null>(null)
   const [editingReportName, setEditingReportName] = useState('')
   const [pdfSections, setPdfSections] = useState({
