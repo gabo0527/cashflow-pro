@@ -2794,8 +2794,13 @@ const handleQuickAdd = useCallback(async () => {
 
   const monthlyData = useMemo((): MonthlyData[] => {
     const now = new Date()
-    const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1)
-    const endDate = new Date(now.getFullYear() + projectionYears, now.getMonth(), 1)
+    // Use activeDateRange for start, extend end for projections
+    const rangeStart = new Date(activeDateRange.start + '-01')
+    const rangeEnd = new Date(activeDateRange.end + '-01')
+    // Extend past the range end for projections
+    const projectionEnd = new Date(rangeEnd.getFullYear() + projectionYears, rangeEnd.getMonth(), 1)
+    const startDate = rangeStart
+    const endDate = projectionEnd
     const months: MonthlyData[] = []
     
     let runningActual = beginningBalance
@@ -2882,7 +2887,7 @@ const handleQuickAdd = useCallback(async () => {
     }
     
     return months
-  }, [filteredTransactions, activeAssumptions, beginningBalance, projectionYears, cutoffDate, selectedProject])
+  }, [filteredTransactions, activeAssumptions, beginningBalance, projectionYears, cutoffDate, selectedProject, activeDateRange])
 
   const filteredMonthlyData = useMemo(() => {
     return monthlyData.filter(d => d.month >= activeDateRange.start && d.month <= activeDateRange.end)
