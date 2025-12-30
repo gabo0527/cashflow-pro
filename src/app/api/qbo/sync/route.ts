@@ -23,27 +23,6 @@ function parseCustomerProject(raw: string): { client: string; project: string | 
   return { client: raw.trim(), project: null }
 }
 
-// Helper to categorize QB transactions
-function categorizeTransaction(qbCategory: string | null, amount: number): string {
-  if (!qbCategory) return amount > 0 ? 'revenue' : 'opex'
-  
-  const cat = qbCategory.toLowerCase()
-  
-  // Revenue indicators
-  if (cat.includes('income') || cat.includes('sales') || cat.includes('revenue')) {
-    return 'revenue'
-  }
-  
-  // Overhead indicators
-  if (cat.includes('rent') || cat.includes('utilities') || cat.includes('insurance') ||
-      cat.includes('office') || cat.includes('admin') || cat.includes('internet')) {
-    return 'overhead'
-  }
-  
-  // Default to opex for expenses
-  return amount > 0 ? 'revenue' : 'opex'
-}
-
 // Helper to parse invoice status
 function parseInvoiceStatus(balance: number, dueDate: string | null): { status: string; statusDetail: string; daysOverdue: number } {
   const today = new Date()
@@ -101,7 +80,6 @@ export async function POST(request: NextRequest) {
     const tokenExpiry = new Date(settings.qbo_token_expires_at)
     
     if (tokenExpiry < new Date()) {
-      // Refresh token logic here (implement separately)
       return NextResponse.json({ error: 'Token expired, please reconnect' }, { status: 401 })
     }
 
@@ -111,15 +89,19 @@ export async function POST(request: NextRequest) {
       invoices: { synced: 0, skipped: 0, errors: 0 }
     }
 
-    // ========================================
-    // SYNC BANK TRANSACTIONS (Cash Basis)
-    // ========================================
-    if (!syncType || syncType === 'all' || syncType === 'bank') {
-      try {
-        // Query purchases (expenses)
-        const purchaseQuery = `SELECT * FROM Purchase WHERE TxnDate >= '2024-01-01' MAXRESULTS 1000`
-        const purchaseResponse = await fetch(
-          `${QB_API_BASE}/${realmId}/query?query=${encodeURIComponent(purchaseQuery)}`,
+    // Helper function to fetch all pages from QB (handles pagination)
+    async function fetchAllFromQB(query: string, entityName: string): Promise<any[]> {
+      const allResults: any[] = []
+      let startPosition = 1
+      const maxResults = 1000
+      let hasMore = true
+
+      while (hasMore) {
+        const pagedQuery = `${query} STARTPOSITION ${startPosition} MAXRESULTS ${maxResults}`
+        console.log(`Fetching ${entityName}: page starting at ${startPosition}`)
+        
+        const response = await fetch(
+          `${QB_API_BASE}/${realmId}/query?query=${encodeURIComponent(pagedQuery)}`,
           {
             headers: {
               'Authorization': `Bearer ${accessToken}`,
@@ -128,109 +110,212 @@ export async function POST(request: NextRequest) {
           }
         )
 
-        if (purchaseResponse.ok) {
-          const purchaseData = await purchaseResponse.json()
-          const purchases = purchaseData.QueryResponse?.Purchase || []
+        if (!response.ok) {
+          console.error(`QB query failed for ${entityName}:`, await response.text())
+          break
+        }
 
-          for (const purchase of purchases) {
-            const qbId = purchase.Id
-            const amount = -Math.abs(purchase.TotalAmt || 0) // Expenses are negative
-            
-            // Get payee name
-            let payee = ''
-            if (purchase.EntityRef) {
-              payee = purchase.EntityRef.name || ''
+        const data = await response.json()
+        const items = data.QueryResponse?.[entityName] || []
+        allResults.push(...items)
+        
+        console.log(`Fetched ${items.length} ${entityName} (total: ${allResults.length})`)
+
+        if (items.length < maxResults) {
+          hasMore = false
+        } else {
+          startPosition += maxResults
+        }
+      }
+
+      return allResults
+    }
+
+    // ========================================
+    // SYNC BANK TRANSACTIONS (Cash Basis)
+    // Pulls: Purchases, Deposits, Transfers, Payments, SalesReceipts
+    // These are the transactions that hit your bank accounts
+    // ========================================
+    if (!syncType || syncType === 'all' || syncType === 'bank') {
+      try {
+        // 1. PURCHASES (Expenses - checks, credit cards, etc.)
+        const purchases = await fetchAllFromQB(
+          `SELECT * FROM Purchase ORDER BY TxnDate DESC`,
+          'Purchase'
+        )
+
+        for (const purchase of purchases) {
+          const qbId = `PUR-${purchase.Id}`
+          const amount = -Math.abs(purchase.TotalAmt || 0)
+          
+          let payee = purchase.EntityRef?.name || ''
+          let description = ''
+          let qbCategory = ''
+          
+          if (purchase.Line && purchase.Line.length > 0) {
+            const firstLine = purchase.Line[0]
+            description = firstLine.Description || ''
+            if (firstLine.AccountBasedExpenseLineDetail) {
+              qbCategory = firstLine.AccountBasedExpenseLineDetail.AccountRef?.name || ''
             }
+          }
+          
+          if (!description) description = purchase.PrivateNote || payee || 'Purchase'
 
-            // Get category from line items
-            let qbCategory = ''
-            if (purchase.Line && purchase.Line[0]?.AccountBasedExpenseLineDetail) {
-              const accountRef = purchase.Line[0].AccountBasedExpenseLineDetail.AccountRef
-              qbCategory = accountRef?.name || ''
-            }
-
-            const category = categorizeTransaction(qbCategory, amount)
-
-            const transactionData = {
+          const { error } = await supabase
+            .from('transactions')
+            .upsert({
               company_id: companyId,
               qb_id: qbId,
               date: purchase.TxnDate,
-              description: purchase.PrivateNote || purchase.Line?.[0]?.Description || '',
+              description: description,
               amount: amount,
               payee: payee,
               qb_category: qbCategory,
-              category: category,
+              category: 'opex',
               type: 'expense',
               account_name: purchase.AccountRef?.name || '',
               sync_source: 'quickbooks',
               synced_at: new Date().toISOString()
-            }
+            }, { onConflict: 'company_id,qb_id', ignoreDuplicates: false })
 
-            // Upsert to prevent duplicates
-            const { error: upsertError } = await supabase
-              .from('transactions')
-              .upsert(transactionData, { 
-                onConflict: 'company_id,qb_id',
-                ignoreDuplicates: false 
-              })
-
-            if (upsertError) {
-              console.error('Transaction upsert error:', upsertError)
-              results.bankTransactions.errors++
-            } else {
-              results.bankTransactions.synced++
-            }
-          }
+          if (error) results.bankTransactions.errors++
+          else results.bankTransactions.synced++
         }
 
-        // Query deposits/payments (income)
-        const depositQuery = `SELECT * FROM Deposit WHERE TxnDate >= '2024-01-01' MAXRESULTS 1000`
-        const depositResponse = await fetch(
-          `${QB_API_BASE}/${realmId}/query?query=${encodeURIComponent(depositQuery)}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Accept': 'application/json'
-            }
-          }
+        // 2. DEPOSITS (Income to bank)
+        const deposits = await fetchAllFromQB(
+          `SELECT * FROM Deposit ORDER BY TxnDate DESC`,
+          'Deposit'
         )
 
-        if (depositResponse.ok) {
-          const depositData = await depositResponse.json()
-          const deposits = depositData.QueryResponse?.Deposit || []
+        for (const deposit of deposits) {
+          const qbId = `DEP-${deposit.Id}`
+          const amount = Math.abs(deposit.TotalAmt || 0)
+          let description = deposit.PrivateNote || 'Deposit'
+          let payee = ''
+          
+          if (deposit.Line && deposit.Line.length > 0) {
+            const firstLine = deposit.Line[0]
+            if (firstLine.DepositLineDetail?.Entity) {
+              payee = firstLine.DepositLineDetail.Entity.name || ''
+            }
+          }
 
-          for (const deposit of deposits) {
-            const qbId = `DEP-${deposit.Id}`
-            const amount = Math.abs(deposit.TotalAmt || 0)
-
-            const transactionData = {
+          const { error } = await supabase
+            .from('transactions')
+            .upsert({
               company_id: companyId,
               qb_id: qbId,
               date: deposit.TxnDate,
-              description: deposit.PrivateNote || 'Deposit',
+              description: description,
               amount: amount,
-              payee: '',
-              qb_category: 'Deposits',
+              payee: payee,
+              qb_category: 'Income',
               category: 'revenue',
               type: 'income',
               account_name: deposit.DepositToAccountRef?.name || '',
               sync_source: 'quickbooks',
               synced_at: new Date().toISOString()
-            }
+            }, { onConflict: 'company_id,qb_id', ignoreDuplicates: false })
 
-            const { error: upsertError } = await supabase
-              .from('transactions')
-              .upsert(transactionData, { 
-                onConflict: 'company_id,qb_id',
-                ignoreDuplicates: false 
-              })
+          if (error) results.bankTransactions.errors++
+          else results.bankTransactions.synced++
+        }
 
-            if (upsertError) {
-              results.bankTransactions.errors++
-            } else {
-              results.bankTransactions.synced++
-            }
-          }
+        // 3. TRANSFERS between accounts
+        const transfers = await fetchAllFromQB(
+          `SELECT * FROM Transfer ORDER BY TxnDate DESC`,
+          'Transfer'
+        )
+
+        for (const transfer of transfers) {
+          const qbId = `TRF-${transfer.Id}`
+          const amount = -Math.abs(transfer.Amount || 0)
+
+          const { error } = await supabase
+            .from('transactions')
+            .upsert({
+              company_id: companyId,
+              qb_id: qbId,
+              date: transfer.TxnDate,
+              description: `Transfer: ${transfer.FromAccountRef?.name || ''} → ${transfer.ToAccountRef?.name || ''}`,
+              amount: amount,
+              payee: '',
+              qb_category: 'Transfer',
+              category: 'opex',
+              type: 'transfer',
+              account_name: transfer.FromAccountRef?.name || '',
+              sync_source: 'quickbooks',
+              synced_at: new Date().toISOString()
+            }, { onConflict: 'company_id,qb_id', ignoreDuplicates: false })
+
+          if (error) results.bankTransactions.errors++
+          else results.bankTransactions.synced++
+        }
+
+        // 4. PAYMENTS received (invoice payments)
+        const payments = await fetchAllFromQB(
+          `SELECT * FROM Payment ORDER BY TxnDate DESC`,
+          'Payment'
+        )
+
+        for (const payment of payments) {
+          const qbId = `PMT-${payment.Id}`
+          const amount = Math.abs(payment.TotalAmt || 0)
+          const customerName = payment.CustomerRef?.name || ''
+
+          const { error } = await supabase
+            .from('transactions')
+            .upsert({
+              company_id: companyId,
+              qb_id: qbId,
+              date: payment.TxnDate,
+              description: `Payment Received - ${customerName}`,
+              amount: amount,
+              payee: customerName,
+              qb_category: 'Payment',
+              category: 'revenue',
+              type: 'income',
+              account_name: payment.DepositToAccountRef?.name || 'Undeposited Funds',
+              sync_source: 'quickbooks',
+              synced_at: new Date().toISOString()
+            }, { onConflict: 'company_id,qb_id', ignoreDuplicates: false })
+
+          if (error) results.bankTransactions.errors++
+          else results.bankTransactions.synced++
+        }
+
+        // 5. SALES RECEIPTS (direct sales, not invoiced)
+        const salesReceipts = await fetchAllFromQB(
+          `SELECT * FROM SalesReceipt ORDER BY TxnDate DESC`,
+          'SalesReceipt'
+        )
+
+        for (const receipt of salesReceipts) {
+          const qbId = `SR-${receipt.Id}`
+          const amount = Math.abs(receipt.TotalAmt || 0)
+          const customerName = receipt.CustomerRef?.name || ''
+
+          const { error } = await supabase
+            .from('transactions')
+            .upsert({
+              company_id: companyId,
+              qb_id: qbId,
+              date: receipt.TxnDate,
+              description: `Sales Receipt - ${customerName}`,
+              amount: amount,
+              payee: customerName,
+              qb_category: 'Sales',
+              category: 'revenue',
+              type: 'income',
+              account_name: receipt.DepositToAccountRef?.name || '',
+              sync_source: 'quickbooks',
+              synced_at: new Date().toISOString()
+            }, { onConflict: 'company_id,qb_id', ignoreDuplicates: false })
+
+          if (error) results.bankTransactions.errors++
+          else results.bankTransactions.synced++
         }
 
       } catch (bankError) {
@@ -239,35 +324,30 @@ export async function POST(request: NextRequest) {
     }
 
     // ========================================
-    // SYNC INVOICES (Accrual Basis)
+    // SYNC INVOICES (Accrual Basis - Sales)
+    // From: Sales & Get Paid → Invoices
     // ========================================
     if (!syncType || syncType === 'all' || syncType === 'invoices') {
       try {
-        const invoiceQuery = `SELECT * FROM Invoice WHERE TxnDate >= '2024-01-01' MAXRESULTS 1000`
-        const invoiceResponse = await fetch(
-          `${QB_API_BASE}/${realmId}/query?query=${encodeURIComponent(invoiceQuery)}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Accept': 'application/json'
-            }
-          }
+        const invoices = await fetchAllFromQB(
+          `SELECT * FROM Invoice ORDER BY TxnDate DESC`,
+          'Invoice'
         )
 
-        if (invoiceResponse.ok) {
-          const invoiceData = await invoiceResponse.json()
-          const invoices = invoiceData.QueryResponse?.Invoice || []
+        console.log(`Found ${invoices.length} invoices`)
 
-          for (const invoice of invoices) {
-            const qbInvoiceId = invoice.Id
-            const customerProjectRaw = invoice.CustomerRef?.name || ''
-            const { client, project } = parseCustomerProject(customerProjectRaw)
-            const balance = invoice.Balance || 0
-            const totalAmount = invoice.TotalAmt || 0
-            const { status, statusDetail, daysOverdue } = parseInvoiceStatus(balance, invoice.DueDate)
+        for (const invoice of invoices) {
+          const qbInvoiceId = invoice.Id
+          const customerProjectRaw = invoice.CustomerRef?.name || ''
+          const { client, project } = parseCustomerProject(customerProjectRaw)
+          const balance = invoice.Balance || 0
+          const totalAmount = invoice.TotalAmt || 0
+          const { status, statusDetail, daysOverdue } = parseInvoiceStatus(balance, invoice.DueDate)
 
-            // Insert into accrual_transactions
-            const accrualData = {
+          // Insert into accrual_transactions
+          const { error: accrualError } = await supabase
+            .from('accrual_transactions')
+            .upsert({
               company_id: companyId,
               qb_invoice_id: qbInvoiceId,
               invoice_number: invoice.DocNumber || '',
@@ -284,23 +364,18 @@ export async function POST(request: NextRequest) {
               description: `Invoice #${invoice.DocNumber || qbInvoiceId}`,
               sync_source: 'quickbooks',
               synced_at: new Date().toISOString()
-            }
+            }, { onConflict: 'company_id,qb_invoice_id', ignoreDuplicates: false })
 
-            const { error: accrualError } = await supabase
-              .from('accrual_transactions')
-              .upsert(accrualData, { 
-                onConflict: 'company_id,qb_invoice_id',
-                ignoreDuplicates: false 
-              })
+          if (accrualError) {
+            console.error('Accrual upsert error:', accrualError)
+            results.invoices.errors++
+            continue
+          }
 
-            if (accrualError) {
-              console.error('Accrual upsert error:', accrualError)
-              results.invoices.errors++
-              continue
-            }
-
-            // Also insert/update in invoices table for detailed tracking
-            const invoiceTableData = {
+          // Also insert into invoices table
+          await supabase
+            .from('invoices')
+            .upsert({
               company_id: companyId,
               qb_invoice_id: qbInvoiceId,
               invoice_number: invoice.DocNumber || '',
@@ -317,17 +392,9 @@ export async function POST(request: NextRequest) {
               days_overdue: daysOverdue,
               sync_source: 'quickbooks',
               synced_at: new Date().toISOString()
-            }
+            }, { onConflict: 'company_id,qb_invoice_id', ignoreDuplicates: false })
 
-            await supabase
-              .from('invoices')
-              .upsert(invoiceTableData, { 
-                onConflict: 'company_id,qb_invoice_id',
-                ignoreDuplicates: false 
-              })
-
-            results.invoices.synced++
-          }
+          results.invoices.synced++
         }
 
       } catch (invoiceError) {
@@ -360,7 +427,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Company ID required' }, { status: 400 })
   }
 
-  // Get last sync info
   const { data: lastTransaction } = await supabase
     .from('transactions')
     .select('synced_at')
@@ -379,7 +445,6 @@ export async function GET(request: NextRequest) {
     .limit(1)
     .single()
 
-  // Get counts
   const { count: transactionCount } = await supabase
     .from('transactions')
     .select('*', { count: 'exact', head: true })
