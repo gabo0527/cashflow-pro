@@ -180,6 +180,7 @@ export const insertProject = async (project: any, companyId?: string, userId?: s
     target_gross_margin: project.targetGrossMargin || null,
     start_date: project.startDate || null,
     end_date: project.endDate || null,
+    year: project.year || null,
     company_id: companyId,
     user_id: userId
   }
@@ -199,6 +200,7 @@ export const updateProject = async (id: string, updates: any) => {
   if (updates.targetGrossMargin !== undefined) dbUpdates.target_gross_margin = updates.targetGrossMargin
   if (updates.startDate !== undefined) dbUpdates.start_date = updates.startDate
   if (updates.endDate !== undefined) dbUpdates.end_date = updates.endDate
+  if (updates.year !== undefined) dbUpdates.year = updates.year || null
   
   const { data, error } = await supabase.from('projects').update(dbUpdates).eq('id', id).select().single()
   return { data, error }
