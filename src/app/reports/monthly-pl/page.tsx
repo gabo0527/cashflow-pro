@@ -210,7 +210,7 @@ export default function MonthlyPLReport() {
     <div className={`min-h-screen ${bgColor} ${textPrimary}`}>
       {/* Header */}
       <header className={`sticky top-0 z-10 ${surfaceColor} border-b ${borderColor}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
               <button
@@ -243,7 +243,7 @@ export default function MonthlyPLReport() {
 
       {/* Filters Bar */}
       <div className={`${surfaceColor} border-b ${borderColor} py-4`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="px-6">
           <div className="flex flex-wrap items-center gap-4">
             {/* Data Source Selector */}
             <div className="flex items-center gap-2">
@@ -334,7 +334,7 @@ export default function MonthlyPLReport() {
       </div>
 
       {/* Data Source Badge */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="px-6 py-4">
         <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
           dataSource === 'cash' ? 'bg-emerald-500/10 text-emerald-500' :
           dataSource === 'accrual' ? 'bg-blue-500/10 text-blue-500' :
@@ -346,7 +346,7 @@ export default function MonthlyPLReport() {
       </div>
 
       {/* Summary Cards */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
+      <div className="px-6 pb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className={`${surfaceColor} rounded-xl p-4 border ${borderColor}`}>
             <p className={`text-sm ${textMuted} mb-1`}>Total Revenue</p>
@@ -374,22 +374,22 @@ export default function MonthlyPLReport() {
         </div>
       </div>
 
-      {/* P&L Table */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+      {/* P&L Table - Full Width */}
+      <div className="px-6 pb-8">
         <div className={`${surfaceColor} rounded-xl border ${borderColor} overflow-hidden`}>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className={theme === 'light' ? 'bg-slate-50' : 'bg-neutral-900'}>
-                  <th className={`px-4 py-3 text-left text-sm font-semibold sticky left-0 ${theme === 'light' ? 'bg-slate-50' : 'bg-neutral-900'}`}>
+                  <th className={`px-6 py-4 text-left text-sm font-semibold sticky left-0 ${theme === 'light' ? 'bg-slate-50' : 'bg-neutral-900'}`}>
                     Category
                   </th>
                   {MONTHS.slice(startMonth - 1, endMonth).map((month, idx) => (
-                    <th key={month} className="px-4 py-3 text-right text-sm font-semibold min-w-[100px]">
-                      {month}
+                    <th key={month} className="px-6 py-4 text-right text-sm font-semibold whitespace-nowrap">
+                      {month} {selectedYear}
                     </th>
                   ))}
-                  <th className={`px-4 py-3 text-right text-sm font-semibold min-w-[120px] ${theme === 'light' ? 'bg-slate-100' : 'bg-neutral-800'}`}>
+                  <th className={`px-6 py-4 text-right text-sm font-semibold whitespace-nowrap ${theme === 'light' ? 'bg-slate-100' : 'bg-neutral-800'}`}>
                     Total
                   </th>
                 </tr>
@@ -397,63 +397,63 @@ export default function MonthlyPLReport() {
               <tbody>
                 {/* Revenue */}
                 <tr className={`border-t ${borderColor}`}>
-                  <td className={`px-4 py-3 font-medium text-emerald-500 sticky left-0 ${surfaceColor}`}>
+                  <td className={`px-6 py-4 font-medium text-emerald-500 sticky left-0 ${surfaceColor}`}>
                     Revenue
                   </td>
                   {Array.from({ length: endMonth - startMonth + 1 }, (_, i) => startMonth + i).map(month => (
-                    <td key={month} className="px-4 py-3 text-right text-emerald-500">
+                    <td key={month} className="px-6 py-4 text-right text-emerald-500 whitespace-nowrap">
                       {formatCurrency(plData[month].revenue)}
                     </td>
                   ))}
-                  <td className={`px-4 py-3 text-right font-semibold text-emerald-500 ${theme === 'light' ? 'bg-slate-50' : 'bg-neutral-900'}`}>
+                  <td className={`px-6 py-4 text-right font-semibold text-emerald-500 whitespace-nowrap ${theme === 'light' ? 'bg-slate-50' : 'bg-neutral-900'}`}>
                     {formatCurrency(totals.revenue)}
                   </td>
                 </tr>
 
                 {/* Operating Expenses */}
                 <tr className={`border-t ${borderColor}`}>
-                  <td className={`px-4 py-3 font-medium text-rose-500 sticky left-0 ${surfaceColor}`}>
+                  <td className={`px-6 py-4 font-medium text-rose-500 sticky left-0 ${surfaceColor}`}>
                     Operating Expenses
                   </td>
                   {Array.from({ length: endMonth - startMonth + 1 }, (_, i) => startMonth + i).map(month => (
-                    <td key={month} className="px-4 py-3 text-right text-rose-500">
+                    <td key={month} className="px-6 py-4 text-right text-rose-500 whitespace-nowrap">
                       {formatCurrency(plData[month].opex)}
                     </td>
                   ))}
-                  <td className={`px-4 py-3 text-right font-semibold text-rose-500 ${theme === 'light' ? 'bg-slate-50' : 'bg-neutral-900'}`}>
+                  <td className={`px-6 py-4 text-right font-semibold text-rose-500 whitespace-nowrap ${theme === 'light' ? 'bg-slate-50' : 'bg-neutral-900'}`}>
                     {formatCurrency(totals.opex)}
                   </td>
                 </tr>
 
                 {/* Overhead */}
                 <tr className={`border-t ${borderColor}`}>
-                  <td className={`px-4 py-3 font-medium text-amber-500 sticky left-0 ${surfaceColor}`}>
+                  <td className={`px-6 py-4 font-medium text-amber-500 sticky left-0 ${surfaceColor}`}>
                     Overhead
                   </td>
                   {Array.from({ length: endMonth - startMonth + 1 }, (_, i) => startMonth + i).map(month => (
-                    <td key={month} className="px-4 py-3 text-right text-amber-500">
+                    <td key={month} className="px-6 py-4 text-right text-amber-500 whitespace-nowrap">
                       {formatCurrency(plData[month].overhead)}
                     </td>
                   ))}
-                  <td className={`px-4 py-3 text-right font-semibold text-amber-500 ${theme === 'light' ? 'bg-slate-50' : 'bg-neutral-900'}`}>
+                  <td className={`px-6 py-4 text-right font-semibold text-amber-500 whitespace-nowrap ${theme === 'light' ? 'bg-slate-50' : 'bg-neutral-900'}`}>
                     {formatCurrency(totals.overhead)}
                   </td>
                 </tr>
 
                 {/* Net Income */}
                 <tr className={`border-t-2 ${borderColor} ${theme === 'light' ? 'bg-slate-50' : 'bg-neutral-900'}`}>
-                  <td className={`px-4 py-3 font-semibold sticky left-0 ${theme === 'light' ? 'bg-slate-50' : 'bg-neutral-900'}`}>
+                  <td className={`px-6 py-4 font-semibold sticky left-0 ${theme === 'light' ? 'bg-slate-50' : 'bg-neutral-900'}`}>
                     Net Income
                   </td>
                   {Array.from({ length: endMonth - startMonth + 1 }, (_, i) => startMonth + i).map(month => {
                     const net = plData[month].revenue - plData[month].opex - plData[month].overhead
                     return (
-                      <td key={month} className={`px-4 py-3 text-right font-semibold ${net >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                      <td key={month} className={`px-6 py-4 text-right font-semibold whitespace-nowrap ${net >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                         {formatCurrency(net)}
                       </td>
                     )
                   })}
-                  <td className={`px-4 py-3 text-right font-bold text-lg ${totals.net >= 0 ? 'text-emerald-500' : 'text-rose-500'} ${theme === 'light' ? 'bg-slate-100' : 'bg-neutral-800'}`}>
+                  <td className={`px-6 py-4 text-right font-bold text-lg whitespace-nowrap ${totals.net >= 0 ? 'text-emerald-500' : 'text-rose-500'} ${theme === 'light' ? 'bg-slate-100' : 'bg-neutral-800'}`}>
                     {formatCurrency(totals.net)}
                   </td>
                 </tr>
@@ -464,7 +464,7 @@ export default function MonthlyPLReport() {
       </div>
 
       {/* Data Source Legend */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+      <div className="px-6 pb-8">
         <div className={`${surfaceColor} rounded-xl p-4 border ${borderColor}`}>
           <h3 className="font-semibold mb-3">Understanding Your Data</h3>
           <div className="grid md:grid-cols-3 gap-4 text-sm">
