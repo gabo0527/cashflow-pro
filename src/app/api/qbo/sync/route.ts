@@ -53,60 +53,18 @@ function parseInvoiceStatus(balance: number, dueDate: string | null): { status: 
   return { status: 'pending', statusDetail: `Due in ${Math.abs(diffDays)} days`, daysOverdue: 0 }
 }
 
-// Helper function to fetch all pages from QB (handles pagination)
-async function fetchAllFromQB(
-  realmId: string, 
-  accessToken: string, 
-  query: string, 
-  entityName: string
-): Promise<any[]> {
-  const allResults: any[] = []
-  let startPosition = 1
-  const maxResults = 1000
-  let hasMore = true
-
-  while (hasMore) {
-    const pagedQuery = `${query} STARTPOSITION ${startPosition} MAXRESULTS ${maxResults}`
-    console.log(`Fetching ${entityName}: page starting at ${startPosition}`)
-    
-    const response = await fetch(
-      `${QB_API_BASE}/${realmId}/query?query=${encodeURIComponent(pagedQuery)}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json'
-        }
-      }
-    )
-
-    if (!response.ok) {
-      console.error(`QB query failed for ${entityName}:`, await response.text())
-      break
-    }
-
-    const data = await response.json()
-    const items = data.QueryResponse?.[entityName] || []
-    allResults.push(...items)
-    
-    console.log(`Fetched ${items.length} ${entityName} (total: ${allResults.length})`)
-
-    if (items.length < maxResults) {
-      hasMore = false
-    } else {
-      startPosition += maxResults
-    }
-  }
-
-  return allResults
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const { companyId, syncType } = await request.json()
+    const { companyId, syncType, year } = await request.json()
     
     if (!companyId) {
       return NextResponse.json({ error: 'Company ID required' }, { status: 400 })
     }
+
+    // Sync by year to avoid timeout - default to current year
+    const syncYear = year || new Date().getFullYear()
+    const startDate = `${syncYear}-01-01`
+    const endDate = `${syncYear}-12-31`
 
     // Get QuickBooks credentials from company_settings
     const { data: settings, error: settingsError } = await supabase
@@ -133,7 +91,33 @@ export async function POST(request: NextRequest) {
     const realmId = settings.qbo_realm_id
     const results = {
       bankTransactions: { synced: 0, skipped: 0, errors: 0 },
-      invoices: { synced: 0, skipped: 0, errors: 0 }
+      invoices: { synced: 0, skipped: 0, errors: 0 },
+      year: syncYear
+    }
+
+    // Helper function to fetch from QB with date range
+    async function fetchFromQB(query: string, entityName: string): Promise<any[]> {
+      console.log(`Fetching ${entityName} for ${syncYear}...`)
+      
+      const response = await fetch(
+        `${QB_API_BASE}/${realmId}/query?query=${encodeURIComponent(query)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
+          }
+        }
+      )
+
+      if (!response.ok) {
+        console.error(`QB query failed for ${entityName}:`, await response.text())
+        return []
+      }
+
+      const data = await response.json()
+      const items = data.QueryResponse?.[entityName] || []
+      console.log(`Fetched ${items.length} ${entityName} for ${syncYear}`)
+      return items
     }
 
     // ========================================
@@ -144,10 +128,8 @@ export async function POST(request: NextRequest) {
     if (!syncType || syncType === 'all' || syncType === 'bank') {
       try {
         // 1. PURCHASES (Expenses - checks, credit cards, etc.)
-        const purchases = await fetchAllFromQB(
-          realmId,
-          accessToken,
-          `SELECT * FROM Purchase ORDER BY TxnDate DESC`,
+        const purchases = await fetchFromQB(
+          `SELECT * FROM Purchase WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`,
           'Purchase'
         )
 
@@ -191,8 +173,8 @@ export async function POST(request: NextRequest) {
         }
 
         // 2. DEPOSITS (Income to bank)
-        const deposits = await fetchAllFromQB(realmId, accessToken,
-          `SELECT * FROM Deposit ORDER BY TxnDate DESC`,
+        const deposits = await fetchFromQB(
+          `SELECT * FROM Deposit WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`,
           'Deposit'
         )
 
@@ -231,8 +213,8 @@ export async function POST(request: NextRequest) {
         }
 
         // 3. TRANSFERS between accounts
-        const transfers = await fetchAllFromQB(realmId, accessToken,
-          `SELECT * FROM Transfer ORDER BY TxnDate DESC`,
+        const transfers = await fetchFromQB(
+          `SELECT * FROM Transfer WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`,
           'Transfer'
         )
 
@@ -262,8 +244,8 @@ export async function POST(request: NextRequest) {
         }
 
         // 4. PAYMENTS received (invoice payments)
-        const payments = await fetchAllFromQB(realmId, accessToken,
-          `SELECT * FROM Payment ORDER BY TxnDate DESC`,
+        const payments = await fetchFromQB(
+          `SELECT * FROM Payment WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`,
           'Payment'
         )
 
@@ -294,8 +276,8 @@ export async function POST(request: NextRequest) {
         }
 
         // 5. SALES RECEIPTS (direct sales, not invoiced)
-        const salesReceipts = await fetchAllFromQB(realmId, accessToken,
-          `SELECT * FROM SalesReceipt ORDER BY TxnDate DESC`,
+        const salesReceipts = await fetchFromQB(
+          `SELECT * FROM SalesReceipt WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`,
           'SalesReceipt'
         )
 
@@ -336,8 +318,8 @@ export async function POST(request: NextRequest) {
     // ========================================
     if (!syncType || syncType === 'all' || syncType === 'invoices') {
       try {
-        const invoices = await fetchAllFromQB(realmId, accessToken,
-          `SELECT * FROM Invoice ORDER BY TxnDate DESC`,
+        const invoices = await fetchFromQB(
+          `SELECT * FROM Invoice WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`,
           'Invoice'
         )
 
@@ -411,7 +393,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Sync completed',
+      message: `Sync completed for ${syncYear}`,
       results,
       syncedAt: new Date().toISOString()
     })
