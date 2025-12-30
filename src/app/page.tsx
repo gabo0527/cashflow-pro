@@ -2322,7 +2322,7 @@ const handleQuickAdd = useCallback(async () => {
     window.location.href = `/api/qbo/connect?companyId=${companyId}`
   }, [companyId])
 
-  const syncQuickBooks = useCallback(async (syncType: 'all' | 'transactions' | 'invoices' = 'all') => {
+  const syncQuickBooks = useCallback(async (syncType: 'all' | 'transactions' | 'invoices' | 'bank' = 'all', year?: number) => {
     if (!companyId) return
     
     setQboSyncing(true)
@@ -2330,14 +2330,19 @@ const handleQuickAdd = useCallback(async () => {
       const response = await fetch('/api/qbo/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, syncType })
+        body: JSON.stringify({ 
+          companyId, 
+          syncType: syncType === 'transactions' ? 'bank' : syncType,
+          year: year || new Date().getFullYear()
+        })
       })
       
       const data = await response.json()
       
       if (data.success) {
         setQboLastSync(new Date().toISOString())
-        alert(`Sync complete! ${data.message}`)
+        const yearMsg = year ? ` for ${year}` : ''
+        alert(`Sync complete${yearMsg}! Bank: ${data.results?.bankTransactions?.synced || 0}, Invoices: ${data.results?.invoices?.synced || 0}`)
         // Reload transactions
         window.location.reload()
       } else {
@@ -9470,30 +9475,50 @@ const handleQuickAdd = useCallback(async () => {
                       </div>
                     </div>
                     
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        onClick={() => syncQuickBooks('all')}
-                        disabled={qboSyncing}
-                        className="flex items-center gap-2 px-4 py-2 bg-[#f97316] text-[#121212] rounded-lg font-medium hover:bg-[#ea580c] disabled:opacity-50"
-                      >
-                        <RefreshCw className={`w-4 h-4 ${qboSyncing ? 'animate-spin' : ''}`} />
-                        {qboSyncing ? 'Syncing...' : 'Sync All'}
-                      </button>
-                      <button
-                        onClick={() => syncQuickBooks('transactions')}
-                        disabled={qboSyncing}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'}`}
-                      >
-                        Bank Transactions Only
-                      </button>
-                      <button
-                        onClick={() => syncQuickBooks('invoices')}
-                        disabled={qboSyncing}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'}`}
-                      >
-                        Invoices Only
-                      </button>
+                    <div className="space-y-3">
+                      <p className={`text-sm font-medium ${textMuted}`}>Sync by Year (to avoid timeout):</p>
+                      <div className="flex flex-wrap gap-2">
+                        {[2025, 2024, 2023, 2022].map(year => (
+                          <button
+                            key={year}
+                            onClick={() => syncQuickBooks('all', year)}
+                            disabled={qboSyncing}
+                            className={`px-4 py-2 rounded-lg font-medium border ${
+                              theme === 'light' 
+                                ? 'border-gray-300 hover:bg-gray-50 hover:border-[#f97316]' 
+                                : 'border-neutral-700 hover:bg-neutral-900 hover:border-[#f97316]'
+                            } disabled:opacity-50`}
+                          >
+                            {year}
+                          </button>
+                        ))}
+                      </div>
+                      
+                      <p className={`text-sm font-medium ${textMuted} mt-4`}>Or sync by type:</p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => syncQuickBooks('bank')}
+                          disabled={qboSyncing}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'}`}
+                        >
+                          Bank Transactions Only
+                        </button>
+                        <button
+                          onClick={() => syncQuickBooks('invoices')}
+                          disabled={qboSyncing}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium border ${theme === 'light' ? 'border-gray-300 hover:bg-gray-50' : 'border-neutral-700 hover:bg-neutral-900'}`}
+                        >
+                          Invoices Only
+                        </button>
+                      </div>
                     </div>
+                    
+                    {qboSyncing && (
+                      <div className="flex items-center gap-2 text-[#f97316]">
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span className="text-sm">Syncing... this may take a minute</span>
+                      </div>
+                    )}
                     
                     {qboLastSync && (
                       <p className={`text-xs ${textMuted}`}>
