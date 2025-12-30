@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useCallback, useRef, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { 
   LineChart, Line, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -90,6 +90,7 @@ const formatCurrency = (value: number): string => {
 
 export default function ReportBuilder() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const canvasRef = useRef<HTMLDivElement>(null)
   
   // Auth & Data
@@ -123,6 +124,7 @@ export default function ReportBuilder() {
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [companyId, setCompanyId] = useState<string | null>(null)
+  const [loadedReportId, setLoadedReportId] = useState<string | null>(null)
 
   // Load data on mount
   useEffect(() => {
@@ -165,13 +167,30 @@ export default function ReportBuilder() {
         // Load theme preference
         const savedTheme = localStorage.getItem('vantage_theme')
         if (savedTheme) setTheme(savedTheme as 'light' | 'dark')
+        
+        // Check if we need to load a saved report
+        const loadReportId = searchParams.get('load')
+        if (loadReportId) {
+          const savedReports = JSON.parse(localStorage.getItem('vantage_saved_reports') || '[]')
+          const reportToLoad = savedReports.find((r: any) => r.id === loadReportId)
+          if (reportToLoad) {
+            setReportName(reportToLoad.name)
+            // Handle both old and new config field names
+            const config = reportToLoad.config || reportToLoad.canvas_config
+            if (config) {
+              setComponents(config.components || [])
+              if (config.zoom) setZoom(config.zoom)
+            }
+            setLoadedReportId(loadReportId)
+          }
+        }
       } catch (error) {
         console.error('Error loading data:', error)
       }
       setLoading(false)
     }
     loadData()
-  }, [router])
+  }, [router, searchParams])
 
   // Add component to canvas
   const addComponent = useCallback((type: string, customConfig?: Partial<CanvasComponent['config']>) => {
@@ -390,30 +409,44 @@ export default function ReportBuilder() {
     setSaveStatus('saving')
     
     try {
+      // Use loaded report id if available, otherwise generate new one
+      const reportId = loadedReportId || `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      
       const reportData = {
+        id: reportId,
         company_id: companyId,
         name: reportName,
         type: 'custom',
-        canvas_config: {
+        config: {
           components,
           zoom,
           theme
         },
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       }
 
       // For now, save to localStorage (Supabase table can be added later)
       const savedReports = JSON.parse(localStorage.getItem('vantage_saved_reports') || '[]')
-      const existingIndex = savedReports.findIndex((r: any) => r.name === reportName)
+      
+      // Find by id first (for loaded reports), then by name
+      let existingIndex = loadedReportId 
+        ? savedReports.findIndex((r: any) => r.id === loadedReportId)
+        : savedReports.findIndex((r: any) => r.name === reportName)
       
       if (existingIndex >= 0) {
+        // Keep original id and createdAt when updating
+        reportData.id = savedReports[existingIndex].id || reportId
+        reportData.createdAt = savedReports[existingIndex].createdAt || savedReports[existingIndex].created_at || reportData.createdAt
         savedReports[existingIndex] = reportData
       } else {
         savedReports.push(reportData)
       }
       
       localStorage.setItem('vantage_saved_reports', JSON.stringify(savedReports))
+      
+      // Update loadedReportId so subsequent saves update the same report
+      setLoadedReportId(reportData.id)
       
       setSaveStatus('saved')
       setShowSaveModal(true)
@@ -425,7 +458,7 @@ export default function ReportBuilder() {
       setSaveStatus('error')
       alert('Error saving report. Please try again.')
     }
-  }, [companyId, reportName, components, zoom, theme])
+  }, [companyId, reportName, components, zoom, theme, loadedReportId])
 
   // Export report
   const exportReport = useCallback((format: 'pdf' | 'png' | 'json') => {
