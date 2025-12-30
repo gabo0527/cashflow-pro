@@ -61,6 +61,7 @@ interface Transaction {
   id: string
   date: string
   category: string  // Now supports custom categories
+  subcategory?: string  // Subcategory for detailed reporting (e.g., Marketing, Payroll, Software)
   description: string
   amount: number
   type: 'actual' | 'budget'
@@ -69,7 +70,8 @@ interface Transaction {
   recurringId?: string
   notes?: string
   expectedPaymentDate?: string // For AR/AP timing
-  source?: 'qbo' | 'csv' | 'manual' // Data source
+  source?: 'qbo' | 'csv' | 'manual' // Data source (legacy)
+  sync_source?: string  // 'quickbooks' | 'manual'
   qbo_transaction_id?: string // QuickBooks transaction ID
 }
 
@@ -79,6 +81,7 @@ interface AccrualTransaction {
   date: string  // Invoice date (when recognized)
   type: 'revenue' | 'direct_cost'  // Invoice TO client or FROM contractor
   category?: string  // revenue, opex, overhead, investment
+  subcategory?: string  // Subcategory for detailed reporting
   description: string
   amount: number  // Positive for revenue, negative for costs
   project: string  // Required for accrual - must be project-based
@@ -390,6 +393,15 @@ const DEFAULT_CATEGORIES: Category[] = [
   { id: 'unassigned', name: 'Unassigned', type: 'expense', color: '#64748b', isDefault: true },
 ]
 
+// Subcategories mapped to main categories
+const SUBCATEGORIES: Record<string, string[]> = {
+  revenue: ['Services', 'Product Sales', 'Consulting', 'Retainer', 'Licensing', 'Other Revenue'],
+  opex: ['Labor', 'Materials', 'Subcontractors', 'Equipment', 'Travel', 'Other Direct'],
+  overhead: ['Marketing', 'Payroll', 'Rent', 'Utilities', 'Software', 'Insurance', 'Professional Services', 'Office Supplies', 'Other Overhead'],
+  investment: ['Equipment Purchase', 'Software Development', 'R&D', 'Training', 'Other Investment'],
+  unassigned: []
+}
+
 // Branding interface
 interface BrandingSettings {
   companyName: string
@@ -693,13 +705,15 @@ export default function CashFlowPro() {
               id: t.id,
               date: t.date,
               category: t.category,
+              subcategory: t.subcategory,
               description: t.description,
               amount: parseFloat(t.amount),
               type: t.type,
               project: t.project,
               notes: t.notes,
-              source: t.source || 'manual',
-              qbo_transaction_id: t.qbo_transaction_id
+              source: t.sync_source || t.source || 'manual',
+              sync_source: t.sync_source || 'manual',
+              qbo_transaction_id: t.qbo_transaction_id || t.qb_id
             }))
             setTransactions(mapped)
           }
@@ -1876,16 +1890,17 @@ export default function CashFlowPro() {
   }, [editingId, editForm, normalizeTransaction])
 
   // Quick inline categorization (no modal)
-  const quickCategorize = useCallback(async (transactionId: string, category: string, project?: string) => {
+  const quickCategorize = useCallback(async (transactionId: string, category: string, project?: string, subcategory?: string) => {
     const updates: any = { category }
     if (project !== undefined) updates.project = project
+    if (subcategory !== undefined) updates.subcategory = subcategory
     
     const { error } = await supabaseUpdateTransaction(transactionId, updates)
     if (!error) {
       setTransactions(prev => prev.map(t => 
         t.id === transactionId ? { ...t, ...updates } : t
       ))
-      setExpandedTransaction(null)
+      // Don't collapse - let user make multiple edits then click Close
     }
   }, [])
 
@@ -1904,7 +1919,7 @@ export default function CashFlowPro() {
       setAccrualTransactions(prev => prev.map(t => 
         t.id === transactionId ? { ...t, ...updates } : t
       ))
-      setExpandedAccrualTransaction(null)
+      // Don't collapse - let user make multiple edits then click Close
     }
   }, [])
 
@@ -7649,7 +7664,8 @@ const handleQuickAdd = useCallback(async () => {
                             {filteredTransactions.map(t => {
                               const cat = getCategoryById(t.category)
                               const isExpanded = expandedTransaction === t.id
-                              const source = (t as any).source || 'manual'
+                              const source = t.sync_source || t.source || 'manual'
+                              const isQB = source === 'qbo' || source === 'quickbooks' || !!t.qbo_transaction_id
                               return (
                                 <React.Fragment key={t.id}>
                                   <tr 
@@ -7669,13 +7685,13 @@ const handleQuickAdd = useCallback(async () => {
                                     <td className="py-3 text-sm">{t.date}</td>
                                     <td className="py-3">
                                       <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                        source === 'qbo' 
+                                        isQB 
                                           ? 'bg-green-100 text-green-700' 
                                           : source === 'csv'
                                           ? 'bg-blue-100 text-blue-700'
                                           : 'bg-gray-100 text-gray-600'
                                       }`}>
-                                        {source === 'qbo' ? 'QBO' : source === 'csv' ? 'CSV' : 'Manual'}
+                                        {isQB ? 'QB' : source === 'csv' ? 'CSV' : 'Manual'}
                                       </span>
                                     </td>
                                     <td className="py-3">
@@ -7752,7 +7768,7 @@ const handleQuickAdd = useCallback(async () => {
                                                 return (
                                                   <button
                                                     key={catId}
-                                                    onClick={() => quickCategorize(t.id, catId)}
+                                                    onClick={() => quickCategorize(t.id, catId, t.project, t.category !== catId ? undefined : t.subcategory)}
                                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                                                       t.category === catId 
                                                         ? 'ring-2 ring-offset-2 ring-[#f97316]' 
@@ -7770,6 +7786,21 @@ const handleQuickAdd = useCallback(async () => {
                                             </div>
                                           </div>
                                           <div onClick={(e) => e.stopPropagation()}>
+                                            <p className={`text-xs font-medium mb-2 ${textMuted}`}>Subcategory:</p>
+                                            <select
+                                              value={t.subcategory || ''}
+                                              onClick={(e) => e.stopPropagation()}
+                                              onChange={(e) => quickCategorize(t.id, t.category || 'unassigned', t.project, e.target.value)}
+                                              className={`rounded-lg px-3 py-1.5 text-sm border ${inputClasses}`}
+                                              style={{ colorScheme: theme }}
+                                            >
+                                              <option value="">No Subcategory</option>
+                                              {(SUBCATEGORIES[t.category || 'unassigned'] || []).map(sub => (
+                                                <option key={sub} value={sub}>{sub}</option>
+                                              ))}
+                                            </select>
+                                          </div>
+                                          <div onClick={(e) => e.stopPropagation()}>
                                             <p className={`text-xs font-medium mb-2 ${textMuted}`}>Assign Project:</p>
                                             <select
                                               value={t.project || ''}
@@ -7779,10 +7810,10 @@ const handleQuickAdd = useCallback(async () => {
                                                   const newProject = prompt('Enter new project name:')
                                                   if (newProject && newProject.trim()) {
                                                     addProjectQuick(newProject.trim())
-                                                    quickCategorize(t.id, t.category || 'unassigned', newProject.trim())
+                                                    quickCategorize(t.id, t.category || 'unassigned', newProject.trim(), t.subcategory)
                                                   }
                                                 } else {
-                                                  quickCategorize(t.id, t.category || 'unassigned', e.target.value)
+                                                  quickCategorize(t.id, t.category || 'unassigned', e.target.value, t.subcategory)
                                                 }
                                               }}
                                               className={`rounded-lg px-3 py-1.5 text-sm border ${inputClasses}`}
