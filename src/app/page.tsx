@@ -234,7 +234,7 @@ const getMonthLabel = (monthStr: string): string => {
   return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
 }
 
-const PROJECT_COLORS = ['#f97316', '#34d399', '#60a5fa', '#fbbf24', '#fb7185', '#2dd4bf', '#94a3b8', '#06b6d4']
+const PROJECT_COLORS = ['#f97316', '#60a5fa', '#fbbf24', '#fb7185', '#a78bfa', '#94a3b8', '#ec4899', '#14b8a6']
 
 // Sample data generator
 const generateSampleData = (): { transactions: Transaction[], projects: Project[] } => {
@@ -386,7 +386,7 @@ const STORAGE_KEYS = {
 
 // Default categories
 const DEFAULT_CATEGORIES: Category[] = [
-  { id: 'revenue', name: 'Revenue', type: 'income', color: '#34d399', isDefault: true },
+  { id: 'revenue', name: 'Revenue', type: 'income', color: '#f97316', isDefault: true },
   { id: 'opex', name: 'OpEx', type: 'expense', color: '#fb7185', isDefault: true },
   { id: 'overhead', name: 'Overhead', type: 'expense', color: '#f59e0b', isDefault: true },
   { id: 'investment', name: 'Investment', type: 'expense', color: '#3b82f6', isDefault: true },
@@ -3332,7 +3332,10 @@ const handleQuickAdd = useCallback(async () => {
     accrualTransactions.forEach(t => months.add(t.date.slice(0, 7)))
     transactions.filter(t => t.category === 'revenue').forEach(t => months.add(t.date.slice(0, 7)))
     
-    const sortedMonths = Array.from(months).sort()
+    // Filter months by activeDateRange
+    const sortedMonths = Array.from(months)
+      .filter(month => month >= activeDateRange.start && month <= activeDateRange.end)
+      .sort()
     
     return sortedMonths.map(month => {
       // Invoiced (accrual revenue)
@@ -3349,7 +3352,7 @@ const handleQuickAdd = useCallback(async () => {
       
       return { month, invoiced, collected, delta }
     })
-  }, [accrualTransactions, transactions])
+  }, [accrualTransactions, transactions, activeDateRange])
 
   // Accrual Period Comparison (MoM/QoQ/YoY)
   const accrualPeriodComparison = useMemo(() => {
@@ -4744,7 +4747,7 @@ const handleQuickAdd = useCallback(async () => {
                                   <span className="font-medium">{projectName}</span>
                                   {existingProject && (
                                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                      existingProject.status === 'active' ? 'bg-[#34d399]/20 text-[#34d399]' :
+                                      existingProject.status === 'active' ? 'bg-[#f97316]/20 text-[#f97316]' :
                                       existingProject.status === 'completed' ? 'bg-[#f97316]/20 text-[#f97316]' :
                                       'bg-yellow-500/20 text-yellow-400'
                                     }`}>
@@ -5122,8 +5125,8 @@ const handleQuickAdd = useCallback(async () => {
             >
               <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'} flex items-center justify-between`}>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-[#34d399]/20 flex items-center justify-center">
-                    <BarChart3 className="w-5 h-5 text-[#34d399]" />
+                  <div className="w-10 h-10 rounded-lg bg-[#f97316]/20 flex items-center justify-center">
+                    <BarChart3 className="w-5 h-5 text-[#f97316]" />
                   </div>
                   <div>
                     <h3 className="font-semibold">Monthly P&L Report</h3>
@@ -5177,7 +5180,7 @@ const handleQuickAdd = useCallback(async () => {
                     <tbody>
                       {/* Revenue Row */}
                       <tr className={`border-b ${tableBorder}`}>
-                        <td className="px-4 py-3 font-medium text-[#34d399]">Revenue</td>
+                        <td className="px-4 py-3 font-medium text-[#f97316]">Revenue</td>
                         {Array.from({ length: 12 }, (_, i) => {
                           const monthStr = `${parseInt(reportDateRange.start) || new Date().getFullYear()}-${String(i + 1).padStart(2, '0')}`
                           const monthRevenue = transactions
@@ -5187,7 +5190,7 @@ const handleQuickAdd = useCallback(async () => {
                             <td key={i} className="px-3 py-3 text-right font-mono">{formatCurrency(monthRevenue)}</td>
                           )
                         })}
-                        <td className="px-4 py-3 text-right font-mono font-semibold text-[#34d399]">
+                        <td className="px-4 py-3 text-right font-mono font-semibold text-[#f97316]">
                           {formatCurrency(transactions
                             .filter(t => t.date.startsWith(String(parseInt(reportDateRange.start) || new Date().getFullYear())) && t.category === 'revenue' && t.type === 'actual')
                             .reduce((sum, t) => sum + t.amount, 0))}
@@ -5238,12 +5241,12 @@ const handleQuickAdd = useCallback(async () => {
                             .filter(t => t.date.startsWith(monthStr) && t.type === 'actual')
                             .reduce((sum, t) => sum + t.amount, 0)
                           return (
-                            <td key={i} className={`px-3 py-3 text-right font-mono font-semibold ${monthNet >= 0 ? 'text-[#34d399]' : 'text-[#fb7185]'}`}>
+                            <td key={i} className={`px-3 py-3 text-right font-mono font-semibold ${monthNet >= 0 ? 'text-[#f97316]' : 'text-[#fb7185]'}`}>
                               {formatCurrency(monthNet)}
                             </td>
                           )
                         })}
-                        <td className="px-4 py-3 text-right font-mono font-bold text-[#2dd4bf]">
+                        <td className="px-4 py-3 text-right font-mono font-bold text-[#60a5fa]">
                           {formatCurrency(transactions
                             .filter(t => t.date.startsWith(String(parseInt(reportDateRange.start) || new Date().getFullYear())) && t.type === 'actual')
                             .reduce((sum, t) => sum + t.amount, 0))}
@@ -5313,14 +5316,14 @@ const handleQuickAdd = useCallback(async () => {
                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: project.color }} />
                             <span className="font-semibold">{project.name}</span>
                           </div>
-                          <span className={`text-lg font-bold ${margin >= 30 ? 'text-[#34d399]' : margin >= 15 ? 'text-[#fbbf24]' : 'text-[#fb7185]'}`}>
+                          <span className={`text-lg font-bold ${margin >= 30 ? 'text-[#f97316]' : margin >= 15 ? 'text-[#fbbf24]' : 'text-[#fb7185]'}`}>
                             {margin.toFixed(1)}% GM
                           </span>
                         </div>
                         <div className="grid grid-cols-3 gap-4">
                           <div>
                             <p className={`text-xs ${textMuted}`}>Revenue</p>
-                            <p className="text-lg font-semibold text-[#34d399]">{formatCurrency(projectRevenue)}</p>
+                            <p className="text-lg font-semibold text-[#f97316]">{formatCurrency(projectRevenue)}</p>
                           </div>
                           <div>
                             <p className={`text-xs ${textMuted}`}>Costs</p>
@@ -5328,7 +5331,7 @@ const handleQuickAdd = useCallback(async () => {
                           </div>
                           <div>
                             <p className={`text-xs ${textMuted}`}>Gross Profit</p>
-                            <p className={`text-lg font-semibold ${grossProfit >= 0 ? 'text-[#2dd4bf]' : 'text-[#fb7185]'}`}>{formatCurrency(grossProfit)}</p>
+                            <p className={`text-lg font-semibold ${grossProfit >= 0 ? 'text-[#60a5fa]' : 'text-[#fb7185]'}`}>{formatCurrency(grossProfit)}</p>
                           </div>
                         </div>
                         {/* Margin Bar */}
@@ -5337,7 +5340,7 @@ const handleQuickAdd = useCallback(async () => {
                             className="h-full rounded-full transition-all"
                             style={{ 
                               width: `${Math.min(margin, 100)}%`,
-                              backgroundColor: margin >= 30 ? '#34d399' : margin >= 15 ? '#fbbf24' : '#fb7185'
+                              backgroundColor: margin >= 30 ? '#f97316' : margin >= 15 ? '#fbbf24' : '#fb7185'
                             }}
                           />
                         </div>
@@ -5424,9 +5427,9 @@ const handleQuickAdd = useCallback(async () => {
                                 <span className="font-medium">{client.name}</span>
                               </div>
                             </td>
-                            <td className="px-4 py-3 text-right font-mono text-[#34d399]">{formatCurrency(clientRevenue)}</td>
+                            <td className="px-4 py-3 text-right font-mono text-[#f97316]">{formatCurrency(clientRevenue)}</td>
                             <td className="px-4 py-3 text-right font-mono text-[#fb7185]">{formatCurrency(clientCosts)}</td>
-                            <td className={`px-4 py-3 text-right font-semibold ${margin >= 30 ? 'text-[#34d399]' : margin >= 15 ? 'text-[#fbbf24]' : 'text-[#fb7185]'}`}>
+                            <td className={`px-4 py-3 text-right font-semibold ${margin >= 30 ? 'text-[#f97316]' : margin >= 15 ? 'text-[#fbbf24]' : 'text-[#fb7185]'}`}>
                               {margin.toFixed(1)}%
                             </td>
                             <td className="px-4 py-3">
@@ -5470,8 +5473,8 @@ const handleQuickAdd = useCallback(async () => {
             >
               <div className={`p-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-neutral-700'} flex items-center justify-between`}>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-[#2dd4bf]/20 flex items-center justify-center">
-                    <DollarSign className="w-5 h-5 text-[#2dd4bf]" />
+                  <div className="w-10 h-10 rounded-lg bg-[#60a5fa]/20 flex items-center justify-center">
+                    <DollarSign className="w-5 h-5 text-[#60a5fa]" />
                   </div>
                   <div>
                     <h3 className="font-semibold">Cash Flow Statement</h3>
@@ -5500,9 +5503,9 @@ const handleQuickAdd = useCallback(async () => {
                     <div className="space-y-6">
                       {/* Summary Cards */}
                       <div className="grid grid-cols-2 gap-4">
-                        <div className={`p-4 rounded-lg ${theme === 'light' ? 'bg-green-50' : 'bg-[#34d399]/10'}`}>
+                        <div className={`p-4 rounded-lg ${theme === 'light' ? 'bg-green-50' : 'bg-[#f97316]/10'}`}>
                           <p className={`text-sm ${textMuted}`}>Total Inflows</p>
-                          <p className="text-2xl font-bold text-[#34d399]">{formatCurrency(totalInflows)}</p>
+                          <p className="text-2xl font-bold text-[#f97316]">{formatCurrency(totalInflows)}</p>
                         </div>
                         <div className={`p-4 rounded-lg ${theme === 'light' ? 'bg-red-50' : 'bg-[#fb7185]/10'}`}>
                           <p className={`text-sm ${textMuted}`}>Total Outflows</p>
@@ -5520,7 +5523,7 @@ const handleQuickAdd = useCallback(async () => {
                             <span>Beginning Balance</span>
                             <span className="font-mono font-semibold">{formatCurrency(beginningBalance)}</span>
                           </div>
-                          <div className="px-4 py-3 flex justify-between text-[#34d399]">
+                          <div className="px-4 py-3 flex justify-between text-[#f97316]">
                             <span>+ Cash Inflows (Revenue)</span>
                             <span className="font-mono font-semibold">{formatCurrency(totalInflows)}</span>
                           </div>
@@ -5528,7 +5531,7 @@ const handleQuickAdd = useCallback(async () => {
                             <span>- Cash Outflows (Expenses)</span>
                             <span className="font-mono font-semibold">({formatCurrency(totalOutflows)})</span>
                           </div>
-                          <div className={`px-4 py-3 flex justify-between ${netCashFlow >= 0 ? 'text-[#2dd4bf]' : 'text-[#fb7185]'}`}>
+                          <div className={`px-4 py-3 flex justify-between ${netCashFlow >= 0 ? 'text-[#60a5fa]' : 'text-[#fb7185]'}`}>
                             <span className="font-semibold">= Net Cash Flow</span>
                             <span className="font-mono font-bold">{formatCurrency(netCashFlow)}</span>
                           </div>
@@ -5646,7 +5649,7 @@ const handleQuickAdd = useCallback(async () => {
                             <tr className={`border-b ${tableBorder}`}>
                               <td className="px-4 py-3 font-medium">Revenue</td>
                               {quarters.map(q => (
-                                <td key={q.label} className="px-4 py-3 text-right font-mono text-[#34d399]">
+                                <td key={q.label} className="px-4 py-3 text-right font-mono text-[#f97316]">
                                   {formatCurrency(q.data.revenue)}
                                 </td>
                               ))}
@@ -5662,7 +5665,7 @@ const handleQuickAdd = useCallback(async () => {
                             <tr className={`${theme === 'light' ? 'bg-gray-50' : 'bg-neutral-800'}`}>
                               <td className="px-4 py-3 font-semibold">Net Income</td>
                               {quarters.map(q => (
-                                <td key={q.label} className={`px-4 py-3 text-right font-mono font-semibold ${q.data.net >= 0 ? 'text-[#2dd4bf]' : 'text-[#fb7185]'}`}>
+                                <td key={q.label} className={`px-4 py-3 text-right font-mono font-semibold ${q.data.net >= 0 ? 'text-[#60a5fa]' : 'text-[#fb7185]'}`}>
                                   {formatCurrency(q.data.net)}
                                 </td>
                               ))}
@@ -5688,7 +5691,7 @@ const handleQuickAdd = useCallback(async () => {
                                 }}
                                 formatter={(value: number) => formatCurrency(value)}
                               />
-                              <Bar dataKey="revenue" name="Revenue" fill="#34d399" radius={[4, 4, 0, 0]} />
+                              <Bar dataKey="revenue" name="Revenue" fill="#f97316" radius={[4, 4, 0, 0]} />
                               <Bar dataKey="expenses" name="Expenses" fill="#fb7185" radius={[4, 4, 0, 0]} />
                             </BarChart>
                           </ResponsiveContainer>
@@ -5997,7 +6000,7 @@ const handleQuickAdd = useCallback(async () => {
                         </td>
                         <td className="py-3 px-2 text-center">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
-                            suggestion.confidence >= 80 ? 'bg-[#34d399]/20 text-[#34d399]' :
+                            suggestion.confidence >= 80 ? 'bg-[#f97316]/20 text-[#f97316]' :
                             suggestion.confidence >= 60 ? 'bg-yellow-500/20 text-yellow-400' :
                             'bg-[#fb7185]/20 text-[#fb7185]'
                           }`}>
@@ -6569,11 +6572,11 @@ const handleQuickAdd = useCallback(async () => {
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {[
-                        { key: 'revenue', label: 'Rev', color: '#34d399' },
+                        { key: 'revenue', label: 'Rev', color: '#f97316' },
                         { key: 'opex', label: 'OpEx', color: '#fb7185' },
-                        { key: 'overhead', label: 'OH', color: '#f97316' },
-                        { key: 'investment', label: 'Inv', color: '#64748b' },
-                        { key: 'net', label: 'Net', color: '#22d3ee' },
+                        { key: 'overhead', label: 'OH', color: '#f59e0b' },
+                        { key: 'investment', label: 'Inv', color: '#3b82f6' },
+                        { key: 'net', label: 'Net', color: '#60a5fa' },
                       ].map(f => (
                         <button
                           key={f.key}
@@ -6606,7 +6609,7 @@ const handleQuickAdd = useCallback(async () => {
                       {chartFilters.opex && <Bar dataKey="opex" name="OpEx" fill={getCategoryColor('opex')} radius={[2, 2, 0, 0]} />}
                       {chartFilters.overhead && <Bar dataKey="overhead" name="Overhead" fill={getCategoryColor('overhead')} radius={[2, 2, 0, 0]} />}
                       {chartFilters.investment && <Bar dataKey="investment" name="InvEx" fill={getCategoryColor('investment')} radius={[2, 2, 0, 0]} />}
-                      {chartFilters.net && <Line type="monotone" dataKey="netCash" name="Net" stroke="#22d3ee" strokeWidth={2} dot={false} />}
+                      {chartFilters.net && <Line type="monotone" dataKey="netCash" name="Net" stroke="#60a5fa" strokeWidth={2} dot={false} />}
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
@@ -6617,8 +6620,8 @@ const handleQuickAdd = useCallback(async () => {
                     <AreaChart data={chartData}>
                       <defs>
                         <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#34d399" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#34d399" stopOpacity={0}/>
+                          <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#e5e7eb' : '#333333'} />
@@ -6632,7 +6635,7 @@ const handleQuickAdd = useCallback(async () => {
                         <ReferenceLine y={balanceAlertThreshold} stroke="#fb7185" strokeDasharray="5 5" label={{ value: 'Alert', fill: '#fb7185', fontSize: 10 }} />
                       )}
                       <ReferenceLine y={0} stroke="#fb7185" strokeDasharray="3 3" />
-                      <Area type="monotone" dataKey="balance" stroke="#34d399" fill="url(#balanceGradient)" strokeWidth={2} />
+                      <Area type="monotone" dataKey="balance" stroke="#f97316" fill="url(#balanceGradient)" strokeWidth={2} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -6785,7 +6788,7 @@ const handleQuickAdd = useCallback(async () => {
                           key={`rev${year}`}
                           dataKey={`rev${year}`} 
                           name={`Rev ${year}`} 
-                          fill={idx === 0 ? '#6ee7b7' : '#34d399'} 
+                          fill={idx === 0 ? '#fdba74' : '#f97316'} 
                           radius={[4, 4, 0, 0]} 
                         />
                       ))}
@@ -6973,7 +6976,7 @@ const handleQuickAdd = useCallback(async () => {
                                   contentStyle={{ background: theme === 'light' ? 'white' : '#1f2937', border: 'none', borderRadius: '8px' }}
                                 />
                                 <Legend />
-                                <Bar yAxisId="left" dataKey="revenue" name="Revenue" fill="#34d399" radius={[4, 4, 0, 0]} />
+                                <Bar yAxisId="left" dataKey="revenue" name="Revenue" fill="#f97316" radius={[4, 4, 0, 0]} />
                                 <Bar yAxisId="left" dataKey="directCosts" name="Direct Costs" fill="#fb7185" radius={[4, 4, 0, 0]} />
                                 <Line yAxisId="right" type="monotone" dataKey="grossMarginPct" name="GM %" stroke="#64748b" strokeWidth={3} dot={{ r: 4 }} />
                               </ComposedChart>
@@ -7440,7 +7443,7 @@ const handleQuickAdd = useCallback(async () => {
                             />
                             <Legend />
                             <Bar dataKey="invoiced" name="Invoiced (Accrual)" fill="#f97316" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="collected" name="Collected (Cash)" fill="#34d399" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="collected" name="Collected (Cash)" fill="#60a5fa" radius={[4, 4, 0, 0]} />
                             <ReferenceLine y={0} stroke="#6b7280" />
                           </ComposedChart>
                         </ResponsiveContainer>
@@ -9087,7 +9090,7 @@ const handleQuickAdd = useCallback(async () => {
                       />
                       <Legend />
                       <ReferenceLine yAxisId="left" y={0} stroke="#fb7185" strokeDasharray="3 3" />
-                      <Bar yAxisId="left" dataKey="netCash" name="Net Cash" fill={theme === 'light' ? '#34d399' : '#34d399'} radius={[4, 4, 0, 0]} />
+                      <Bar yAxisId="left" dataKey="netCash" name="Net Cash" fill={theme === 'light' ? '#f97316' : '#f97316'} radius={[4, 4, 0, 0]} />
                       <Area yAxisId="right" type="monotone" dataKey="balance" name="Balance" stroke="#f97316" fill="url(#balanceGradient)" strokeWidth={2} />
                     </ComposedChart>
                   </ResponsiveContainer>
@@ -9258,7 +9261,7 @@ const handleQuickAdd = useCallback(async () => {
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                                client.status === 'active' ? 'bg-[#34d399]/20 text-[#34d399]' :
+                                client.status === 'active' ? 'bg-[#f97316]/20 text-[#f97316]' :
                                 client.status === 'prospect' ? 'bg-[#f97316]/20 text-[#f97316]' :
                                 'bg-gray-500/20 text-gray-400'
                               }`}>
@@ -9467,7 +9470,7 @@ const handleQuickAdd = useCallback(async () => {
                     title: 'Monthly P&L', 
                     description: 'Profit & Loss statement by month',
                     icon: BarChart3,
-                    color: '#34d399',
+                    color: '#f97316',
                     route: '/reports/monthly-pl',
                     badge: 'Full Page'
                   },
@@ -9494,7 +9497,7 @@ const handleQuickAdd = useCallback(async () => {
                     title: 'Cash Flow Statement', 
                     description: 'Cash inflows, outflows, and net position',
                     icon: DollarSign,
-                    color: '#2dd4bf',
+                    color: '#60a5fa',
                     route: null,
                     badge: 'Coming Soon'
                   },
@@ -10196,7 +10199,7 @@ const handleQuickAdd = useCallback(async () => {
               }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#f97316] to-[#34d399] flex items-center justify-center shadow-lg">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#f97316] to-[#fb923c] flex items-center justify-center shadow-lg">
                       <Sparkles className="w-5 h-5 text-white" />
                     </div>
                     <div>
@@ -10234,7 +10237,7 @@ const handleQuickAdd = useCallback(async () => {
                   <div className="h-full flex flex-col">
                     {/* Welcome Message */}
                     <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#f97316] to-[#34d399] flex items-center justify-center mb-4 shadow-lg">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#f97316] to-[#fb923c] flex items-center justify-center mb-4 shadow-lg">
                         <Sparkles className="w-8 h-8 text-white" />
                       </div>
                       <h4 className="text-lg font-semibold mb-2">Hi! I'm Vantage AI</h4>
@@ -10303,7 +10306,7 @@ const handleQuickAdd = useCallback(async () => {
                         <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
                           msg.role === 'user'
                             ? 'bg-[#f97316]'
-                            : 'bg-gradient-to-br from-[#f97316] to-[#34d399]'
+                            : 'bg-gradient-to-br from-[#f97316] to-[#fb923c]'
                         }`}>
                           {msg.role === 'user' 
                             ? <User className="w-4 h-4 text-[#121212]" />
@@ -10401,7 +10404,7 @@ const handleQuickAdd = useCallback(async () => {
                     {/* Loading Indicator */}
                     {chatLoading && (
                       <div className="flex gap-3">
-                        <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-[#f97316] to-[#34d399] flex items-center justify-center">
+                        <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-[#f97316] to-[#fb923c] flex items-center justify-center">
                           <Sparkles className="w-4 h-4 text-white" />
                         </div>
                         <div className={`rounded-2xl rounded-tl-md px-4 py-3 ${
@@ -10469,7 +10472,7 @@ const handleQuickAdd = useCallback(async () => {
         className={`fixed bottom-6 right-6 z-40 print:hidden w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all ${
           chatOpen 
             ? 'bg-[#333333] text-white scale-0 opacity-0' 
-            : 'bg-gradient-to-br from-[#f97316] to-[#34d399] text-white hover:shadow-xl hover:shadow-[#f97316]/20 scale-100 opacity-100'
+            : 'bg-gradient-to-br from-[#f97316] to-[#fb923c] text-white hover:shadow-xl hover:shadow-[#f97316]/20 scale-100 opacity-100'
         }`}
       >
         <MessageSquare className="w-6 h-6" />
