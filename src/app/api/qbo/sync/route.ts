@@ -53,6 +53,53 @@ function parseInvoiceStatus(balance: number, dueDate: string | null): { status: 
   return { status: 'pending', statusDetail: `Due in ${Math.abs(diffDays)} days`, daysOverdue: 0 }
 }
 
+// Helper function to fetch all pages from QB (handles pagination)
+async function fetchAllFromQB(
+  realmId: string, 
+  accessToken: string, 
+  query: string, 
+  entityName: string
+): Promise<any[]> {
+  const allResults: any[] = []
+  let startPosition = 1
+  const maxResults = 1000
+  let hasMore = true
+
+  while (hasMore) {
+    const pagedQuery = `${query} STARTPOSITION ${startPosition} MAXRESULTS ${maxResults}`
+    console.log(`Fetching ${entityName}: page starting at ${startPosition}`)
+    
+    const response = await fetch(
+      `${QB_API_BASE}/${realmId}/query?query=${encodeURIComponent(pagedQuery)}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/json'
+        }
+      }
+    )
+
+    if (!response.ok) {
+      console.error(`QB query failed for ${entityName}:`, await response.text())
+      break
+    }
+
+    const data = await response.json()
+    const items = data.QueryResponse?.[entityName] || []
+    allResults.push(...items)
+    
+    console.log(`Fetched ${items.length} ${entityName} (total: ${allResults.length})`)
+
+    if (items.length < maxResults) {
+      hasMore = false
+    } else {
+      startPosition += maxResults
+    }
+  }
+
+  return allResults
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { companyId, syncType } = await request.json()
@@ -89,48 +136,6 @@ export async function POST(request: NextRequest) {
       invoices: { synced: 0, skipped: 0, errors: 0 }
     }
 
-    // Helper function to fetch all pages from QB (handles pagination)
-    async function fetchAllFromQB(query: string, entityName: string): Promise<any[]> {
-      const allResults: any[] = []
-      let startPosition = 1
-      const maxResults = 1000
-      let hasMore = true
-
-      while (hasMore) {
-        const pagedQuery = `${query} STARTPOSITION ${startPosition} MAXRESULTS ${maxResults}`
-        console.log(`Fetching ${entityName}: page starting at ${startPosition}`)
-        
-        const response = await fetch(
-          `${QB_API_BASE}/${realmId}/query?query=${encodeURIComponent(pagedQuery)}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Accept': 'application/json'
-            }
-          }
-        )
-
-        if (!response.ok) {
-          console.error(`QB query failed for ${entityName}:`, await response.text())
-          break
-        }
-
-        const data = await response.json()
-        const items = data.QueryResponse?.[entityName] || []
-        allResults.push(...items)
-        
-        console.log(`Fetched ${items.length} ${entityName} (total: ${allResults.length})`)
-
-        if (items.length < maxResults) {
-          hasMore = false
-        } else {
-          startPosition += maxResults
-        }
-      }
-
-      return allResults
-    }
-
     // ========================================
     // SYNC BANK TRANSACTIONS (Cash Basis)
     // Pulls: Purchases, Deposits, Transfers, Payments, SalesReceipts
@@ -140,6 +145,8 @@ export async function POST(request: NextRequest) {
       try {
         // 1. PURCHASES (Expenses - checks, credit cards, etc.)
         const purchases = await fetchAllFromQB(
+          realmId,
+          accessToken,
           `SELECT * FROM Purchase ORDER BY TxnDate DESC`,
           'Purchase'
         )
@@ -184,7 +191,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 2. DEPOSITS (Income to bank)
-        const deposits = await fetchAllFromQB(
+        const deposits = await fetchAllFromQB(realmId, accessToken,
           `SELECT * FROM Deposit ORDER BY TxnDate DESC`,
           'Deposit'
         )
@@ -224,7 +231,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 3. TRANSFERS between accounts
-        const transfers = await fetchAllFromQB(
+        const transfers = await fetchAllFromQB(realmId, accessToken,
           `SELECT * FROM Transfer ORDER BY TxnDate DESC`,
           'Transfer'
         )
@@ -255,7 +262,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 4. PAYMENTS received (invoice payments)
-        const payments = await fetchAllFromQB(
+        const payments = await fetchAllFromQB(realmId, accessToken,
           `SELECT * FROM Payment ORDER BY TxnDate DESC`,
           'Payment'
         )
@@ -287,7 +294,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 5. SALES RECEIPTS (direct sales, not invoiced)
-        const salesReceipts = await fetchAllFromQB(
+        const salesReceipts = await fetchAllFromQB(realmId, accessToken,
           `SELECT * FROM SalesReceipt ORDER BY TxnDate DESC`,
           'SalesReceipt'
         )
@@ -329,7 +336,7 @@ export async function POST(request: NextRequest) {
     // ========================================
     if (!syncType || syncType === 'all' || syncType === 'invoices') {
       try {
-        const invoices = await fetchAllFromQB(
+        const invoices = await fetchAllFromQB(realmId, accessToken,
           `SELECT * FROM Invoice ORDER BY TxnDate DESC`,
           'Invoice'
         )
