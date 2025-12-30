@@ -1952,7 +1952,6 @@ export default function CashFlowPro() {
     
     const clientData = {
       name: name.trim(),
-      color: PROJECT_COLORS[clients.length % PROJECT_COLORS.length],
       status: 'active' as const
     }
     
@@ -1961,13 +1960,12 @@ export default function CashFlowPro() {
       const newClient: Client = {
         id: data.id,
         name: data.name,
-        color: data.color,
         status: data.status,
         createdAt: data.created_at
       }
       setClients(prev => [...prev, newClient])
     }
-  }, [companyId, user, clients.length])
+  }, [companyId, user])
 
   // Bulk categorize selected transactions
   const bulkCategorizeSelected = useCallback(async () => {
