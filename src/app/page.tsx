@@ -2254,7 +2254,6 @@ const clearAllAccrualTransactions = useCallback(async () => {
     // Build updates object, filtering out undefined values
     const rawUpdates: Record<string, any> = {
       date: editAccrualForm.date,
-      type: editAccrualForm.type,
       category: editAccrualForm.category,
       description: editAccrualForm.description,
       amount: editAccrualForm.amount,
@@ -2263,6 +2262,11 @@ const clearAllAccrualTransactions = useCallback(async () => {
       client: editAccrualForm.client,
       invoice_number: editAccrualForm.invoiceNumber,
       notes: editAccrualForm.notes
+    }
+    
+    // Only include type if it's a valid value
+    if (editAccrualForm.type && (editAccrualForm.type === 'revenue' || editAccrualForm.type === 'direct_cost')) {
+      rawUpdates.type = editAccrualForm.type
     }
     
     // Remove undefined values to avoid database errors
@@ -2275,7 +2279,9 @@ const clearAllAccrualTransactions = useCallback(async () => {
     const { error } = await supabaseUpdateAccrualTransaction(editingAccrualId, updates)
     if (error) {
       console.error('Error updating accrual transaction:', error)
-      alert('Failed to save changes. Please try again.')
+      console.error('Transaction ID:', editingAccrualId)
+      console.error('Updates attempted:', JSON.stringify(updates, null, 2))
+      alert(`Failed to save changes: ${error.message || 'Unknown error'}`)
       return
     }
     
@@ -2365,15 +2371,19 @@ const clearAllAccrualTransactions = useCallback(async () => {
     } else {
       if (!accrualModalForm.id) return
       
-      const updates = {
+      const updates: Record<string, any> = {
         date: accrualModalForm.date,
-        type: accrualModalForm.type,
         description: accrualModalForm.description,
         amount,
         project: accrualModalForm.project,
         vendor: accrualModalForm.vendor,
         invoice_number: accrualModalForm.invoiceNumber,
         notes: accrualModalForm.notes
+      }
+      
+      // Only include type if valid
+      if (accrualModalForm.type && (accrualModalForm.type === 'revenue' || accrualModalForm.type === 'direct_cost')) {
+        updates.type = accrualModalForm.type
       }
       
       const { error } = await supabaseUpdateAccrualTransaction(accrualModalForm.id, updates)
