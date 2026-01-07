@@ -1972,8 +1972,12 @@ export default function CashFlowPro() {
   }, [])
 
   // Quick categorize accrual transaction
-  const quickCategorizeAccrual = useCallback(async (transactionId: string, type: 'revenue' | 'direct_cost', project?: string, client?: string, category?: string) => {
-    const updates: any = { type }
+  const quickCategorizeAccrual = useCallback(async (transactionId: string, type?: 'revenue' | 'direct_cost' | string | null, project?: string, client?: string, category?: string) => {
+    const updates: any = {}
+    // Only include type if it's a valid value
+    if (type && (type === 'revenue' || type === 'direct_cost')) {
+      updates.type = type
+    }
     if (project !== undefined) updates.project = project
     if (client !== undefined) {
       updates.client = client
@@ -1981,8 +1985,13 @@ export default function CashFlowPro() {
     }
     if (category !== undefined) updates.category = category
     
+    // Only make API call if there's something to update
+    if (Object.keys(updates).length === 0) return
+    
     const { error } = await supabaseUpdateAccrualTransaction(transactionId, updates)
-    if (!error) {
+    if (error) {
+      console.error('Error updating accrual transaction:', error)
+    } else {
       setAccrualTransactions(prev => prev.map(t => 
         t.id === transactionId ? { ...t, ...updates } : t
       ))
