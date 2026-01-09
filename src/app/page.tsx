@@ -1981,7 +1981,7 @@ export default function CashFlowPro() {
     if (project !== undefined) updates.project = project
     if (client !== undefined) {
       updates.client = client
-      updates.vendor = client // Also update vendor for compatibility
+      // Note: vendor column doesn't exist in accrual_transactions table
     }
     if (category !== undefined) updates.category = category
     
@@ -2258,7 +2258,6 @@ const clearAllAccrualTransactions = useCallback(async () => {
       description: editAccrualForm.description,
       amount: editAccrualForm.amount,
       project: editAccrualForm.project,
-      vendor: editAccrualForm.vendor,
       client: editAccrualForm.client,
       invoice_number: editAccrualForm.invoiceNumber,
       notes: editAccrualForm.notes
@@ -2347,7 +2346,7 @@ const clearAllAccrualTransactions = useCallback(async () => {
         description: accrualModalForm.description,
         amount,
         project: accrualModalForm.project,
-        vendor: accrualModalForm.vendor,
+        client: accrualModalForm.vendor || accrualModalForm.client,
         invoice_number: accrualModalForm.invoiceNumber,
         notes: accrualModalForm.notes
       }
@@ -2362,7 +2361,7 @@ const clearAllAccrualTransactions = useCallback(async () => {
           description: data.description,
           amount: parseFloat(data.amount),
           project: data.project,
-          vendor: data.vendor,
+          client: data.client,
           invoiceNumber: data.invoice_number,
           notes: data.notes
         }
@@ -2376,7 +2375,7 @@ const clearAllAccrualTransactions = useCallback(async () => {
         description: accrualModalForm.description,
         amount,
         project: accrualModalForm.project,
-        vendor: accrualModalForm.vendor,
+        client: accrualModalForm.client,
         invoice_number: accrualModalForm.invoiceNumber,
         notes: accrualModalForm.notes
       }
@@ -2434,7 +2433,7 @@ const handleQuickAdd = useCallback(async () => {
         description: quickAddForm.description,
         amount: quickAddForm.category === 'revenue' ? Math.abs(quickAddForm.amount) : -Math.abs(quickAddForm.amount),
         project: quickAddForm.project || 'Unassigned',
-        vendor: '',
+        client: '',
         invoice_number: '',
         notes: quickAddForm.notes
       }
@@ -2449,7 +2448,7 @@ const handleQuickAdd = useCallback(async () => {
           description: data.description,
           amount: parseFloat(data.amount),
           project: data.project,
-          vendor: data.vendor,
+          client: data.client,
           invoiceNumber: data.invoice_number,
           notes: data.notes
         }
