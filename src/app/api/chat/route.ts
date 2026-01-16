@@ -29,14 +29,15 @@ export async function POST(request: NextRequest) {
       'description', 'amount', 'date', 'revenue', 'opex', 'overhead', 'investment', 
       'cash', 'flow', 'please', 'help', 'want', 'need', 'like', 'make', 'them', 'those',
       'these', 'what', 'where', 'when', 'which', 'who', 'how', 'why', 'get', 'put',
-      'uncategorized', 'unassigned', 'named', 'called', 'containing', 'includes'
+      'uncategorized', 'unassigned', 'named', 'called', 'containing', 'includes',
+      'overall', 'gross', 'margin', 'profit', 'total', 'much', 'many'
     ])
     
-    const words = message.toLowerCase().match(/\b[a-z0-9]{3,}\b/g) || []
+    const words = (message || '').toLowerCase().match(/\b[a-z0-9]{3,}\b/g) || []
     const searchTerms = words.filter((w: string) => !commonWords.has(w))
     
     // Also extract quoted phrases (e.g., "Airtable Inc")
-    const quotedPhrases = message.match(/["']([^"']+)["']/g)?.map((p: string) => 
+    const quotedPhrases = (message || '').match(/["']([^"']+)["']/g)?.map((p: string) => 
       p.replace(/["']/g, '').toLowerCase()
     ) || []
     
@@ -97,17 +98,17 @@ export async function POST(request: NextRequest) {
             matchingTransactions = (cashMatches || []).map(t => ({
               id: t.id,
               date: t.date,
-              description: t.description,
-              amount: parseFloat(t.amount),
+              description: t.description || '',
+              amount: parseFloat(t.amount) || 0,
               category: t.category || 'unassigned',
               project: t.project || 'none',
-              type: t.type
+              type: t.type || 'actual'
             }))
           }
         }
 
         // Check for "uncategorized" request
-        if (message.toLowerCase().includes('uncategorized') || message.toLowerCase().includes('unassigned')) {
+        if ((message || '').toLowerCase().includes('uncategorized') || (message || '').toLowerCase().includes('unassigned')) {
           const { data: uncatMatches, error: uncatError } = await supabase
             .from('transactions')
             .select('*')
@@ -120,11 +121,11 @@ export async function POST(request: NextRequest) {
             const uncatFormatted = uncatMatches.map(t => ({
               id: t.id,
               date: t.date,
-              description: t.description,
-              amount: parseFloat(t.amount),
+              description: t.description || '',
+              amount: parseFloat(t.amount) || 0,
               category: t.category || 'unassigned',
               project: t.project || 'none',
-              type: t.type
+              type: t.type || 'actual'
             }))
             // Merge with existing matches, avoiding duplicates
             const existingIds = new Set(matchingTransactions.map(t => t.id))
@@ -167,7 +168,7 @@ export async function POST(request: NextRequest) {
           .eq('company_id', companyId)
 
         if (projects) {
-          existingProjects = projects.map(p => p.name)
+          existingProjects = projects.map(p => p.name || '').filter(Boolean)
         }
       } catch (dbError) {
         console.error('Database query error:', dbError)
@@ -188,8 +189,8 @@ export async function POST(request: NextRequest) {
         }).map((t: any) => ({
           id: t.id,
           date: t.date,
-          description: t.description,
-          amount: t.amount,
+          description: t.description || '',
+          amount: t.amount || 0,
           category: t.category || 'unassigned',
           project: t.project || 'none',
           type: t.type || 'actual'
@@ -197,14 +198,14 @@ export async function POST(request: NextRequest) {
       }
       
       // Check for uncategorized in context
-      if (message.toLowerCase().includes('uncategorized') || message.toLowerCase().includes('unassigned')) {
+      if ((message || '').toLowerCase().includes('uncategorized') || (message || '').toLowerCase().includes('unassigned')) {
         const uncatFromContext = allTransactions.filter((t: any) => 
           !t.category || t.category === 'unassigned' || t.category === ''
         ).map((t: any) => ({
           id: t.id,
           date: t.date,
-          description: t.description,
-          amount: t.amount,
+          description: t.description || '',
+          amount: t.amount || 0,
           category: 'unassigned',
           project: t.project || 'none',
           type: t.type || 'actual'
@@ -223,14 +224,15 @@ export async function POST(request: NextRequest) {
         uncategorized: allTransactions.filter((t: any) => !t.category || t.category === 'unassigned').length,
         unassignedProject: allTransactions.filter((t: any) => !t.project).length
       }
-      
-      existingProjects = context.existingProjects || []
     }
 
-    // Format transactions for AI
-    const formatTransaction = (t: any) => 
-      `[ID:${t.id}] ${t.date} | ${t.description} | $${t.amount} | cat:${t.category} | proj:${t.project}`
-    
+    // Format transactions for display
+    const formatTransaction = (t: any) => {
+      const desc = (t.description || 'No description').substring(0, 50)
+      const amt = typeof t.amount === 'number' ? t.amount.toFixed(2) : '0.00'
+      return `- ID: ${t.id} | ${t.date || 'No date'} | ${desc} | $${amt} | Category: ${t.category || 'unassigned'} | Project: ${t.project || 'none'}`
+    }
+
     let transactionSection = ''
     if (matchingTransactions.length > 0) {
       transactionSection = `MATCHING TRANSACTIONS (${matchingTransactions.length} found${searchTerms.length > 0 ? ` for "${searchTerms.join('", "')}"` : ''}):\n`
@@ -243,6 +245,51 @@ export async function POST(request: NextRequest) {
       transactionSection += `Database has ${stats.total} total transactions.`
     } else {
       transactionSection = `DATABASE STATS:\n- Total transactions: ${stats.total}\n- Uncategorized: ${stats.uncategorized}\n- Without project: ${stats.unassignedProject}`
+    }
+
+    // Safely format project financials with null checks
+    const formatAcrrualProjects = () => {
+      if (!context?.projects || !Array.isArray(context.projects) || context.projects.length === 0) {
+        return ''
+      }
+      try {
+        const lines = context.projects
+          .filter((p: any) => p && p.name)
+          .map((p: any) => {
+            const name = p.name || 'Unknown'
+            const revenue = typeof p.revenue === 'number' ? p.revenue.toLocaleString() : '0'
+            const costs = typeof p.costs === 'number' ? p.costs.toLocaleString() : '0'
+            const grossProfit = typeof p.grossProfit === 'number' ? p.grossProfit.toLocaleString() : '0'
+            const grossMargin = p.grossMargin ?? 0
+            return `- ${name}: Revenue $${revenue}, Costs $${costs}, Profit $${grossProfit}, Margin ${grossMargin}%`
+          })
+        return lines.length > 0 ? `\nPROJECT FINANCIALS - ACCRUAL/INVOICES (gross margin analysis):\n${lines.join('\n')}\n` : ''
+      } catch (e) {
+        console.error('Error formatting accrual projects:', e)
+        return ''
+      }
+    }
+
+    const formatCashProjects = () => {
+      if (!context?.cashProjects || !Array.isArray(context.cashProjects) || context.cashProjects.length === 0) {
+        return ''
+      }
+      try {
+        const lines = context.cashProjects
+          .filter((p: any) => p && p.name && p.transactionCount > 0)
+          .map((p: any) => {
+            const name = p.name || 'Unknown'
+            const inflows = typeof p.inflows === 'number' ? p.inflows.toLocaleString() : '0'
+            const outflows = typeof p.outflows === 'number' ? p.outflows.toLocaleString() : '0'
+            const netCash = typeof p.netCash === 'number' ? p.netCash.toLocaleString() : '0'
+            const count = p.transactionCount || 0
+            return `- ${name}: Inflows $${inflows}, Outflows $${outflows}, Net Cash $${netCash} (${count} transactions)`
+          })
+        return lines.length > 0 ? `\nPROJECT FINANCIALS - CASH FLOW (actual money in/out):\n${lines.join('\n')}\n` : 'No cash transactions assigned to projects yet\n'
+      } catch (e) {
+        console.error('Error formatting cash projects:', e)
+        return ''
+      }
     }
 
     // Build the system prompt
@@ -264,26 +311,16 @@ DATABASE SUMMARY:
 - Without project assigned: ${stats.unassignedProject}
 
 EXISTING PROJECTS: ${existingProjects.join(', ') || 'None'}
-
-${context?.projects && context.projects.length > 0 ? `
-PROJECT FINANCIALS - ACCRUAL/INVOICES (gross margin analysis):
-${context.projects.map((p: any) => `- ${p.name}: Revenue $${p.revenue?.toLocaleString() || 0}, Costs $${p.costs?.toLocaleString() || 0}, Profit $${p.grossProfit?.toLocaleString() || 0}, Margin ${p.grossMargin}%`).join('\n')}
-` : ''}
-
-${context?.cashProjects && context.cashProjects.length > 0 ? `
-PROJECT FINANCIALS - CASH FLOW (actual money in/out):
-${context.cashProjects.filter((p: any) => p.transactionCount > 0).map((p: any) => `- ${p.name}: Inflows $${p.inflows?.toLocaleString() || 0}, Outflows $${p.outflows?.toLocaleString() || 0}, Net Cash $${p.netCash?.toLocaleString() || 0} (${p.transactionCount} transactions)`).join('\n') || 'No cash transactions assigned to projects yet'}
-` : ''}
-
+${formatAcrrualProjects()}${formatCashProjects()}
 CATEGORIES AVAILABLE: revenue, opex, overhead, investment
 
 ${transactionSection}
 
 ${context?.metrics ? `
 KEY METRICS:
-- Total Revenue: $${context.metrics.totalRevenue?.toLocaleString() || 0}
-- Total Expenses: $${context.metrics.totalExpenses?.toLocaleString() || 0}
-- Net Cash Flow: $${context.metrics.netCashFlow?.toLocaleString() || 0}
+- Total Revenue: $${(context.metrics.totalRevenue || 0).toLocaleString()}
+- Total Expenses: $${(context.metrics.totalExpenses || 0).toLocaleString()}
+- Net Cash Flow: $${(context.metrics.netCashFlow || 0).toLocaleString()}
 ` : ''}
 
 ACTION MODE INSTRUCTIONS:
