@@ -2,271 +2,86 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Vantage Design System v2 */
-/* Light theme default, Charcoal dark mode, Soft pastel data colors */
-
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
-
-:root {
-  /* ===== LIGHT THEME (Default) ===== */
-  --color-bg: #f8fafc;
-  --color-bg-alt: #f1f5f9;
-  --color-surface: #ffffff;
-  --color-elevated: #ffffff;
-  --color-border: #e2e8f0;
-  --color-border-light: #f1f5f9;
-  
-  /* Primary Accent - Warm Orange */
-  --color-primary: #f97316;
-  --color-primary-hover: #ea580c;
-  --color-primary-muted: rgba(249, 115, 22, 0.12);
-  
-  /* Text Colors */
-  --color-text-primary: #1e293b;
-  --color-text-secondary: #475569;
-  --color-text-muted: #94a3b8;
-  
-  /* ===== DATA VISUALIZATION - Soft Pastels ===== */
-  /* Revenue/Income - Soft Mint Green */
-  --color-revenue: #34d399;
-  --color-revenue-light: rgba(52, 211, 153, 0.15);
-  
-  /* Expenses/Costs - Soft Coral */
-  --color-expense: #fb7185;
-  --color-expense-light: rgba(251, 113, 133, 0.15);
-  
-  /* Overhead - Soft Purple */
-  --color-overhead: #fbbf24;
-  --color-overhead-light: rgba(167, 139, 250, 0.15);
-  
-  /* Investment - Soft Blue */
-  --color-investment: #60a5fa;
-  --color-investment-light: rgba(96, 165, 250, 0.15);
-  
-  /* Net/Profit - Soft Teal */
-  --color-net: #2dd4bf;
-  --color-net-light: rgba(45, 212, 191, 0.15);
-  
-  /* Budget/Projected - Soft Gray */
-  --color-budget: #94a3b8;
-  --color-budget-light: rgba(148, 163, 184, 0.15);
-  
-  /* Semantic */
-  --color-success: #22c55e;
-  --color-success-light: rgba(34, 197, 94, 0.12);
-  --color-danger: #ef4444;
-  --color-danger-light: rgba(239, 68, 68, 0.12);
-  --color-warning: #f59e0b;
-  --color-warning-light: rgba(245, 158, 11, 0.12);
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-/* ===== DARK THEME - Charcoal (not navy) ===== */
-.dark,
-body:not(.light-mode) {
-  /* Charcoal backgrounds - NOT navy blue */
-  --color-bg: #121212;
-  --color-bg-alt: #1a1a1a;
-  --color-surface: #1e1e1e;
-  --color-elevated: #262626;
-  --color-border: #333333;
-  --color-border-light: #2a2a2a;
-  
-  /* Text */
-  --color-text-primary: #f5f5f5;
-  --color-text-secondary: #a3a3a3;
-  --color-text-muted: #737373;
-  
-  /* Data colors stay the same but slightly more vibrant for dark bg */
-  --color-revenue: #4ade80;
-  --color-revenue-light: rgba(74, 222, 128, 0.2);
-  
-  --color-expense: #fb923c;
-  --color-expense-light: rgba(251, 146, 60, 0.2);
-  
-  --color-overhead: #fcd34d;
-  --color-overhead-light: rgba(196, 181, 253, 0.2);
-  
-  --color-investment: #93c5fd;
-  --color-investment-light: rgba(147, 197, 253, 0.2);
-  
-  --color-net: #5eead4;
-  --color-net-light: rgba(94, 234, 212, 0.2);
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-@layer base {
-  html {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    -webkit-font-smoothing: antialiased;
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Light mode scrollbar */
+.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Animation utilities */
+@keyframes slide-in-from-right {
+  from {
+    transform: translateX(100%);
   }
-  
-  body {
-    @apply bg-[var(--color-bg)] text-[var(--color-text-primary)];
-  }
-  
-  body.light-mode {
-    --color-bg: #f8fafc;
-    --color-surface: #ffffff;
-    --color-border: #e2e8f0;
-    --color-text-primary: #1e293b;
-    --color-text-secondary: #475569;
-    --color-text-muted: #94a3b8;
+  to {
+    transform: translateX(0);
   }
 }
 
-/* ===== Override old navy colors to charcoal ===== */
-.bg-\[\#0c1222\], .bg-\[\#0f172a\] { background-color: #121212 !important; }
-.bg-\[\#141c2e\], .bg-\[\#1e293b\] { background-color: #1e1e1e !important; }
-.bg-\[\#1c2740\], .bg-\[\#334155\] { background-color: #262626 !important; }
-.border-\[\#2a3a55\], .border-\[\#334155\] { border-color: #333333 !important; }
-
-.bg-terminal-bg { background-color: var(--color-bg) !important; }
-.bg-terminal-surface { background-color: var(--color-surface) !important; }
-.border-terminal-border { border-color: var(--color-border) !important; }
-
-/* ===== Override teal accent to orange ===== */
-.bg-\[\#00d4aa\] { @apply bg-orange-500 !important; }
-.text-\[\#00d4aa\] { @apply text-orange-500 !important; }
-.border-\[\#00d4aa\] { @apply border-orange-500 !important; }
-.from-\[\#00d4aa\] { @apply from-orange-500 !important; }
-.hover\:bg-\[\#00c49a\]:hover { @apply bg-orange-600 !important; }
-
-/* ===== Scrollbar ===== */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { 
-  background: var(--color-border); 
-  border-radius: 3px; 
-}
-::-webkit-scrollbar-thumb:hover { 
-  background: var(--color-text-muted); 
+.animate-in {
+  animation-duration: 300ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
 }
 
-/* ===== Focus States ===== */
+.slide-in-from-right {
+  animation-name: slide-in-from-right;
+}
+
+/* Focus styles */
 *:focus-visible {
-  @apply outline-none ring-2 ring-orange-500 ring-offset-2;
-  ring-offset-color: var(--color-bg);
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
 }
 
-/* ===== Buttons ===== */
-.btn-primary {
-  @apply px-4 py-2.5 bg-orange-500 text-white rounded-xl font-semibold
-         hover:bg-orange-600 active:scale-[0.98] transition-all shadow-sm;
-}
-
-.btn-secondary {
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  border: 1px solid var(--color-border);
-  @apply px-4 py-2.5 rounded-xl font-medium transition-all;
-}
-
-.btn-secondary:hover {
-  background: var(--color-bg-alt);
-  border-color: var(--color-text-muted);
-}
-
-/* ===== Tables - Better Spacing ===== */
-.table-cell {
-  @apply px-4 py-3;
-}
-
-.table-header th,
-table thead th {
-  @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider;
-  color: var(--color-text-muted);
-  background: var(--color-bg-alt);
-  white-space: nowrap;
-}
-
-table td {
-  @apply px-4 py-3;
-  white-space: nowrap;
-}
-
-/* Ensure minimum column width */
-table th:not(:first-child),
-table td:not(:first-child) {
-  min-width: 100px;
-}
-
-/* ===== Badges ===== */
-.badge-success {
-  background: var(--color-success-light);
-  color: var(--color-success);
-  @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
-}
-
-.badge-danger {
-  background: var(--color-danger-light);
-  color: var(--color-danger);
-  @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
-}
-
-.badge-warning {
-  background: var(--color-warning-light);
-  color: var(--color-warning);
-  @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
-}
-
-/* ===== Cards ===== */
-.card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  @apply rounded-2xl p-5;
-}
-
-.card-hover:hover {
-  border-color: var(--color-primary);
-  @apply shadow-lg;
-}
-
-/* ===== Sidebar ===== */
-.sidebar-item.active {
-  background: var(--color-primary-muted);
-  color: var(--color-primary);
-  @apply font-medium;
-}
-
-/* ===== Inputs ===== */
-input, select, textarea {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-primary);
-  @apply rounded-xl px-4 py-2.5 text-sm transition-all;
-}
-
-input:focus, select:focus, textarea:focus {
-  border-color: var(--color-primary);
-  @apply ring-2 ring-orange-500/20 outline-none;
-}
-
-input::placeholder, textarea::placeholder {
-  color: var(--color-text-muted);
-}
-
-/* ===== Data Color Utilities ===== */
-.text-revenue { color: var(--color-revenue); }
-.bg-revenue { background: var(--color-revenue); }
-.bg-revenue-light { background: var(--color-revenue-light); }
-
-.text-expense { color: var(--color-expense); }
-.bg-expense { background: var(--color-expense); }
-.bg-expense-light { background: var(--color-expense-light); }
-
-.text-overhead { color: var(--color-overhead); }
-.bg-overhead { background: var(--color-overhead); }
-.bg-overhead-light { background: var(--color-overhead-light); }
-
-.text-investment { color: var(--color-investment); }
-.bg-investment { background: var(--color-investment); }
-.bg-investment-light { background: var(--color-investment-light); }
-
-.text-net { color: var(--color-net); }
-.bg-net { background: var(--color-net); }
-.bg-net-light { background: var(--color-net-light); }
-
-/* ===== Print ===== */
+/* Print styles */
 @media print {
-  body { @apply bg-white text-black !important; }
-  .no-print { display: none !important; }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* Number formatting for tables */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Transitions */
+* {
+  transition-property: color, background-color, border-color;
+  transition-duration: 150ms;
+  transition-timing-function: ease-in-out;
+}
+
+/* Disable transitions for specific elements */
+.no-transition,
+.no-transition * {
+  transition: none !important;
 }
