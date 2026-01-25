@@ -1430,7 +1430,7 @@ export default function CashFlowPro() {
       // Build context from current data
       // Accrual-based project stats (for gross margin)
       const accrualProjectStats = projectList.map(projectName => {
-      const projectTransactions = accrualTransactions.filter(t => 
+    const projectTransactions = accrualTransactions.filter(t => 
   t.project && t.project.toLowerCase() === projectName.toLowerCase()
 )
         const revenue = projectTransactions
@@ -2148,8 +2148,8 @@ export default function CashFlowPro() {
     if (keywords.length === 0) return []
     
     return transactions.filter(t => {
-      const descLower = t.description.toLowerCase()
-      return keywords.some(kw => descLower.includes(kw.toLowerCase())) && !t.category
+    const descLower = (t.description || '').toLowerCase()
+return keywords.some(kw => descLower.includes(kw.toLowerCase())) && !t.category
     })
   }, [transactions])
 
