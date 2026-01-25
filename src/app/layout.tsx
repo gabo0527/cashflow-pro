@@ -1,9 +1,13 @@
 import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
 import './globals.css'
+import AppShell from '@/components/layout/AppShell'
+
+const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'CashFlow Pro | Business Cash Management',
-  description: 'Professional cash flow forecasting and management tool for businesses',
+  title: 'Vantage | Financial Analytics',
+  description: 'Financial operating system for project-based businesses',
 }
 
 export default function RootLayout({
@@ -12,9 +16,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen antialiased">
-        {children}
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
+        <AppShell>
+          {children}
+        </AppShell>
       </body>
     </html>
   )
