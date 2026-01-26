@@ -243,15 +243,15 @@ export default function TimesheetPage() {
 
     const entriesToSubmit = Object.entries(entries)
       .filter(([_, e]) => parseFloat(e.hours) > 0)
-      .map(([projectId, e]) => ({
-        company_id: member.company_id,
-        team_member_id: member.id,
-        project_id: projectId,
-        date: weekDates.start.toISOString().split('T')[0],
-        hours: parseFloat(e.hours),
-        notes: e.notes || null,
-        bill_rate: assignments.find(a => a.project_id === projectId)?.rate || 0
-      }))
+     .map(([projectId, e]) => ({
+  company_id: member.company_id,
+  contractor_id: member.id,        // was team_member_id
+  project_id: projectId,
+  date: weekDates.start.toISOString().split('T')[0],
+  hours: parseFloat(e.hours),
+  description: e.notes || null,    // was notes
+  bill_rate: assignments.find(a => a.project_id === projectId)?.rate || 0
+}))
 
     if (entriesToSubmit.length === 0) {
       setError('Please enter hours for at least one project')
