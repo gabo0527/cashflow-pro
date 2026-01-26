@@ -9,7 +9,7 @@ import { createClient } from '@supabase/supabase-js'
 
 // Hardcoded for public timesheet page (anon key is safe to expose)
 const supabaseUrl = 'https://jmahfgpbtjeomuepfozf.supabase.co'
-const supabaseAnonKey = 'sb_publishable_NDkezr5quDBBdngXvb7kBQ_jXw_R2S4'
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptYWhmZ3BidGplb211ZXBmb3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0OTAxNzcsImV4cCI6MjA4MTA2NjE3N30.3SVDvWCGIYYHV57BpKjpDJVCZLKzuRv8B_VietQDxUQ'
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Types
