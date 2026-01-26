@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { 
   Search, Filter, Download, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
   FolderOpen, Plus, Edit2, X, Check, Users, DollarSign, TrendingUp,
-  BarChart3, Target, Calendar, MoreHorizontal, GitBranch
+  BarChart3, Target, Calendar, MoreHorizontal, GitBranch, Trash2
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'
 import { supabase, getCurrentUser, fetchProjects, fetchClients } from '@/lib/supabase'
@@ -145,7 +145,7 @@ export default function ProjectsPage() {
   // Form state
   const [formData, setFormData] = useState({
     name: '',
-    client: '',
+    client_id: '',
     status: 'active',
     budget_type: 'lump_sum' as 'lump_sum' | 'nte' | 'tm',
     budget: '',
@@ -185,27 +185,32 @@ export default function ProjectsPage() {
           fetchClients(profile.company_id)
         ])
 
-        // Transform projects data with defaults
-        const transformedProjects = (projRes.data || []).map((p: any) => ({
-          id: p.id,
-          name: p.name || '',
-          client: p.client || '',
-          client_id: p.client_id,
-          status: p.status || 'active',
-          budget_type: p.budget_type || 'lump_sum',
-          budget: p.budget || 0,
-          spent: p.spent || 0,
-          start_date: p.start_date,
-          end_date: p.end_date,
-          resources: p.resources || 0,
-          parent_id: p.parent_id,
-          is_change_order: p.is_change_order || false,
-          co_number: p.co_number,
-          description: p.description,
-        }))
+        const clientsData = clientRes.data || []
+
+        // Transform projects data with defaults and client names
+        const transformedProjects = (projRes.data || []).map((p: any) => {
+          const clientObj = clientsData.find((c: any) => c.id === p.client_id)
+          return {
+            id: p.id,
+            name: p.name || '',
+            client: clientObj?.name || '',
+            client_id: p.client_id,
+            status: p.status || 'active',
+            budget_type: p.budget_type || 'lump_sum',
+            budget: p.budget || 0,
+            spent: p.spent || 0,
+            start_date: p.start_date,
+            end_date: p.end_date,
+            resources: p.resources || 0,
+            parent_id: p.parent_id,
+            is_change_order: p.is_change_order || false,
+            co_number: p.co_number,
+            description: p.description,
+          }
+        })
 
         setProjects(transformedProjects)
-        setClients(clientRes.data || [])
+        setClients(clientsData)
       } catch (error) {
         console.error('Error loading data:', error)
       } finally {
@@ -328,7 +333,7 @@ export default function ProjectsPage() {
     setIsAddingCO(false)
     setParentProjectId(null)
     setFormData({
-      name: '', client: '', status: 'active', budget_type: 'lump_sum',
+      name: '', client_id: '', status: 'active', budget_type: 'lump_sum',
       budget: '', spent: '', start_date: '', end_date: '', resources: '', description: ''
     })
     setShowProjectModal(true)
@@ -342,7 +347,7 @@ export default function ProjectsPage() {
     const existingCOs = projects.filter(p => p.parent_id === parentId).length
     setFormData({
       name: `${parentName} - CO${existingCOs + 1}`,
-      client: parent?.client || '',
+      client_id: parent?.client_id || '',
       status: 'active',
       budget_type: parent?.budget_type || 'lump_sum',
       budget: '', spent: '', start_date: '', end_date: '', 
@@ -357,7 +362,7 @@ export default function ProjectsPage() {
     setParentProjectId(null)
     setFormData({
       name: project.name,
-      client: project.client,
+      client_id: project.client_id || '',
       status: project.status,
       budget_type: project.budget_type,
       budget: project.budget.toString(),
@@ -377,7 +382,7 @@ export default function ProjectsPage() {
       const projectData = {
         company_id: companyId,
         name: formData.name,
-        client: formData.client,
+        client_id: formData.client_id || null,
         status: formData.status,
         budget_type: formData.budget_type,
         budget: parseFloat(formData.budget) || 0,
@@ -399,8 +404,10 @@ export default function ProjectsPage() {
 
         if (error) throw error
 
+        // Get client name for display
+        const clientName = clients.find(c => c.id === formData.client_id)?.name || ''
         setProjects(prev => prev.map(p => 
-          p.id === editingProject.id ? { ...p, ...projectData } as Project : p
+          p.id === editingProject.id ? { ...p, ...projectData, client: clientName } as Project : p
         ))
       } else {
         const { data, error } = await supabase
@@ -411,7 +418,9 @@ export default function ProjectsPage() {
 
         if (error) throw error
 
-        setProjects(prev => [...prev, data as Project])
+        // Get client name for display
+        const clientName = clients.find(c => c.id === formData.client_id)?.name || ''
+        setProjects(prev => [...prev, { ...data, client: clientName } as Project])
       }
 
       setShowProjectModal(false)
@@ -434,6 +443,30 @@ export default function ProjectsPage() {
       ))
     } catch (error) {
       console.error('Error updating status:', error)
+    }
+  }
+
+  const deleteProject = async (projectId: string, projectName: string) => {
+    if (!confirm(`Are you sure you want to delete "${projectName}"? This will also delete any change orders.`)) return
+    
+    try {
+      // First delete any change orders
+      await supabase
+        .from('projects')
+        .delete()
+        .eq('parent_id', projectId)
+      
+      // Then delete the project
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId)
+
+      if (error) throw error
+
+      setProjects(prev => prev.filter(p => p.id !== projectId && p.parent_id !== projectId))
+    } catch (error) {
+      console.error('Error deleting project:', error)
     }
   }
 
@@ -697,6 +730,9 @@ export default function ProjectsPage() {
                             <button onClick={() => openAddCO(project.id, project.name)} className="p-1.5 rounded bg-blue-500/20 text-blue-500 hover:bg-blue-500/30" title="Add Change Order">
                               <GitBranch size={14} />
                             </button>
+                            <button onClick={() => deleteProject(project.id, project.name)} className="p-1.5 rounded bg-red-500/20 text-red-500 hover:bg-red-500/30" title="Delete">
+                              <Trash2 size={14} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -780,13 +816,13 @@ export default function ProjectsPage() {
               <div>
                 <label className="block text-sm text-slate-400 mb-1">Client</label>
                 <select
-                  value={formData.client}
-                  onChange={(e) => setFormData(prev => ({ ...prev, client: e.target.value }))}
+                  value={formData.client_id}
+                  onChange={(e) => setFormData(prev => ({ ...prev, client_id: e.target.value }))}
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
                   disabled={isAddingCO}
                 >
                   <option value="">Select client...</option>
-                  {clients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
 
