@@ -168,7 +168,7 @@ export default function TimesheetPage() {
       }
 
       // Step 5: Get client IDs and fetch client names
-      const clientIds = [...new Set((projectsData || []).map((p: any) => p.client_id).filter(Boolean))]
+      const clientIds = Array.from(new Set((projectsData || []).map((p: any) => p.client_id).filter(Boolean)))
       console.log('Client IDs to fetch:', clientIds)
 
       let clientsMap: Record<string, string> = {}
