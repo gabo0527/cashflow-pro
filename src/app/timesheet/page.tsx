@@ -7,9 +7,9 @@ import {
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 
-// Create Supabase client directly in this file
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// Hardcoded for public timesheet page (anon key is safe to expose)
+const supabaseUrl = 'https://jmahfgpbtjeomuepfozf.supabase.co'
+const supabaseAnonKey = 'sb_publishable_NDkezr5quDBBdngXvb7kBQ_jXw_R2S4'
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Types
