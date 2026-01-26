@@ -211,11 +211,14 @@ export default function TeamPage() {
           .eq('company_id', profile.company_id)
           .order('name')
 
-        // Fetch projects
-        const { data: projData } = await supabase
-          .from('projects')
-          .select('id, name, client')
-          .eq('company_id', profile.company_id)
+        // Fetch projects using helper
+        const { data: projData, error: projError } = await fetchProjects(profile.company_id)
+        
+        console.log('Projects fetched:', projData?.length, 'Error:', projError)
+        
+        if (projError) {
+          console.error('Error fetching projects:', projError)
+        }
 
         // Fetch project assignments
         const { data: assignData } = await supabase
@@ -274,7 +277,9 @@ export default function TeamPage() {
         }))
 
         setTeamMembers(transformedMembers)
-        setProjects((projData || []).map((p: any) => ({ id: p.id, name: p.name || '', client: p.client || '' })))
+        const transformedProjects = (projData || []).map((p: any) => ({ id: p.id, name: p.name || '', client: p.client || '' }))
+        console.log('Setting projects state:', transformedProjects.length, transformedProjects)
+        setProjects(transformedProjects)
         setAssignments(transformedAssignments)
         setHoursSummary(hoursSummaryData)
       } catch (error) {
