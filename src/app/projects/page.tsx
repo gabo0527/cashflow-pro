@@ -379,27 +379,23 @@ export default function ProjectsPage() {
     if (!companyId || !formData.name) return
 
     try {
-      const projectData = {
+      // Only include columns that exist in the database
+      const projectData: any = {
         company_id: companyId,
         name: formData.name,
         client_id: formData.client_id || null,
         status: formData.status,
-        budget_type: formData.budget_type,
         budget: parseFloat(formData.budget) || 0,
-        spent: parseFloat(formData.spent) || 0,
         start_date: formData.start_date || null,
         end_date: formData.end_date || null,
-        resources: parseInt(formData.resources) || 0,
-        description: formData.description,
-        is_change_order: isAddingCO,
-        parent_id: isAddingCO ? parentProjectId : null,
-        co_number: isAddingCO ? projects.filter(p => p.parent_id === parentProjectId).length + 1 : null,
       }
 
       if (editingProject) {
+        // Don't include company_id in update
+        const { company_id, ...updateData } = projectData
         const { error } = await supabase
           .from('projects')
-          .update(projectData)
+          .update(updateData)
           .eq('id', editingProject.id)
 
         if (error) throw error
@@ -407,7 +403,15 @@ export default function ProjectsPage() {
         // Get client name for display
         const clientName = clients.find(c => c.id === formData.client_id)?.name || ''
         setProjects(prev => prev.map(p => 
-          p.id === editingProject.id ? { ...p, ...projectData, client: clientName } as Project : p
+          p.id === editingProject.id ? { 
+            ...p, 
+            ...updateData, 
+            client: clientName,
+            budget_type: formData.budget_type,
+            spent: parseFloat(formData.spent) || 0,
+            resources: parseInt(formData.resources) || 0,
+            description: formData.description,
+          } as Project : p
         ))
       } else {
         const { data, error } = await supabase
@@ -420,7 +424,13 @@ export default function ProjectsPage() {
 
         // Get client name for display
         const clientName = clients.find(c => c.id === formData.client_id)?.name || ''
-        setProjects(prev => [...prev, { ...data, client: clientName } as Project])
+        setProjects(prev => [...prev, { 
+          ...data, 
+          client: clientName,
+          budget_type: formData.budget_type || 'lump_sum',
+          spent: 0,
+          resources: 0,
+        } as Project])
       }
 
       setShowProjectModal(false)
