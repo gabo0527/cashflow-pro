@@ -243,13 +243,12 @@ export default function TimesheetPage() {
 
     const entriesToSubmit = Object.entries(entries)
       .filter(([_, e]) => parseFloat(e.hours) > 0)
-     .map(([projectId, e]) => ({
+   .map(([projectId, e]) => ({
   company_id: member.company_id,
-  contractor_id: member.id,        // was team_member_id
   project_id: projectId,
   date: weekDates.start.toISOString().split('T')[0],
   hours: parseFloat(e.hours),
-  description: e.notes || null,    // was notes
+  description: e.notes || null,
   bill_rate: assignments.find(a => a.project_id === projectId)?.rate || 0
 }))
 
