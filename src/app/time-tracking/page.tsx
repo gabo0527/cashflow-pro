@@ -20,7 +20,7 @@ interface TimeEntry {
   project_name: string
   client_name: string
   bill_rate: number
-  notes?: string
+  notes: string | null
 }
 
 interface TeamMember {
@@ -218,7 +218,7 @@ export default function TimeTrackingPage() {
           project_name: e.projects?.name || 'Unknown',
           client_name: e.projects?.client || '',
           bill_rate: e.bill_rate || e.projects?.bill_rate || 0,
-          notes: e.notes,
+          notes: e.notes || null,
         }))
 
         setTeamMembers((teamData || []).map((t: any) => ({
