@@ -1,14 +1,13 @@
 'use client'
 
-import React from 'react'
 import { Construction } from 'lucide-react'
 
-export default function AssumptionsPage() {
+export default function CashFlowPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-100">Assumptions</h1>
-        <p className="text-sm mt-1 text-slate-400">Manage forecast inputs and scenarios</p>
+        <h1 className="text-2xl font-semibold text-slate-100">Cash Flow</h1>
+        <p className="text-sm mt-1 text-slate-400">Track income and expenses</p>
       </div>
       
       <div className="p-12 rounded-xl border text-center bg-slate-800 border-slate-700">
