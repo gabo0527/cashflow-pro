@@ -40,114 +40,111 @@ const getWeekDates = (date: Date): { start: Date; end: Date; days: Date[] } => {
   const d = new Date(date)
   const day = d.getDay()
   const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  const monday = new Date(d.setDate(diff))
-  monday.setHours(0, 0, 0, 0)
+  const start = new Date(d.setDate(diff))
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
   
   const days: Date[] = []
   for (let i = 0; i < 7; i++) {
-    const dayDate = new Date(monday)
-    dayDate.setDate(monday.getDate() + i)
-    days.push(dayDate)
+    const day = new Date(start)
+    day.setDate(start.getDate() + i)
+    days.push(day)
   }
   
-  const sunday = new Date(monday)
-  sunday.setDate(monday.getDate() + 6)
-  
-  return { start: monday, end: sunday, days }
+  return { start, end, days }
 }
 
 const formatDateRange = (start: Date, end: Date): string => {
-  const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
-  const startStr = start.toLocaleDateString('en-US', options)
-  const endStr = end.toLocaleDateString('en-US', { ...options, year: 'numeric' })
-  return `${startStr} - ${endStr}`
+  const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' }
+  return `${start.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}`
 }
 
 export default function TimesheetPage() {
-  const [step, setStep] = useState<'email' | 'entry' | 'success'>('email')
   const [email, setEmail] = useState('')
-  const [teamMember, setTeamMember] = useState<TeamMember | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [member, setMember] = useState<TeamMember | null>(null)
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [entries, setEntries] = useState<Record<string, EntryData>>({})
   const [currentWeek, setCurrentWeek] = useState(new Date())
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-  const [collapsedClients, setCollapsedClients] = useState<Record<string, boolean>>({})
+  const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set())
 
   const weekDates = useMemo(() => getWeekDates(currentWeek), [currentWeek])
 
-  // Group assignments by client
-  const assignmentsByClient = useMemo(() => {
+  const groupedAssignments = useMemo(() => {
     const grouped: Record<string, Assignment[]> = {}
     assignments.forEach(a => {
       const client = a.client_name || 'Other'
       if (!grouped[client]) grouped[client] = []
       grouped[client].push(a)
     })
-    // Sort clients alphabetically, but put "Other" at the end
-    const sortedKeys = Object.keys(grouped).sort((a, b) => {
-      if (a === 'Other') return 1
-      if (b === 'Other') return -1
-      return a.localeCompare(b)
-    })
-    const sorted: Record<string, Assignment[]> = {}
-    sortedKeys.forEach(key => {
-      sorted[key] = grouped[key]
-    })
-    return sorted
+    return grouped
   }, [assignments])
 
-  const totalHours = useMemo(() => {
-    return Object.values(entries).reduce((sum, e) => sum + (parseFloat(e.hours) || 0), 0)
-  }, [entries])
-
-  // Toggle client collapse
   const toggleClient = (client: string) => {
-    setCollapsedClients(prev => ({
-      ...prev,
-      [client]: !prev[client]
-    }))
+    setCollapsedClients(prev => {
+      const next = new Set(prev)
+      if (next.has(client)) {
+        next.delete(client)
+      } else {
+        next.add(client)
+      }
+      return next
+    })
   }
 
-  // Calculate hours per client
-  const getClientHours = (client: string) => {
-    const clientAssignments = assignmentsByClient[client] || []
-    return clientAssignments.reduce((sum, a) => {
-      const entry = entries[a.project_id]
-      return sum + (parseFloat(entry?.hours) || 0)
-    }, 0)
+  // Helper function to fetch a single project
+  const fetchSingleProject = async (projectId: string) => {
+    console.log(`Fetching single project: ${projectId}`)
+    const { data, error } = await supabase
+      .from('projects')
+      .select('id, name, client, status')
+      .eq('id', projectId)
+      .single()
+    
+    if (error) {
+      console.error(`Error fetching project ${projectId}:`, error)
+      return null
+    }
+    console.log(`Fetched project ${projectId}:`, data)
+    return data
   }
 
-  // Lookup team member by email
-  const lookupEmail = async () => {
+  const lookupMember = async () => {
     if (!email.trim()) {
-      setError('Please enter your email')
+      setError('Please enter your email address')
       return
     }
 
     setLoading(true)
-    setError(null)
+    setError('')
+    setSuccess('')
+    setAssignments([])
 
     try {
-      // Find team member by email
-      console.log('Looking up email:', email.toLowerCase().trim())
+      console.log('Looking up email:', email.trim().toLowerCase())
+      
+      // Step 1: Find team member by email
       const { data: memberData, error: memberError } = await supabase
         .from('team_members')
         .select('id, name, email, company_id')
-        .eq('email', email.toLowerCase().trim())
-        .eq('status', 'active')
+        .eq('email', email.trim().toLowerCase())
         .single()
 
       console.log('Member lookup result:', memberData, memberError)
 
       if (memberError || !memberData) {
-        setError('Email not found. Please contact your administrator.')
+        setError('Email not found. Please check your email address.')
         setLoading(false)
         return
       }
 
-      // Get their project assignments (no join)
+      setMember(memberData)
+
+      // Step 2: Get assignments
       const { data: assignData, error: assignError } = await supabase
         .from('team_project_assignments')
         .select('id, project_id, service, payment_type, rate')
@@ -162,410 +159,361 @@ export default function TimesheetPage() {
         return
       }
 
-      // Fetch project details separately
-      const projectIds = (assignData || []).map((a: any) => a.project_id)
-      console.log('Project IDs to fetch:', projectIds)
-      
-      const { data: projectsData, error: projectsError } = await supabase
-        .from('projects')
-        .select('id, name, client, status')
-        .in('id', projectIds)
-
-      console.log('Projects fetched:', projectsData, 'Error:', projectsError)
-
-      // Filter to active projects only and combine data
-      const activeAssignments = (assignData || [])
-        .map((a: any) => {
-          const project = (projectsData || []).find((p: any) => p.id === a.project_id)
-          console.log('Matching project for', a.project_id, ':', project)
-          return {
-            ...a,
-            projects: project
-          }
-        })
-        .filter((a: any) => a.projects?.status === 'active' || !a.projects?.status)
-        .map((a: any) => ({
-          id: a.id,
-          project_id: a.project_id,
-          project_name: a.projects?.name || 'Unknown Project',
-          client_name: a.projects?.client || '',
-          service: a.service,
-          payment_type: a.payment_type,
-          rate: a.rate,
-        }))
-
-      console.log('Final assignments:', activeAssignments)
-
-      if (activeAssignments.length === 0) {
-        setError('No active project assignments found. Please contact your administrator.')
+      if (!assignData || assignData.length === 0) {
+        setError('No projects assigned to you. Contact your administrator.')
         setLoading(false)
         return
       }
 
-      setTeamMember(memberData)
-      setAssignments(activeAssignments)
+      // Step 3: Get project IDs
+      const projectIds = assignData.map((a: any) => a.project_id).filter(Boolean)
+      console.log('Project IDs to fetch:', projectIds)
+
+      if (projectIds.length === 0) {
+        setError('No valid project assignments found.')
+        setLoading(false)
+        return
+      }
+
+      // Step 4: Try to fetch projects with .in() first
+      console.log('Attempting bulk fetch with .in()...')
+      let projectsData: any[] = []
       
+      const { data: bulkData, error: bulkError } = await supabase
+        .from('projects')
+        .select('id, name, client, status')
+        .in('id', projectIds)
+
+      console.log('Bulk projects fetch result:', bulkData, bulkError)
+
+      if (bulkError) {
+        console.warn('Bulk fetch failed, trying individual fetches...')
+        // Fallback: Fetch each project individually
+        const fetchPromises = projectIds.map(fetchSingleProject)
+        const results = await Promise.all(fetchPromises)
+        projectsData = results.filter(Boolean)
+        console.log('Individual fetch results:', projectsData)
+      } else {
+        projectsData = bulkData || []
+      }
+
+      // Step 5: Combine assignments with project data
+      const combinedAssignments: Assignment[] = assignData.map((a: any) => {
+        const project = projectsData.find((p: any) => p?.id === a.project_id)
+        console.log(`Matching project for ${a.project_id}:`, project)
+        return {
+          id: a.id,
+          project_id: a.project_id,
+          project_name: project?.name || 'Unknown Project',
+          client_name: project?.client || 'Other',
+          service: a.service,
+          payment_type: a.payment_type,
+          rate: a.rate || 0
+        }
+      }).filter((a: any) => {
+        // Only include active projects or if status is unknown
+        const project = projectsData.find((p: any) => p?.id === a.project_id)
+        return !project?.status || project.status === 'active'
+      })
+
+      console.log('Final assignments:', combinedAssignments)
+      setAssignments(combinedAssignments)
+
       // Initialize entries
       const initialEntries: Record<string, EntryData> = {}
-      activeAssignments.forEach((a: Assignment) => {
+      combinedAssignments.forEach(a => {
         initialEntries[a.project_id] = { project_id: a.project_id, hours: '', notes: '' }
       })
       setEntries(initialEntries)
-      
-      setStep('entry')
+
     } catch (err) {
       console.error('Lookup error:', err)
-      setError('Something went wrong. Please try again.')
-    } finally {
-      setLoading(false)
+      setError('An error occurred. Please try again.')
     }
+
+    setLoading(false)
   }
 
-  // Navigate weeks
-  const prevWeek = () => {
-    const newDate = new Date(currentWeek)
-    newDate.setDate(newDate.getDate() - 7)
-    setCurrentWeek(newDate)
-  }
-
-  const nextWeek = () => {
-    const newDate = new Date(currentWeek)
-    newDate.setDate(newDate.getDate() + 7)
-    setCurrentWeek(newDate)
-  }
-
-  // Update entry
   const updateEntry = (projectId: string, field: 'hours' | 'notes', value: string) => {
     setEntries(prev => ({
       ...prev,
-      [projectId]: {
-        ...prev[projectId],
-        [field]: value
-      }
+      [projectId]: { ...prev[projectId], [field]: value }
     }))
   }
 
-  // Submit timesheet
-  const submitTimesheet = async () => {
-    // Filter entries with hours > 0
-    const validEntries = Object.values(entries).filter(e => parseFloat(e.hours) > 0)
-    
-    if (validEntries.length === 0) {
-      setError('Please enter hours for at least one project.')
+  const totalHours = useMemo(() => {
+    return Object.values(entries).reduce((sum, e) => {
+      const h = parseFloat(e.hours) || 0
+      return sum + h
+    }, 0)
+  }, [entries])
+
+  const handleSubmit = async () => {
+    if (!member) return
+
+    const entriesToSubmit = Object.entries(entries)
+      .filter(([_, e]) => parseFloat(e.hours) > 0)
+      .map(([projectId, e]) => ({
+        company_id: member.company_id,
+        team_member_id: member.id,
+        project_id: projectId,
+        date: weekDates.start.toISOString().split('T')[0],
+        hours: parseFloat(e.hours),
+        notes: e.notes || null,
+        bill_rate: assignments.find(a => a.project_id === projectId)?.rate || 0
+      }))
+
+    if (entriesToSubmit.length === 0) {
+      setError('Please enter hours for at least one project')
       return
     }
 
     setSubmitting(true)
-    setError(null)
+    setError('')
 
     try {
-      // Get Friday of the selected week as entry date
-      const friday = new Date(weekDates.start)
-      friday.setDate(friday.getDate() + 4)
-      const entryDate = friday.toISOString().split('T')[0]
-
-      // Prepare entries for insert
-      const insertData = validEntries.map(entry => {
-        const assignment = assignments.find(a => a.project_id === entry.project_id)
-        return {
-          company_id: teamMember?.company_id,
-          team_member_id: teamMember?.id,
-          project_id: entry.project_id,
-          date: entryDate,
-          hours: parseFloat(entry.hours),
-          bill_rate: assignment?.rate || 0,
-          notes: entry.notes || null,
-        }
-      })
-
       const { error: insertError } = await supabase
         .from('time_entries')
-        .insert(insertData)
+        .insert(entriesToSubmit)
 
       if (insertError) {
-        console.error('Insert error:', insertError)
+        console.error('Submit error:', insertError)
         setError('Error submitting timesheet. Please try again.')
-        setSubmitting(false)
-        return
+      } else {
+        setSuccess(`Timesheet submitted successfully! Total: ${totalHours} hours`)
+        // Reset entries
+        const resetEntries: Record<string, EntryData> = {}
+        assignments.forEach(a => {
+          resetEntries[a.project_id] = { project_id: a.project_id, hours: '', notes: '' }
+        })
+        setEntries(resetEntries)
       }
-
-      setStep('success')
     } catch (err) {
       console.error('Submit error:', err)
-      setError('Something went wrong. Please try again.')
-    } finally {
-      setSubmitting(false)
+      setError('An error occurred. Please try again.')
     }
+
+    setSubmitting(false)
   }
 
-  // Reset form
-  const resetForm = () => {
-    setStep('email')
-    setEmail('')
-    setTeamMember(null)
-    setAssignments([])
-    setEntries({})
-    setError(null)
-    setCollapsedClients({})
-  }
-
-  // Enter another week
-  const enterAnotherWeek = () => {
-    setStep('entry')
-    const initialEntries: Record<string, EntryData> = {}
-    assignments.forEach((a: Assignment) => {
-      initialEntries[a.project_id] = { project_id: a.project_id, hours: '', notes: '' }
+  const navigateWeek = (direction: 'prev' | 'next') => {
+    setCurrentWeek(prev => {
+      const d = new Date(prev)
+      d.setDate(d.getDate() + (direction === 'next' ? 7 : -7))
+      return d
     })
-    setEntries(initialEntries)
-    setError(null)
-    setCollapsedClients({})
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-2xl">
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-2xl mx-auto py-8 px-4">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-500/20 mb-4">
-            <Clock className="w-8 h-8 text-blue-400" />
+          <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Clock className="h-8 w-8 text-orange-600" />
           </div>
-          <h1 className="text-2xl font-bold">Timesheet Entry</h1>
-          <p className="text-slate-400 mt-1">Enter your weekly hours</p>
+          <h1 className="text-2xl font-bold text-gray-900">Timesheet Entry</h1>
+          <p className="text-gray-600 mt-1">Enter your weekly hours</p>
         </div>
 
-        {/* Email Step */}
-        {step === 'email' && (
-          <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
-            <label className="block text-sm text-slate-400 mb-2">
-              Enter your email to get started
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && lookupEmail()}
-              placeholder="yourname@company.com"
-              className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            
-            {error && (
-              <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2 text-red-400">
-                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <span className="text-sm">{error}</span>
+        {/* Email Lookup */}
+        {!member ? (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center gap-4 mb-4">
+              <img 
+                src="/api/placeholder/48/48" 
+                alt="User" 
+                className="w-12 h-12 rounded-full bg-gray-200"
+              />
+              <div className="flex-1">
+                <input
+                  type="email"
+                  placeholder="Enter your email address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && lookupMember()}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                />
               </div>
-            )}
-
+            </div>
             <button
-              onClick={lookupEmail}
+              onClick={lookupMember}
               disabled={loading}
-              className="w-full mt-4 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 className="h-5 w-5 animate-spin" />
                   Looking up...
                 </>
               ) : (
                 'Continue'
               )}
             </button>
+            <p className="text-center text-sm text-gray-500 mt-4">
+              Not you? Contact your administrator for access.
+            </p>
           </div>
-        )}
-
-        {/* Entry Step */}
-        {step === 'entry' && teamMember && (
+        ) : (
           <>
-            {/* User Info */}
-            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 mb-4 flex items-center justify-between">
-              <div>
-                <p className="font-medium">{teamMember.name}</p>
-                <p className="text-sm text-slate-400">{teamMember.email}</p>
-              </div>
-              <button
-                onClick={resetForm}
-                className="text-sm text-slate-400 hover:text-white transition-colors"
-              >
-                Not you?
-              </button>
-            </div>
-
-            {/* Week Selector */}
-            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 mb-4">
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={prevWeek}
-                  className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <div className="text-center">
-                  <p className="font-medium">{formatDateRange(weekDates.start, weekDates.end)}</p>
-                  <p className="text-sm text-slate-400">Week of entry</p>
+            {/* Member Info */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                  <span className="text-orange-600 font-semibold">
+                    {member.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                  </span>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">{member.name}</p>
+                  <p className="text-sm text-gray-500">{member.email}</p>
                 </div>
                 <button
-                  onClick={nextWeek}
-                  className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                  onClick={() => { setMember(null); setAssignments([]); setEmail('') }}
+                  className="ml-auto text-sm text-gray-500 hover:text-gray-700"
                 >
-                  <ChevronRight className="w-5 h-5" />
+                  Not you?
                 </button>
               </div>
             </div>
 
-            {/* Hours Entry - Grouped by Client */}
-            <div className="bg-slate-800/50 rounded-xl border border-slate-700 mb-4 overflow-hidden">
-              <div className="p-4 border-b border-slate-700">
-                <h2 className="font-semibold">Enter Hours by Project</h2>
-                <p className="text-sm text-slate-400">Enter total hours for the week</p>
-              </div>
-
-              <div className="divide-y divide-slate-700">
-                {Object.entries(assignmentsByClient).map(([client, clientAssignments]) => {
-                  const isCollapsed = collapsedClients[client]
-                  const clientHours = getClientHours(client)
-                  
-                  return (
-                    <div key={client}>
-                      {/* Client Header */}
-                      <button
-                        onClick={() => toggleClient(client)}
-                        className="w-full px-4 py-3 flex items-center justify-between bg-slate-700/30 hover:bg-slate-700/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Building2 className="w-4 h-4 text-slate-400" />
-                          <span className="font-medium">{client}</span>
-                          <span className="text-xs text-slate-500">
-                            ({clientAssignments.length} project{clientAssignments.length !== 1 ? 's' : ''})
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {clientHours > 0 && (
-                            <span className="text-sm text-blue-400 font-medium">
-                              {clientHours.toFixed(1)} hrs
-                            </span>
-                          )}
-                          {isCollapsed ? (
-                            <ChevronDown className="w-4 h-4 text-slate-400" />
-                          ) : (
-                            <ChevronUp className="w-4 h-4 text-slate-400" />
-                          )}
-                        </div>
-                      </button>
-
-                      {/* Projects under this client */}
-                      {!isCollapsed && (
-                        <div className="divide-y divide-slate-700/50">
-                          {clientAssignments.map((assignment) => (
-                            <div key={assignment.id} className="p-4 bg-slate-800/30">
-                              <div className="flex items-start gap-3 mb-3">
-                                <FolderOpen className="w-4 h-4 text-slate-500 mt-1" />
-                                <div className="flex-1">
-                                  <p className="font-medium text-slate-200">{assignment.project_name}</p>
-                                  {assignment.service && (
-                                    <p className="text-xs text-slate-500">{assignment.service}</p>
-                                  )}
-                                </div>
-                              </div>
-                              
-                              <div className="grid grid-cols-2 gap-3 ml-7">
-                                <div>
-                                  <label className="block text-xs text-slate-500 mb-1">Hours</label>
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    step="0.5"
-                                    value={entries[assignment.project_id]?.hours || ''}
-                                    onChange={(e) => updateEntry(assignment.project_id, 'hours', e.target.value)}
-                                    placeholder="0"
-                                    className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs text-slate-500 mb-1">Notes (optional)</label>
-                                  <input
-                                    type="text"
-                                    value={entries[assignment.project_id]?.notes || ''}
-                                    onChange={(e) => updateEntry(assignment.project_id, 'notes', e.target.value)}
-                                    placeholder="Brief description..."
-                                    className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Total */}
-              <div className="p-4 border-t border-slate-700 flex items-center justify-between bg-slate-700/20">
-                <span className="font-medium">Total Hours</span>
-                <span className={`text-xl font-bold ${totalHours > 0 ? 'text-blue-400' : 'text-slate-500'}`}>
-                  {totalHours.toFixed(1)}
-                </span>
+            {/* Week Navigator */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => navigateWeek('prev')}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <ChevronLeft className="h-5 w-5 text-gray-600" />
+                </button>
+                <div className="text-center">
+                  <p className="font-semibold text-gray-900">
+                    {formatDateRange(weekDates.start, weekDates.end)}
+                  </p>
+                  <p className="text-sm text-gray-500">Week of entry</p>
+                </div>
+                <button
+                  onClick={() => navigateWeek('next')}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <ChevronRight className="h-5 w-5 text-gray-600" />
+                </button>
               </div>
             </div>
 
-            {/* Error */}
-            {error && (
-              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2 text-red-400">
-                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <span className="text-sm">{error}</span>
+            {/* Projects by Client */}
+            <div className="space-y-4 mb-4">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-gray-900">Enter Hours by Project</h2>
+                <p className="text-sm text-gray-500">Enter total hours for the week</p>
               </div>
-            )}
 
-            {/* Submit Button */}
-            <button
-              onClick={submitTimesheet}
-              disabled={submitting || totalHours === 0}
-              className="w-full px-4 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <Send className="w-5 h-5" />
-                  Submit Timesheet
-                </>
-              )}
-            </button>
+              {Object.entries(groupedAssignments).map(([client, clientAssignments]) => (
+                <div key={client} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  {/* Client Header */}
+                  <button
+                    onClick={() => toggleClient(client)}
+                    className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-gray-500" />
+                      <span className="font-medium text-gray-900">{client}</span>
+                      <span className="text-sm text-gray-500">({clientAssignments.length} projects)</span>
+                    </div>
+                    {collapsedClients.has(client) ? (
+                      <ChevronDown className="h-5 w-5 text-gray-500" />
+                    ) : (
+                      <ChevronUp className="h-5 w-5 text-gray-500" />
+                    )}
+                  </button>
+
+                  {/* Projects */}
+                  {!collapsedClients.has(client) && (
+                    <div className="divide-y divide-gray-100">
+                      {clientAssignments.map(assignment => (
+                        <div key={assignment.id} className="p-4">
+                          <div className="flex items-start gap-3">
+                            <FolderOpen className="h-5 w-5 text-orange-500 mt-0.5" />
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900">{assignment.project_name}</p>
+                              <p className="text-sm text-gray-500">{assignment.service || 'General'}</p>
+                            </div>
+                          </div>
+                          <div className="mt-3 grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Hours</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.5"
+                                placeholder="0"
+                                value={entries[assignment.project_id]?.hours || ''}
+                                onChange={(e) => updateEntry(assignment.project_id, 'hours', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Notes (optional)</label>
+                              <input
+                                type="text"
+                                placeholder="Brief description..."
+                                value={entries[assignment.project_id]?.notes || ''}
+                                onChange={(e) => updateEntry(assignment.project_id, 'notes', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Total & Submit */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <div className="flex items-center justify-between mb-4">
+                <span className="font-medium text-gray-900">Total Hours</span>
+                <span className="text-2xl font-bold text-orange-600">{totalHours.toFixed(1)}</span>
+              </div>
+              <button
+                onClick={handleSubmit}
+                disabled={submitting || totalHours === 0}
+                className="w-full py-3 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-5 w-5" />
+                    Submit Timesheet
+                  </>
+                )}
+              </button>
+            </div>
           </>
         )}
 
-        {/* Success Step */}
-        {step === 'success' && (
-          <div className="bg-slate-800/50 rounded-xl p-8 border border-slate-700 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/20 mb-4">
-              <Check className="w-8 h-8 text-emerald-400" />
-            </div>
-            <h2 className="text-xl font-bold mb-2">Timesheet Submitted!</h2>
-            <p className="text-slate-400 mb-6">
-              Your hours for {formatDateRange(weekDates.start, weekDates.end)} have been recorded.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={enterAnotherWeek}
-                className="flex-1 px-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors"
-              >
-                Enter Another Week
-              </button>
-              <button
-                onClick={resetForm}
-                className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors"
-              >
-                Done
-              </button>
-            </div>
+        {/* Messages */}
+        {error && (
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
+            <AlertCircle className="h-5 w-5" />
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-700">
+            <Check className="h-5 w-5" />
+            {success}
           </div>
         )}
 
         {/* Footer */}
-        <p className="text-center text-slate-500 text-sm mt-6">
+        <p className="text-center text-sm text-gray-400 mt-8">
           Powered by Vantage
         </p>
       </div>
