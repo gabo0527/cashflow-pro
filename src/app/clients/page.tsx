@@ -194,8 +194,29 @@ export default function ClientsPage() {
         }))
 
         setClients(transformedClients)
-        setProjects(projRes.data || [])
-        setInvoices(invRes.data || [])
+        
+        // Transform projects with defaults
+        const transformedProjects = (projRes.data || []).map((p: any) => ({
+          id: p.id,
+          name: p.name || '',
+          client: p.client || '',
+          status: p.status || 'active',
+          budget: p.budget || 0,
+          spent: p.spent || 0,
+          start_date: p.start_date,
+        }))
+        setProjects(transformedProjects)
+        
+        // Transform invoices with defaults
+        const transformedInvoices = (invRes.data || []).map((i: any) => ({
+          id: i.id,
+          client: i.client || '',
+          amount: i.amount || 0,
+          amount_paid: i.amount_paid || 0,
+          balance_due: i.balance_due || 0,
+          invoice_date: i.invoice_date || '',
+        }))
+        setInvoices(transformedInvoices)
       } catch (error) {
         console.error('Error loading data:', error)
       } finally {
