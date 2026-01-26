@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { 
-  Search, Filter, Download, ChevronDown, ChevronLeft, ChevronRight,
+  Search, Filter, Download, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
   FileText, AlertTriangle, Clock, CheckCircle, DollarSign, X, Calendar
 } from 'lucide-react'
 import { supabase, getCurrentUser, fetchInvoices, fetchProjects, fetchClients } from '@/lib/supabase'
@@ -79,6 +79,49 @@ const AGING_BUCKETS = [
   { id: '61-90', label: '61-90 Days', color: 'rose' },
   { id: '90+', label: '90+ Days', color: 'red' },
 ]
+
+// Collapsible Section Component
+function CollapsibleSection({ 
+  title, 
+  children, 
+  defaultExpanded = true,
+  badge
+}: { 
+  title: string
+  children: React.ReactNode
+  defaultExpanded?: boolean
+  badge?: string | number
+}) {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded)
+  
+  return (
+    <div className="rounded-xl border bg-slate-800 border-slate-700 overflow-hidden">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-700/50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium text-slate-100">{title}</h3>
+          {badge !== undefined && (
+            <span className="px-2 py-0.5 text-xs rounded-full bg-slate-700 text-slate-300">
+              {badge}
+            </span>
+          )}
+        </div>
+        {isExpanded ? (
+          <ChevronUp size={18} className="text-slate-400" />
+        ) : (
+          <ChevronDown size={18} className="text-slate-400" />
+        )}
+      </button>
+      {isExpanded && (
+        <div className="px-4 pb-4 pt-1">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function InvoicesPage() {
   // Data state
@@ -161,14 +204,12 @@ export default function InvoicesPage() {
       // Aging bucket filter
       if (selectedBucket !== 'all') {
         const bucket = getAgingBucket(inv.days_overdue || 0)
-        // Special case: if filtering for non-current, exclude paid invoices
         if (selectedBucket !== 'current' && inv.balance_due <= 0) return false
         if (bucket !== selectedBucket) return false
       }
 
       return true
     }).sort((a, b) => {
-      // Sort by days overdue (most overdue first), then by date
       const aOverdue = a.days_overdue || 0
       const bOverdue = b.days_overdue || 0
       if (bOverdue !== aOverdue) return bOverdue - aOverdue
@@ -203,7 +244,6 @@ export default function InvoicesPage() {
       .filter(inv => (inv.days_overdue || 0) > 0 && inv.balance_due > 0)
       .reduce((sum, inv) => sum + (inv.balance_due || 0), 0)
     
-    // Collected this month
     const currentMonth = new Date().toISOString().slice(0, 7)
     const collectedThisMonth = invoices
       .filter(inv => inv.amount_paid > 0)
@@ -329,7 +369,7 @@ export default function InvoicesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -341,66 +381,59 @@ export default function InvoicesPage() {
           className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors"
         >
           <Download size={18} />
-          Export Excel
+          Export
         </button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-xl border bg-slate-800 border-slate-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-400">Total AR</p>
-              <p className="text-2xl font-semibold mt-1 text-blue-500">{formatCurrency(summary.totalAR)}</p>
+      {/* Summary Cards - Collapsible */}
+      <CollapsibleSection title="Summary" badge={formatCurrency(summary.totalAR)}>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="p-4 rounded-lg bg-slate-900/50">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-slate-400">Total AR</p>
+                <p className="text-xl font-semibold mt-1 text-blue-500">{formatCurrency(summary.totalAR)}</p>
+              </div>
+              <FileText size={20} className="text-blue-500/50" />
             </div>
-            <div className="p-3 rounded-lg bg-blue-500/20">
-              <FileText size={22} className="text-blue-500" />
+          </div>
+
+          <div className="p-4 rounded-lg bg-slate-900/50">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-slate-400">Overdue</p>
+                <p className="text-xl font-semibold mt-1 text-rose-500">{formatCurrency(summary.totalOverdue)}</p>
+                <p className="text-xs text-slate-500">{summary.overdueCount} invoices</p>
+              </div>
+              <AlertTriangle size={20} className="text-rose-500/50" />
+            </div>
+          </div>
+
+          <div className="p-4 rounded-lg bg-slate-900/50">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-slate-400">Current</p>
+                <p className="text-xl font-semibold mt-1 text-emerald-500">{formatCurrency(agingSummary.current)}</p>
+              </div>
+              <CheckCircle size={20} className="text-emerald-500/50" />
+            </div>
+          </div>
+
+          <div className="p-4 rounded-lg bg-slate-900/50">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-slate-400">Collected (MTD)</p>
+                <p className="text-xl font-semibold mt-1 text-emerald-500">{formatCurrency(summary.collectedThisMonth)}</p>
+              </div>
+              <DollarSign size={20} className="text-emerald-500/50" />
             </div>
           </div>
         </div>
+      </CollapsibleSection>
 
-        <div className="p-5 rounded-xl border bg-slate-800 border-slate-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-400">Overdue</p>
-              <p className="text-2xl font-semibold mt-1 text-rose-500">{formatCurrency(summary.totalOverdue)}</p>
-              <p className="text-xs text-slate-500 mt-1">{summary.overdueCount} invoices</p>
-            </div>
-            <div className="p-3 rounded-lg bg-rose-500/20">
-              <AlertTriangle size={22} className="text-rose-500" />
-            </div>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-xl border bg-slate-800 border-slate-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-400">Current</p>
-              <p className="text-2xl font-semibold mt-1 text-emerald-500">{formatCurrency(agingSummary.current)}</p>
-            </div>
-            <div className="p-3 rounded-lg bg-emerald-500/20">
-              <CheckCircle size={22} className="text-emerald-500" />
-            </div>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-xl border bg-slate-800 border-slate-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-400">Collected (MTD)</p>
-              <p className="text-2xl font-semibold mt-1 text-emerald-500">{formatCurrency(summary.collectedThisMonth)}</p>
-            </div>
-            <div className="p-3 rounded-lg bg-emerald-500/20">
-              <DollarSign size={22} className="text-emerald-500" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Aging Buckets */}
-      <div className="p-4 rounded-xl border bg-slate-800 border-slate-700">
-        <h3 className="text-sm font-medium text-slate-400 mb-3">Aging Summary</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      {/* Aging Summary - Collapsible */}
+      <CollapsibleSection title="Aging Breakdown">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
           {AGING_BUCKETS.map(bucket => {
             const amount = agingSummary[bucket.id] || 0
             const isSelected = selectedBucket === bucket.id
@@ -437,101 +470,98 @@ export default function InvoicesPage() {
             )
           })}
         </div>
-      </div>
+      </CollapsibleSection>
 
       {/* Search and Filters */}
-      <div className="p-4 rounded-xl border bg-slate-800 border-slate-700 space-y-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          {/* Search */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by invoice #, client, or amount..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-            />
+      <div className="rounded-xl border bg-slate-800 border-slate-700 overflow-hidden">
+        <div className="p-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by invoice #, client, or amount..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              />
+            </div>
+
+            {/* Filter Toggle */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                showFilters || hasActiveFilters
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-slate-700 hover:bg-slate-600 text-slate-100'
+              }`}
+            >
+              <Filter size={16} />
+              Filters
+            </button>
+
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-100 transition-colors"
+              >
+                <X size={16} />
+                Clear
+              </button>
+            )}
           </div>
 
-          {/* Filter Toggle */}
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              showFilters || hasActiveFilters
-                ? 'bg-blue-500 text-white'
-                : 'bg-slate-700 hover:bg-slate-600 text-slate-100'
-            }`}
-          >
-            <Filter size={18} />
-            Filters
-          </button>
+          {/* Filter Panel */}
+          {showFilters && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 mt-4 border-t border-slate-700">
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Client</label>
+                <select
+                  value={selectedClient}
+                  onChange={(e) => setSelectedClient(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                >
+                  <option value="all">All Clients</option>
+                  {clients.map(client => (
+                    <option key={client.id} value={client.name}>{client.name}</option>
+                  ))}
+                </select>
+              </div>
 
-          {hasActiveFilters && (
-            <button
-              onClick={clearFilters}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-100 transition-colors"
-            >
-              <X size={18} />
-              Clear
-            </button>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Project</label>
+                <select
+                  value={selectedProject}
+                  onChange={(e) => setSelectedProject(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                >
+                  <option value="all">All Projects</option>
+                  {projects.map(proj => (
+                    <option key={proj.id} value={proj.name}>{proj.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Aging</label>
+                <select
+                  value={selectedBucket}
+                  onChange={(e) => setSelectedBucket(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                >
+                  <option value="all">All</option>
+                  {AGING_BUCKETS.map(bucket => (
+                    <option key={bucket.id} value={bucket.id}>{bucket.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Filter Panel */}
-        {showFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-700">
-            {/* Client */}
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Client</label>
-              <select
-                value={selectedClient}
-                onChange={(e) => setSelectedClient(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-              >
-                <option value="all">All Clients</option>
-                {clients.map(client => (
-                  <option key={client.id} value={client.name}>{client.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Project */}
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Project</label>
-              <select
-                value={selectedProject}
-                onChange={(e) => setSelectedProject(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-              >
-                <option value="all">All Projects</option>
-                {projects.map(proj => (
-                  <option key={proj.id} value={proj.name}>{proj.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Aging Bucket */}
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Aging</label>
-              <select
-                value={selectedBucket}
-                onChange={(e) => setSelectedBucket(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-              >
-                <option value="all">All</option>
-                {AGING_BUCKETS.map(bucket => (
-                  <option key={bucket.id} value={bucket.id}>{bucket.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Invoices Table */}
-      <div className="rounded-xl border bg-slate-800 border-slate-700 overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Invoices Table */}
+        <div className="overflow-x-auto border-t border-slate-700">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-900/50">
