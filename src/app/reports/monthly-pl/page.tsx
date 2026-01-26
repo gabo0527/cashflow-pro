@@ -7,9 +7,7 @@ import {
   ArrowLeft, Download, Calendar, Database, TrendingUp, TrendingDown,
   ChevronDown, Info, FileText, Moon, Sun, Filter
 } from 'lucide-react'
-import { supabase, getCurrentUser, fetchTransactions, fetchAccrualTransactions } from '@/lib/supabase'
-
-type DataSource = 'cash' | 'accrual' | 'combined'
+import { supabase, getCurrentUser, fetchTransactions } from '@/lib/supabase'
 
 interface Transaction {
   id: string
@@ -37,18 +35,15 @@ export default function MonthlyPLReport() {
   
   // Data state
   const [loading, setLoading] = useState(true)
-  const [cashTransactions, setCashTransactions] = useState<Transaction[]>([])
-  const [accrualTransactions, setAccrualTransactions] = useState<Transaction[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
   
   // Filter state
-  const [dataSource, setDataSource] = useState<DataSource>('cash')
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [startMonth, setStartMonth] = useState(1)
   const [endMonth, setEndMonth] = useState(12)
   
   // UI state
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
-  const [showDataInfo, setShowDataInfo] = useState(false)
 
   // Load data
   useEffect(() => {
@@ -71,30 +66,15 @@ export default function MonthlyPLReport() {
           return
         }
 
-        const [cashResult, accrualResult] = await Promise.all([
-          fetchTransactions(profile.company_id),
-          fetchAccrualTransactions(profile.company_id)
-        ])
+        const txResult = await fetchTransactions(profile.company_id)
 
-        if (cashResult?.data) {
-          setCashTransactions(cashResult.data.map((t: any) => ({
+        if (txResult?.data) {
+          setTransactions(txResult.data.map((t: any) => ({
             id: t.id,
             date: t.date,
             description: t.description,
             amount: t.amount,
             category: t.category,
-            type: t.type,
-            project: t.project
-          })))
-        }
-        
-        if (accrualResult?.data) {
-          setAccrualTransactions(accrualResult.data.map((t: any) => ({
-            id: t.id,
-            date: t.date,
-            description: t.description,
-            amount: t.amount,
-            category: t.category || (t.type === 'revenue' ? 'revenue' : 'opex'),
             type: t.type,
             project: t.project
           })))
@@ -111,21 +91,6 @@ export default function MonthlyPLReport() {
     loadData()
   }, [router])
 
-  // Get active transactions based on data source
-  const activeTransactions = useMemo(() => {
-    switch (dataSource) {
-      case 'cash':
-        return cashTransactions
-      case 'accrual':
-        return accrualTransactions
-      case 'combined':
-        // Combine but avoid duplicates - prefer accrual for invoices
-        return [...cashTransactions, ...accrualTransactions]
-      default:
-        return cashTransactions
-    }
-  }, [dataSource, cashTransactions, accrualTransactions])
-
   // Calculate P&L data
   const plData = useMemo(() => {
     const months: { [key: number]: { revenue: number; opex: number; overhead: number } } = {}
@@ -135,7 +100,7 @@ export default function MonthlyPLReport() {
       months[m] = { revenue: 0, opex: 0, overhead: 0 }
     }
 
-    activeTransactions.forEach(t => {
+    transactions.forEach(t => {
       if (!t.date) return
       const txYear = parseInt(t.date.substring(0, 4))
       const txMonth = parseInt(t.date.substring(5, 7))
@@ -156,7 +121,7 @@ export default function MonthlyPLReport() {
     })
 
     return months
-  }, [activeTransactions, selectedYear, startMonth, endMonth])
+  }, [transactions, selectedYear, startMonth, endMonth])
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -176,25 +141,6 @@ export default function MonthlyPLReport() {
   const textPrimary = theme === 'light' ? 'text-slate-900' : 'text-white'
   const textMuted = theme === 'light' ? 'text-slate-500' : 'text-neutral-400'
 
-  // Data source info
-  const dataSourceInfo = {
-    cash: {
-      label: 'Cash Basis',
-      description: 'Shows actual money received and paid. Revenue appears when payment hits your bank.',
-      color: 'bg-emerald-500'
-    },
-    accrual: {
-      label: 'Accrual Basis',
-      description: 'Shows revenue when earned (invoiced) and expenses when incurred, regardless of payment.',
-      color: 'bg-blue-500'
-    },
-    combined: {
-      label: 'Combined View',
-      description: 'Shows both cash and accrual transactions. May include duplicates if same transaction exists in both.',
-      color: 'bg-purple-500'
-    }
-  }
-
   if (loading) {
     return (
       <div className={`min-h-screen ${bgColor} flex items-center justify-center`}>
@@ -210,73 +156,23 @@ export default function MonthlyPLReport() {
     <div className={`min-h-screen ${bgColor} ${textPrimary}`}>
       {/* Header */}
       <header className={`sticky top-0 z-10 ${surfaceColor} border-b ${borderColor}`}>
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex items-center justify-between h-16">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => router.push('/')}
+                onClick={() => router.back()}
                 className={`p-2 rounded-lg ${theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-neutral-800'}`}
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div>
-                <h1 className="text-xl font-semibold">Monthly P&L Report</h1>
-                <p className={`text-sm ${textMuted}`}>Profit & Loss by Month</p>
+                <h1 className="text-xl font-bold">Monthly P&L Report</h1>
+                <p className={`text-sm ${textMuted}`}>Cash basis analysis</p>
               </div>
             </div>
             
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                className={`p-2 rounded-lg ${theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-neutral-800'}`}
-              >
-                {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-              </button>
-              <button className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${borderColor} ${theme === 'light' ? 'hover:bg-slate-50' : 'hover:bg-neutral-800'}`}>
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Filters Bar */}
-      <div className={`${surfaceColor} border-b ${borderColor} py-4`}>
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Data Source Selector */}
-            <div className="flex items-center gap-2">
-              <Database className={`w-4 h-4 ${textMuted}`} />
-              <span className={`text-sm ${textMuted}`}>Data Source:</span>
-              <div className={`flex rounded-lg border ${borderColor} overflow-hidden`}>
-                {(['cash', 'accrual', 'combined'] as DataSource[]).map(source => (
-                  <button
-                    key={source}
-                    onClick={() => setDataSource(source)}
-                    className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                      dataSource === source
-                        ? 'bg-orange-500 text-white'
-                        : theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-neutral-800'
-                    }`}
-                  >
-                    {source.charAt(0).toUpperCase() + source.slice(1)}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={() => setShowDataInfo(!showDataInfo)}
-                className={`p-1 rounded ${theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-neutral-800'}`}
-              >
-                <Info className={`w-4 h-4 ${textMuted}`} />
-              </button>
-            </div>
-
-            <div className={`h-6 w-px ${theme === 'light' ? 'bg-slate-200' : 'bg-neutral-700'}`} />
-
-            {/* Year Selector */}
-            <div className="flex items-center gap-2">
-              <Calendar className={`w-4 h-4 ${textMuted}`} />
+            <div className="flex items-center gap-4">
+              {/* Year selector */}
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
@@ -286,67 +182,25 @@ export default function MonthlyPLReport() {
                   <option key={year} value={year}>{year}</option>
                 ))}
               </select>
-            </div>
-
-            {/* Month Range */}
-            <div className="flex items-center gap-2">
-              <span className={`text-sm ${textMuted}`}>From:</span>
-              <select
-                value={startMonth}
-                onChange={(e) => setStartMonth(Number(e.target.value))}
-                className={`px-3 py-1.5 rounded-lg border text-sm ${surfaceColor} ${borderColor} ${textPrimary}`}
+              
+              {/* Theme toggle */}
+              <button
+                onClick={() => {
+                  const newTheme = theme === 'light' ? 'dark' : 'light'
+                  setTheme(newTheme)
+                  localStorage.setItem('vantage_theme', newTheme)
+                }}
+                className={`p-2 rounded-lg ${theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-neutral-800'}`}
               >
-                {MONTHS.map((month, idx) => (
-                  <option key={idx} value={idx + 1}>{month}</option>
-                ))}
-              </select>
-              <span className={`text-sm ${textMuted}`}>To:</span>
-              <select
-                value={endMonth}
-                onChange={(e) => setEndMonth(Number(e.target.value))}
-                className={`px-3 py-1.5 rounded-lg border text-sm ${surfaceColor} ${borderColor} ${textPrimary}`}
-              >
-                {MONTHS.map((month, idx) => (
-                  <option key={idx} value={idx + 1}>{month}</option>
-                ))}
-              </select>
+                {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+              </button>
             </div>
           </div>
-
-          {/* Data Source Info Banner */}
-          {showDataInfo && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className={`mt-4 p-4 rounded-lg border ${borderColor} ${theme === 'light' ? 'bg-slate-50' : 'bg-neutral-900'}`}
-            >
-              <div className="flex items-start gap-3">
-                <div className={`w-3 h-3 rounded-full mt-1 ${dataSourceInfo[dataSource].color}`} />
-                <div>
-                  <p className="font-medium">{dataSourceInfo[dataSource].label}</p>
-                  <p className={`text-sm ${textMuted} mt-1`}>{dataSourceInfo[dataSource].description}</p>
-                </div>
-              </div>
-            </motion.div>
-          )}
         </div>
-      </div>
+      </header>
 
-      {/* Data Source Badge */}
-      <div className="max-w-7xl mx-auto px-6 py-4">
-        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
-          dataSource === 'cash' ? 'bg-emerald-500/10 text-emerald-500' :
-          dataSource === 'accrual' ? 'bg-blue-500/10 text-blue-500' :
-          'bg-purple-500/10 text-purple-500'
-        }`}>
-          <div className={`w-2 h-2 rounded-full ${dataSourceInfo[dataSource].color}`} />
-          {dataSourceInfo[dataSource].label} • {selectedYear} • {MONTHS[startMonth-1]} - {MONTHS[endMonth-1]}
-        </div>
-      </div>
-
-      {/* Summary Cards - Contained */}
-      <div className="max-w-7xl mx-auto px-6 pb-6">
+      {/* Summary Cards */}
+      <div className="max-w-7xl mx-auto px-6 py-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className={`${surfaceColor} rounded-xl p-4 border ${borderColor}`}>
             <p className={`text-sm ${textMuted} mb-1`}>Total Revenue</p>
@@ -365,17 +219,12 @@ export default function MonthlyPLReport() {
             <p className={`text-2xl font-bold ${totals.net >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
               {formatCurrency(totals.net)}
             </p>
-            {totals.revenue > 0 && (
-              <p className={`text-xs ${textMuted} mt-1`}>
-                {((totals.net / totals.revenue) * 100).toFixed(1)}% margin
-              </p>
-            )}
           </div>
         </div>
       </div>
 
-      {/* P&L Table - Full Width */}
-      <div className="px-6 pb-8">
+      {/* P&L Table */}
+      <div className="max-w-7xl mx-auto px-6 pb-8">
         <div className={`${surfaceColor} rounded-xl border ${borderColor} overflow-hidden`}>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -384,7 +233,7 @@ export default function MonthlyPLReport() {
                   <th className={`px-6 py-4 text-left text-sm font-semibold sticky left-0 ${theme === 'light' ? 'bg-slate-50' : 'bg-neutral-900'}`}>
                     Category
                   </th>
-                  {MONTHS.slice(startMonth - 1, endMonth).map((month, idx) => (
+                  {MONTHS.slice(startMonth - 1, endMonth).map((month) => (
                     <th key={month} className="px-6 py-4 text-right text-sm font-semibold whitespace-nowrap">
                       {month} {selectedYear}
                     </th>
@@ -459,36 +308,6 @@ export default function MonthlyPLReport() {
                 </tr>
               </tbody>
             </table>
-          </div>
-        </div>
-      </div>
-
-      {/* Data Source Legend - Contained */}
-      <div className="max-w-7xl mx-auto px-6 pb-8">
-        <div className={`${surfaceColor} rounded-xl p-4 border ${borderColor}`}>
-          <h3 className="font-semibold mb-3">Understanding Your Data</h3>
-          <div className="grid md:grid-cols-3 gap-4 text-sm">
-            <div className="flex items-start gap-3">
-              <div className="w-3 h-3 rounded-full bg-emerald-500 mt-1" />
-              <div>
-                <p className="font-medium">Cash Basis</p>
-                <p className={textMuted}>Actual bank transactions. Revenue when paid, expenses when withdrawn.</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-3 h-3 rounded-full bg-blue-500 mt-1" />
-              <div>
-                <p className="font-medium">Accrual Basis</p>
-                <p className={textMuted}>Invoice-based. Revenue when invoiced, expenses when incurred.</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-3 h-3 rounded-full bg-purple-500 mt-1" />
-              <div>
-                <p className="font-medium">Combined</p>
-                <p className={textMuted}>Both sources combined. Use for full picture, but watch for duplicates.</p>
-              </div>
-            </div>
           </div>
         </div>
       </div>
