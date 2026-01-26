@@ -126,27 +126,36 @@ export default function TimesheetPage() {
         return
       }
 
-      // Get their project assignments
+      // Get their project assignments (no join)
       const { data: assignData, error: assignError } = await supabase
         .from('team_project_assignments')
-        .select(`
-          id,
-          project_id,
-          service,
-          payment_type,
-          rate,
-          projects (id, name, client, status)
-        `)
+        .select('id, project_id, service, payment_type, rate')
         .eq('team_member_id', memberData.id)
 
       if (assignError) {
+        console.error('Assignment error:', assignError)
         setError('Error loading your projects. Please try again.')
         setLoading(false)
         return
       }
 
-      // Filter to active projects only
+      // Fetch project details separately
+      const projectIds = (assignData || []).map((a: any) => a.project_id)
+      const { data: projectsData } = await supabase
+        .from('projects')
+        .select('id, name, client, status')
+        .in('id', projectIds)
+
+      // Filter to active projects only and combine data
       const activeAssignments = (assignData || [])
+        .map((a: any) => {
+          const project = (projectsData || []).find((p: any) => p.id === a.project_id)
+          return {
+            ...a,
+            projects: project
+          }
+        })
+        .filter((a: any) => a.projects?.status === 'active' || !a.projects?.status)
         .filter((a: any) => a.projects?.status === 'active' || !a.projects?.status)
         .map((a: any) => ({
           id: a.id,
