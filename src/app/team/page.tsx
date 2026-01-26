@@ -220,22 +220,23 @@ export default function TeamPage() {
           console.error('Error fetching projects:', projError)
         }
 
-        // Fetch project assignments
-        const { data: assignData } = await supabase
+        // Fetch project assignments (simplified - no join)
+        const { data: assignData, error: assignError } = await supabase
           .from('team_project_assignments')
-          .select(`
-            *,
-            projects (id, name, client)
-          `)
+          .select('*')
           .eq('company_id', profile.company_id)
+
+        console.log('Assignments fetched:', assignData?.length, 'Error:', assignError)
 
         // Fetch hours summary for current month
         const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
-        const { data: hoursData } = await supabase
+        const { data: hoursData, error: hoursError } = await supabase
           .from('time_entries')
           .select('team_member_id, hours')
           .eq('company_id', profile.company_id)
           .gte('date', startOfMonth)
+
+        console.log('Hours fetched:', hoursData?.length, 'Error:', hoursError)
 
         // Aggregate hours by team member
         const hoursMap: Record<string, number> = {}
@@ -264,17 +265,20 @@ export default function TeamPage() {
           payment_method: t.payment_method || null,
         }))
 
-        // Transform assignments
-        const transformedAssignments = (assignData || []).map((a: any) => ({
-          id: a.id,
-          team_member_id: a.team_member_id,
-          project_id: a.project_id,
-          project_name: a.projects?.name || '',
-          client_name: a.projects?.client || '',
-          service: a.service || null,
-          payment_type: a.payment_type || 'tm',
-          rate: a.rate || 0,
-        }))
+        // Transform assignments (look up project names from projData)
+        const transformedAssignments = (assignData || []).map((a: any) => {
+          const project = (projData || []).find((p: any) => p.id === a.project_id)
+          return {
+            id: a.id,
+            team_member_id: a.team_member_id,
+            project_id: a.project_id,
+            project_name: project?.name || 'Unknown Project',
+            client_name: project?.client || '',
+            service: a.service || null,
+            payment_type: a.payment_type || 'tm',
+            rate: a.rate || 0,
+          }
+        })
 
         setTeamMembers(transformedMembers)
         const transformedProjects = (projData || []).map((p: any) => ({ id: p.id, name: p.name || '', client: p.client || '' }))
