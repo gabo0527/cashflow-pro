@@ -2,15 +2,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
 import {
-  ArrowLeft, Download, Calendar, Database, TrendingUp, TrendingDown,
-  ChevronDown, Info, Target, Moon, Sun, Filter, BarChart3
+  ArrowLeft, Calendar, Moon, Sun, Filter
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { supabase, getCurrentUser, fetchTransactions, fetchAccrualTransactions, fetchProjects } from '@/lib/supabase'
-
-type DataSource = 'cash' | 'accrual' | 'combined'
+import { supabase, getCurrentUser, fetchTransactions, fetchProjects } from '@/lib/supabase'
 
 const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('en-US', {
@@ -28,19 +24,16 @@ export default function ProjectProfitabilityReport() {
   
   // Data state
   const [loading, setLoading] = useState(true)
-  const [cashTransactions, setCashTransactions] = useState<any[]>([])
-  const [accrualTransactions, setAccrualTransactions] = useState<any[]>([])
+  const [transactions, setTransactions] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
   
   // Filter state
-  const [dataSource, setDataSource] = useState<DataSource>('cash')
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [startMonth, setStartMonth] = useState(1)
   const [endMonth, setEndMonth] = useState(12)
   
   // UI state
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
-  const [showDataInfo, setShowDataInfo] = useState(false)
   const [sortBy, setSortBy] = useState<'revenue' | 'profit' | 'margin'>('profit')
 
   // Load data
@@ -64,14 +57,12 @@ export default function ProjectProfitabilityReport() {
           return
         }
 
-        const [cashResult, accrualResult, projectsResult] = await Promise.all([
+        const [txResult, projectsResult] = await Promise.all([
           fetchTransactions(profile.company_id),
-          fetchAccrualTransactions(profile.company_id),
           fetchProjects(profile.company_id)
         ])
 
-        if (cashResult?.data) setCashTransactions(cashResult.data)
-        if (accrualResult?.data) setAccrualTransactions(accrualResult.data)
+        if (txResult?.data) setTransactions(txResult.data)
         if (projectsResult?.data) setProjects(projectsResult.data)
 
         const savedTheme = localStorage.getItem('vantage_theme')
@@ -84,16 +75,6 @@ export default function ProjectProfitabilityReport() {
     loadData()
   }, [router])
 
-  // Get active transactions based on data source
-  const activeTransactions = useMemo(() => {
-    switch (dataSource) {
-      case 'cash': return cashTransactions
-      case 'accrual': return accrualTransactions
-      case 'combined': return [...cashTransactions, ...accrualTransactions]
-      default: return cashTransactions
-    }
-  }, [dataSource, cashTransactions, accrualTransactions])
-
   // Calculate project profitability
   const projectData = useMemo(() => {
     const projectMap: { [key: string]: { revenue: number; costs: number; color: string } } = {}
@@ -103,7 +84,7 @@ export default function ProjectProfitabilityReport() {
       projectMap[p.name] = { revenue: 0, costs: 0, color: p.color || '#6b7280' }
     })
 
-    activeTransactions.forEach(t => {
+    transactions.forEach(t => {
       if (!t.date || !t.project) return
       const txYear = parseInt(t.date.substring(0, 4))
       const txMonth = parseInt(t.date.substring(5, 7))
@@ -141,7 +122,7 @@ export default function ProjectProfitabilityReport() {
         if (sortBy === 'profit') return b.profit - a.profit
         return b.margin - a.margin
       })
-  }, [activeTransactions, projects, selectedYear, startMonth, endMonth, sortBy])
+  }, [transactions, projects, selectedYear, startMonth, endMonth, sortBy])
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -159,12 +140,6 @@ export default function ProjectProfitabilityReport() {
   const textPrimary = theme === 'light' ? 'text-slate-900' : 'text-white'
   const textMuted = theme === 'light' ? 'text-slate-500' : 'text-neutral-400'
 
-  const dataSourceInfo = {
-    cash: { label: 'Cash Basis', color: 'bg-emerald-500' },
-    accrual: { label: 'Accrual Basis', color: 'bg-blue-500' },
-    combined: { label: 'Combined View', color: 'bg-purple-500' }
-  }
-
   if (loading) {
     return (
       <div className={`min-h-screen ${bgColor} flex items-center justify-center`}>
@@ -180,67 +155,23 @@ export default function ProjectProfitabilityReport() {
     <div className={`min-h-screen ${bgColor} ${textPrimary}`}>
       {/* Header */}
       <header className={`sticky top-0 z-10 ${surfaceColor} border-b ${borderColor}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => router.push('/')}
+                onClick={() => router.back()}
                 className={`p-2 rounded-lg ${theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-neutral-800'}`}
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div>
-                <h1 className="text-xl font-semibold">Project Profitability</h1>
-                <p className={`text-sm ${textMuted}`}>Revenue, costs, and margins by project</p>
+                <h1 className="text-xl font-bold">Project Profitability</h1>
+                <p className={`text-sm ${textMuted}`}>Cash basis analysis by project</p>
               </div>
             </div>
             
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                className={`p-2 rounded-lg ${theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-neutral-800'}`}
-              >
-                {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-              </button>
-              <button className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${borderColor} ${theme === 'light' ? 'hover:bg-slate-50' : 'hover:bg-neutral-800'}`}>
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Filters Bar */}
-      <div className={`${surfaceColor} border-b ${borderColor} py-4`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Data Source Selector */}
-            <div className="flex items-center gap-2">
-              <Database className={`w-4 h-4 ${textMuted}`} />
-              <span className={`text-sm ${textMuted}`}>Data:</span>
-              <div className={`flex rounded-lg border ${borderColor} overflow-hidden`}>
-                {(['cash', 'accrual', 'combined'] as DataSource[]).map(source => (
-                  <button
-                    key={source}
-                    onClick={() => setDataSource(source)}
-                    className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                      dataSource === source
-                        ? 'bg-orange-500 text-white'
-                        : theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-neutral-800'
-                    }`}
-                  >
-                    {source.charAt(0).toUpperCase() + source.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className={`h-6 w-px ${theme === 'light' ? 'bg-slate-200' : 'bg-neutral-700'}`} />
-
-            {/* Year & Month Range */}
-            <div className="flex items-center gap-2">
-              <Calendar className={`w-4 h-4 ${textMuted}`} />
+            <div className="flex items-center gap-4">
+              {/* Year selector */}
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
@@ -250,33 +181,8 @@ export default function ProjectProfitabilityReport() {
                   <option key={year} value={year}>{year}</option>
                 ))}
               </select>
-              <select
-                value={startMonth}
-                onChange={(e) => setStartMonth(Number(e.target.value))}
-                className={`px-3 py-1.5 rounded-lg border text-sm ${surfaceColor} ${borderColor} ${textPrimary}`}
-              >
-                {MONTHS.map((month, idx) => (
-                  <option key={idx} value={idx + 1}>{month}</option>
-                ))}
-              </select>
-              <span className={textMuted}>-</span>
-              <select
-                value={endMonth}
-                onChange={(e) => setEndMonth(Number(e.target.value))}
-                className={`px-3 py-1.5 rounded-lg border text-sm ${surfaceColor} ${borderColor} ${textPrimary}`}
-              >
-                {MONTHS.map((month, idx) => (
-                  <option key={idx} value={idx + 1}>{month}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className={`h-6 w-px ${theme === 'light' ? 'bg-slate-200' : 'bg-neutral-700'}`} />
-
-            {/* Sort By */}
-            <div className="flex items-center gap-2">
-              <Filter className={`w-4 h-4 ${textMuted}`} />
-              <span className={`text-sm ${textMuted}`}>Sort:</span>
+              
+              {/* Sort selector */}
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
@@ -286,25 +192,25 @@ export default function ProjectProfitabilityReport() {
                 <option value="revenue">By Revenue</option>
                 <option value="margin">By Margin</option>
               </select>
+              
+              {/* Theme toggle */}
+              <button
+                onClick={() => {
+                  const newTheme = theme === 'light' ? 'dark' : 'light'
+                  setTheme(newTheme)
+                  localStorage.setItem('vantage_theme', newTheme)
+                }}
+                className={`p-2 rounded-lg ${theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-neutral-800'}`}
+              >
+                {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+              </button>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Data Source Badge */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
-          dataSource === 'cash' ? 'bg-emerald-500/10 text-emerald-500' :
-          dataSource === 'accrual' ? 'bg-blue-500/10 text-blue-500' :
-          'bg-purple-500/10 text-purple-500'
-        }`}>
-          <div className={`w-2 h-2 rounded-full ${dataSourceInfo[dataSource].color}`} />
-          {dataSourceInfo[dataSource].label} • {selectedYear} • {MONTHS[startMonth-1]} - {MONTHS[endMonth-1]}
-        </div>
-      </div>
+      </header>
 
       {/* Summary Cards */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className={`${surfaceColor} rounded-xl p-4 border ${borderColor}`}>
             <p className={`text-sm ${textMuted} mb-1`}>Total Revenue</p>
