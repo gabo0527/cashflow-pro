@@ -3,8 +3,9 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { 
   Search, Filter, Download, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
-  FileText, AlertTriangle, Clock, CheckCircle, DollarSign, X, Calendar
+  FileText, AlertTriangle, CheckCircle, DollarSign, X, BarChart3
 } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { supabase, getCurrentUser, fetchInvoices, fetchProjects, fetchClients } from '@/lib/supabase'
 
 // Types
@@ -38,6 +39,12 @@ const formatCurrency = (value: number): string => {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   }).format(value)
+}
+
+const formatCompactCurrency = (value: number): string => {
+  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`
+  if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`
+  return `$${value}`
 }
 
 const formatDate = (dateStr: string): string => {
@@ -80,17 +87,21 @@ const AGING_BUCKETS = [
   { id: '90+', label: '90+ Days', color: 'red' },
 ]
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
 // Collapsible Section Component
 function CollapsibleSection({ 
   title, 
   children, 
   defaultExpanded = true,
-  badge
+  badge,
+  icon
 }: { 
   title: string
   children: React.ReactNode
   defaultExpanded?: boolean
   badge?: string | number
+  icon?: React.ReactNode
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
   
@@ -101,6 +112,7 @@ function CollapsibleSection({
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-700/50 transition-colors"
       >
         <div className="flex items-center gap-2">
+          {icon && <span className="text-slate-400">{icon}</span>}
           <h3 className="text-sm font-medium text-slate-100">{title}</h3>
           {badge !== undefined && (
             <span className="px-2 py-0.5 text-xs rounded-full bg-slate-700 text-slate-300">
@@ -137,6 +149,9 @@ export default function InvoicesPage() {
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [selectedBucket, setSelectedBucket] = useState<string>('all')
   const [showFilters, setShowFilters] = useState(false)
+
+  // Chart filter state
+  const [chartYear, setChartYear] = useState(new Date().getFullYear())
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
@@ -183,10 +198,47 @@ export default function InvoicesPage() {
     loadData()
   }, [])
 
+  // Chart data - Invoiced vs Collected by month
+  const chartData = useMemo(() => {
+    const monthlyData: Record<number, { invoiced: number; collected: number }> = {}
+    
+    // Initialize all months
+    for (let m = 0; m < 12; m++) {
+      monthlyData[m] = { invoiced: 0, collected: 0 }
+    }
+
+    invoices.forEach(inv => {
+      if (!inv.invoice_date) return
+      const invYear = parseInt(inv.invoice_date.substring(0, 4))
+      const invMonth = parseInt(inv.invoice_date.substring(5, 7)) - 1
+      
+      if (invYear === chartYear) {
+        monthlyData[invMonth].invoiced += inv.amount || 0
+        monthlyData[invMonth].collected += inv.amount_paid || 0
+      }
+    })
+
+    return MONTHS.map((month, idx) => ({
+      month,
+      invoiced: monthlyData[idx].invoiced,
+      collected: monthlyData[idx].collected
+    }))
+  }, [invoices, chartYear])
+
+  // Available years for chart filter
+  const availableYears = useMemo(() => {
+    const years = new Set<number>()
+    invoices.forEach(inv => {
+      if (inv.invoice_date) {
+        years.add(parseInt(inv.invoice_date.substring(0, 4)))
+      }
+    })
+    return Array.from(years).sort((a, b) => b - a)
+  }, [invoices])
+
   // Filtered invoices
   const filteredInvoices = useMemo(() => {
     return invoices.filter(inv => {
-      // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase()
         const matchesNumber = inv.invoice_number?.toLowerCase().includes(query)
@@ -195,13 +247,9 @@ export default function InvoicesPage() {
         if (!matchesNumber && !matchesClient && !matchesAmount) return false
       }
 
-      // Client filter
       if (selectedClient !== 'all' && inv.client !== selectedClient) return false
-
-      // Project filter
       if (selectedProject !== 'all' && inv.project !== selectedProject) return false
 
-      // Aging bucket filter
       if (selectedBucket !== 'all') {
         const bucket = getAgingBucket(inv.days_overdue || 0)
         if (selectedBucket !== 'current' && inv.balance_due <= 0) return false
@@ -217,23 +265,16 @@ export default function InvoicesPage() {
     })
   }, [invoices, searchQuery, selectedClient, selectedProject, selectedBucket])
 
-  // Aging summary (only unpaid invoices)
+  // Aging summary
   const agingSummary = useMemo(() => {
     const unpaidInvoices = invoices.filter(inv => inv.balance_due > 0)
-    
     const buckets: Record<string, number> = {
-      current: 0,
-      '1-30': 0,
-      '31-60': 0,
-      '61-90': 0,
-      '90+': 0,
+      current: 0, '1-30': 0, '31-60': 0, '61-90': 0, '90+': 0,
     }
-
     unpaidInvoices.forEach(inv => {
       const bucket = getAgingBucket(inv.days_overdue || 0)
       buckets[bucket] += inv.balance_due || 0
     })
-
     return buckets
   }, [invoices])
 
@@ -243,14 +284,10 @@ export default function InvoicesPage() {
     const totalOverdue = invoices
       .filter(inv => (inv.days_overdue || 0) > 0 && inv.balance_due > 0)
       .reduce((sum, inv) => sum + (inv.balance_due || 0), 0)
-    
-    const currentMonth = new Date().toISOString().slice(0, 7)
     const collectedThisMonth = invoices
       .filter(inv => inv.amount_paid > 0)
       .reduce((sum, inv) => sum + (inv.amount_paid || 0), 0)
-
     const overdueCount = invoices.filter(inv => (inv.days_overdue || 0) > 0 && inv.balance_due > 0).length
-
     return { totalAR, totalOverdue, collectedThisMonth, overdueCount }
   }, [invoices])
 
@@ -265,7 +302,6 @@ export default function InvoicesPage() {
   // Record payment
   const recordPayment = async () => {
     if (!paymentModal || !companyId) return
-    
     const amount = parseFloat(paymentModal.amount)
     if (isNaN(amount) || amount <= 0) return
 
@@ -275,10 +311,7 @@ export default function InvoicesPage() {
 
       const { error } = await supabase
         .from('invoices')
-        .update({
-          amount_paid: newAmountPaid,
-          balance_due: Math.max(0, newBalanceDue)
-        })
+        .update({ amount_paid: newAmountPaid, balance_due: Math.max(0, newBalanceDue) })
         .eq('id', paymentModal.invoice.id)
 
       if (error) throw error
@@ -297,52 +330,30 @@ export default function InvoicesPage() {
   // Mark as paid
   const markAsPaid = async (invoice: Invoice) => {
     if (!companyId) return
-
     try {
       const { error } = await supabase
         .from('invoices')
-        .update({
-          amount_paid: invoice.amount,
-          balance_due: 0
-        })
+        .update({ amount_paid: invoice.amount, balance_due: 0 })
         .eq('id', invoice.id)
 
       if (error) throw error
 
       setInvoices(prev => prev.map(inv => 
-        inv.id === invoice.id 
-          ? { ...inv, amount_paid: invoice.amount, balance_due: 0 }
-          : inv
+        inv.id === invoice.id ? { ...inv, amount_paid: invoice.amount, balance_due: 0 } : inv
       ))
     } catch (error) {
       console.error('Error marking as paid:', error)
     }
   }
 
-  // Export to Excel
+  // Export
   const exportToExcel = () => {
     const headers = ['Invoice #', 'Date', 'Due Date', 'Client', 'Project', 'Amount', 'Paid', 'Balance', 'Days Overdue', 'Status']
     const rows = filteredInvoices.map(inv => {
       const status = getInvoiceStatus(inv)
-      return [
-        inv.invoice_number,
-        inv.invoice_date,
-        inv.due_date,
-        inv.client,
-        inv.project || '',
-        inv.amount,
-        inv.amount_paid,
-        inv.balance_due,
-        inv.days_overdue || 0,
-        status.label
-      ]
+      return [inv.invoice_number, inv.invoice_date, inv.due_date, inv.client, inv.project || '', inv.amount, inv.amount_paid, inv.balance_due, inv.days_overdue || 0, status.label]
     })
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n')
-
+    const csvContent = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n')
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
@@ -386,7 +397,7 @@ export default function InvoicesPage() {
       </div>
 
       {/* Summary Cards - Collapsible */}
-      <CollapsibleSection title="Summary" badge={formatCurrency(summary.totalAR)}>
+      <CollapsibleSection title="Summary" badge={formatCurrency(summary.totalAR)} icon={<DollarSign size={16} />}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="p-4 rounded-lg bg-slate-900/50">
             <div className="flex items-center justify-between">
@@ -397,7 +408,6 @@ export default function InvoicesPage() {
               <FileText size={20} className="text-blue-500/50" />
             </div>
           </div>
-
           <div className="p-4 rounded-lg bg-slate-900/50">
             <div className="flex items-center justify-between">
               <div>
@@ -408,7 +418,6 @@ export default function InvoicesPage() {
               <AlertTriangle size={20} className="text-rose-500/50" />
             </div>
           </div>
-
           <div className="p-4 rounded-lg bg-slate-900/50">
             <div className="flex items-center justify-between">
               <div>
@@ -418,11 +427,10 @@ export default function InvoicesPage() {
               <CheckCircle size={20} className="text-emerald-500/50" />
             </div>
           </div>
-
           <div className="p-4 rounded-lg bg-slate-900/50">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-slate-400">Collected (MTD)</p>
+                <p className="text-xs font-medium text-slate-400">Collected (Total)</p>
                 <p className="text-xl font-semibold mt-1 text-emerald-500">{formatCurrency(summary.collectedThisMonth)}</p>
               </div>
               <DollarSign size={20} className="text-emerald-500/50" />
@@ -431,8 +439,8 @@ export default function InvoicesPage() {
         </div>
       </CollapsibleSection>
 
-      {/* Aging Summary - Collapsible */}
-      <CollapsibleSection title="Aging Breakdown">
+      {/* Aging Breakdown - Collapsible */}
+      <CollapsibleSection title="Aging Breakdown" icon={<AlertTriangle size={16} />}>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
           {AGING_BUCKETS.map(bucket => {
             const amount = agingSummary[bucket.id] || 0
@@ -451,32 +459,67 @@ export default function InvoicesPage() {
               rose: 'text-rose-500',
               red: 'text-red-500',
             }
-            
             return (
               <button
                 key={bucket.id}
                 onClick={() => setSelectedBucket(isSelected ? 'all' : bucket.id)}
-                className={`p-3 rounded-lg border-2 transition-all ${
-                  isSelected 
-                    ? colorMap[bucket.color]
-                    : 'border-slate-700 hover:border-slate-600'
-                }`}
+                className={`p-3 rounded-lg border-2 transition-all ${isSelected ? colorMap[bucket.color] : 'border-slate-700 hover:border-slate-600'}`}
               >
                 <p className="text-xs font-medium text-slate-400">{bucket.label}</p>
-                <p className={`text-lg font-semibold mt-1 ${textMap[bucket.color]}`}>
-                  {formatCurrency(amount)}
-                </p>
+                <p className={`text-lg font-semibold mt-1 ${textMap[bucket.color]}`}>{formatCurrency(amount)}</p>
               </button>
             )
           })}
         </div>
       </CollapsibleSection>
 
-      {/* Search and Filters */}
-      <div className="rounded-xl border bg-slate-800 border-slate-700 overflow-hidden">
-        <div className="p-4">
+      {/* Invoiced vs Collected Chart - Collapsible */}
+      <CollapsibleSection title="Invoiced vs Collected" icon={<BarChart3 size={16} />}>
+        <div className="space-y-3">
+          {/* Year selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400">Year:</span>
+            <select
+              value={chartYear}
+              onChange={(e) => setChartYear(Number(e.target.value))}
+              className="px-2 py-1 bg-slate-900 border border-slate-700 rounded text-sm text-slate-100 focus:outline-none"
+            >
+              {availableYears.length > 0 ? (
+                availableYears.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))
+              ) : (
+                <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>
+              )}
+            </select>
+          </div>
+          
+          {/* Chart */}
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={{ stroke: '#475569' }} />
+                <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={{ stroke: '#475569' }} tickFormatter={formatCompactCurrency} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }}
+                  labelStyle={{ color: '#f1f5f9' }}
+                  formatter={(value: number) => formatCurrency(value)}
+                />
+                <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                <Bar dataKey="invoiced" name="Invoiced" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="collected" name="Collected" fill="#10b981" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </CollapsibleSection>
+
+      {/* Invoices Table - Collapsible */}
+      <CollapsibleSection title="Invoices" badge={filteredInvoices.length} icon={<FileText size={16} />}>
+        {/* Search and Filters */}
+        <div className="space-y-3 mb-4">
           <div className="flex flex-col sm:flex-row gap-3">
-            {/* Search */}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
@@ -487,81 +530,50 @@ export default function InvoicesPage() {
                 className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               />
             </div>
-
-            {/* Filter Toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                showFilters || hasActiveFilters
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-slate-700 hover:bg-slate-600 text-slate-100'
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${showFilters || hasActiveFilters ? 'bg-blue-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-100'}`}
             >
               <Filter size={16} />
               Filters
             </button>
-
             {hasActiveFilters && (
-              <button
-                onClick={clearFilters}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-100 transition-colors"
-              >
+              <button onClick={clearFilters} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-100 transition-colors">
                 <X size={16} />
                 Clear
               </button>
             )}
           </div>
 
-          {/* Filter Panel */}
           {showFilters && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 mt-4 border-t border-slate-700">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-700">
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Client</label>
-                <select
-                  value={selectedClient}
-                  onChange={(e) => setSelectedClient(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                >
+                <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none">
                   <option value="all">All Clients</option>
-                  {clients.map(client => (
-                    <option key={client.id} value={client.name}>{client.name}</option>
-                  ))}
+                  {clients.map(client => (<option key={client.id} value={client.name}>{client.name}</option>))}
                 </select>
               </div>
-
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Project</label>
-                <select
-                  value={selectedProject}
-                  onChange={(e) => setSelectedProject(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                >
+                <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none">
                   <option value="all">All Projects</option>
-                  {projects.map(proj => (
-                    <option key={proj.id} value={proj.name}>{proj.name}</option>
-                  ))}
+                  {projects.map(proj => (<option key={proj.id} value={proj.name}>{proj.name}</option>))}
                 </select>
               </div>
-
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Aging</label>
-                <select
-                  value={selectedBucket}
-                  onChange={(e) => setSelectedBucket(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                >
+                <select value={selectedBucket} onChange={(e) => setSelectedBucket(e.target.value)} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none">
                   <option value="all">All</option>
-                  {AGING_BUCKETS.map(bucket => (
-                    <option key={bucket.id} value={bucket.id}>{bucket.label}</option>
-                  ))}
+                  {AGING_BUCKETS.map(bucket => (<option key={bucket.id} value={bucket.id}>{bucket.label}</option>))}
                 </select>
               </div>
             </div>
           )}
         </div>
 
-        {/* Invoices Table */}
-        <div className="overflow-x-auto border-t border-slate-700">
+        {/* Table */}
+        <div className="overflow-x-auto rounded-lg border border-slate-700">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-900/50">
@@ -588,40 +600,20 @@ export default function InvoicesPage() {
                       <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{formatDate(inv.due_date)}</td>
                       <td className="px-4 py-3 text-slate-100">{inv.client || '—'}</td>
                       <td className="px-4 py-3 text-slate-400 text-xs">{inv.project || '—'}</td>
-                      <td className="px-4 py-3 text-right text-slate-100 font-medium whitespace-nowrap">
-                        {formatCurrency(inv.amount)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-emerald-500 whitespace-nowrap">
-                        {formatCurrency(inv.amount_paid || 0)}
-                      </td>
-                      <td className={`px-4 py-3 text-right font-medium whitespace-nowrap ${
-                        inv.balance_due > 0 ? 'text-amber-500' : 'text-slate-400'
-                      }`}>
-                        {formatCurrency(inv.balance_due)}
-                      </td>
+                      <td className="px-4 py-3 text-right text-slate-100 font-medium whitespace-nowrap">{formatCurrency(inv.amount)}</td>
+                      <td className="px-4 py-3 text-right text-emerald-500 whitespace-nowrap">{formatCurrency(inv.amount_paid || 0)}</td>
+                      <td className={`px-4 py-3 text-right font-medium whitespace-nowrap ${inv.balance_due > 0 ? 'text-amber-500' : 'text-slate-400'}`}>{formatCurrency(inv.balance_due)}</td>
                       <td className="px-4 py-3 text-center">
                         <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${status.bg} ${status.color}`}>
                           {status.label}
-                          {(inv.days_overdue || 0) > 0 && inv.balance_due > 0 && (
-                            <span className="ml-1">({inv.days_overdue}d)</span>
-                          )}
+                          {(inv.days_overdue || 0) > 0 && inv.balance_due > 0 && <span className="ml-1">({inv.days_overdue}d)</span>}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         {inv.balance_due > 0 && (
                           <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => setPaymentModal({ invoice: inv, amount: '' })}
-                              className="px-2 py-1 text-xs rounded bg-blue-500/20 text-blue-500 hover:bg-blue-500/30"
-                            >
-                              + Payment
-                            </button>
-                            <button
-                              onClick={() => markAsPaid(inv)}
-                              className="px-2 py-1 text-xs rounded bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30"
-                            >
-                              Paid
-                            </button>
+                            <button onClick={() => setPaymentModal({ invoice: inv, amount: '' })} className="px-2 py-1 text-xs rounded bg-blue-500/20 text-blue-500 hover:bg-blue-500/30">+ Payment</button>
+                            <button onClick={() => markAsPaid(inv)} className="px-2 py-1 text-xs rounded bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30">Paid</button>
                           </div>
                         )}
                       </td>
@@ -629,11 +621,7 @@ export default function InvoicesPage() {
                   )
                 })
               ) : (
-                <tr>
-                  <td colSpan={10} className="px-4 py-12 text-center text-slate-400">
-                    No invoices found
-                  </td>
-                </tr>
+                <tr><td colSpan={10} className="px-4 py-12 text-center text-slate-400">No invoices found</td></tr>
               )}
             </tbody>
           </table>
@@ -641,75 +629,39 @@ export default function InvoicesPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-700">
-            <p className="text-sm text-slate-400">
-              Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredInvoices.length)} of {filteredInvoices.length}
-            </p>
+          <div className="flex items-center justify-between pt-3">
+            <p className="text-sm text-slate-400">Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredInvoices.length)} of {filteredInvoices.length}</p>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <span className="text-sm text-slate-300">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronRight size={18} />
-              </button>
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"><ChevronLeft size={18} /></button>
+              <span className="text-sm text-slate-300">Page {currentPage} of {totalPages}</span>
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"><ChevronRight size={18} /></button>
             </div>
           </div>
         )}
-      </div>
+      </CollapsibleSection>
 
       {/* Payment Modal */}
       {paymentModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold text-slate-100 mb-4">Record Payment</h3>
-            
             <div className="space-y-4">
               <div>
                 <p className="text-sm text-slate-400">Invoice</p>
                 <p className="text-slate-100 font-medium">{paymentModal.invoice.invoice_number}</p>
               </div>
-              
               <div>
                 <p className="text-sm text-slate-400">Balance Due</p>
                 <p className="text-amber-500 font-medium">{formatCurrency(paymentModal.invoice.balance_due)}</p>
               </div>
-              
               <div>
                 <label className="block text-sm text-slate-400 mb-1.5">Payment Amount</label>
-                <input
-                  type="number"
-                  value={paymentModal.amount}
-                  onChange={(e) => setPaymentModal(prev => prev ? { ...prev, amount: e.target.value } : null)}
-                  placeholder="0.00"
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                />
+                <input type="number" value={paymentModal.amount} onChange={(e) => setPaymentModal(prev => prev ? { ...prev, amount: e.target.value } : null)} placeholder="0.00" className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
               </div>
             </div>
-
             <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setPaymentModal(null)}
-                className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={recordPayment}
-                className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-medium transition-colors"
-              >
-                Record Payment
-              </button>
+              <button onClick={() => setPaymentModal(null)} className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+              <button onClick={recordPayment} className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-medium transition-colors">Record Payment</button>
             </div>
           </div>
         </div>
