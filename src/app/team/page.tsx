@@ -267,7 +267,7 @@ export default function TeamPage() {
 
         // Transform assignments (look up project names from projData)
         const transformedAssignments = (assignData || []).map((a: any) => {
-          const project = (projData || []).find((p: any) => p.id === a.project_id)
+          const project = (projData || []).find((p: any) => p.id === a.project_id) as any
           return {
             id: a.id,
             team_member_id: a.team_member_id,
