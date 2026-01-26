@@ -96,23 +96,6 @@ export default function TimesheetPage() {
     })
   }
 
-  // Helper function to fetch a single project
-  const fetchSingleProject = async (projectId: string) => {
-    console.log(`Fetching single project: ${projectId}`)
-    const { data, error } = await supabase
-      .from('projects')
-      .select('id, name, client, status')
-      .eq('id', projectId)
-      .single()
-    
-    if (error) {
-      console.error(`Error fetching project ${projectId}:`, error)
-      return null
-    }
-    console.log(`Fetched project ${projectId}:`, data)
-    return data
-  }
-
   const lookupMember = async () => {
     if (!email.trim()) {
       setError('Please enter your email address')
@@ -169,50 +152,57 @@ export default function TimesheetPage() {
       const projectIds = assignData.map((a: any) => a.project_id).filter(Boolean)
       console.log('Project IDs to fetch:', projectIds)
 
-      if (projectIds.length === 0) {
-        setError('No valid project assignments found.')
+      // Step 4: Fetch projects (using correct columns: id, name, client_id, status)
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, name, client_id, status')
+        .in('id', projectIds)
+
+      console.log('Projects fetch result:', projectsData, projectsError)
+
+      if (projectsError) {
+        console.error('Projects error:', projectsError)
+        setError('Error loading projects. Please try again.')
         setLoading(false)
         return
       }
 
-      // Step 4: Try to fetch projects with .in() first
-      console.log('Attempting bulk fetch with .in()...')
-      let projectsData: any[] = []
-      
-      const { data: bulkData, error: bulkError } = await supabase
-        .from('projects')
-        .select('id, name, client, status')
-        .in('id', projectIds)
+      // Step 5: Get client IDs and fetch client names
+      const clientIds = [...new Set((projectsData || []).map((p: any) => p.client_id).filter(Boolean))]
+      console.log('Client IDs to fetch:', clientIds)
 
-      console.log('Bulk projects fetch result:', bulkData, bulkError)
+      let clientsMap: Record<string, string> = {}
+      if (clientIds.length > 0) {
+        const { data: clientsData, error: clientsError } = await supabase
+          .from('clients')
+          .select('id, name')
+          .in('id', clientIds)
 
-      if (bulkError) {
-        console.warn('Bulk fetch failed, trying individual fetches...')
-        // Fallback: Fetch each project individually
-        const fetchPromises = projectIds.map(fetchSingleProject)
-        const results = await Promise.all(fetchPromises)
-        projectsData = results.filter(Boolean)
-        console.log('Individual fetch results:', projectsData)
-      } else {
-        projectsData = bulkData || []
+        console.log('Clients fetch result:', clientsData, clientsError)
+
+        if (clientsData) {
+          clientsData.forEach((c: any) => {
+            clientsMap[c.id] = c.name
+          })
+        }
       }
 
-      // Step 5: Combine assignments with project data
+      // Step 6: Combine assignments with project and client data
       const combinedAssignments: Assignment[] = assignData.map((a: any) => {
-        const project = projectsData.find((p: any) => p?.id === a.project_id)
-        console.log(`Matching project for ${a.project_id}:`, project)
+        const project = (projectsData || []).find((p: any) => p?.id === a.project_id)
+        const clientName = project?.client_id ? clientsMap[project.client_id] : 'Other'
         return {
           id: a.id,
           project_id: a.project_id,
           project_name: project?.name || 'Unknown Project',
-          client_name: project?.client || 'Other',
+          client_name: clientName || 'Other',
           service: a.service,
           payment_type: a.payment_type,
           rate: a.rate || 0
         }
-      }).filter((a: any) => {
+      }).filter((a: Assignment) => {
         // Only include active projects or if status is unknown
-        const project = projectsData.find((p: any) => p?.id === a.project_id)
+        const project = (projectsData || []).find((p: any) => p?.id === a.project_id)
         return !project?.status || project.status === 'active'
       })
 
@@ -320,11 +310,9 @@ export default function TimesheetPage() {
         {!member ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center gap-4 mb-4">
-              <img 
-                src="/api/placeholder/48/48" 
-                alt="User" 
-                className="w-12 h-12 rounded-full bg-gray-200"
-              />
+              <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+                <span className="text-gray-500 text-lg">?</span>
+              </div>
               <div className="flex-1">
                 <input
                   type="email"
@@ -332,7 +320,7 @@ export default function TimesheetPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && lookupMember()}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900 placeholder-gray-400"
                 />
               </div>
             </div>
@@ -449,7 +437,7 @@ export default function TimesheetPage() {
                                 placeholder="0"
                                 value={entries[assignment.project_id]?.hours || ''}
                                 onChange={(e) => updateEntry(assignment.project_id, 'hours', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900"
                               />
                             </div>
                             <div>
@@ -459,7 +447,7 @@ export default function TimesheetPage() {
                                 placeholder="Brief description..."
                                 value={entries[assignment.project_id]?.notes || ''}
                                 onChange={(e) => updateEntry(assignment.project_id, 'notes', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900 placeholder-gray-400"
                               />
                             </div>
                           </div>
