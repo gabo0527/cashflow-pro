@@ -716,7 +716,7 @@ export default function TimeTrackingPage() {
                     <td className="px-4 py-3 text-right text-blue-500 font-medium">{entry.hours}</td>
                     <td className="px-4 py-3 text-right text-slate-400">{formatCurrency(entry.bill_rate)}</td>
                     <td className="px-4 py-3 text-right text-emerald-500 font-medium">{formatCurrency(entry.hours * entry.bill_rate)}</td>
-                    <td className="px-4 py-3 text-slate-400 text-xs max-w-[150px] truncate" title={entry.notes}>{entry.notes || '—'}</td>
+                    <td className="px-4 py-3 text-slate-400 text-xs max-w-[150px] truncate" title={entry.notes || ''}>{entry.notes || '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
                         <button onClick={() => openEditEntry(entry)} className="p-1.5 rounded bg-slate-700 text-slate-300 hover:bg-slate-600" title="Edit">
