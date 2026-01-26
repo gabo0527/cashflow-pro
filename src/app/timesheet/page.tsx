@@ -9,7 +9,7 @@ import { createClient } from '@supabase/supabase-js'
 
 // Hardcoded for public timesheet page (anon key is safe to expose)
 const supabaseUrl = 'https://jmahfgpbtjeomuepfozf.supabase.co'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptYWhmZ3BidGplb211ZXBmb3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0OTAxNzcsImV4cCI6MjA4MTA2NjE3N30.3SVDvWCGIYYHV57BpKjpDJVCZLKzuRv8B_VietQDxUQ'
+const supabaseAnonKey = 'PASTE_YOUR_ANON_KEY_HERE'
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Types
@@ -141,10 +141,14 @@ export default function TimesheetPage() {
 
       // Fetch project details separately
       const projectIds = (assignData || []).map((a: any) => a.project_id)
-      const { data: projectsData } = await supabase
+      console.log('Fetching projects for IDs:', projectIds)
+      
+      const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
         .select('id, name, client, status')
         .in('id', projectIds)
+
+      console.log('Projects fetched:', projectsData, 'Error:', projectsError)
 
       // Filter to active projects only and combine data
       const activeAssignments = (assignData || [])
