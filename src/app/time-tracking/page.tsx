@@ -214,7 +214,9 @@ export default function TimeTrackingPage() {
         
         const clientMap: Record<string, string> = {}
         ;(clientData || []).forEach((c: any) => { clientMap[c.id] = c.name })
-
+        // Build team member lookup
+const teamMemberMap: Record<string, any> = {}
+;(teamData || []).forEach((t: any) => { teamMemberMap[t.id] = t })
         // Transform entries
         const transformedEntries = (entriesData || []).map((e: any) => {
           const project = projectMap[e.project_id]
@@ -224,8 +226,8 @@ export default function TimeTrackingPage() {
             date: e.date,
             hours: e.hours || 0,
             team_member_id: e.contractor_id || e.user_id || '',
-            team_member_name: 'Team Member', // We don't have team_member linked
-            team_member_email: '',
+            team_member_name: teamMemberMap[e.contractor_id]?.name || 'Unknown',
+            team_member_email: teamMemberMap[e.contractor_id]?.email || '',
             project_id: e.project_id,
             project_name: project?.name || 'Unknown',
             client_name: clientName,
