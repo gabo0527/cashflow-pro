@@ -6,7 +6,13 @@ import {
   Clock, Plus, Edit2, X, Check, Trash2, Calendar, Users, DollarSign, BarChart3
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { supabase, getCurrentUser, fetchProjects, fetchClients } from '@/lib/supabase'
+import { getCurrentUser, fetchProjects, fetchClients } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  'https://jmahfgpbtjeomuepfozf.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptYWhmZ3BidGplb211ZXBmb3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0OTAxNzcsImV4cCI6MjA4MTA2NjE3N30.3SVDvWCGIYYHV57BpKjpDJVCZLKzuRv8B_VietQDxUQ'
+)
 
 // Types
 interface TimeEntry {
