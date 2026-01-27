@@ -195,31 +195,38 @@ export default function TimeTrackingPage() {
           .select('*')
           .eq('company_id', profile.company_id)
 
-        // Fetch time entries with joins
+        // Fetch time entries (no joins - fetch related data separately)
         const { data: entriesData } = await supabase
           .from('time_entries')
-          .select(`
-            *,
-            team_members (id, name, email),
-            projects (id, name, client, bill_rate)
-          `)
+          .select('*')
           .eq('company_id', profile.company_id)
           .order('date', { ascending: false })
 
+        // Build lookup maps for projects and clients
+        const projectMap: Record<string, any> = {}
+        ;(projData || []).forEach((p: any) => { projectMap[p.id] = p })
+        
+        const clientMap: Record<string, string> = {}
+        ;(clientData || []).forEach((c: any) => { clientMap[c.id] = c.name })
+
         // Transform entries
-        const transformedEntries = (entriesData || []).map((e: any) => ({
-          id: e.id,
-          date: e.date,
-          hours: e.hours || 0,
-          team_member_id: e.team_member_id,
-          team_member_name: e.team_members?.name || 'Unknown',
-          team_member_email: e.team_members?.email || '',
-          project_id: e.project_id,
-          project_name: e.projects?.name || 'Unknown',
-          client_name: e.projects?.client || '',
-          bill_rate: e.bill_rate || e.projects?.bill_rate || 0,
-          notes: e.notes || null,
-        }))
+        const transformedEntries = (entriesData || []).map((e: any) => {
+          const project = projectMap[e.project_id]
+          const clientName = project?.client_id ? clientMap[project.client_id] : ''
+          return {
+            id: e.id,
+            date: e.date,
+            hours: e.hours || 0,
+            team_member_id: e.contractor_id || e.user_id || '',
+            team_member_name: 'Team Member', // We don't have team_member linked
+            team_member_email: '',
+            project_id: e.project_id,
+            project_name: project?.name || 'Unknown',
+            client_name: clientName,
+            bill_rate: e.bill_rate || 0,
+            notes: e.description || null,
+          }
+        })
 
         setTeamMembers((teamData || []).map((t: any) => ({
           id: t.id,
