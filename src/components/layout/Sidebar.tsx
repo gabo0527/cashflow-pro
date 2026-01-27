@@ -47,7 +47,7 @@ const navItems: NavItem[] = [
   { label: 'Team', href: '/team', icon: <UserCog size={20} /> },
   { label: 'Reports', href: '/reports', icon: <BarChart3 size={20} />, section: 'Analysis' },
   { label: 'Forecast', href: '/forecast', icon: <Calculator size={20} /> },
-  { label: 'AI Assistant', href: '/ai', icon: <MessageSquare size={20} />, section: 'Intelligence' },
+  { label: 'AI Assistant', href: '/ai-assistant', icon: <MessageSquare size={20} />, section: 'Intelligence' },
   { label: 'Settings', href: '/settings', icon: <Settings size={20} />, section: 'System' },
 ]
 
