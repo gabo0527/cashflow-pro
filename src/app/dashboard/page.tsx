@@ -307,6 +307,12 @@ export default function DashboardPage() {
   const [teamMembers, setTeamMembers] = useState<any[]>([])
   const [companySettings, setCompanySettings] = useState<any>(null)
   const [period, setPeriod] = useState<'week' | 'month' | 'quarter' | 'ytd'>('month')
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
+
+  // Available years for filter
+  const availableYears = [2026, 2025, 2024, 2023]
+  const currentYear = new Date().getFullYear()
+  const isCurrentYear = selectedYear === currentYear
 
   useEffect(() => {
     const loadData = async () => {
@@ -348,35 +354,68 @@ export default function DashboardPage() {
   // ============ PERIOD DATE RANGE ============
   const periodRange = useMemo(() => {
     const now = new Date()
-    const endDate = now
+    let endDate: Date
     let startDate: Date
     let weeksInPeriod: number
     
+    // For past years, use Dec 31 as end date; for current year, use today
+    if (selectedYear < currentYear) {
+      endDate = new Date(selectedYear, 11, 31, 23, 59, 59)
+    } else {
+      endDate = now
+    }
+    
     switch (period) {
       case 'week':
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7)
-        weeksInPeriod = 1
+        // For past years, show last week of that year; for current year, last 7 days
+        if (selectedYear < currentYear) {
+          startDate = new Date(selectedYear, 11, 24) // Dec 24-31
+          weeksInPeriod = 1
+        } else {
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7)
+          weeksInPeriod = 1
+        }
         break
       case 'month':
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1)
-        weeksInPeriod = 4
+        // For past years, show December; for current year, current month
+        if (selectedYear < currentYear) {
+          startDate = new Date(selectedYear, 11, 1) // December
+          endDate = new Date(selectedYear, 11, 31, 23, 59, 59)
+          weeksInPeriod = 4
+        } else {
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+          weeksInPeriod = 4
+        }
         break
       case 'quarter':
-        const quarterStart = Math.floor(now.getMonth() / 3) * 3
-        startDate = new Date(now.getFullYear(), quarterStart, 1)
-        weeksInPeriod = 13
+        // For past years, show Q4; for current year, current quarter
+        if (selectedYear < currentYear) {
+          startDate = new Date(selectedYear, 9, 1) // Q4 = Oct 1
+          endDate = new Date(selectedYear, 11, 31, 23, 59, 59)
+          weeksInPeriod = 13
+        } else {
+          const quarterStart = Math.floor(now.getMonth() / 3) * 3
+          startDate = new Date(now.getFullYear(), quarterStart, 1)
+          weeksInPeriod = 13
+        }
         break
       case 'ytd':
-        startDate = new Date(now.getFullYear(), 0, 1)
-        weeksInPeriod = Math.ceil((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000))
+        // For past years, show full year; for current year, Jan 1 to today
+        startDate = new Date(selectedYear, 0, 1)
+        if (selectedYear < currentYear) {
+          endDate = new Date(selectedYear, 11, 31, 23, 59, 59)
+          weeksInPeriod = 52
+        } else {
+          weeksInPeriod = Math.ceil((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000))
+        }
         break
       default:
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+        startDate = new Date(selectedYear, 0, 1)
         weeksInPeriod = 4
     }
     
     return { startDate, endDate, weeksInPeriod }
-  }, [period])
+  }, [period, selectedYear, currentYear])
 
   // ============ FILTERED DATA BY PERIOD ============
   const filteredTransactions = useMemo(() => {
@@ -577,11 +616,26 @@ export default function DashboardPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          {/* Year Dropdown */}
+          <div className="relative">
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="appearance-none bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 pr-8 text-xs font-medium text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer"
+            >
+              {availableYears.map((year) => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+          
+          {/* Period Buttons */}
           <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700">
             {(['week', 'month', 'quarter', 'ytd'] as const).map((p) => (
               <button key={p} onClick={() => setPeriod(p)} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${period === p ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-slate-200'}`}>
-                {p === 'ytd' ? 'YTD' : p.charAt(0).toUpperCase() + p.slice(1)}
+                {p === 'ytd' ? (isCurrentYear ? 'YTD' : 'Year') : p.charAt(0).toUpperCase() + p.slice(1)}
               </button>
             ))}
           </div>
