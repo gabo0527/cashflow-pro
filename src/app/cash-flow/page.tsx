@@ -2,644 +2,1059 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { 
-  Search, Filter, Download, ChevronDown, ChevronLeft, ChevronRight,
-  TrendingUp, TrendingDown, DollarSign, Calendar, X, Check, Edit2
+  TrendingUp, TrendingDown, DollarSign, CreditCard, Building2, Wallet,
+  Plus, ChevronDown, ChevronRight, Filter, Download, Upload, Search,
+  ArrowUpRight, ArrowDownRight, Receipt, Users, Briefcase, RefreshCw,
+  MoreHorizontal, Edit2, Trash2, Check, X, AlertCircle, Calendar,
+  PieChart, BarChart3, ArrowRight, CircleDollarSign, Landmark, FileText
 } from 'lucide-react'
-import { supabase, getCurrentUser, fetchTransactions, fetchProjects, fetchClients } from '@/lib/supabase'
+import Link from 'next/link'
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart as RePieChart, Pie, Cell, ComposedChart, Line, Area, AreaChart
+} from 'recharts'
+import { createClient } from '@supabase/supabase-js'
+import { getCurrentUser } from '@/lib/supabase'
 
-// Types
-interface Transaction {
-  id: string
-  date: string
-  description: string
-  amount: number
-  category: string
-  sub_category?: string
-  project?: string
-  client?: string
-}
+const supabase = createClient(
+  'https://jmahfgpbtjeomuepfozf.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptYWhmZ3BidGplb211ZXBmb3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0OTAxNzcsImV4cCI6MjA4MTA2NjE3N30.3SVDvWCGIYYHV57BpKjpDJVCZLKzuRv8B_VietQDxUQ'
+)
 
-interface Project {
-  id: string
-  name: string
-  client_id?: string
-}
-
-interface Client {
-  id: string
-  name: string
-}
-
-// Category configuration
-const CATEGORIES = [
-  { id: 'revenue', label: 'Revenue', color: 'emerald' },
-  { id: 'opex', label: 'OpEx / Direct Cost', color: 'rose' },
-  { id: 'overhead', label: 'Overhead', color: 'amber' },
-  { id: 'investment', label: 'Investment / CapEx', color: 'blue' },
-]
-
-const SUB_CATEGORIES: Record<string, string[]> = {
-  revenue: ['Retainer', 'Project Fee', 'Reimbursement', 'Consulting', 'Other Revenue'],
-  opex: ['Labor', 'Software', 'Materials', 'Contractors', 'Travel', 'Other Direct'],
-  overhead: ['Rent', 'Insurance', 'Utilities', 'Office Supplies', 'Subscriptions', 'Other Overhead'],
-  investment: ['Equipment', 'Software License', 'Training', 'Other CapEx'],
-}
-
-const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(value)
-}
-
-const formatMonth = (dateStr: string): string => {
-  if (!dateStr) return ''
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-}
-
-const getCategoryColor = (category: string, type: 'bg' | 'text' = 'text'): string => {
-  const colors: Record<string, Record<string, string>> = {
-    revenue: { bg: 'bg-emerald-500/20', text: 'text-emerald-500' },
-    opex: { bg: 'bg-rose-500/20', text: 'text-rose-500' },
-    overhead: { bg: 'bg-amber-500/20', text: 'text-amber-500' },
-    investment: { bg: 'bg-blue-500/20', text: 'text-blue-500' },
+// ============ DESIGN SYSTEM ============
+const COLORS = {
+  emerald: '#10b981',
+  emeraldLight: '#34d399',
+  blue: '#3b82f6',
+  blueLight: '#60a5fa',
+  rose: '#f43f5e',
+  roseLight: '#fb7185',
+  amber: '#f59e0b',
+  amberLight: '#fbbf24',
+  purple: '#8b5cf6',
+  cyan: '#06b6d4',
+  slate: {
+    50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1',
+    400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155',
+    800: '#1e293b', 900: '#0f172a'
   }
-  return colors[category]?.[type] || (type === 'bg' ? 'bg-slate-500/20' : 'text-slate-500')
 }
 
+// ============ CATEGORY DEFINITIONS ============
+const CATEGORIES = {
+  revenue: {
+    label: 'Revenue',
+    color: COLORS.emerald,
+    subcategories: ['Client Revenue', 'Reimbursements', 'Other Income']
+  },
+  directCosts: {
+    label: 'Direct Costs',
+    color: COLORS.rose,
+    subcategories: ['Contractor Labor', 'Materials', 'Subcontractors', 'Project Expenses']
+  },
+  overhead: {
+    label: 'Overhead',
+    color: COLORS.amber,
+    subcategories: ['Payroll', 'Software & Subscriptions', 'Rent & Utilities', 'Insurance', 'Professional Services', 'Travel & Entertainment', 'Office & Supplies', 'Marketing', 'Other Overhead']
+  },
+  nonOperating: {
+    label: 'Non-Operating',
+    color: COLORS.slate[500],
+    subcategories: ['Transfers', 'Owner Draw', 'Taxes', 'Loan Payments']
+  }
+}
+
+// ============ UTILITY FUNCTIONS ============
+const formatCurrency = (value: number, compact = false): string => {
+  if (compact && Math.abs(value) >= 1000000) {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 }).format(value)
+  }
+  if (compact && Math.abs(value) >= 10000) {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 0 }).format(value)
+  }
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value)
+}
+
+const formatDate = (dateStr: string): string => {
+  if (!dateStr) return '—'
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+const formatDateFull = (dateStr: string): string => {
+  if (!dateStr) return '—'
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+// ============ COMPONENTS ============
+
+// Metric Card
+function MetricCard({ 
+  label, 
+  value, 
+  subtitle, 
+  icon: Icon, 
+  trend,
+  color = 'emerald',
+  size = 'default'
+}: { 
+  label: string
+  value: string
+  subtitle?: string
+  icon: any
+  trend?: { value: number; label: string }
+  color?: 'emerald' | 'blue' | 'rose' | 'amber' | 'purple' | 'slate'
+  size?: 'default' | 'large'
+}) {
+  const colorMap = {
+    emerald: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400', icon: 'text-emerald-500' },
+    blue: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-400', icon: 'text-blue-500' },
+    rose: { bg: 'bg-rose-500/10', border: 'border-rose-500/20', text: 'text-rose-400', icon: 'text-rose-500' },
+    amber: { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-400', icon: 'text-amber-500' },
+    purple: { bg: 'bg-purple-500/10', border: 'border-purple-500/20', text: 'text-purple-400', icon: 'text-purple-500' },
+    slate: { bg: 'bg-slate-500/10', border: 'border-slate-500/20', text: 'text-slate-400', icon: 'text-slate-500' }
+  }
+  const c = colorMap[color]
+  const isLarge = size === 'large'
+
+  return (
+    <div className={`${c.bg} ${c.border} border rounded-xl ${isLarge ? 'p-6' : 'p-5'}`}>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm font-medium text-slate-400">{label}</p>
+          <p className={`${isLarge ? 'text-3xl' : 'text-2xl'} font-bold ${c.text} mt-1`}>{value}</p>
+          {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
+          {trend && (
+            <div className="flex items-center gap-1 mt-2">
+              {trend.value >= 0 ? <ArrowUpRight size={14} className="text-emerald-500" /> : <ArrowDownRight size={14} className="text-rose-500" />}
+              <span className={`text-xs font-medium ${trend.value >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{Math.abs(trend.value).toFixed(1)}%</span>
+              <span className="text-xs text-slate-500">{trend.label}</span>
+            </div>
+          )}
+        </div>
+        <div className={`${c.bg} p-2.5 rounded-lg`}>
+          <Icon size={20} className={c.icon} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Account Card
+function AccountCard({ 
+  name, 
+  type, 
+  balance, 
+  lastSync,
+  isConnected = false
+}: { 
+  name: string
+  type: 'bank' | 'credit_card'
+  balance: number
+  lastSync?: string
+  isConnected?: boolean
+}) {
+  return (
+    <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 hover:border-slate-600/50 transition-colors">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-lg ${type === 'bank' ? 'bg-blue-500/10' : 'bg-purple-500/10'}`}>
+            {type === 'bank' ? <Landmark size={18} className="text-blue-500" /> : <CreditCard size={18} className="text-purple-500" />}
+          </div>
+          <div>
+            <p className="text-sm font-medium text-slate-200">{name}</p>
+            <p className="text-xs text-slate-500">{type === 'bank' ? 'Bank Account' : 'Credit Card'}</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className={`text-lg font-semibold ${balance >= 0 ? 'text-slate-100' : 'text-rose-400'}`}>
+            {formatCurrency(balance)}
+          </p>
+          {isConnected && lastSync && (
+            <p className="text-xs text-slate-500">Synced {lastSync}</p>
+          )}
+          {!isConnected && (
+            <span className="text-xs text-amber-500">Manual</span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// P&L Waterfall Bar
+function WaterfallBar({ 
+  label, 
+  value, 
+  maxValue, 
+  color, 
+  isSubtotal = false,
+  showPercent,
+  percentValue
+}: { 
+  label: string
+  value: number
+  maxValue: number
+  color: string
+  isSubtotal?: boolean
+  showPercent?: boolean
+  percentValue?: number
+}) {
+  const width = Math.min(Math.abs(value) / maxValue * 100, 100)
+  
+  return (
+    <div className={`flex items-center gap-4 ${isSubtotal ? 'py-3 border-t border-slate-700/50 mt-2' : 'py-2'}`}>
+      <div className="w-32 shrink-0">
+        <p className={`text-sm ${isSubtotal ? 'font-semibold text-slate-200' : 'text-slate-400'}`}>{label}</p>
+      </div>
+      <div className="flex-1 h-6 bg-slate-700/30 rounded-full overflow-hidden">
+        <div 
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${width}%`, backgroundColor: color }}
+        />
+      </div>
+      <div className="w-28 text-right shrink-0">
+        <p className={`text-sm font-semibold ${isSubtotal ? 'text-slate-100' : 'text-slate-300'}`}>
+          {value < 0 ? '-' : ''}{formatCurrency(Math.abs(value))}
+        </p>
+      </div>
+      {showPercent && (
+        <div className="w-16 text-right shrink-0">
+          <p className={`text-sm font-medium ${(percentValue || 0) >= 30 ? 'text-emerald-400' : (percentValue || 0) >= 15 ? 'text-amber-400' : 'text-rose-400'}`}>
+            {percentValue?.toFixed(1)}%
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Transaction Row
+function TransactionRow({ 
+  transaction, 
+  onEdit, 
+  onDelete 
+}: { 
+  transaction: any
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  const isInflow = transaction.amount > 0
+  const categoryColor = transaction.category === 'revenue' ? COLORS.emerald 
+    : transaction.category === 'directCosts' ? COLORS.rose
+    : transaction.category === 'overhead' ? COLORS.amber
+    : COLORS.slate[500]
+
+  return (
+    <div className="flex items-center gap-4 py-3 px-4 hover:bg-slate-800/30 transition-colors border-b border-slate-700/30 last:border-0">
+      <div className="w-20 shrink-0">
+        <p className="text-sm text-slate-400">{formatDate(transaction.date)}</p>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-slate-200 truncate">{transaction.description}</p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: `${categoryColor}20`, color: categoryColor }}>
+            {transaction.subcategory || CATEGORIES[transaction.category as keyof typeof CATEGORIES]?.label}
+          </span>
+          {transaction.project && (
+            <span className="text-xs text-slate-500">• {transaction.project}</span>
+          )}
+          {transaction.vendor && (
+            <span className="text-xs text-slate-500">• {transaction.vendor}</span>
+          )}
+        </div>
+      </div>
+      <div className="w-24 text-right shrink-0">
+        <p className={`text-sm font-semibold ${isInflow ? 'text-emerald-400' : 'text-rose-400'}`}>
+          {isInflow ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount))}
+        </p>
+      </div>
+      <div className="w-24 text-right shrink-0">
+        <p className="text-xs text-slate-500">{transaction.account}</p>
+      </div>
+      <div className="w-8 shrink-0">
+        <button className="p-1 hover:bg-slate-700 rounded transition-colors">
+          <MoreHorizontal size={16} className="text-slate-500" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Custom Tooltip
+const CustomTooltip = ({ active, payload, label, formatter }: any) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 shadow-xl">
+      <p className="text-xs text-slate-400 mb-1">{label}</p>
+      {payload.map((entry: any, index: number) => (
+        <p key={index} className="text-sm font-medium" style={{ color: entry.color }}>
+          {entry.name}: {formatter ? formatter(entry.value) : entry.value}
+        </p>
+      ))}
+    </div>
+  )
+}
+
+// Section Header
+function SectionHeader({ 
+  title, 
+  subtitle,
+  action 
+}: { 
+  title: string
+  subtitle?: string
+  action?: React.ReactNode
+}) {
+  return (
+    <div className="flex items-center justify-between mb-4">
+      <div>
+        <h2 className="text-lg font-semibold text-slate-100">{title}</h2>
+        {subtitle && <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>}
+      </div>
+      {action}
+    </div>
+  )
+}
+
+// Add Transaction Modal
+function AddTransactionModal({ 
+  isOpen, 
+  onClose, 
+  accounts,
+  onSave 
+}: { 
+  isOpen: boolean
+  onClose: () => void
+  accounts: any[]
+  onSave: (transaction: any) => void
+}) {
+  const [type, setType] = useState<'inflow' | 'outflow'>('outflow')
+  const [category, setCategory] = useState('directCosts')
+  const [subcategory, setSubcategory] = useState('')
+  const [amount, setAmount] = useState('')
+  const [description, setDescription] = useState('')
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [accountId, setAccountId] = useState('')
+  const [vendor, setVendor] = useState('')
+  const [project, setProject] = useState('')
+
+  if (!isOpen) return null
+
+  const handleSave = () => {
+    onSave({
+      type,
+      category: type === 'inflow' ? 'revenue' : category,
+      subcategory,
+      amount: type === 'inflow' ? Math.abs(parseFloat(amount)) : -Math.abs(parseFloat(amount)),
+      description,
+      date,
+      account_id: accountId,
+      vendor,
+      project
+    })
+    onClose()
+  }
+
+  const currentSubcategories = type === 'inflow' 
+    ? CATEGORIES.revenue.subcategories 
+    : CATEGORIES[category as keyof typeof CATEGORIES]?.subcategories || []
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg mx-4 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+          <h3 className="text-lg font-semibold text-slate-100">Add Transaction</h3>
+          <button onClick={onClose} className="p-1 hover:bg-slate-700 rounded-lg transition-colors">
+            <X size={20} className="text-slate-400" />
+          </button>
+        </div>
+        
+        <div className="p-6 space-y-4">
+          {/* Type Toggle */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setType('inflow')}
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${
+                type === 'inflow' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-700/50 text-slate-400 border border-transparent'
+              }`}
+            >
+              <ArrowDownRight size={16} className="inline mr-2" />
+              Cash In
+            </button>
+            <button
+              onClick={() => setType('outflow')}
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${
+                type === 'outflow' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-slate-700/50 text-slate-400 border border-transparent'
+              }`}
+            >
+              <ArrowUpRight size={16} className="inline mr-2" />
+              Cash Out
+            </button>
+          </div>
+
+          {/* Category (for outflows) */}
+          {type === 'outflow' && (
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1.5">Category</label>
+              <select
+                value={category}
+                onChange={(e) => { setCategory(e.target.value); setSubcategory(''); }}
+                className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+              >
+                <option value="directCosts">Direct Costs (affects GM)</option>
+                <option value="overhead">Overhead</option>
+                <option value="nonOperating">Non-Operating</option>
+              </select>
+            </div>
+          )}
+
+          {/* Subcategory */}
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1.5">Subcategory</label>
+            <select
+              value={subcategory}
+              onChange={(e) => setSubcategory(e.target.value)}
+              className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+            >
+              <option value="">Select...</option>
+              {currentSubcategories.map(sub => (
+                <option key={sub} value={sub}>{sub}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Amount & Date Row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1.5">Amount</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full bg-slate-700/50 border border-slate-600 rounded-lg pl-7 pr-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1.5">Date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1.5">Description</label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g., Travis Swank - January Invoice"
+              className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+
+          {/* Account */}
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1.5">Account</label>
+            <select
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+              className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+            >
+              <option value="">Select account...</option>
+              {accounts.map(acc => (
+                <option key={acc.id} value={acc.id}>{acc.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Vendor (for outflows) */}
+          {type === 'outflow' && category === 'directCosts' && (
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1.5">Contractor/Vendor</label>
+              <input
+                type="text"
+                value={vendor}
+                onChange={(e) => setVendor(e.target.value)}
+                placeholder="e.g., Travis Swank"
+                className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+          )}
+
+          {/* Project */}
+          {(type === 'inflow' || category === 'directCosts') && (
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1.5">Project (optional)</label>
+              <input
+                type="text"
+                value={project}
+                onChange={(e) => setProject(e.target.value)}
+                placeholder="e.g., Clean Arc Data Center"
+                className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-700 bg-slate-800/50">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">
+            Cancel
+          </button>
+          <button 
+            onClick={handleSave}
+            disabled={!amount || !description || !subcategory}
+            className="px-4 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Add Transaction
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Add Account Modal
+function AddAccountModal({ 
+  isOpen, 
+  onClose, 
+  onSave 
+}: { 
+  isOpen: boolean
+  onClose: () => void
+  onSave: (account: any) => void
+}) {
+  const [name, setName] = useState('')
+  const [type, setType] = useState<'bank' | 'credit_card'>('credit_card')
+  const [balance, setBalance] = useState('')
+
+  if (!isOpen) return null
+
+  const handleSave = () => {
+    onSave({
+      name,
+      type,
+      balance: type === 'credit_card' ? -Math.abs(parseFloat(balance) || 0) : parseFloat(balance) || 0,
+      is_connected: false
+    })
+    setName('')
+    setBalance('')
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md mx-4 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+          <h3 className="text-lg font-semibold text-slate-100">Add Account</h3>
+          <button onClick={onClose} className="p-1 hover:bg-slate-700 rounded-lg transition-colors">
+            <X size={20} className="text-slate-400" />
+          </button>
+        </div>
+        
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1.5">Account Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g., Amex - Gabriel"
+              className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1.5">Account Type</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setType('bank')}
+                className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${
+                  type === 'bank' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-slate-700/50 text-slate-400 border border-transparent'
+                }`}
+              >
+                <Landmark size={16} className="inline mr-2" />
+                Bank Account
+              </button>
+              <button
+                onClick={() => setType('credit_card')}
+                className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${
+                  type === 'credit_card' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-slate-700/50 text-slate-400 border border-transparent'
+                }`}
+              >
+                <CreditCard size={16} className="inline mr-2" />
+                Credit Card
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-1.5">
+              {type === 'credit_card' ? 'Current Balance (amount owed)' : 'Current Balance'}
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+              <input
+                type="number"
+                value={balance}
+                onChange={(e) => setBalance(e.target.value)}
+                placeholder="0.00"
+                className="w-full bg-slate-700/50 border border-slate-600 rounded-lg pl-7 pr-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            {type === 'credit_card' && (
+              <p className="text-xs text-slate-500 mt-1">Enter as positive number (we'll track it as debt)</p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-700 bg-slate-800/50">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">
+            Cancel
+          </button>
+          <button 
+            onClick={handleSave}
+            disabled={!name}
+            className="px-4 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Add Account
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============ MAIN PAGE ============
 export default function CashFlowPage() {
-  // Data state
   const [loading, setLoading] = useState(true)
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
-  const [clients, setClients] = useState<Client[]>([])
-  const [companyId, setCompanyId] = useState<string | null>(null)
-
-  // Filter state
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState<number | 'all'>(new Date().getMonth())
+  const [showAddTransaction, setShowAddTransaction] = useState(false)
+  const [showAddAccount, setShowAddAccount] = useState(false)
+  const [filterAccount, setFilterAccount] = useState<string>('all')
+  const [filterCategory, setFilterCategory] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
-    start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0]
-  })
-  const [selectedCategory, setSelectedCategory] = useState<string>('all')
-  const [selectedProject, setSelectedProject] = useState<string>('all')
-  const [selectedClient, setSelectedClient] = useState<string>('all')
-  const [showFilters, setShowFilters] = useState(false)
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize] = useState(25)
+  // Sample data - will be replaced with Supabase data
+  const [accounts, setAccounts] = useState([
+    { id: '1', name: 'Chase Business Checking', type: 'bank', balance: 125430, is_connected: true, last_sync: '2 hours ago' },
+    { id: '2', name: 'Amex Business Platinum', type: 'credit_card', balance: -4200, is_connected: true, last_sync: '2 hours ago' },
+    { id: '3', name: 'Amex - Gabriel (AU)', type: 'credit_card', balance: -1850, is_connected: false },
+    { id: '4', name: 'Amex - Maria (AU)', type: 'credit_card', balance: -920, is_connected: false },
+  ])
 
-  // Edit state
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editValues, setEditValues] = useState<Partial<Transaction>>({})
+  const [transactions, setTransactions] = useState([
+    { id: '1', date: '2024-01-28', description: 'Clean Arc Data Center - Progress Payment', amount: 45000, category: 'revenue', subcategory: 'Client Revenue', account: 'Chase Business Checking', project: 'Clean Arc Data Center' },
+    { id: '2', date: '2024-01-27', description: 'Travis Swank - January Invoice', amount: -8500, category: 'directCosts', subcategory: 'Contractor Labor', account: 'Chase Business Checking', vendor: 'Travis Swank', project: 'Clean Arc Data Center' },
+    { id: '3', date: '2024-01-26', description: 'Miguel Fernandez - Week 4', amount: -3200, category: 'directCosts', subcategory: 'Contractor Labor', account: 'Chase Business Checking', vendor: 'Miguel Fernandez', project: 'TechFlow Migration' },
+    { id: '4', date: '2024-01-25', description: 'Figma - Annual Subscription', amount: -144, category: 'overhead', subcategory: 'Software & Subscriptions', account: 'Amex Business Platinum' },
+    { id: '5', date: '2024-01-25', description: 'AWS Services - January', amount: -892, category: 'overhead', subcategory: 'Software & Subscriptions', account: 'Amex Business Platinum' },
+    { id: '6', date: '2024-01-24', description: 'TechFlow Inc - Milestone 2', amount: 28000, category: 'revenue', subcategory: 'Client Revenue', account: 'Chase Business Checking', project: 'TechFlow Migration' },
+    { id: '7', date: '2024-01-23', description: 'Office Rent - January', amount: -3500, category: 'overhead', subcategory: 'Rent & Utilities', account: 'Chase Business Checking' },
+    { id: '8', date: '2024-01-22', description: 'Client Dinner - Clean Arc Team', amount: -285, category: 'overhead', subcategory: 'Travel & Entertainment', account: 'Amex - Gabriel (AU)' },
+    { id: '9', date: '2024-01-20', description: 'DataSys Corp - Retainer', amount: 12000, category: 'revenue', subcategory: 'Client Revenue', account: 'Chase Business Checking', project: 'DataSys Retainer' },
+    { id: '10', date: '2024-01-18', description: 'Equipment Purchase', amount: -2400, category: 'directCosts', subcategory: 'Materials', account: 'Amex - Maria (AU)', project: 'Clean Arc Data Center' },
+  ])
 
-  // Load data
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const { user } = await getCurrentUser()
-        if (!user) return
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single()
-
-        if (!profile?.company_id) {
-          setLoading(false)
-          return
-        }
-
-        setCompanyId(profile.company_id)
-
-        const [txRes, projRes, clientRes] = await Promise.all([
-          fetchTransactions(profile.company_id),
-          fetchProjects(profile.company_id),
-          fetchClients(profile.company_id)
-        ])
-
-        setTransactions(txRes.data || [])
-        setProjects(projRes.data || [])
-        setClients(clientRes.data || [])
-      } catch (error) {
-        console.error('Error loading data:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    loadData()
+    // Simulate loading
+    setTimeout(() => setLoading(false), 500)
   }, [])
 
-  // Filtered transactions
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter(tx => {
-      // Search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase()
-        const matchesDescription = tx.description?.toLowerCase().includes(query)
-        const matchesAmount = tx.amount?.toString().includes(query)
-        if (!matchesDescription && !matchesAmount) return false
-      }
-
-      // Date filter
-      if (dateRange.start && tx.date < dateRange.start) return false
-      if (dateRange.end && tx.date > dateRange.end) return false
-
-      // Category filter
-      if (selectedCategory !== 'all' && tx.category !== selectedCategory) return false
-
-      // Project filter
-      if (selectedProject !== 'all' && tx.project !== selectedProject) return false
-
-      // Client filter
-      if (selectedClient !== 'all' && tx.client !== selectedClient) return false
-
+  // Calculate P&L metrics
+  const pnlMetrics = useMemo(() => {
+    const filtered = transactions.filter(t => {
+      const txDate = new Date(t.date)
+      if (txDate.getFullYear() !== selectedYear) return false
+      if (selectedMonth !== 'all' && txDate.getMonth() !== selectedMonth) return false
       return true
-    }).sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-  }, [transactions, searchQuery, dateRange, selectedCategory, selectedProject, selectedClient])
-
-  // Summary calculations
-  const summary = useMemo(() => {
-    const totalIn = filteredTransactions
-      .filter(tx => tx.category === 'revenue')
-      .reduce((sum, tx) => sum + (tx.amount || 0), 0)
-    
-    const totalOut = filteredTransactions
-      .filter(tx => ['opex', 'overhead', 'investment'].includes(tx.category || ''))
-      .reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0)
-
-    const opex = filteredTransactions
-      .filter(tx => tx.category === 'opex')
-      .reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0)
-
-    const overhead = filteredTransactions
-      .filter(tx => tx.category === 'overhead')
-      .reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0)
-
-    return {
-      totalIn,
-      totalOut,
-      net: totalIn - totalOut,
-      opex,
-      overhead,
-      count: filteredTransactions.length
-    }
-  }, [filteredTransactions])
-
-  // Pagination
-  const paginatedTransactions = useMemo(() => {
-    const start = (currentPage - 1) * pageSize
-    return filteredTransactions.slice(start, start + pageSize)
-  }, [filteredTransactions, currentPage, pageSize])
-
-  const totalPages = Math.ceil(filteredTransactions.length / pageSize)
-
-  // Edit handlers
-  const startEdit = (tx: Transaction) => {
-    setEditingId(tx.id)
-    setEditValues({
-      category: tx.category,
-      sub_category: tx.sub_category,
-      project: tx.project,
-      client: tx.client
     })
-  }
 
-  const cancelEdit = () => {
-    setEditingId(null)
-    setEditValues({})
-  }
+    const revenue = filtered.filter(t => t.category === 'revenue').reduce((sum, t) => sum + t.amount, 0)
+    const directCosts = Math.abs(filtered.filter(t => t.category === 'directCosts').reduce((sum, t) => sum + t.amount, 0))
+    const overhead = Math.abs(filtered.filter(t => t.category === 'overhead').reduce((sum, t) => sum + t.amount, 0))
+    const grossProfit = revenue - directCosts
+    const grossMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0
+    const netProfit = grossProfit - overhead
+    const netMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0
 
-  const saveEdit = async (id: string) => {
-    if (!companyId) return
-    
-    try {
-      const { error } = await supabase
-        .from('transactions')
-        .update({
-          category: editValues.category,
-          sub_category: editValues.sub_category,
-          project: editValues.project,
-          client: editValues.client
-        })
-        .eq('id', id)
+    return { revenue, directCosts, overhead, grossProfit, grossMargin, netProfit, netMargin }
+  }, [transactions, selectedYear, selectedMonth])
 
-      if (error) throw error
+  // Account totals
+  const accountTotals = useMemo(() => {
+    const bankTotal = accounts.filter(a => a.type === 'bank').reduce((sum, a) => sum + a.balance, 0)
+    const ccTotal = accounts.filter(a => a.type === 'credit_card').reduce((sum, a) => sum + a.balance, 0)
+    return { bankTotal, ccTotal, netCash: bankTotal + ccTotal }
+  }, [accounts])
 
-      setTransactions(prev => prev.map(tx => 
-        tx.id === id ? { ...tx, ...editValues } : tx
-      ))
-      setEditingId(null)
-      setEditValues({})
-    } catch (error) {
-      console.error('Error updating transaction:', error)
-    }
-  }
-
-  // Export to Excel
-  const exportToExcel = () => {
-    const headers = ['Date', 'Month', 'Description', 'Amount', 'Category', 'Sub-Category', 'Project', 'Client']
-    const rows = filteredTransactions.map(tx => [
-      tx.date,
-      formatMonth(tx.date),
-      tx.description,
-      tx.amount,
-      tx.category,
-      tx.sub_category || '',
-      tx.project || '',
-      tx.client || ''
-    ])
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `cash-flow-${new Date().toISOString().split('T')[0]}.csv`
-    link.click()
-  }
-
-  // Clear filters
-  const clearFilters = () => {
-    setSearchQuery('')
-    setSelectedCategory('all')
-    setSelectedProject('all')
-    setSelectedClient('all')
-    setDateRange({
-      start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-      end: new Date().toISOString().split('T')[0]
+  // Filtered transactions for list
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(t => {
+      const txDate = new Date(t.date)
+      if (txDate.getFullYear() !== selectedYear) return false
+      if (selectedMonth !== 'all' && txDate.getMonth() !== selectedMonth) return false
+      if (filterAccount !== 'all' && t.account !== filterAccount) return false
+      if (filterCategory !== 'all' && t.category !== filterCategory) return false
+      if (searchQuery && !t.description.toLowerCase().includes(searchQuery.toLowerCase())) return false
+      return true
     })
+  }, [transactions, selectedYear, selectedMonth, filterAccount, filterCategory, searchQuery])
+
+  // Revenue by client
+  const revenueByClient = useMemo(() => {
+    const byProject: { [key: string]: number } = {}
+    transactions
+      .filter(t => t.category === 'revenue')
+      .forEach(t => {
+        const project = t.project || 'Other'
+        byProject[project] = (byProject[project] || 0) + t.amount
+      })
+    return Object.entries(byProject)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+  }, [transactions])
+
+  // Expense breakdown
+  const expenseBreakdown = useMemo(() => {
+    const bySubcat: { [key: string]: { category: string; value: number } } = {}
+    transactions
+      .filter(t => ['directCosts', 'overhead'].includes(t.category))
+      .forEach(t => {
+        const key = t.subcategory || 'Other'
+        if (!bySubcat[key]) bySubcat[key] = { category: t.category, value: 0 }
+        bySubcat[key].value += Math.abs(t.amount)
+      })
+    return Object.entries(bySubcat)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.value - a.value)
+  }, [transactions])
+
+  const handleAddTransaction = (transaction: any) => {
+    const account = accounts.find(a => a.id === transaction.account_id)
+    setTransactions(prev => [{
+      id: Date.now().toString(),
+      ...transaction,
+      account: account?.name || ''
+    }, ...prev])
   }
 
-  const hasActiveFilters = searchQuery || selectedCategory !== 'all' || selectedProject !== 'all' || selectedClient !== 'all'
+  const handleAddAccount = (account: any) => {
+    setAccounts(prev => [...prev, { id: Date.now().toString(), ...account }])
+  }
+
+  const months = [
+    { value: 'all', label: 'All Months' },
+    { value: 0, label: 'January' },
+    { value: 1, label: 'February' },
+    { value: 2, label: 'March' },
+    { value: 3, label: 'April' },
+    { value: 4, label: 'May' },
+    { value: 5, label: 'June' },
+    { value: 6, label: 'July' },
+    { value: 7, label: 'August' },
+    { value: 8, label: 'September' },
+    { value: 9, label: 'October' },
+    { value: 10, label: 'November' },
+    { value: 11, label: 'December' },
+  ]
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="text-center">
+          <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" />
+          <p className="text-slate-400 text-sm">Loading cash flow...</p>
+        </div>
       </div>
     )
   }
 
+  const maxPnlValue = Math.max(pnlMetrics.revenue, pnlMetrics.directCosts + pnlMetrics.overhead)
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 pb-8">
+      {/* ============ HEADER ============ */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-100">Cash Flow</h1>
-          <p className="text-sm mt-1 text-slate-400">Track and categorize transactions</p>
+          <h1 className="text-2xl font-bold text-slate-100">Cash Flow</h1>
+          <p className="text-sm text-slate-400 mt-1">Real-time cash position & profitability</p>
         </div>
-        <button
-          onClick={exportToExcel}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors"
-        >
-          <Download size={18} />
-          Export Excel
-        </button>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-xl border bg-slate-800 border-slate-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-400">Cash In</p>
-              <p className="text-2xl font-semibold mt-1 text-emerald-500">{formatCurrency(summary.totalIn)}</p>
-            </div>
-            <div className="p-3 rounded-lg bg-emerald-500/20">
-              <TrendingUp size={22} className="text-emerald-500" />
-            </div>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-xl border bg-slate-800 border-slate-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-400">Cash Out</p>
-              <p className="text-2xl font-semibold mt-1 text-rose-500">{formatCurrency(summary.totalOut)}</p>
-            </div>
-            <div className="p-3 rounded-lg bg-rose-500/20">
-              <TrendingDown size={22} className="text-rose-500" />
-            </div>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-xl border bg-slate-800 border-slate-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-400">Net Cash Flow</p>
-              <p className={`text-2xl font-semibold mt-1 ${summary.net >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                {formatCurrency(summary.net)}
-              </p>
-            </div>
-            <div className={`p-3 rounded-lg ${summary.net >= 0 ? 'bg-emerald-500/20' : 'bg-rose-500/20'}`}>
-              <DollarSign size={22} className={summary.net >= 0 ? 'text-emerald-500' : 'text-rose-500'} />
-            </div>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-xl border bg-slate-800 border-slate-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-400">Transactions</p>
-              <p className="text-2xl font-semibold mt-1 text-blue-500">{summary.count.toLocaleString()}</p>
-            </div>
-            <div className="p-3 rounded-lg bg-blue-500/20">
-              <Calendar size={22} className="text-blue-500" />
-            </div>
-          </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+          >
+            {[2026, 2025, 2024, 2023].map(year => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+          >
+            {months.map(m => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+          </select>
+          <button className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 hover:border-slate-600 transition-colors">
+            <RefreshCw size={16} />
+            Sync QBO
+          </button>
+          <button 
+            onClick={() => setShowAddTransaction(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors"
+          >
+            <Plus size={16} />
+            Add Entry
+          </button>
         </div>
       </div>
 
-      {/* Search and Filters */}
-      <div className="p-4 rounded-xl border bg-slate-800 border-slate-700 space-y-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          {/* Search */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by description or amount..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+      {/* ============ POSITION OVERVIEW ============ */}
+      <div className="grid grid-cols-12 gap-4">
+        {/* Cash Position */}
+        <div className="col-span-12 lg:col-span-8">
+          <div className="grid grid-cols-4 gap-4">
+            <MetricCard
+              label="Cash on Hand"
+              value={formatCurrency(accountTotals.bankTotal)}
+              subtitle="Bank accounts"
+              icon={Landmark}
+              color="blue"
+            />
+            <MetricCard
+              label="Credit Card Debt"
+              value={formatCurrency(Math.abs(accountTotals.ccTotal))}
+              subtitle={`${accounts.filter(a => a.type === 'credit_card').length} cards`}
+              icon={CreditCard}
+              color="purple"
+            />
+            <MetricCard
+              label="Net Position"
+              value={formatCurrency(accountTotals.netCash)}
+              subtitle="Cash - CC debt"
+              icon={Wallet}
+              trend={{ value: 8.2, label: 'vs last month' }}
+              color="emerald"
+            />
+            <MetricCard
+              label="Gross Margin"
+              value={`${pnlMetrics.grossMargin.toFixed(1)}%`}
+              subtitle={formatCurrency(pnlMetrics.grossProfit)}
+              icon={TrendingUp}
+              color={pnlMetrics.grossMargin >= 30 ? 'emerald' : pnlMetrics.grossMargin >= 15 ? 'amber' : 'rose'}
             />
           </div>
+        </div>
 
-          {/* Filter Toggle */}
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              showFilters || hasActiveFilters
-                ? 'bg-blue-500 text-white'
-                : 'bg-slate-700 hover:bg-slate-600 text-slate-100'
-            }`}
-          >
-            <Filter size={18} />
-            Filters
-            {hasActiveFilters && (
-              <span className="w-2 h-2 rounded-full bg-white" />
+        {/* Accounts */}
+        <div className="col-span-12 lg:col-span-4">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-slate-100">Accounts</h3>
+              <button 
+                onClick={() => setShowAddAccount(true)}
+                className="text-xs text-emerald-400 hover:text-emerald-300 font-medium"
+              >
+                + Add
+              </button>
+            </div>
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {accounts.map(acc => (
+                <div key={acc.id} className="flex items-center justify-between py-1.5">
+                  <div className="flex items-center gap-2">
+                    {acc.type === 'bank' ? <Landmark size={14} className="text-blue-500" /> : <CreditCard size={14} className="text-purple-500" />}
+                    <span className="text-sm text-slate-300">{acc.name}</span>
+                    {!acc.is_connected && <span className="text-xs text-amber-500">Manual</span>}
+                  </div>
+                  <span className={`text-sm font-medium ${acc.balance >= 0 ? 'text-slate-200' : 'text-rose-400'}`}>
+                    {formatCurrency(acc.balance)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ============ P&L WATERFALL ============ */}
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-12 lg:col-span-8">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
+            <SectionHeader 
+              title="Profit & Loss" 
+              subtitle={selectedMonth === 'all' ? `Full Year ${selectedYear}` : `${months.find(m => m.value === selectedMonth)?.label} ${selectedYear}`}
+            />
+            <div className="space-y-1">
+              <WaterfallBar label="Revenue" value={pnlMetrics.revenue} maxValue={maxPnlValue} color={COLORS.emerald} />
+              <WaterfallBar label="Contractor Labor" value={-pnlMetrics.directCosts} maxValue={maxPnlValue} color={COLORS.rose} />
+              <WaterfallBar label="Gross Profit" value={pnlMetrics.grossProfit} maxValue={maxPnlValue} color={COLORS.emeraldLight} isSubtotal showPercent percentValue={pnlMetrics.grossMargin} />
+              <WaterfallBar label="Overhead" value={-pnlMetrics.overhead} maxValue={maxPnlValue} color={COLORS.amber} />
+              <WaterfallBar label="Net Profit" value={pnlMetrics.netProfit} maxValue={maxPnlValue} color={pnlMetrics.netProfit >= 0 ? COLORS.emerald : COLORS.rose} isSubtotal showPercent percentValue={pnlMetrics.netMargin} />
+            </div>
+          </div>
+        </div>
+
+        {/* Revenue Breakdown */}
+        <div className="col-span-12 lg:col-span-4">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 h-full">
+            <SectionHeader title="Revenue by Project" />
+            {revenueByClient.length > 0 ? (
+              <>
+                <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RePieChart>
+                      <Pie
+                        data={revenueByClient}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={35}
+                        outerRadius={55}
+                        paddingAngle={3}
+                        dataKey="value"
+                      >
+                        {revenueByClient.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={[COLORS.emerald, COLORS.blue, COLORS.cyan, COLORS.purple][index % 4]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip formatter={(v: number) => formatCurrency(v)} />} />
+                    </RePieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="space-y-2 mt-2">
+                  {revenueByClient.slice(0, 4).map((item, i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: [COLORS.emerald, COLORS.blue, COLORS.cyan, COLORS.purple][i % 4] }} />
+                        <span className="text-xs text-slate-400 truncate max-w-[120px]">{item.name}</span>
+                      </div>
+                      <span className="text-xs font-medium text-slate-200">{formatCurrency(item.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-40 text-slate-500 text-sm">No revenue data</div>
             )}
-          </button>
+          </div>
+        </div>
+      </div>
 
-          {hasActiveFilters && (
-            <button
-              onClick={clearFilters}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-100 transition-colors"
+      {/* ============ EXPENSE BREAKDOWN ============ */}
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-12">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
+            <SectionHeader title="Expense Breakdown" subtitle="Direct costs vs. overhead" />
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {expenseBreakdown.slice(0, 6).map((item, i) => (
+                <div key={i} className="bg-slate-700/30 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.category === 'directCosts' ? COLORS.rose : COLORS.amber }} />
+                    <span className="text-xs text-slate-500">{item.category === 'directCosts' ? 'Direct' : 'Overhead'}</span>
+                  </div>
+                  <p className="text-sm font-medium text-slate-200 truncate">{item.name}</p>
+                  <p className="text-lg font-bold text-slate-100 mt-1">{formatCurrency(item.value)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ============ TRANSACTIONS ============ */}
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-5 py-4 border-b border-slate-700/50">
+          <h2 className="text-lg font-semibold text-slate-100">Transactions</h2>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search..."
+                className="bg-slate-700/50 border border-slate-600 rounded-lg pl-9 pr-3 py-1.5 text-sm text-slate-200 w-48 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            <select
+              value={filterAccount}
+              onChange={(e) => setFilterAccount(e.target.value)}
+              className="bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
             >
-              <X size={18} />
-              Clear
+              <option value="all">All Accounts</option>
+              {accounts.map(acc => (
+                <option key={acc.id} value={acc.name}>{acc.name}</option>
+              ))}
+            </select>
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+            >
+              <option value="all">All Categories</option>
+              <option value="revenue">Revenue</option>
+              <option value="directCosts">Direct Costs</option>
+              <option value="overhead">Overhead</option>
+            </select>
+            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700/50 border border-slate-600 rounded-lg text-sm text-slate-300 hover:border-slate-500 transition-colors">
+              <Download size={14} />
+              Export
             </button>
+          </div>
+        </div>
+        
+        {/* Transaction Headers */}
+        <div className="flex items-center gap-4 py-2 px-4 bg-slate-800/80 border-b border-slate-700/50 text-xs font-medium text-slate-500 uppercase tracking-wider">
+          <div className="w-20 shrink-0">Date</div>
+          <div className="flex-1">Description</div>
+          <div className="w-24 text-right shrink-0">Amount</div>
+          <div className="w-24 text-right shrink-0">Account</div>
+          <div className="w-8 shrink-0"></div>
+        </div>
+
+        {/* Transaction List */}
+        <div className="max-h-96 overflow-y-auto">
+          {filteredTransactions.length > 0 ? (
+            filteredTransactions.map(tx => (
+              <TransactionRow
+                key={tx.id}
+                transaction={tx}
+                onEdit={() => {}}
+                onDelete={() => {}}
+              />
+            ))
+          ) : (
+            <div className="flex items-center justify-center py-12 text-slate-500">
+              No transactions found
+            </div>
           )}
         </div>
-
-        {/* Filter Panel */}
-        {showFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-slate-700">
-            {/* Date Range */}
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Start Date</label>
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">End Date</label>
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-              />
-            </div>
-
-            {/* Category */}
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Category</label>
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-              >
-                <option value="all">All Categories</option>
-                {CATEGORIES.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.label}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Project */}
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Project</label>
-              <select
-                value={selectedProject}
-                onChange={(e) => setSelectedProject(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-              >
-                <option value="all">All Projects</option>
-                {projects.map(proj => (
-                  <option key={proj.id} value={proj.name}>{proj.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Client */}
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Client</label>
-              <select
-                value={selectedClient}
-                onChange={(e) => setSelectedClient(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-              >
-                <option value="all">All Clients</option>
-                {clients.map(client => (
-                  <option key={client.id} value={client.name}>{client.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Transactions Table */}
-      <div className="rounded-xl border bg-slate-800 border-slate-700 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-900/50">
-                <th className="px-4 py-3 text-left font-medium text-slate-400">Date</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-400">Month</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-400 min-w-[200px]">Description</th>
-                <th className="px-4 py-3 text-right font-medium text-slate-400">Amount</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-400">Category</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-400">Sub-Category</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-400">Project</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-400">Client</th>
-                <th className="px-4 py-3 text-center font-medium text-slate-400 w-20">Edit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedTransactions.length > 0 ? (
-                paginatedTransactions.map((tx) => (
-                  <tr key={tx.id} className="border-t border-slate-700 hover:bg-slate-700/30">
-                    <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{tx.date}</td>
-                    <td className="px-4 py-3 text-slate-400 whitespace-nowrap">{formatMonth(tx.date)}</td>
-                    <td className="px-4 py-3 text-slate-100 max-w-xs truncate" title={tx.description}>
-                      {tx.description || '—'}
-                    </td>
-                    <td className={`px-4 py-3 text-right font-medium whitespace-nowrap ${
-                      tx.amount >= 0 ? 'text-emerald-500' : 'text-rose-500'
-                    }`}>
-                      {formatCurrency(tx.amount)}
-                    </td>
-                    
-                    {/* Editable cells */}
-                    {editingId === tx.id ? (
-                      <>
-                        <td className="px-4 py-3">
-                          <select
-                            value={editValues.category || ''}
-                            onChange={(e) => setEditValues(prev => ({ 
-                              ...prev, 
-                              category: e.target.value,
-                              sub_category: '' // Reset sub-category when category changes
-                            }))}
-                            className="w-full px-2 py-1 bg-slate-900 border border-slate-600 rounded text-xs"
-                          >
-                            <option value="">Select...</option>
-                            {CATEGORIES.map(cat => (
-                              <option key={cat.id} value={cat.id}>{cat.label}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-4 py-3">
-                          <select
-                            value={editValues.sub_category || ''}
-                            onChange={(e) => setEditValues(prev => ({ ...prev, sub_category: e.target.value }))}
-                            className="w-full px-2 py-1 bg-slate-900 border border-slate-600 rounded text-xs"
-                            disabled={!editValues.category}
-                          >
-                            <option value="">Select...</option>
-                            {editValues.category && SUB_CATEGORIES[editValues.category]?.map(sub => (
-                              <option key={sub} value={sub}>{sub}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-4 py-3">
-                          <select
-                            value={editValues.project || ''}
-                            onChange={(e) => setEditValues(prev => ({ ...prev, project: e.target.value }))}
-                            className="w-full px-2 py-1 bg-slate-900 border border-slate-600 rounded text-xs"
-                          >
-                            <option value="">Select...</option>
-                            {projects.map(proj => (
-                              <option key={proj.id} value={proj.name}>{proj.name}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-4 py-3">
-                          <select
-                            value={editValues.client || ''}
-                            onChange={(e) => setEditValues(prev => ({ ...prev, client: e.target.value }))}
-                            className="w-full px-2 py-1 bg-slate-900 border border-slate-600 rounded text-xs"
-                          >
-                            <option value="">Select...</option>
-                            {clients.map(client => (
-                              <option key={client.id} value={client.name}>{client.name}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => saveEdit(tx.id)}
-                              className="p-1.5 rounded bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30"
-                            >
-                              <Check size={14} />
-                            </button>
-                            <button
-                              onClick={cancelEdit}
-                              className="p-1.5 rounded bg-slate-600 text-slate-300 hover:bg-slate-500"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="px-4 py-3">
-                          {tx.category && (
-                            <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${getCategoryColor(tx.category, 'bg')} ${getCategoryColor(tx.category, 'text')}`}>
-                              {CATEGORIES.find(c => c.id === tx.category)?.label || tx.category}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-slate-400 text-xs">{tx.sub_category || '—'}</td>
-                        <td className="px-4 py-3 text-slate-300 text-xs">{tx.project || '—'}</td>
-                        <td className="px-4 py-3 text-slate-300 text-xs">{tx.client || '—'}</td>
-                        <td className="px-4 py-3">
-                          <button
-                            onClick={() => startEdit(tx)}
-                            className="p-1.5 rounded bg-slate-700 text-slate-300 hover:bg-slate-600 mx-auto block"
-                          >
-                            <Edit2 size={14} />
-                          </button>
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
-                    No transactions found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-700">
-            <p className="text-sm text-slate-400">
-              Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredTransactions.length)} of {filteredTransactions.length}
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <span className="text-sm text-slate-300">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* ============ MODALS ============ */}
+      <AddTransactionModal
+        isOpen={showAddTransaction}
+        onClose={() => setShowAddTransaction(false)}
+        accounts={accounts}
+        onSave={handleAddTransaction}
+      />
+      <AddAccountModal
+        isOpen={showAddAccount}
+        onClose={() => setShowAddAccount(false)}
+        onSave={handleAddAccount}
+      />
     </div>
   )
 }
