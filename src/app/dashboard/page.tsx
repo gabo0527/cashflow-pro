@@ -345,19 +345,80 @@ export default function DashboardPage() {
     loadData()
   }, [])
 
+  // ============ PERIOD DATE RANGE ============
+  const periodRange = useMemo(() => {
+    const now = new Date()
+    const endDate = now
+    let startDate: Date
+    let weeksInPeriod: number
+    
+    switch (period) {
+      case 'week':
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7)
+        weeksInPeriod = 1
+        break
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+        weeksInPeriod = 4
+        break
+      case 'quarter':
+        const quarterStart = Math.floor(now.getMonth() / 3) * 3
+        startDate = new Date(now.getFullYear(), quarterStart, 1)
+        weeksInPeriod = 13
+        break
+      case 'ytd':
+        startDate = new Date(now.getFullYear(), 0, 1)
+        weeksInPeriod = Math.ceil((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000))
+        break
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+        weeksInPeriod = 4
+    }
+    
+    return { startDate, endDate, weeksInPeriod }
+  }, [period])
+
+  // ============ FILTERED DATA BY PERIOD ============
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(t => {
+      if (!t.date) return false
+      const txDate = new Date(t.date)
+      return txDate >= periodRange.startDate && txDate <= periodRange.endDate
+    })
+  }, [transactions, periodRange])
+
+  const filteredTimeEntries = useMemo(() => {
+    return timeEntries.filter(t => {
+      if (!t.date) return false
+      const entryDate = new Date(t.date)
+      return entryDate >= periodRange.startDate && entryDate <= periodRange.endDate
+    })
+  }, [timeEntries, periodRange])
+
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter(inv => {
+      const invDate = new Date(inv.invoice_date || inv.created_at)
+      return invDate >= periodRange.startDate && invDate <= periodRange.endDate
+    })
+  }, [invoices, periodRange])
+
   // ============ CALCULATED METRICS ============
   const metrics = useMemo(() => {
-    const revenue = transactions.filter(t => t.category === 'revenue').reduce((sum, t) => sum + (t.amount || 0), 0)
-    const expenses = transactions.filter(t => ['opex', 'overhead', 'cogs'].includes(t.category || '')).reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
-    const cogs = transactions.filter(t => t.category === 'cogs').reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
+    // Use filtered data for period-specific metrics
+    const revenue = filteredTransactions.filter(t => t.category === 'revenue').reduce((sum, t) => sum + (t.amount || 0), 0)
+    const expenses = filteredTransactions.filter(t => ['opex', 'overhead', 'cogs'].includes(t.category || '')).reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
+    const cogs = filteredTransactions.filter(t => t.category === 'cogs').reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
     const netCash = revenue - expenses
     const grossProfit = revenue - cogs
     const grossMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0
 
     const currentCash = companySettings?.beginning_balance || 0
-    const monthlyBurn = expenses / Math.max(1, new Set(transactions.filter(t => t.category !== 'revenue').map(t => t.date?.substring(0, 7))).size)
+    // Calculate monthly burn from filtered data, normalized to monthly rate
+    const monthsInPeriod = Math.max(1, periodRange.weeksInPeriod / 4)
+    const monthlyBurn = expenses / monthsInPeriod
     const cashRunway = monthlyBurn > 0 ? currentCash / monthlyBurn : 99
 
+    // AR uses all invoices (current state, not period-filtered)
     const totalAR = invoices.reduce((sum, inv) => sum + (inv.balance_due || 0), 0)
     const overdueAR = invoices.filter(inv => (inv.days_overdue || 0) > 0).reduce((sum, inv) => sum + (inv.balance_due || 0), 0)
     const arCurrent = invoices.filter(inv => (inv.days_overdue || 0) <= 0 && (inv.balance_due || 0) > 0).reduce((sum, inv) => sum + (inv.balance_due || 0), 0)
@@ -365,16 +426,18 @@ export default function DashboardPage() {
     const ar60 = invoices.filter(inv => (inv.days_overdue || 0) > 30 && (inv.days_overdue || 0) <= 60).reduce((sum, inv) => sum + (inv.balance_due || 0), 0)
     const ar90 = invoices.filter(inv => (inv.days_overdue || 0) > 60).reduce((sum, inv) => sum + (inv.balance_due || 0), 0)
 
-    const paidInvoices = invoices.filter(inv => inv.paid_date && inv.invoice_date)
+    const paidInvoices = filteredInvoices.filter(inv => inv.paid_date && inv.invoice_date)
     const avgDSO = paidInvoices.length > 0 ? paidInvoices.reduce((sum, inv) => {
       const days = Math.floor((new Date(inv.paid_date).getTime() - new Date(inv.invoice_date).getTime()) / (1000 * 60 * 60 * 24))
       return sum + Math.max(0, days)
     }, 0) / paidInvoices.length : 0
 
-    const totalHours = timeEntries.reduce((sum, t) => sum + (t.hours || 0), 0)
-    const billableAmount = timeEntries.reduce((sum, t) => sum + ((t.hours || 0) * (t.bill_rate || 0)), 0)
+    // Time entries - use filtered data
+    const totalHours = filteredTimeEntries.reduce((sum, t) => sum + (t.hours || 0), 0)
+    const billableAmount = filteredTimeEntries.reduce((sum, t) => sum + ((t.hours || 0) * (t.bill_rate || 0)), 0)
     const activeTeamCount = teamMembers.filter(m => m.status === 'active').length
-    const availableHours = activeTeamCount * 40 * 4
+    // Available hours based on period
+    const availableHours = activeTeamCount * 40 * periodRange.weeksInPeriod
     const utilization = availableHours > 0 ? (totalHours / availableHours) * 100 : 0
 
     let healthScore = 50
@@ -391,7 +454,7 @@ export default function DashboardPage() {
     healthScore = Math.min(100, Math.max(0, healthScore))
 
     return { revenue, expenses, netCash, grossProfit, grossMargin, currentCash, monthlyBurn, cashRunway, totalAR, overdueAR, arCurrent, ar30, ar60, ar90, avgDSO, totalHours, billableAmount, utilization, healthScore, openInvoices: invoices.filter(i => (i.balance_due || 0) > 0).length }
-  }, [transactions, invoices, timeEntries, teamMembers, companySettings])
+  }, [filteredTransactions, filteredTimeEntries, filteredInvoices, invoices, teamMembers, companySettings, periodRange])
 
   // Cash Flow Chart Data
   const cashFlowData = useMemo(() => {
@@ -431,7 +494,7 @@ export default function DashboardPage() {
   // Project Profitability
   const projectProfitability = useMemo(() => {
     const projectData: { [key: string]: { name: string; revenue: number; cost: number; hours: number; margin: number } } = {}
-    timeEntries.forEach(entry => {
+    filteredTimeEntries.forEach(entry => {
       const project = projects.find(p => p.id === entry.project_id)
       const projectName = project?.name || 'Unknown'
       if (!projectData[projectName]) projectData[projectName] = { name: projectName, revenue: 0, cost: 0, hours: 0, margin: 0 }
@@ -441,19 +504,19 @@ export default function DashboardPage() {
     })
     Object.values(projectData).forEach(p => { p.margin = p.revenue > 0 ? ((p.revenue - p.cost) / p.revenue) * 100 : 0 })
     return Object.values(projectData).filter(p => p.hours > 0).sort((a, b) => b.revenue - a.revenue).slice(0, 6)
-  }, [timeEntries, projects])
+  }, [filteredTimeEntries, projects])
 
   // Team Utilization
   const teamUtilization = useMemo(() => {
     const memberHours: { [key: string]: { name: string; hours: number; rate: number } } = {}
-    timeEntries.forEach(entry => {
+    filteredTimeEntries.forEach(entry => {
       const member = teamMembers.find(m => m.id === entry.contractor_id)
       const memberName = member?.name || 'Unknown'
       if (!memberHours[memberName]) memberHours[memberName] = { name: memberName, hours: 0, rate: member?.bill_rate || 0 }
       memberHours[memberName].hours += entry.hours || 0
     })
     return Object.values(memberHours).sort((a, b) => b.hours - a.hours).slice(0, 5)
-  }, [timeEntries, teamMembers])
+  }, [filteredTimeEntries, teamMembers])
 
   // AR Aging
   const arAgingData = useMemo(() => [
@@ -493,15 +556,26 @@ export default function DashboardPage() {
     )
   }
 
+  // Period label helper
+  const periodLabel = useMemo(() => {
+    const start = periodRange.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const end = periodRange.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    return `${start} – ${end}`
+  }, [periodRange])
+
   return (
     <div className="space-y-5 pb-8">
       {/* ============ HEADER ============ */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-100">Dashboard</h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Financial overview • {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-          </p>
+        <div className="flex items-center gap-4">
+          <VantageLogo size="md" />
+          <div className="h-8 w-px bg-slate-700" />
+          <div>
+            <h1 className="text-xl font-semibold text-slate-100">Dashboard</h1>
+            <p className="text-xs text-slate-400">
+              {periodLabel}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700">
