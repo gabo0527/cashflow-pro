@@ -395,7 +395,7 @@ export default function AIAssistantPage() {
     try {
       const dataContext = companyData && kpis ? buildDataContext(companyData, kpis) : 'No company data available.'
       
-      const response = await fetch('/api/ai/chat', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
