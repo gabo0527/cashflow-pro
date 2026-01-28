@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Wallet,
   FileText,
+  Receipt,
   FolderKanban,
   Users,
   Clock,
@@ -17,8 +18,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  LogOut,
-  Building2
+  LogOut
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -41,6 +41,7 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={20} /> },
   { label: 'Cash Flow', href: '/cash-flow', icon: <Wallet size={20} /> },
   { label: 'Invoices & AR', href: '/invoices', icon: <FileText size={20} /> },
+  { label: 'Expenses', href: '/expenses', icon: <Receipt size={20} /> },
   { label: 'Projects', href: '/projects', icon: <FolderKanban size={20} /> },
   { label: 'Clients', href: '/clients', icon: <Users size={20} /> },
   { label: 'Time Tracking', href: '/time-tracking', icon: <Clock size={20} />, section: 'Operations' },
@@ -62,7 +63,7 @@ export default function Sidebar({ collapsed, onToggle, theme, companyName, onSig
   const textClass = isDark ? 'text-slate-100' : 'text-slate-800'
   const textMutedClass = isDark ? 'text-slate-400' : 'text-slate-500'
   const hoverClass = isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
-  const activeClass = isDark ? 'bg-slate-800 text-blue-400' : 'bg-blue-50 text-blue-600'
+  const activeClass = isDark ? 'bg-slate-800 text-emerald-400' : 'bg-emerald-50 text-emerald-600'
   
   let currentSection = ''
 
@@ -78,12 +79,19 @@ export default function Sidebar({ collapsed, onToggle, theme, companyName, onSig
       {/* Logo / Company */}
       <div className={cn('flex items-center h-16 px-4 border-b', borderClass)}>
         {!collapsed && (
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center flex-shrink-0">
-              <Building2 size={18} className="text-white" />
-            </div>
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+            {/* Gradient V Icon */}
+            <svg width={32} height={32} viewBox="0 0 40 40" fill="none" className="flex-shrink-0">
+              <defs>
+                <linearGradient id="vGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#34d399" />
+                  <stop offset="100%" stopColor="#10b981" />
+                </linearGradient>
+              </defs>
+              <path d="M8 8L20 32L32 8" stroke="url(#vGradient)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+            </svg>
             <div className="min-w-0">
-              <h1 className={cn('font-semibold truncate', textClass)}>Vantage</h1>
+              <h1 className={cn('font-bold text-lg tracking-tight', textClass)}>Vantage</h1>
               {companyName && (
                 <p className={cn('text-xs truncate', textMutedClass)}>{companyName}</p>
               )}
@@ -91,9 +99,15 @@ export default function Sidebar({ collapsed, onToggle, theme, companyName, onSig
           </div>
         )}
         {collapsed && (
-          <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center mx-auto">
-            <Building2 size={18} className="text-white" />
-          </div>
+          <svg width={28} height={28} viewBox="0 0 40 40" fill="none" className="mx-auto">
+            <defs>
+              <linearGradient id="vGradientCollapsed" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#34d399" />
+                <stop offset="100%" stopColor="#10b981" />
+              </linearGradient>
+            </defs>
+            <path d="M8 8L20 32L32 8" stroke="url(#vGradientCollapsed)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+          </svg>
         )}
       </div>
 
