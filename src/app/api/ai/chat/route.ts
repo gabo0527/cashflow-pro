@@ -22,16 +22,18 @@ export async function POST(request: NextRequest) {
 
     const fullSystemPrompt = `${systemPrompt}
 
----
+=== CURRENT COMPANY DATA ===
 ${dataContext}
----
+=== END DATA ===
 
-Remember to:
+RESPONSE INSTRUCTIONS:
 1. Always reference specific numbers from the data above
-2. Be concise but insightful
-3. Proactively mention related insights
+2. Be concise but insightful - lead with the answer
+3. Proactively mention related concerns or opportunities
 4. Suggest actionable next steps
-5. Use markdown formatting for clarity`
+5. Use **bold** for key numbers and metrics
+6. When relevant, suggest viewing related pages: [View Reports →] or [Open Forecast →]
+7. If you don't have data to answer, say so clearly - never make up numbers`
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -69,7 +71,7 @@ Remember to:
     })
 
   } catch (error: any) {
-    console.error('AI Chat Error:', error)
+    console.error('Sage AI Error:', error)
     return NextResponse.json(
       { error: 'Failed to process request', details: error.message },
       { status: 500 }
@@ -80,6 +82,7 @@ Remember to:
 export async function GET() {
   return NextResponse.json({ 
     status: 'ok', 
-    service: 'Vantage AI Assistant'
+    service: 'Sage - Financial Intelligence Partner',
+    version: '1.0'
   })
 }
