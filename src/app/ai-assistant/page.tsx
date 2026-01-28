@@ -261,7 +261,7 @@ function getClientProfitability(data: CompanyData): any[] {
   data.timeEntries?.forEach(entry => {
     const project = data.projects?.find(p => p.id === entry.project_id)
     if (project?.client_id && clientData[project.client_id]) {
-      const team = data.teamMembers?.find(t => t.id === entry.team_member_id)
+      const team = data.teamMembers?.find(t => t.id === entry.contractor_id)
       clientData[project.client_id].cost += (entry.hours || 0) * (team?.cost_rate || 50)
       clientData[project.client_id].hours += entry.hours || 0
     }
@@ -287,7 +287,7 @@ function getProjectPerformance(data: CompanyData): any[] {
     
     const hours = projectTime.reduce((sum, t) => sum + (t.hours || 0), 0)
     const cost = projectTime.reduce((sum, t) => {
-      const team = data.teamMembers?.find(tm => tm.id === t.team_member_id)
+      const team = data.teamMembers?.find(tm => tm.id === t.contractor_id)
       return sum + (t.hours || 0) * (team?.cost_rate || 50)
     }, 0)
     
@@ -349,7 +349,7 @@ function buildDataContext(data: CompanyData, kpis: KPISummary): string {
   data.timeEntries?.forEach(entry => {
     const date = new Date(entry.date)
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-    const member = data.teamMembers?.find(m => m.id === entry.team_member_id)
+    const member = data.teamMembers?.find(m => m.id === entry.contractor_id)
     const memberName = member?.name || 'Unknown'
     
     if (!timeEntriesByMonth[monthKey]) timeEntriesByMonth[monthKey] = {}
@@ -365,7 +365,7 @@ function buildDataContext(data: CompanyData, kpis: KPISummary): string {
   const allTimeByMember: Record<string, { hours: number, billable: number, projectBreakdown: Record<string, number> }> = {}
   
   data.timeEntries?.forEach(entry => {
-    const member = data.teamMembers?.find(m => m.id === entry.team_member_id)
+    const member = data.teamMembers?.find(m => m.id === entry.contractor_id)
     const memberName = member?.name || 'Unknown'
     const project = data.projects?.find(p => p.id === entry.project_id)
     const projectName = project?.name || 'No Project'
@@ -387,7 +387,7 @@ function buildDataContext(data: CompanyData, kpis: KPISummary): string {
   
   const thisWeekByMember: Record<string, number> = {}
   thisWeekEntries.forEach(entry => {
-    const member = data.teamMembers?.find(m => m.id === entry.team_member_id)
+    const member = data.teamMembers?.find(m => m.id === entry.contractor_id)
     const memberName = member?.name || 'Unknown'
     thisWeekByMember[memberName] = (thisWeekByMember[memberName] || 0) + (entry.hours || 0)
   })
