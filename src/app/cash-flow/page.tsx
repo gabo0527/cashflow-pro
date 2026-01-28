@@ -526,35 +526,56 @@ function AddTransactionModal({
 function AddAccountModal({ 
   isOpen, 
   onClose, 
-  onSave 
+  onSave,
+  editAccount,
+  onDelete
 }: { 
   isOpen: boolean
   onClose: () => void
   onSave: (account: any) => void
+  editAccount?: any
+  onDelete?: (id: string) => void
 }) {
-  const [name, setName] = useState('')
-  const [type, setType] = useState<'bank' | 'credit_card'>('credit_card')
-  const [balance, setBalance] = useState('')
+  const [name, setName] = useState(editAccount?.name || '')
+  const [type, setType] = useState<'bank' | 'credit_card'>(editAccount?.type || 'credit_card')
+  const [balance, setBalance] = useState(editAccount ? Math.abs(editAccount.balance).toString() : '')
+
+  // Reset form when editAccount changes
+  useEffect(() => {
+    if (editAccount) {
+      setName(editAccount.name)
+      setType(editAccount.type)
+      setBalance(Math.abs(editAccount.balance).toString())
+    } else {
+      setName('')
+      setType('credit_card')
+      setBalance('')
+    }
+  }, [editAccount, isOpen])
 
   if (!isOpen) return null
 
   const handleSave = () => {
     onSave({
+      id: editAccount?.id,
       name,
       type,
       balance: type === 'credit_card' ? -Math.abs(parseFloat(balance) || 0) : parseFloat(balance) || 0,
-      is_connected: false
+      is_connected: editAccount?.is_connected || false,
+      last_sync: editAccount?.last_sync
     })
     setName('')
     setBalance('')
     onClose()
   }
 
+  const isEditing = !!editAccount
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md mx-4 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
-          <h3 className="text-lg font-semibold text-slate-100">Add Account</h3>
+          <h3 className="text-lg font-semibold text-slate-100">{isEditing ? 'Edit Account' : 'Add Account'}</h3>
           <button onClick={onClose} className="p-1 hover:bg-slate-700 rounded-lg transition-colors">
             <X size={20} className="text-slate-400" />
           </button>
@@ -567,7 +588,7 @@ function AddAccountModal({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Amex - Gabriel"
+              placeholder="e.g., Chase Business Checking"
               className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
             />
           </div>
@@ -614,19 +635,42 @@ function AddAccountModal({
               <p className="text-xs text-slate-500 mt-1">Enter as positive number (we'll track it as debt)</p>
             )}
           </div>
+
+          {editAccount?.is_connected && (
+            <div className="flex items-center gap-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <RefreshCw size={14} className="text-blue-400" />
+              <span className="text-xs text-blue-400">Connected to QuickBooks • Last sync: {editAccount.last_sync}</span>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-700 bg-slate-800/50">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">
-            Cancel
-          </button>
-          <button 
-            onClick={handleSave}
-            disabled={!name}
-            className="px-4 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            Add Account
-          </button>
+        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-700 bg-slate-800/50">
+          <div>
+            {isEditing && !editAccount?.is_connected && onDelete && (
+              <button 
+                onClick={() => {
+                  if (confirm('Delete this account? This will not delete transactions.')) {
+                    onDelete(editAccount.id)
+                  }
+                }}
+                className="px-3 py-1.5 text-sm font-medium text-rose-400 hover:text-rose-300 transition-colors"
+              >
+                Delete Account
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">
+              Cancel
+            </button>
+            <button 
+              onClick={handleSave}
+              disabled={!name}
+              className="px-4 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isEditing ? 'Save Changes' : 'Add Account'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -640,6 +684,7 @@ export default function CashFlowPage() {
   const [selectedMonth, setSelectedMonth] = useState<number | 'all'>(new Date().getMonth())
   const [showAddTransaction, setShowAddTransaction] = useState(false)
   const [showAddAccount, setShowAddAccount] = useState(false)
+  const [editingAccount, setEditingAccount] = useState<any>(null)
   const [filterAccount, setFilterAccount] = useState<string>('all')
   const [filterCategory, setFilterCategory] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -749,7 +794,19 @@ export default function CashFlowPage() {
   }
 
   const handleAddAccount = (account: any) => {
-    setAccounts(prev => [...prev, { id: Date.now().toString(), ...account }])
+    if (account.id) {
+      // Edit existing account
+      setAccounts(prev => prev.map(acc => acc.id === account.id ? account : acc))
+    } else {
+      // Add new account
+      setAccounts(prev => [...prev, { id: Date.now().toString(), ...account }])
+    }
+    setEditingAccount(null)
+  }
+
+  const handleDeleteAccount = (accountId: string) => {
+    setAccounts(prev => prev.filter(acc => acc.id !== accountId))
+    setEditingAccount(null)
   }
 
   const months = [
@@ -873,11 +930,16 @@ export default function CashFlowPage() {
             </div>
             <div className="space-y-2 max-h-40 overflow-y-auto">
               {accounts.map(acc => (
-                <div key={acc.id} className="flex items-center justify-between py-1.5">
+                <div 
+                  key={acc.id} 
+                  onClick={() => setEditingAccount(acc)}
+                  className="flex items-center justify-between py-1.5 px-2 -mx-2 rounded-lg cursor-pointer hover:bg-slate-700/30 transition-colors group"
+                >
                   <div className="flex items-center gap-2">
                     {acc.type === 'bank' ? <Landmark size={14} className="text-blue-500" /> : <CreditCard size={14} className="text-purple-500" />}
                     <span className="text-sm text-slate-300">{acc.name}</span>
                     {!acc.is_connected && <span className="text-xs text-amber-500">Manual</span>}
+                    <Edit2 size={12} className="text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                   <span className={`text-sm font-medium ${acc.balance >= 0 ? 'text-slate-200' : 'text-rose-400'}`}>
                     {formatCurrency(acc.balance)}
@@ -1051,9 +1113,11 @@ export default function CashFlowPage() {
         onSave={handleAddTransaction}
       />
       <AddAccountModal
-        isOpen={showAddAccount}
-        onClose={() => setShowAddAccount(false)}
+        isOpen={showAddAccount || !!editingAccount}
+        onClose={() => { setShowAddAccount(false); setEditingAccount(null); }}
         onSave={handleAddAccount}
+        editAccount={editingAccount}
+        onDelete={handleDeleteAccount}
       />
     </div>
   )
