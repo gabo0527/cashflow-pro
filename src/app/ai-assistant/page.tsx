@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { 
   Send, User, TrendingUp, DollarSign, 
-  AlertTriangle, RefreshCw, Users, ChevronRight, Trash2, Clock, Target
+  AlertTriangle, RefreshCw, Users, ChevronRight, Trash2, Clock, Target,
+  Plus, MessageSquare, MoreHorizontal, Pencil, Check, X
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
@@ -53,14 +54,7 @@ function SageLogo({ size = 32, className = '' }: { size?: number, className?: st
         fill="none"
       />
       
-      <path 
-        d="M24 8V39" 
-        stroke="url(#sageGradient)" 
-        strokeWidth="2" 
-        strokeLinecap="round"
-        opacity="0.6"
-      />
-      
+      <path d="M24 8V39" stroke="url(#sageGradient)" strokeWidth="2" strokeLinecap="round" opacity="0.6" />
       <path d="M14 20C16 20 18 22 18 24" stroke="url(#sageGradient)" strokeWidth="1.5" strokeLinecap="round" fill="none" opacity="0.7" />
       <path d="M12 28C15 28 17 30 18 32" stroke="url(#sageGradient)" strokeWidth="1.5" strokeLinecap="round" fill="none" opacity="0.7" />
       <path d="M34 20C32 20 30 22 30 24" stroke="url(#sageGradient)" strokeWidth="1.5" strokeLinecap="round" fill="none" opacity="0.7" />
@@ -83,6 +77,14 @@ interface Message {
   content: string
   timestamp: Date
   data?: any
+}
+
+interface Conversation {
+  id: string
+  title: string
+  messages: Message[]
+  created_at: string
+  updated_at: string
 }
 
 interface CompanyData {
@@ -262,7 +264,7 @@ function getClientProfitability(data: CompanyData): any[] {
     const project = data.projects?.find(p => p.id === entry.project_id)
     if (project?.client_id && clientData[project.client_id]) {
       const team = data.teamMembers?.find(t => t.id === entry.contractor_id)
-      clientData[project.client_id].cost += (entry.hours || 0) * (team?.cost_rate || 50)
+      clientData[project.client_id].cost += (entry.hours || 0) * (team?.cost_rate || entry.cost_rate || 50)
       clientData[project.client_id].hours += entry.hours || 0
     }
   })
@@ -288,7 +290,7 @@ function getProjectPerformance(data: CompanyData): any[] {
     const hours = projectTime.reduce((sum, t) => sum + (t.hours || 0), 0)
     const cost = projectTime.reduce((sum, t) => {
       const team = data.teamMembers?.find(tm => tm.id === t.contractor_id)
-      return sum + (t.hours || 0) * (team?.cost_rate || 50)
+      return sum + (t.hours || 0) * (team?.cost_rate || t.cost_rate || 50)
     }, 0)
     
     const client = data.clients?.find(c => c.id === project.client_id)
@@ -343,7 +345,7 @@ function buildDataContext(data: CompanyData, kpis: KPISummary): string {
   const projectPerf = getProjectPerformance(data)
   const overdueInv = getOverdueInvoices(data)
   
-  // ALL time entries organized by month for historical analysis
+  // ALL time entries organized by month
   const timeEntriesByMonth: Record<string, Record<string, { hours: number, billable: number }>> = {}
   
   data.timeEntries?.forEach(entry => {
@@ -361,7 +363,7 @@ function buildDataContext(data: CompanyData, kpis: KPISummary): string {
     if (entry.billable) timeEntriesByMonth[monthKey][memberName].billable += entry.hours || 0
   })
 
-  // Time by team member (all time totals with project breakdown)
+  // Time by team member (all time totals)
   const allTimeByMember: Record<string, { hours: number, billable: number, projectBreakdown: Record<string, number> }> = {}
   
   data.timeEntries?.forEach(entry => {
@@ -380,7 +382,7 @@ function buildDataContext(data: CompanyData, kpis: KPISummary): string {
       (allTimeByMember[memberName].projectBreakdown[projectName] || 0) + (entry.hours || 0)
   })
 
-  // Recent week's time entries for "this week" questions
+  // This week
   const oneWeekAgo = new Date()
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
   const thisWeekEntries = data.timeEntries?.filter(t => new Date(t.date) >= oneWeekAgo) || []
@@ -408,18 +410,18 @@ KEY METRICS:
 
 === CLIENTS (${data.clients?.length || 0} total) ===
 ${data.clients?.map(c => 
-  `• ${c.name} | Status: ${c.status || 'active'} | Email: ${c.email || 'N/A'} | Created: ${c.created_at ? new Date(c.created_at).toLocaleDateString() : 'N/A'}`
+  `• ${c.name} | Status: ${c.status || 'active'} | Email: ${c.email || 'N/A'}`
 ).join('\n') || 'No clients'}
 
 === PROJECTS (${data.projects?.length || 0} total) ===
 ${data.projects?.map(p => {
   const client = data.clients?.find(c => c.id === p.client_id)
-  return `• ${p.name} | Client: ${client?.name || 'No Client'} | Status: ${p.status || 'active'} | Budget: ${p.budget ? formatCurrency(p.budget) : 'N/A'} | Start: ${p.start_date || 'N/A'} | End: ${p.end_date || 'N/A'}`
+  return `• ${p.name} | Client: ${client?.name || 'No Client'} | Status: ${p.status || 'active'} | Budget: ${p.budget ? formatCurrency(p.budget) : 'N/A'}`
 }).join('\n') || 'No projects'}
 
 === TEAM MEMBERS (${data.teamMembers?.length || 0} total) ===
 ${data.teamMembers?.map(t => 
-  `• ${t.name} | Role: ${t.role || 'Team Member'} | Email: ${t.email || 'N/A'} | Bill Rate: ${t.bill_rate ? '$' + t.bill_rate + '/hr' : 'N/A'} | Cost Rate: ${t.cost_rate ? '$' + t.cost_rate + '/hr' : 'N/A'}`
+  `• ${t.name} | Role: ${t.role || 'Team Member'} | Bill Rate: ${t.bill_rate ? '$' + t.bill_rate + '/hr' : 'N/A'} | Cost Rate: ${t.cost_rate ? '$' + t.cost_rate + '/hr' : 'N/A'}`
 ).join('\n') || 'No team members'}
 
 === TIME ENTRIES - THIS WEEK (Last 7 Days) ===
@@ -427,13 +429,13 @@ ${Object.entries(thisWeekByMember).map(([name, hours]) =>
   `• ${name}: ${hours.toFixed(1)} hours`
 ).join('\n') || 'No time entries this week'}
 
-=== TIME ENTRIES - ALL TIME TOTALS BY TEAM MEMBER ===
+=== TIME ENTRIES - ALL TIME BY TEAM MEMBER ===
 ${Object.entries(allTimeByMember).map(([name, data]) => 
   `• ${name}: ${data.hours.toFixed(1)} total hours, ${data.billable.toFixed(1)} billable (${data.hours > 0 ? ((data.billable/data.hours)*100).toFixed(0) : 0}% utilization)
   Projects: ${Object.entries(data.projectBreakdown).sort((a, b) => b[1] - a[1]).map(([proj, hrs]) => `${proj}: ${hrs.toFixed(1)}hrs`).join(', ')}`
 ).join('\n') || 'No time entries'}
 
-=== TIME ENTRIES BY MONTH (Full History for Comparisons) ===
+=== TIME ENTRIES BY MONTH ===
 ${Object.entries(timeEntriesByMonth).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 12).map(([month, members]) => 
   `${month}:\n${Object.entries(members).map(([name, data]) => 
     `  • ${name}: ${data.hours.toFixed(1)} hrs (${data.billable.toFixed(1)} billable)`
@@ -445,46 +447,28 @@ Total: ${data.invoices?.length || 0}
 • Paid: ${data.invoices?.filter(i => i.status === 'paid').length || 0} (${formatCurrency(data.invoices?.filter(i => i.status === 'paid').reduce((sum, i) => sum + (i.amount || 0), 0) || 0)})
 • Pending: ${data.invoices?.filter(i => i.status === 'pending').length || 0} (${formatCurrency(data.invoices?.filter(i => i.status === 'pending').reduce((sum, i) => sum + (i.amount || 0), 0) || 0)})
 • Overdue: ${data.invoices?.filter(i => i.status === 'overdue').length || 0} (${formatCurrency(data.invoices?.filter(i => i.status === 'overdue').reduce((sum, i) => sum + (i.amount || 0), 0) || 0)})
-• Draft: ${data.invoices?.filter(i => i.status === 'draft').length || 0}
 
 AR AGING:
-• Current (not due): ${formatCurrency(aging.current)}
-• 1-30 Days Overdue: ${formatCurrency(aging.days30)}
-• 31-60 Days Overdue: ${formatCurrency(aging.days60)}
-• 61-90 Days Overdue: ${formatCurrency(aging.days90)}
-• 90+ Days Overdue: ${formatCurrency(aging.over90)}
+• Current: ${formatCurrency(aging.current)}
+• 1-30 Days: ${formatCurrency(aging.days30)}
+• 31-60 Days: ${formatCurrency(aging.days60)}
+• 61-90 Days: ${formatCurrency(aging.days90)}
+• 90+ Days: ${formatCurrency(aging.over90)}
 
-OVERDUE INVOICES DETAIL:
-${overdueInv.slice(0, 15).map(inv => 
-  `• Invoice #${inv.invoiceNumber} - ${inv.client}: ${formatCurrency(inv.amount)} (${inv.daysOverdue} days overdue)`
+OVERDUE INVOICES:
+${overdueInv.slice(0, 10).map(inv => 
+  `• ${inv.client}: ${formatCurrency(inv.amount)} (${inv.daysOverdue} days overdue)`
 ).join('\n') || 'No overdue invoices'}
 
 === CLIENT PROFITABILITY ===
-${clientProfit.slice(0, 15).map((c, i) => 
-  `${i + 1}. ${c.name}: Revenue ${formatCurrency(c.revenue)}, Cost ${formatCurrency(c.cost)}, Profit ${formatCurrency(c.profit)} (${formatPercent(c.margin)} margin), ${c.hours.toFixed(1)} hours logged`
+${clientProfit.slice(0, 10).map((c, i) => 
+  `${i + 1}. ${c.name}: Revenue ${formatCurrency(c.revenue)}, Profit ${formatCurrency(c.profit)} (${formatPercent(c.margin)} margin)`
 ).join('\n') || 'No client data'}
 
 === PROJECT PERFORMANCE ===
-${projectPerf.slice(0, 15).map((p, i) => 
-  `${i + 1}. ${p.name} (${p.client}) [${p.status}]: Revenue ${formatCurrency(p.revenue)}, Cost ${formatCurrency(p.cost)}, Profit ${formatCurrency(p.profit)} (${formatPercent(p.margin)} margin), ${p.hours.toFixed(1)} hours${p.budget > 0 ? `, Budget: ${formatCurrency(p.budget)} (${p.budgetUsed.toFixed(0)}% used)` : ''}`
+${projectPerf.slice(0, 10).map((p, i) => 
+  `${i + 1}. ${p.name} (${p.client}): Revenue ${formatCurrency(p.revenue)}, Profit ${formatCurrency(p.profit)} (${formatPercent(p.margin)} margin)`
 ).join('\n') || 'No project data'}
-
-=== TRANSACTIONS SUMMARY ===
-Total: ${data.transactions?.length || 0}
-• Income: ${data.transactions?.filter(t => t.type === 'income' || (t.amount && t.amount > 0)).length || 0}
-• Expenses: ${data.transactions?.filter(t => t.type === 'expense' || (t.amount && t.amount < 0)).length || 0}
-• Uncategorized: ${data.transactions?.filter(t => !t.category || t.category === 'uncategorized').length || 0}
-• Without Project: ${data.transactions?.filter(t => !t.project_id).length || 0}
-
-Categories breakdown:
-${(() => {
-  const cats: Record<string, number> = {}
-  data.transactions?.forEach(t => {
-    const cat = t.category || 'uncategorized'
-    cats[cat] = (cats[cat] || 0) + Math.abs(t.amount || 0)
-  })
-  return Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([cat, amt]) => `• ${cat}: ${formatCurrency(amt)}`).join('\n')
-})()}
 `
 }
 
@@ -543,7 +527,7 @@ function ChatMessage({ message }: { message: Message }) {
           </div>
         </div>
         <p className="text-xs text-slate-500 mt-1.5 px-2">
-          {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </p>
       </div>
     </div>
@@ -563,14 +547,95 @@ function QuickActionButton({ action, onClick }: { action: typeof QUICK_ACTIONS[0
   )
 }
 
+function ConversationItem({ 
+  conversation, 
+  isActive, 
+  onClick, 
+  onDelete,
+  onRename 
+}: { 
+  conversation: Conversation
+  isActive: boolean
+  onClick: () => void
+  onDelete: () => void
+  onRename: (title: string) => void
+}) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState(conversation.title)
+  const [showMenu, setShowMenu] = useState(false)
+
+  const handleSaveTitle = () => {
+    onRename(editTitle)
+    setIsEditing(false)
+  }
+
+  return (
+    <div 
+      className={`group relative flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all ${
+        isActive ? 'bg-slate-700/80' : 'hover:bg-slate-800/60'
+      }`}
+      onClick={() => !isEditing && onClick()}
+    >
+      <MessageSquare size={16} className="text-slate-400 flex-shrink-0" />
+      
+      {isEditing ? (
+        <div className="flex-1 flex items-center gap-1">
+          <input
+            type="text"
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            className="flex-1 bg-slate-700 text-sm text-slate-100 px-2 py-1 rounded border border-slate-600 focus:outline-none focus:border-emerald-500"
+            autoFocus
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSaveTitle()
+              if (e.key === 'Escape') setIsEditing(false)
+            }}
+          />
+          <button onClick={(e) => { e.stopPropagation(); handleSaveTitle() }} className="p-1 text-emerald-400 hover:text-emerald-300">
+            <Check size={14} />
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); setIsEditing(false) }} className="p-1 text-slate-400 hover:text-slate-300">
+            <X size={14} />
+          </button>
+        </div>
+      ) : (
+        <>
+          <span className="flex-1 text-sm text-slate-200 truncate">{conversation.title}</span>
+          
+          <div className={`flex items-center gap-1 ${showMenu || isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+            <button 
+              onClick={(e) => { e.stopPropagation(); setIsEditing(true); setEditTitle(conversation.title) }}
+              className="p-1 text-slate-400 hover:text-slate-200"
+            >
+              <Pencil size={14} />
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); onDelete() }}
+              className="p-1 text-slate-400 hover:text-red-400"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ============ MAIN PAGE ============
 export default function SageAssistantPage() {
   const [messages, setMessages] = useState<Message[]>([])
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [companyData, setCompanyData] = useState<CompanyData | null>(null)
   const [kpis, setKpis] = useState<KPISummary | null>(null)
   const [dataLoading, setDataLoading] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [companyId, setCompanyId] = useState<string | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -589,6 +654,7 @@ export default function SageAssistantPage() {
     }
   }, [input])
 
+  // Load user, company data, and conversations
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -597,6 +663,7 @@ export default function SageAssistantPage() {
           setDataLoading(false)
           return
         }
+        setUserId(user.id)
 
         const { data: profile } = await supabase
           .from('profiles')
@@ -605,6 +672,9 @@ export default function SageAssistantPage() {
           .single()
 
         if (profile?.company_id) {
+          setCompanyId(profile.company_id)
+          
+          // Load company data
           const [transactions, invoices, projects, clients, teamMembers, timeEntries] = await Promise.all([
             supabase.from('transactions').select('*').eq('company_id', profile.company_id),
             supabase.from('invoices').select('*').eq('company_id', profile.company_id),
@@ -625,6 +695,20 @@ export default function SageAssistantPage() {
           
           setCompanyData(data)
           setKpis(calculateKPIs(data))
+
+          // Load conversations
+          const { data: convos } = await supabase
+            .from('sage_conversations')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('updated_at', { ascending: false })
+
+          if (convos) {
+            setConversations(convos.map(c => ({
+              ...c,
+              messages: c.messages || []
+            })))
+          }
         }
       } catch (error) {
         console.error('Error loading data:', error)
@@ -635,6 +719,53 @@ export default function SageAssistantPage() {
     loadData()
   }, [])
 
+  // Save conversation to database
+  const saveConversation = async (msgs: Message[], conversationId: string | null, title?: string) => {
+    if (!userId || !companyId) return null
+
+    const messagesForStorage = msgs.map(m => ({
+      ...m,
+      timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp
+    }))
+
+    if (conversationId) {
+      // Update existing conversation
+      await supabase
+        .from('sage_conversations')
+        .update({ 
+          messages: messagesForStorage,
+          updated_at: new Date().toISOString(),
+          ...(title ? { title } : {})
+        })
+        .eq('id', conversationId)
+      return conversationId
+    } else {
+      // Create new conversation
+      const { data, error } = await supabase
+        .from('sage_conversations')
+        .insert({
+          user_id: userId,
+          company_id: companyId,
+          title: title || 'New Conversation',
+          messages: messagesForStorage
+        })
+        .select()
+        .single()
+
+      if (data) {
+        setConversations(prev => [{ ...data, messages: msgs }, ...prev])
+        return data.id
+      }
+      return null
+    }
+  }
+
+  // Generate title from first message
+  const generateTitle = (content: string): string => {
+    const words = content.split(' ').slice(0, 6).join(' ')
+    return words.length > 40 ? words.slice(0, 40) + '...' : words
+  }
+
   const sendMessage = async (content: string) => {
     if (!content.trim() || loading) return
     
@@ -644,7 +775,9 @@ export default function SageAssistantPage() {
       content: content.trim(),
       timestamp: new Date()
     }
-    setMessages(prev => [...prev, userMessage])
+    
+    const newMessages = [...messages, userMessage]
+    setMessages(newMessages)
     setInput('')
     setLoading(true)
 
@@ -655,10 +788,7 @@ export default function SageAssistantPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [
-            ...messages.map(m => ({ role: m.role, content: m.content })),
-            { role: 'user', content: content.trim() }
-          ],
+          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
           systemPrompt: SYSTEM_PROMPT,
           dataContext
         })
@@ -675,7 +805,25 @@ export default function SageAssistantPage() {
         timestamp: new Date(),
         data: data.metadata
       }
-      setMessages(prev => [...prev, assistantMessage])
+      
+      const finalMessages = [...newMessages, assistantMessage]
+      setMessages(finalMessages)
+      
+      // Save to database
+      const title = messages.length === 0 ? generateTitle(content) : undefined
+      const savedId = await saveConversation(finalMessages, currentConversationId, title)
+      if (savedId && !currentConversationId) {
+        setCurrentConversationId(savedId)
+      }
+      
+      // Update conversation in list
+      if (currentConversationId) {
+        setConversations(prev => prev.map(c => 
+          c.id === currentConversationId 
+            ? { ...c, messages: finalMessages, updated_at: new Date().toISOString() }
+            : c
+        ))
+      }
       
     } catch (error) {
       console.error('Error:', error)
@@ -701,8 +849,30 @@ export default function SageAssistantPage() {
     }
   }
 
-  const clearChat = () => {
+  const startNewConversation = () => {
+    setCurrentConversationId(null)
     setMessages([])
+  }
+
+  const loadConversation = (conversation: Conversation) => {
+    setCurrentConversationId(conversation.id)
+    setMessages(conversation.messages.map(m => ({
+      ...m,
+      timestamp: new Date(m.timestamp)
+    })))
+  }
+
+  const deleteConversation = async (id: string) => {
+    await supabase.from('sage_conversations').delete().eq('id', id)
+    setConversations(prev => prev.filter(c => c.id !== id))
+    if (currentConversationId === id) {
+      startNewConversation()
+    }
+  }
+
+  const renameConversation = async (id: string, title: string) => {
+    await supabase.from('sage_conversations').update({ title }).eq('id', id)
+    setConversations(prev => prev.map(c => c.id === id ? { ...c, title } : c))
   }
 
   const hasMessages = messages.length > 0
@@ -716,131 +886,179 @@ export default function SageAssistantPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)]">
-      {hasMessages && (
-        <div className="flex items-center justify-between px-6 py-3 border-b border-slate-700/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 via-indigo-500 to-blue-500 flex items-center justify-center">
-              <SageLogo size={28} />
-            </div>
-            <div>
-              <h1 className="text-base font-semibold text-slate-100">Sage</h1>
-              <p className="text-xs text-slate-400">Financial Intelligence Partner</p>
-            </div>
-          </div>
-          <button 
-            onClick={clearChat}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-            title="New conversation"
+    <div className="flex h-[calc(100vh-80px)]">
+      {/* Sidebar */}
+      <div className={`${sidebarOpen ? 'w-72' : 'w-0'} border-r border-slate-700/50 bg-slate-900/50 flex flex-col transition-all overflow-hidden`}>
+        {/* Sidebar Header */}
+        <div className="p-4 border-b border-slate-700/50">
+          <button
+            onClick={startNewConversation}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-medium transition-colors"
           >
-            <Trash2 size={18} />
+            <Plus size={18} />
+            New Chat
           </button>
         </div>
-      )}
 
-      <div className="flex-1 overflow-y-auto">
-        {!hasMessages ? (
-          <div className="h-full flex flex-col items-center justify-center px-4">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 via-indigo-500 to-blue-500 flex items-center justify-center mb-6 shadow-lg shadow-purple-500/20">
-              <SageLogo size={48} />
-            </div>
-            <h1 className="text-3xl font-bold text-slate-100 mb-2">Sage</h1>
-            <p className="text-slate-400 text-center mb-8 max-w-lg">
-              Your AI financial intelligence partner. I have access to all your data — 
-              transactions, invoices, projects, clients, team, and time tracking. Ask me anything.
-            </p>
-            
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-8 max-w-3xl w-full">
-              {QUICK_ACTIONS.map((action, i) => (
-                <QuickActionButton key={i} action={action} onClick={() => handleQuickAction(action)} />
-              ))}
-            </div>
-
-            <div className="w-full max-w-2xl">
-              <div className="relative">
-                <textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyPress}
-                  placeholder="Ask Sage about your finances..."
-                  rows={1}
-                  className="w-full bg-slate-800/80 border border-slate-600/50 rounded-2xl pl-5 pr-14 py-4 text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 text-base"
-                  style={{ minHeight: '64px', maxHeight: '200px' }}
-                />
-                <button
-                  onClick={() => sendMessage(input)}
-                  disabled={!input.trim() || loading}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
-                >
-                  {loading ? (
-                    <RefreshCw size={18} className="text-white animate-spin" />
-                  ) : (
-                    <Send size={18} className="text-white" />
-                  )}
-                </button>
-              </div>
-              <p className="text-xs text-slate-500 mt-3 text-center">
-                Press Enter to send • Shift+Enter for new line
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="py-6 px-4 space-y-6">
-            {messages.map(message => (
-              <ChatMessage key={message.id} message={message} />
+        {/* Conversations List */}
+        <div className="flex-1 overflow-y-auto p-2">
+          <div className="space-y-1">
+            {conversations.map(conversation => (
+              <ConversationItem
+                key={conversation.id}
+                conversation={conversation}
+                isActive={conversation.id === currentConversationId}
+                onClick={() => loadConversation(conversation)}
+                onDelete={() => deleteConversation(conversation.id)}
+                onRename={(title) => renameConversation(conversation.id, title)}
+              />
             ))}
-            
-            {loading && (
-              <div className="flex gap-4 max-w-4xl mx-auto">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 via-indigo-500 to-blue-500 flex items-center justify-center">
-                  <SageLogo size={24} />
+          </div>
+          
+          {conversations.length === 0 && (
+            <p className="text-sm text-slate-500 text-center py-8">
+              No conversations yet
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        {hasMessages && (
+          <div className="flex items-center justify-between px-6 py-3 border-b border-slate-700/50">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors lg:hidden"
+              >
+                <MessageSquare size={18} />
+              </button>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 via-indigo-500 to-blue-500 flex items-center justify-center">
+                <SageLogo size={28} />
+              </div>
+              <div>
+                <h1 className="text-base font-semibold text-slate-100">Sage</h1>
+                <p className="text-xs text-slate-400">Financial Intelligence Partner</p>
+              </div>
+            </div>
+            <button 
+              onClick={startNewConversation}
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+              title="New conversation"
+            >
+              <Plus size={18} />
+            </button>
+          </div>
+        )}
+
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto">
+          {!hasMessages ? (
+            <div className="h-full flex flex-col items-center justify-center px-4">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 via-indigo-500 to-blue-500 flex items-center justify-center mb-6 shadow-lg shadow-purple-500/20">
+                <SageLogo size={48} />
+              </div>
+              <h1 className="text-3xl font-bold text-slate-100 mb-2">Sage</h1>
+              <p className="text-slate-400 text-center mb-8 max-w-lg">
+                Your AI financial intelligence partner. I have access to all your data — 
+                transactions, invoices, projects, clients, team, and time tracking. Ask me anything.
+              </p>
+              
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-8 max-w-3xl w-full">
+                {QUICK_ACTIONS.map((action, i) => (
+                  <QuickActionButton key={i} action={action} onClick={() => handleQuickAction(action)} />
+                ))}
+              </div>
+
+              <div className="w-full max-w-2xl">
+                <div className="relative">
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    placeholder="Ask Sage about your finances..."
+                    rows={1}
+                    className="w-full bg-slate-800/80 border border-slate-600/50 rounded-2xl pl-5 pr-14 py-4 text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 text-base"
+                    style={{ minHeight: '64px', maxHeight: '200px' }}
+                  />
+                  <button
+                    onClick={() => sendMessage(input)}
+                    disabled={!input.trim() || loading}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                  >
+                    {loading ? (
+                      <RefreshCw size={18} className="text-white animate-spin" />
+                    ) : (
+                      <Send size={18} className="text-white" />
+                    )}
+                  </button>
                 </div>
-                <div className="bg-slate-800/90 rounded-2xl rounded-tl-md px-5 py-3 border border-slate-700/50">
-                  <div className="flex items-center gap-2">
-                    <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <p className="text-xs text-slate-500 mt-3 text-center">
+                  Press Enter to send • Shift+Enter for new line
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="py-6 px-4 space-y-6">
+              {messages.map(message => (
+                <ChatMessage key={message.id} message={message} />
+              ))}
+              
+              {loading && (
+                <div className="flex gap-4 max-w-4xl mx-auto">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 via-indigo-500 to-blue-500 flex items-center justify-center">
+                    <SageLogo size={24} />
+                  </div>
+                  <div className="bg-slate-800/90 rounded-2xl rounded-tl-md px-5 py-3 border border-slate-700/50">
+                    <div className="flex items-center gap-2">
+                      <div className="flex gap-1">
+                        <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                      <span className="text-sm text-slate-400">Sage is thinking...</span>
                     </div>
-                    <span className="text-sm text-slate-400">Sage is thinking...</span>
                   </div>
                 </div>
-              </div>
-            )}
-            
-            <div ref={messagesEndRef} />
+              )}
+              
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Input */}
+        {hasMessages && (
+          <div className="border-t border-slate-700/50 px-4 py-4 bg-slate-900/80">
+            <div className="max-w-4xl mx-auto relative">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyPress}
+                placeholder="Ask a follow-up question..."
+                rows={1}
+                className="w-full bg-slate-800/80 border border-slate-600/50 rounded-2xl pl-5 pr-14 py-4 text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50"
+                style={{ minHeight: '60px', maxHeight: '200px' }}
+              />
+              <button
+                onClick={() => sendMessage(input)}
+                disabled={!input.trim() || loading}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+              >
+                {loading ? (
+                  <RefreshCw size={18} className="text-white animate-spin" />
+                ) : (
+                  <Send size={18} className="text-white" />
+                )}
+              </button>
+            </div>
           </div>
         )}
       </div>
-
-      {hasMessages && (
-        <div className="border-t border-slate-700/50 px-4 py-4 bg-slate-900/80">
-          <div className="max-w-4xl mx-auto relative">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyPress}
-              placeholder="Ask a follow-up question..."
-              rows={1}
-              className="w-full bg-slate-800/80 border border-slate-600/50 rounded-2xl pl-5 pr-14 py-4 text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50"
-              style={{ minHeight: '60px', maxHeight: '200px' }}
-            />
-            <button
-              onClick={() => sendMessage(input)}
-              disabled={!input.trim() || loading}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
-            >
-              {loading ? (
-                <RefreshCw size={18} className="text-white animate-spin" />
-              ) : (
-                <Send size={18} className="text-white" />
-              )}
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
