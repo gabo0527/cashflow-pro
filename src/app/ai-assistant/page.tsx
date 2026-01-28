@@ -512,8 +512,8 @@ export default function AIAssistantPage() {
                   onKeyDown={handleKeyPress}
                   placeholder="Ask about your finances..."
                   rows={1}
-                  className="w-full bg-slate-800 border border-slate-600 rounded-2xl pl-5 pr-14 py-4 text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                  style={{ minHeight: '56px', maxHeight: '200px' }}
+                  className="w-full bg-slate-800 border border-slate-600 rounded-2xl pl-5 pr-14 py-5 text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                  style={{ minHeight: '72px', maxHeight: '200px' }}
                 />
                 <button
                   onClick={() => sendMessage(input)}
@@ -564,7 +564,7 @@ export default function AIAssistantPage() {
 
       {/* Bottom Input - Only show when there are messages */}
       {hasMessages && (
-        <div className="border-t border-slate-700 px-4 py-4 bg-slate-900/80">
+        <div className="border-t border-slate-700 px-4 py-5 bg-slate-900/80">
           <div className="max-w-4xl mx-auto relative">
             <textarea
               ref={textareaRef}
@@ -573,8 +573,8 @@ export default function AIAssistantPage() {
               onKeyDown={handleKeyPress}
               placeholder="Ask a follow-up question..."
               rows={1}
-              className="w-full bg-slate-800 border border-slate-600 rounded-2xl pl-5 pr-14 py-4 text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              style={{ minHeight: '56px', maxHeight: '200px' }}
+              className="w-full bg-slate-800 border border-slate-600 rounded-2xl pl-5 pr-14 py-5 text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              style={{ minHeight: '72px', maxHeight: '200px' }}
             />
             <button
               onClick={() => sendMessage(input)}
