@@ -381,7 +381,7 @@ function getTeamUtilization(data: CompanyData): any[] {
     const weekHours = recentTime.reduce((sum, t) => sum + (t.hours || 0), 0)
     const weekBillable = recentTime.filter(t => t.billable).reduce((sum, t) => sum + (t.hours || 0), 0)
     
-    const projects = [...new Set(memberTime.map(t => t.project_id))].length
+    const projects = Array.from(new Set(memberTime.map(t => t.project_id))).length
     
     return {
       id: member.id,
