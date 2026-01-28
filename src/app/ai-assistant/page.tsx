@@ -2,10 +2,9 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { 
-  Send, Bot, User, Sparkles, TrendingUp, TrendingDown, DollarSign, 
-  AlertTriangle, ArrowRight, BarChart3, PieChart, RefreshCw, 
-  Lightbulb, Target, Clock, Users, FileText, ExternalLink,
-  ChevronRight, Zap, Brain, MessageSquare, Trash2
+  Send, Bot, User, TrendingUp, TrendingDown, DollarSign, 
+  AlertTriangle, BarChart3, RefreshCw, Users, FileText, ExternalLink,
+  ChevronRight, Brain, Trash2, Sparkles
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
@@ -52,9 +51,7 @@ const QUICK_ACTIONS = [
   { label: "What's my cash runway?", icon: DollarSign },
   { label: "Which clients are most profitable?", icon: TrendingUp },
   { label: "What should I be worried about?", icon: AlertTriangle },
-  { label: "How's utilization this month?", icon: Users },
-  { label: "Build a 6-month forecast", icon: BarChart3 },
-  { label: "Explain my expense variance", icon: FileText },
+  { label: "How's team utilization?", icon: Users },
 ]
 
 // ============ SYSTEM PROMPT ============
@@ -232,20 +229,20 @@ function ChatMessage({ message }: { message: Message }) {
   const isUser = message.role === 'user'
   
   return (
-    <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+    <div className={`flex gap-4 ${isUser ? 'flex-row-reverse' : ''} max-w-4xl mx-auto`}>
       <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
         isUser ? 'bg-blue-500' : 'bg-gradient-to-br from-purple-500 to-blue-500'
       }`}>
         {isUser ? <User size={16} className="text-white" /> : <Bot size={16} className="text-white" />}
       </div>
       
-      <div className={`flex-1 max-w-[80%] ${isUser ? 'text-right' : ''}`}>
-        <div className={`inline-block rounded-2xl px-4 py-3 ${
+      <div className={`flex-1 ${isUser ? 'text-right' : ''}`}>
+        <div className={`inline-block rounded-2xl px-5 py-3 max-w-[85%] ${
           isUser 
-            ? 'bg-blue-500 text-white rounded-tr-sm' 
-            : 'bg-slate-800 text-slate-100 rounded-tl-sm border border-slate-700'
+            ? 'bg-blue-500 text-white rounded-tr-md' 
+            : 'bg-slate-800 text-slate-100 rounded-tl-md border border-slate-700'
         }`}>
-          <div className="text-sm whitespace-pre-wrap">
+          <div className="text-sm leading-relaxed whitespace-pre-wrap">
             {message.content.split('\n').map((line, i) => {
               if (line.includes('[View') || line.includes('→]')) {
                 const linkMatch = line.match(/\[(.*?)\s*→\]/)
@@ -268,7 +265,6 @@ function ChatMessage({ message }: { message: Message }) {
               if (/^\d+\.\s/.test(line.trim())) {
                 return <p key={i} className="my-0.5 pl-2">{line}</p>
               }
-              // Handle bold text
               const boldProcessed = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
               return <p key={i} className="my-1" dangerouslySetInnerHTML={{ __html: boldProcessed }} />
             })}
@@ -288,7 +284,7 @@ function ChatMessage({ message }: { message: Message }) {
             </div>
           )}
         </div>
-        <p className="text-xs text-slate-500 mt-1 px-2">
+        <p className="text-xs text-slate-500 mt-1.5 px-2">
           {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </p>
       </div>
@@ -301,26 +297,11 @@ function QuickActionButton({ action, onClick }: { action: typeof QUICK_ACTIONS[0
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700 hover:bg-slate-700/50 hover:border-slate-600 transition-all text-sm text-slate-300"
+      className="flex items-center gap-2 px-4 py-3 rounded-xl bg-slate-800/80 border border-slate-700 hover:bg-slate-700/80 hover:border-slate-600 transition-all text-sm text-slate-300"
     >
-      <Icon size={14} className="text-slate-400" />
+      <Icon size={16} className="text-slate-400" />
       {action.label}
     </button>
-  )
-}
-
-function KPIMiniCard({ label, value, status }: { label: string, value: string, status?: 'good' | 'warning' | 'bad' }) {
-  const statusColors = {
-    good: 'text-emerald-400',
-    warning: 'text-amber-400',
-    bad: 'text-rose-400'
-  }
-  
-  return (
-    <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700 min-w-[120px]">
-      <p className="text-xs text-slate-400">{label}</p>
-      <p className={`text-lg font-bold ${status ? statusColors[status] : 'text-slate-100'}`}>{value}</p>
-    </div>
   )
 }
 
@@ -333,6 +314,7 @@ export default function AIAssistantPage() {
   const [kpis, setKpis] = useState<KPISummary | null>(null)
   const [dataLoading, setDataLoading] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -341,6 +323,14 @@ export default function AIAssistantPage() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px'
+    }
+  }, [input])
 
   // Load company data
   useEffect(() => {
@@ -380,20 +370,6 @@ export default function AIAssistantPage() {
           setCompanyData(data)
           setKpis(calculateKPIs(data))
         }
-        
-        setMessages([{
-          id: 'welcome',
-          role: 'assistant',
-          content: `👋 Hi! I'm your Vantage AI Financial Assistant. I have access to your complete financial data and can help you with:
-
-- **Analysis** - KPIs, trends, variances, profitability
-- **Forecasting** - Cash flow projections, scenarios
-- **Insights** - Anomalies, risks, opportunities
-- **Decisions** - Challenge assumptions, strategic advice
-
-What would you like to explore today?`,
-          timestamp: new Date()
-        }])
       } catch (error) {
         console.error('Error loading data:', error)
       } finally {
@@ -424,7 +400,7 @@ What would you like to explore today?`,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [
-            ...messages.filter(m => m.id !== 'welcome').map(m => ({ role: m.role, content: m.content })),
+            ...messages.map(m => ({ role: m.role, content: m.content })),
             { role: 'user', content: content.trim() }
           ],
           systemPrompt: SYSTEM_PROMPT,
@@ -470,13 +446,10 @@ What would you like to explore today?`,
   }
 
   const clearChat = () => {
-    setMessages([{
-      id: 'welcome',
-      role: 'assistant',
-      content: `Chat cleared. How can I help you?`,
-      timestamp: new Date()
-    }])
+    setMessages([])
   }
+
+  const hasMessages = messages.length > 0
 
   if (dataLoading) {
     return (
@@ -487,126 +460,136 @@ What would you like to explore today?`,
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)]">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
-            <Brain size={20} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-lg font-semibold text-slate-100">AI Assistant</h1>
-            <p className="text-xs text-slate-400">Your financial intelligence partner</p>
-          </div>
-        </div>
-        <button 
-          onClick={clearChat}
-          className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-          title="Clear chat"
-        >
-          <Trash2 size={18} />
-        </button>
-      </div>
-
-      {/* KPI Summary Strip */}
-      {kpis && (
-        <div className="px-4 py-3 border-b border-slate-700 bg-slate-800/30 overflow-x-auto">
+    <div className="flex flex-col h-[calc(100vh-80px)]">
+      {/* Header - Only show when there are messages */}
+      {hasMessages && (
+        <div className="flex items-center justify-between px-6 py-3 border-b border-slate-700">
           <div className="flex items-center gap-3">
-            <KPIMiniCard 
-              label="Cash on Hand" 
-              value={formatCurrency(kpis.cashOnHand)} 
-              status={kpis.runway > 6 ? 'good' : kpis.runway > 3 ? 'warning' : 'bad'}
-            />
-            <KPIMiniCard 
-              label="Runway" 
-              value={`${kpis.runway.toFixed(1)} mo`}
-              status={kpis.runway > 6 ? 'good' : kpis.runway > 3 ? 'warning' : 'bad'}
-            />
-            <KPIMiniCard 
-              label="AR Outstanding" 
-              value={formatCurrency(kpis.arOutstanding)}
-            />
-            <KPIMiniCard 
-              label="Utilization" 
-              value={formatPercent(kpis.utilizationRate)}
-              status={kpis.utilizationRate >= 70 ? 'good' : kpis.utilizationRate >= 50 ? 'warning' : 'bad'}
-            />
-            <KPIMiniCard 
-              label="Gross Margin" 
-              value={formatPercent(kpis.grossMargin)}
-              status={kpis.grossMargin >= 40 ? 'good' : kpis.grossMargin >= 20 ? 'warning' : 'bad'}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {messages.map(message => (
-          <ChatMessage key={message.id} message={message} />
-        ))}
-        
-        {loading && (
-          <div className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
-              <Bot size={16} className="text-white" />
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+              <Brain size={18} className="text-white" />
             </div>
-            <div className="bg-slate-800 rounded-2xl rounded-tl-sm px-4 py-3 border border-slate-700">
-              <div className="flex items-center gap-2">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-                <span className="text-sm text-slate-400">Analyzing your data...</span>
-              </div>
+            <div>
+              <h1 className="text-base font-semibold text-slate-100">AI Assistant</h1>
             </div>
           </div>
-        )}
-        
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Quick Actions */}
-      {messages.length <= 1 && (
-        <div className="px-4 py-3 border-t border-slate-700">
-          <p className="text-xs text-slate-400 mb-2">Quick actions:</p>
-          <div className="flex flex-wrap gap-2">
-            {QUICK_ACTIONS.map((action, i) => (
-              <QuickActionButton key={i} action={action} onClick={() => handleQuickAction(action)} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Input Area */}
-      <div className="px-4 py-3 border-t border-slate-700 bg-slate-900/50">
-        <div className="flex items-end gap-3">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyPress}
-            placeholder="Ask about your finances..."
-            rows={1}
-            className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            style={{ minHeight: '48px', maxHeight: '120px' }}
-          />
-          <button
-            onClick={() => sendMessage(input)}
-            disabled={!input.trim() || loading}
-            className="w-12 h-12 rounded-xl bg-blue-500 hover:bg-blue-600 disabled:bg-slate-700 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+          <button 
+            onClick={clearChat}
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            title="New chat"
           >
-            {loading ? (
-              <RefreshCw size={18} className="text-white animate-spin" />
-            ) : (
-              <Send size={18} className="text-white" />
-            )}
+            <Trash2 size={18} />
           </button>
         </div>
-        <p className="text-xs text-slate-500 mt-2 text-center">
-          Press Enter to send • Shift+Enter for new line
-        </p>
+      )}
+
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto">
+        {!hasMessages ? (
+          /* Empty State - Centered like Claude */
+          <div className="h-full flex flex-col items-center justify-center px-4">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center mb-6">
+              <Brain size={32} className="text-white" />
+            </div>
+            <h1 className="text-2xl font-semibold text-slate-100 mb-2">Vantage AI Assistant</h1>
+            <p className="text-slate-400 text-center mb-8 max-w-md">
+              Your financial intelligence partner. Ask questions about your data, get insights, and make better decisions.
+            </p>
+            
+            {/* Quick Actions Grid */}
+            <div className="grid grid-cols-2 gap-3 mb-8 max-w-xl">
+              {QUICK_ACTIONS.map((action, i) => (
+                <QuickActionButton key={i} action={action} onClick={() => handleQuickAction(action)} />
+              ))}
+            </div>
+
+            {/* Centered Input */}
+            <div className="w-full max-w-2xl">
+              <div className="relative">
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyPress}
+                  placeholder="Ask about your finances..."
+                  rows={1}
+                  className="w-full bg-slate-800 border border-slate-600 rounded-2xl pl-5 pr-14 py-4 text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                  style={{ minHeight: '56px', maxHeight: '200px' }}
+                />
+                <button
+                  onClick={() => sendMessage(input)}
+                  disabled={!input.trim() || loading}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-blue-500 hover:bg-blue-600 disabled:bg-slate-700 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                >
+                  {loading ? (
+                    <RefreshCw size={18} className="text-white animate-spin" />
+                  ) : (
+                    <Send size={18} className="text-white" />
+                  )}
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 mt-3 text-center">
+                Press Enter to send • Shift+Enter for new line
+              </p>
+            </div>
+          </div>
+        ) : (
+          /* Messages List */
+          <div className="py-6 px-4 space-y-6">
+            {messages.map(message => (
+              <ChatMessage key={message.id} message={message} />
+            ))}
+            
+            {loading && (
+              <div className="flex gap-4 max-w-4xl mx-auto">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+                  <Bot size={16} className="text-white" />
+                </div>
+                <div className="bg-slate-800 rounded-2xl rounded-tl-md px-5 py-3 border border-slate-700">
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                    <span className="text-sm text-slate-400">Analyzing...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div ref={messagesEndRef} />
+          </div>
+        )}
       </div>
+
+      {/* Bottom Input - Only show when there are messages */}
+      {hasMessages && (
+        <div className="border-t border-slate-700 px-4 py-4 bg-slate-900/80">
+          <div className="max-w-4xl mx-auto relative">
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyPress}
+              placeholder="Ask a follow-up question..."
+              rows={1}
+              className="w-full bg-slate-800 border border-slate-600 rounded-2xl pl-5 pr-14 py-4 text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              style={{ minHeight: '56px', maxHeight: '200px' }}
+            />
+            <button
+              onClick={() => sendMessage(input)}
+              disabled={!input.trim() || loading}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-blue-500 hover:bg-blue-600 disabled:bg-slate-700 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+            >
+              {loading ? (
+                <RefreshCw size={18} className="text-white animate-spin" />
+              ) : (
+                <Send size={18} className="text-white" />
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
