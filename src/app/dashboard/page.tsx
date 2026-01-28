@@ -19,8 +19,8 @@ import { getCurrentUser } from '@/lib/supabase'
 
 // Supabase client
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  'https://jmahfgpbtjeomuepfozf.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptYWhmZ3BidGplb211ZXBmb3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0OTAxNzcsImV4cCI6MjA4MTA2NjE3N30.3SVDvWCGIYYHV57BpKjpDJVCZLKzuRv8B_VietQDxUQ'
 )
 
 // ============ VANTAGE LOGO ============
@@ -545,6 +545,13 @@ export default function DashboardPage() {
     })
   }, [invoices, clients])
 
+  // Period label helper
+  const periodLabel = useMemo(() => {
+    const start = periodRange.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const end = periodRange.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    return `${start} – ${end}`
+  }, [periodRange])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -555,13 +562,6 @@ export default function DashboardPage() {
       </div>
     )
   }
-
-  // Period label helper
-  const periodLabel = useMemo(() => {
-    const start = periodRange.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    const end = periodRange.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    return `${start} – ${end}`
-  }, [periodRange])
 
   return (
     <div className="space-y-5 pb-8">
