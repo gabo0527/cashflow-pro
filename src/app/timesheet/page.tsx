@@ -254,8 +254,8 @@ export default function TimesheetPage() {
         }))
 
       const { error } = await supabase
-        .from('timesheet_entries')
-        .insert(entriesToInsert)
+  .from('time_entries')
+  .insert(entriesToInsert)
 
       if (error) throw error
 
