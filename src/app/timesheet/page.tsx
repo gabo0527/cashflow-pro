@@ -12,6 +12,15 @@ const supabaseUrl = 'https://jmahfgpbtjeomuepfozf.supabase.co'
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptYWhmZ3BidGplb211ZXBmb3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0OTAxNzcsImV4cCI6MjA4MTA2NjE3N30.3SVDvWCGIYYHV57BpKjpDJVCZLKzuRv8B_VietQDxUQ'
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+// Vantage Logo - Teal bars matching dashboard
+const VantageLogo = ({ size = 32 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="4" y="20" width="8" height="16" rx="2" fill="#2dd4bf" fillOpacity="0.5"/>
+    <rect x="16" y="12" width="8" height="24" rx="2" fill="#2dd4bf" fillOpacity="0.75"/>
+    <rect x="28" y="4" width="8" height="32" rx="2" fill="#2dd4bf"/>
+  </svg>
+)
+
 // Types
 interface Assignment {
   id: string
@@ -108,16 +117,12 @@ export default function TimesheetPage() {
     setAssignments([])
 
     try {
-      console.log('Looking up email:', email.trim().toLowerCase())
-      
       // Step 1: Find team member by email
       const { data: memberData, error: memberError } = await supabase
         .from('team_members')
         .select('id, name, email, company_id')
         .eq('email', email.trim().toLowerCase())
         .single()
-
-      console.log('Member lookup result:', memberData, memberError)
 
       if (memberError || !memberData) {
         setError('Email not found. Please check your email address.')
@@ -133,10 +138,7 @@ export default function TimesheetPage() {
         .select('id, project_id, service, payment_type, rate')
         .eq('team_member_id', memberData.id)
 
-      console.log('Assignments:', assignData, assignError)
-
       if (assignError) {
-        console.error('Assignment error:', assignError)
         setError('Error loading your projects. Please try again.')
         setLoading(false)
         return
@@ -150,35 +152,28 @@ export default function TimesheetPage() {
 
       // Step 3: Get project IDs
       const projectIds = assignData.map((a: any) => a.project_id).filter(Boolean)
-      console.log('Project IDs to fetch:', projectIds)
 
-      // Step 4: Fetch projects (using correct columns: id, name, client_id, status)
+      // Step 4: Fetch projects
       const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
         .select('id, name, client_id, status')
         .in('id', projectIds)
 
-      console.log('Projects fetch result:', projectsData, projectsError)
-
       if (projectsError) {
-        console.error('Projects error:', projectsError)
         setError('Error loading projects. Please try again.')
         setLoading(false)
         return
       }
 
-      // Step 5: Get client IDs and fetch client names
+      // Step 5: Get client names
       const clientIds = Array.from(new Set((projectsData || []).map((p: any) => p.client_id).filter(Boolean)))
-      console.log('Client IDs to fetch:', clientIds)
-
       let clientsMap: Record<string, string> = {}
+      
       if (clientIds.length > 0) {
-        const { data: clientsData, error: clientsError } = await supabase
+        const { data: clientsData } = await supabase
           .from('clients')
           .select('id, name')
           .in('id', clientIds)
-
-        console.log('Clients fetch result:', clientsData, clientsError)
 
         if (clientsData) {
           clientsData.forEach((c: any) => {
@@ -187,7 +182,7 @@ export default function TimesheetPage() {
         }
       }
 
-      // Step 6: Combine assignments with project and client data
+      // Step 6: Combine data
       const combinedAssignments: Assignment[] = assignData.map((a: any) => {
         const project = (projectsData || []).find((p: any) => p?.id === a.project_id)
         const clientName = project?.client_id ? clientsMap[project.client_id] : 'Other'
@@ -200,118 +195,110 @@ export default function TimesheetPage() {
           payment_type: a.payment_type,
           rate: a.rate || 0
         }
-      }).filter((a: Assignment) => {
-        // Only include active projects or if status is unknown
-        const project = (projectsData || []).find((p: any) => p?.id === a.project_id)
-        return !project?.status || project.status === 'active'
       })
 
-      console.log('Final assignments:', combinedAssignments)
       setAssignments(combinedAssignments)
 
-      // Initialize entries
-      const initialEntries: Record<string, EntryData> = {}
-      combinedAssignments.forEach(a => {
-        initialEntries[a.project_id] = { project_id: a.project_id, hours: '', notes: '' }
-      })
-      setEntries(initialEntries)
-
     } catch (err) {
-      console.error('Lookup error:', err)
-      setError('An error occurred. Please try again.')
+      console.error('Error:', err)
+      setError('An unexpected error occurred. Please try again.')
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   const updateEntry = (projectId: string, field: 'hours' | 'notes', value: string) => {
     setEntries(prev => ({
       ...prev,
-      [projectId]: { ...prev[projectId], [field]: value }
+      [projectId]: {
+        ...prev[projectId],
+        project_id: projectId,
+        [field]: value
+      }
     }))
   }
 
   const totalHours = useMemo(() => {
     return Object.values(entries).reduce((sum, e) => {
-      const h = parseFloat(e.hours) || 0
-      return sum + h
+      const hours = parseFloat(e.hours) || 0
+      return sum + hours
     }, 0)
   }, [entries])
 
-  const handleSubmit = async () => {
-    if (!member) return
-
-    const entriesToSubmit = Object.entries(entries)
-      .filter(([_, e]) => parseFloat(e.hours) > 0)
-  .map(([projectId, e]) => ({
-  company_id: member.company_id,
-  contractor_id: member.id,  // Add this line
-  project_id: projectId,
-  date: weekDates.start.toISOString().split('T')[0],
-  hours: parseFloat(e.hours),
-  description: e.notes || null,
-  bill_rate: assignments.find(a => a.project_id === projectId)?.rate || 0
-}))
-
-    if (entriesToSubmit.length === 0) {
-      setError('Please enter hours for at least one project')
-      return
-    }
-
-    setSubmitting(true)
-    setError('')
-
-    try {
-      const { error: insertError } = await supabase
-        .from('time_entries')
-        .insert(entriesToSubmit)
-
-      if (insertError) {
-        console.error('Submit error:', insertError)
-        setError('Error submitting timesheet. Please try again.')
-      } else {
-        setSuccess(`Timesheet submitted successfully! Total: ${totalHours} hours`)
-        // Reset entries
-        const resetEntries: Record<string, EntryData> = {}
-        assignments.forEach(a => {
-          resetEntries[a.project_id] = { project_id: a.project_id, hours: '', notes: '' }
-        })
-        setEntries(resetEntries)
-      }
-    } catch (err) {
-      console.error('Submit error:', err)
-      setError('An error occurred. Please try again.')
-    }
-
-    setSubmitting(false)
-  }
-
   const navigateWeek = (direction: 'prev' | 'next') => {
     setCurrentWeek(prev => {
-      const d = new Date(prev)
-      d.setDate(d.getDate() + (direction === 'next' ? 7 : -7))
-      return d
+      const newDate = new Date(prev)
+      newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7))
+      return newDate
     })
   }
 
+  const handleSubmit = async () => {
+    if (!member || totalHours === 0) return
+
+    setSubmitting(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      const entriesToInsert = Object.values(entries)
+        .filter(e => parseFloat(e.hours) > 0)
+        .map(e => ({
+          company_id: member.company_id,
+          team_member_id: member.id,
+          project_id: e.project_id,
+          week_start: weekDates.start.toISOString().split('T')[0],
+          hours: parseFloat(e.hours),
+          notes: e.notes || null,
+          status: 'submitted'
+        }))
+
+      const { error } = await supabase
+        .from('timesheet_entries')
+        .insert(entriesToInsert)
+
+      if (error) throw error
+
+      setSuccess(`Successfully submitted ${totalHours} hours for the week!`)
+      setEntries({})
+
+    } catch (err) {
+      console.error('Submit error:', err)
+      setError('Failed to submit timesheet. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-2xl mx-auto py-8 px-4">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Clock className="h-8 w-8 text-orange-600" />
+    <div className="min-h-screen bg-slate-900">
+      {/* Header */}
+      <div className="bg-slate-800 border-b border-slate-700">
+        <div className="max-w-2xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-center gap-3">
+            <VantageLogo size={32} />
+            <span className="text-xl font-bold text-slate-100">Vantage</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Timesheet Entry</h1>
-          <p className="text-gray-600 mt-1">Enter your weekly hours</p>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        {/* Page Title */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-slate-800 border border-slate-700 mb-4">
+            <Clock className="h-7 w-7 text-teal-400" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-100 mb-2">Time Entry</h1>
+          <p className="text-slate-500">Submit your weekly hours</p>
         </div>
 
-        {/* Email Lookup */}
         {!member ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          /* Email Lookup */
+          <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
             <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
-                <span className="text-gray-500 text-lg">?</span>
+              <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center">
+                <span className="text-slate-500 text-lg">?</span>
               </div>
               <div className="flex-1">
                 <input
@@ -320,14 +307,14 @@ export default function TimesheetPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && lookupMember()}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900 placeholder-gray-400"
+                  className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 text-slate-100 placeholder-slate-500 outline-none transition-all"
                 />
               </div>
             </div>
             <button
               onClick={lookupMember}
               disabled={loading}
-              className="w-full py-3 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3 bg-teal-500 hover:bg-teal-400 text-slate-900 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
             >
               {loading ? (
                 <>
@@ -338,27 +325,27 @@ export default function TimesheetPage() {
                 'Continue'
               )}
             </button>
-            <p className="text-center text-sm text-gray-500 mt-4">
+            <p className="text-center text-sm text-slate-500 mt-4">
               Not you? Contact your administrator for access.
             </p>
           </div>
         ) : (
           <>
             {/* Member Info */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+            <div className="bg-slate-800 rounded-xl border border-slate-700 p-4 mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                  <span className="text-orange-600 font-semibold">
+                <div className="w-10 h-10 bg-teal-500/20 rounded-full flex items-center justify-center">
+                  <span className="text-teal-400 font-semibold text-sm">
                     {member.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                   </span>
                 </div>
-                <div>
-                  <p className="font-medium text-gray-900">{member.name}</p>
-                  <p className="text-sm text-gray-500">{member.email}</p>
+                <div className="flex-1">
+                  <p className="font-medium text-slate-100">{member.name}</p>
+                  <p className="text-sm text-slate-500">{member.email}</p>
                 </div>
                 <button
                   onClick={() => { setMember(null); setAssignments([]); setEmail('') }}
-                  className="ml-auto text-sm text-gray-500 hover:text-gray-700"
+                  className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
                 >
                   Not you?
                 </button>
@@ -366,25 +353,25 @@ export default function TimesheetPage() {
             </div>
 
             {/* Week Navigator */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+            <div className="bg-slate-800 rounded-xl border border-slate-700 p-4 mb-4">
               <div className="flex items-center justify-between">
                 <button
                   onClick={() => navigateWeek('prev')}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
+                  className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
                 >
-                  <ChevronLeft className="h-5 w-5 text-gray-600" />
+                  <ChevronLeft className="h-5 w-5 text-slate-400" />
                 </button>
                 <div className="text-center">
-                  <p className="font-semibold text-gray-900">
+                  <p className="font-semibold text-slate-100">
                     {formatDateRange(weekDates.start, weekDates.end)}
                   </p>
-                  <p className="text-sm text-gray-500">Week of entry</p>
+                  <p className="text-sm text-slate-500">Week of entry</p>
                 </div>
                 <button
                   onClick={() => navigateWeek('next')}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
+                  className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
                 >
-                  <ChevronRight className="h-5 w-5 text-gray-600" />
+                  <ChevronRight className="h-5 w-5 text-slate-400" />
                 </button>
               </div>
             </div>
@@ -392,44 +379,44 @@ export default function TimesheetPage() {
             {/* Projects by Client */}
             <div className="space-y-4 mb-4">
               <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-gray-900">Enter Hours by Project</h2>
-                <p className="text-sm text-gray-500">Enter total hours for the week</p>
+                <h2 className="font-semibold text-slate-100">Enter Hours by Project</h2>
+                <p className="text-sm text-slate-500">Total hours for the week</p>
               </div>
 
               {Object.entries(groupedAssignments).map(([client, clientAssignments]) => (
-                <div key={client} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div key={client} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
                   {/* Client Header */}
                   <button
                     onClick={() => toggleClient(client)}
-                    className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors"
+                    className="w-full px-4 py-3 flex items-center justify-between bg-slate-700/30 hover:bg-slate-700/50 transition-colors"
                   >
                     <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-gray-500" />
-                      <span className="font-medium text-gray-900">{client}</span>
-                      <span className="text-sm text-gray-500">({clientAssignments.length} projects)</span>
+                      <Building2 className="h-4 w-4 text-slate-500" />
+                      <span className="font-medium text-slate-100">{client}</span>
+                      <span className="text-sm text-slate-500">({clientAssignments.length} projects)</span>
                     </div>
                     {collapsedClients.has(client) ? (
-                      <ChevronDown className="h-5 w-5 text-gray-500" />
+                      <ChevronDown className="h-5 w-5 text-slate-500" />
                     ) : (
-                      <ChevronUp className="h-5 w-5 text-gray-500" />
+                      <ChevronUp className="h-5 w-5 text-slate-500" />
                     )}
                   </button>
 
                   {/* Projects */}
                   {!collapsedClients.has(client) && (
-                    <div className="divide-y divide-gray-100">
+                    <div className="divide-y divide-slate-700/50">
                       {clientAssignments.map(assignment => (
                         <div key={assignment.id} className="p-4">
                           <div className="flex items-start gap-3">
-                            <FolderOpen className="h-5 w-5 text-orange-500 mt-0.5" />
+                            <FolderOpen className="h-5 w-5 text-teal-400 mt-0.5" />
                             <div className="flex-1">
-                              <p className="font-medium text-gray-900">{assignment.project_name}</p>
-                              <p className="text-sm text-gray-500">{assignment.service || 'General'}</p>
+                              <p className="font-medium text-slate-100">{assignment.project_name}</p>
+                              <p className="text-sm text-slate-500">{assignment.service || 'General'}</p>
                             </div>
                           </div>
                           <div className="mt-3 grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-xs text-gray-500 mb-1">Hours</label>
+                              <label className="block text-xs text-slate-500 mb-1">Hours</label>
                               <input
                                 type="number"
                                 min="0"
@@ -437,17 +424,17 @@ export default function TimesheetPage() {
                                 placeholder="0"
                                 value={entries[assignment.project_id]?.hours || ''}
                                 onChange={(e) => updateEntry(assignment.project_id, 'hours', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900"
+                                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 text-slate-100 outline-none transition-all"
                               />
                             </div>
                             <div>
-                              <label className="block text-xs text-gray-500 mb-1">Notes (optional)</label>
+                              <label className="block text-xs text-slate-500 mb-1">Notes (optional)</label>
                               <input
                                 type="text"
                                 placeholder="Brief description..."
                                 value={entries[assignment.project_id]?.notes || ''}
                                 onChange={(e) => updateEntry(assignment.project_id, 'notes', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900 placeholder-gray-400"
+                                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 text-slate-100 placeholder-slate-600 outline-none transition-all"
                               />
                             </div>
                           </div>
@@ -460,15 +447,15 @@ export default function TimesheetPage() {
             </div>
 
             {/* Total & Submit */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
               <div className="flex items-center justify-between mb-4">
-                <span className="font-medium text-gray-900">Total Hours</span>
-                <span className="text-2xl font-bold text-orange-600">{totalHours.toFixed(1)}</span>
+                <span className="font-medium text-slate-100">Total Hours</span>
+                <span className="text-2xl font-bold text-teal-400">{totalHours.toFixed(1)}</span>
               </div>
               <button
                 onClick={handleSubmit}
                 disabled={submitting || totalHours === 0}
-                className="w-full py-3 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full py-3 bg-teal-500 hover:bg-teal-400 text-slate-900 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
               >
                 {submitting ? (
                   <>
@@ -488,21 +475,21 @@ export default function TimesheetPage() {
 
         {/* Messages */}
         {error && (
-          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
-            <AlertCircle className="h-5 w-5" />
+          <div className="mt-4 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2 text-rose-400">
+            <AlertCircle className="h-5 w-5 flex-shrink-0" />
             {error}
           </div>
         )}
         {success && (
-          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-700">
-            <Check className="h-5 w-5" />
+          <div className="mt-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2 text-emerald-400">
+            <Check className="h-5 w-5 flex-shrink-0" />
             {success}
           </div>
         )}
 
         {/* Footer */}
-        <p className="text-center text-sm text-gray-400 mt-8">
-          Powered by Vantage
+        <p className="text-center text-sm text-slate-600 mt-8">
+          Powered by <span className="text-slate-500">Vantage</span>
         </p>
       </div>
     </div>
