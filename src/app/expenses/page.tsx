@@ -13,6 +13,14 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart as RePieChart, Pie, Cell, LineChart, Line, AreaChart, Area
 } from 'recharts'
+import { createClient } from '@supabase/supabase-js'
+import { getCurrentUser } from '@/lib/supabase'
+
+// Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+)
 
 // ============ DESIGN SYSTEM ============
 const COLORS = {
@@ -503,6 +511,7 @@ function AddExpenseModal({ isOpen, onClose, contractors, projects, subcategories
 // ============ MAIN PAGE ============
 export default function ExpensesPage() {
   const [loading, setLoading] = useState(true)
+  const [companyId, setCompanyId] = useState<string | null>(null)
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
   const [selectedMonth, setSelectedMonth] = useState<number | 'all'>('all')
   const [filterCategory, setFilterCategory] = useState<string>('all')
@@ -513,33 +522,16 @@ export default function ExpensesPage() {
   const [sortField, setSortField] = useState<string>('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
-  // Editable subcategories
+  // Editable subcategories (could be stored in company settings later)
   const [subcategories, setSubcategories] = useState({
     directCosts: ['Contractor Labor', 'Materials', 'Subcontractors', 'Project Expenses'],
     overhead: ['Payroll', 'Software & Subscriptions', 'Rent & Utilities', 'Insurance', 'Professional Services', 'Travel & Entertainment', 'Office & Supplies', 'Marketing', 'Other']
   })
 
-  const [contractors] = useState([
-    { id: 'con1', name: 'Travis Swank' }, { id: 'con2', name: 'Maria Garcia' },
-    { id: 'con3', name: 'John Smith' }, { id: 'con4', name: 'Sarah Chen' },
-  ])
-
-  const [projects] = useState([
-    { id: 'p1', name: 'gCLS - Doc Control' }, { id: 'p2', name: 'gCLS - QA/QC' },
-    { id: 'p3', name: 'gCLS - Commissioning' }, { id: 'p4', name: 'Yondr Supply Chain' },
-    { id: 'p5', name: 'SDP Buildout' }, { id: 'p6', name: 'CADC Phase 1' },
-  ])
-
-  const [expenses, setExpenses] = useState([
-    { id: '1', date: '2026-01-15', description: 'Travis Swank - January Invoice', category: 'directCosts', subcategory: 'Contractor Labor', amount: 8500, contractor_id: 'con1', project_id: 'p1', status: 'paid' },
-    { id: '2', date: '2026-01-15', description: 'Maria Garcia - January Invoice', category: 'directCosts', subcategory: 'Contractor Labor', amount: 7200, contractor_id: 'con2', project_id: 'p2', status: 'paid' },
-    { id: '3', date: '2026-01-20', description: 'John Smith - Project Support', category: 'directCosts', subcategory: 'Contractor Labor', amount: 4800, contractor_id: 'con3', project_id: 'p4', status: 'pending' },
-    { id: '4', date: '2026-01-01', description: 'Slack - Monthly', category: 'overhead', subcategory: 'Software & Subscriptions', amount: 150, contractor_id: null, project_id: null, status: 'paid' },
-    { id: '5', date: '2026-01-01', description: 'Google Workspace', category: 'overhead', subcategory: 'Software & Subscriptions', amount: 180, contractor_id: null, project_id: null, status: 'paid' },
-    { id: '6', date: '2026-01-01', description: 'Notion - Team Plan', category: 'overhead', subcategory: 'Software & Subscriptions', amount: 96, contractor_id: null, project_id: null, status: 'paid' },
-    { id: '7', date: '2026-01-05', description: 'Office Rent - January', category: 'overhead', subcategory: 'Rent & Utilities', amount: 2500, contractor_id: null, project_id: null, status: 'paid' },
-    { id: '8', date: '2026-01-10', description: 'Liability Insurance - Q1', category: 'overhead', subcategory: 'Insurance', amount: 1800, contractor_id: null, project_id: null, status: 'paid' },
-  ])
+  // Real data from Supabase
+  const [contractors, setContractors] = useState<any[]>([])
+  const [projects, setProjects] = useState<any[]>([])
+  const [expenses, setExpenses] = useState<any[]>([])
 
   const months = [
     { value: 'all', label: 'All Months' },
@@ -549,7 +541,81 @@ export default function ExpensesPage() {
     { value: 9, label: 'October' }, { value: 10, label: 'November' }, { value: 11, label: 'December' }
   ]
 
-  useEffect(() => { setTimeout(() => setLoading(false), 500) }, [])
+  // Load data from Supabase
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Get current user and company
+        const user = await getCurrentUser()
+        if (!user) {
+          console.error('No user found')
+          setLoading(false)
+          return
+        }
+
+        // Get company_id from profiles
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('id', user.id)
+          .single()
+
+        if (!profile?.company_id) {
+          console.error('No company found for user')
+          setLoading(false)
+          return
+        }
+
+        setCompanyId(profile.company_id)
+
+        // Load expenses
+        const { data: expensesData, error: expensesError } = await supabase
+          .from('expenses')
+          .select('*')
+          .eq('company_id', profile.company_id)
+          .order('date', { ascending: false })
+
+        if (expensesError) {
+          console.error('Error loading expenses:', expensesError)
+        } else {
+          setExpenses(expensesData || [])
+        }
+
+        // Load team members (contractors)
+        const { data: teamData, error: teamError } = await supabase
+          .from('team_members')
+          .select('id, name')
+          .eq('company_id', profile.company_id)
+          .order('name')
+
+        if (teamError) {
+          console.error('Error loading team:', teamError)
+        } else {
+          setContractors(teamData || [])
+        }
+
+        // Load projects
+        const { data: projectsData, error: projectsError } = await supabase
+          .from('projects')
+          .select('id, name, client_id')
+          .eq('company_id', profile.company_id)
+          .order('name')
+
+        if (projectsError) {
+          console.error('Error loading projects:', projectsError)
+        } else {
+          setProjects(projectsData || [])
+        }
+
+        setLoading(false)
+      } catch (error) {
+        console.error('Error loading data:', error)
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [])
 
   const expenseMetrics = useMemo(() => {
     const filtered = expenses.filter(exp => {
@@ -609,9 +675,70 @@ export default function ExpensesPage() {
     return data
   }, [expenses, selectedYear])
 
-  const handleAddExpense = (expense: any) => { setExpenses(prev => [...prev, { id: Date.now().toString(), ...expense }]) }
-  const handleUpdateExpense = (id: string, updates: any) => { setExpenses(prev => prev.map(exp => exp.id === id ? { ...exp, ...updates } : exp)) }
-  const handleDeleteExpense = (id: string) => { if (confirm('Delete this expense?')) setExpenses(prev => prev.filter(exp => exp.id !== id)) }
+  const handleAddExpense = async (expense: any) => {
+    if (!companyId) return
+    
+    const newExpense = {
+      company_id: companyId,
+      date: expense.date,
+      description: expense.description,
+      amount: expense.amount,
+      category: expense.category,
+      subcategory: expense.subcategory,
+      contractor_id: expense.contractor_id || null,
+      project_id: expense.project_id || null,
+      status: expense.status || 'paid'
+    }
+
+    const { data, error } = await supabase
+      .from('expenses')
+      .insert(newExpense)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error adding expense:', error)
+      alert('Failed to add expense')
+      return
+    }
+
+    // Add to local state
+    setExpenses(prev => [data, ...prev])
+  }
+
+  const handleUpdateExpense = async (id: string, updates: any) => {
+    const { error } = await supabase
+      .from('expenses')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+
+    if (error) {
+      console.error('Error updating expense:', error)
+      alert('Failed to update expense')
+      return
+    }
+
+    // Update local state
+    setExpenses(prev => prev.map(exp => exp.id === id ? { ...exp, ...updates } : exp))
+  }
+
+  const handleDeleteExpense = async (id: string) => {
+    if (!confirm('Delete this expense?')) return
+
+    const { error } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error('Error deleting expense:', error)
+      alert('Failed to delete expense')
+      return
+    }
+
+    // Remove from local state
+    setExpenses(prev => prev.filter(exp => exp.id !== id))
+  }
   const handleSelectExpense = (id: string) => { setSelectedExpenses(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]) }
   const handleSelectAll = () => { setSelectedExpenses(prev => prev.length === filteredExpenses.length ? [] : filteredExpenses.map(exp => exp.id)) }
   const handleSort = (field: string) => { if (sortField === field) setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); else { setSortField(field); setSortDir('desc') } }
