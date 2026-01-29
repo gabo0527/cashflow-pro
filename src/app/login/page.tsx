@@ -1,6 +1,4 @@
 // src/app/login/page.tsx
-// Modern minimalist login page - Base44/SubTracker inspired
-
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -8,13 +6,12 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { ArrowRight, BarChart3, PieChart, TrendingUp, Shield, Sparkles } from 'lucide-react'
 
-// New Vantage Logo - Modern, minimal
+// Vantage Logo - Teal bars matching dashboard
 const VantageLogo = ({ size = 40, className = "" }: { size?: number, className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-    <rect width="40" height="40" rx="10" fill="#f97316"/>
-    <rect x="8" y="22" width="6" height="10" rx="2" fill="white" fillOpacity="0.6"/>
-    <rect x="17" y="16" width="6" height="16" rx="2" fill="white" fillOpacity="0.8"/>
-    <rect x="26" y="10" width="6" height="22" rx="2" fill="white"/>
+    <rect x="4" y="20" width="8" height="16" rx="2" fill="#2dd4bf" fillOpacity="0.5"/>
+    <rect x="16" y="12" width="8" height="24" rx="2" fill="#2dd4bf" fillOpacity="0.75"/>
+    <rect x="28" y="4" width="8" height="32" rx="2" fill="#2dd4bf"/>
   </svg>
 )
 
@@ -68,18 +65,18 @@ export default function LoginPage() {
     { 
       icon: TrendingUp, 
       title: 'Growth Forecasting',
-      description: 'Project up to 3 years with custom assumptions'
+      description: 'Project revenue with custom assumptions'
     },
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50/30 flex">
+    <div className="min-h-screen bg-slate-900 flex">
       {/* Left Panel - Features */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        {/* Soft gradient background */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-slate-800">
+        {/* Gradient accents */}
         <div className="absolute inset-0">
-          <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-orange-100/50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-          <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-teal-100/40 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-teal-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+          <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-emerald-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
         </div>
         
         {/* Content */}
@@ -87,16 +84,16 @@ export default function LoginPage() {
           {/* Header */}
           <div className="flex items-center gap-3">
             <VantageLogo size={44} />
-            <span className="text-2xl font-bold text-slate-900 tracking-tight">Vantage</span>
+            <span className="text-2xl font-bold text-slate-100 tracking-tight">Vantage</span>
           </div>
           
           {/* Hero Section */}
           <div className="max-w-md">
-            <h1 className="text-4xl font-bold text-slate-900 leading-tight mb-4">
+            <h1 className="text-4xl font-bold text-slate-100 leading-tight mb-4">
               Financial clarity for
-              <span className="block text-orange-500 mt-1">modern businesses</span>
+              <span className="block text-teal-400 mt-1">modern businesses</span>
             </h1>
-            <p className="text-lg text-slate-600 leading-relaxed">
+            <p className="text-lg text-slate-400 leading-relaxed">
               The all-in-one platform for project-based businesses to track cash flow, 
               analyze margins, and make smarter decisions.
             </p>
@@ -107,13 +104,13 @@ export default function LoginPage() {
             {features.map((feature, idx) => (
               <div 
                 key={idx} 
-                className="flex items-start gap-4 p-4 rounded-2xl bg-white/60 backdrop-blur-sm border border-slate-200/50 hover:bg-white/80 hover:border-slate-200 transition-all group"
+                className="flex items-start gap-4 p-4 rounded-xl bg-slate-700/30 border border-slate-700 hover:bg-slate-700/50 hover:border-slate-600 transition-all group"
               >
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-100 to-orange-50 flex items-center justify-center flex-shrink-0 group-hover:from-orange-200 group-hover:to-orange-100 transition-colors">
-                  <feature.icon className="w-6 h-6 text-orange-500" />
+                <div className="w-12 h-12 rounded-xl bg-slate-700 flex items-center justify-center flex-shrink-0 group-hover:bg-slate-600 transition-colors">
+                  <feature.icon className="w-6 h-6 text-teal-400" />
                 </div>
                 <div>
-                  <h3 className="text-slate-900 font-semibold mb-1">{feature.title}</h3>
+                  <h3 className="text-slate-100 font-semibold mb-1">{feature.title}</h3>
                   <p className="text-slate-500 text-sm">{feature.description}</p>
                 </div>
               </div>
@@ -121,17 +118,17 @@ export default function LoginPage() {
           </div>
           
           {/* Stats */}
-          <div className="flex items-center gap-8 pt-6 border-t border-slate-200/50">
+          <div className="flex items-center gap-8 pt-6 border-t border-slate-700">
             <div>
-              <div className="text-2xl font-bold text-slate-900">$50M+</div>
+              <div className="text-2xl font-bold text-slate-100">$50M+</div>
               <div className="text-sm text-slate-500">Tracked Revenue</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-slate-900">500+</div>
+              <div className="text-2xl font-bold text-slate-100">500+</div>
               <div className="text-sm text-slate-500">Projects Managed</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-slate-900">99.9%</div>
+              <div className="text-2xl font-bold text-slate-100">99.9%</div>
               <div className="text-sm text-slate-500">Uptime</div>
             </div>
           </div>
@@ -145,26 +142,26 @@ export default function LoginPage() {
           <div className="lg:hidden text-center mb-10">
             <div className="inline-flex items-center gap-3 mb-2">
               <VantageLogo size={40} />
-              <span className="text-2xl font-bold text-slate-900">Vantage</span>
+              <span className="text-2xl font-bold text-slate-100">Vantage</span>
             </div>
             <p className="text-slate-500">Financial Analytics Platform</p>
           </div>
 
           {/* Login Card */}
-          <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-xl shadow-slate-200/50">
+          <div className="bg-slate-800 rounded-2xl border border-slate-700 p-8">
             {/* Header */}
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-100 to-orange-50 mb-5">
-                <Sparkles className="w-8 h-8 text-orange-500" />
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-700 mb-5">
+                <Sparkles className="w-8 h-8 text-teal-400" />
               </div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-2">Welcome back</h2>
+              <h2 className="text-2xl font-bold text-slate-100 mb-2">Welcome back</h2>
               <p className="text-slate-500">Sign in to access your dashboard</p>
             </div>
 
             {/* Error */}
             {error && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm text-center flex items-center justify-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-500" />
+              <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-sm text-center flex items-center justify-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-rose-500" />
                 {error}
               </div>
             )}
@@ -173,10 +170,10 @@ export default function LoginPage() {
             <button
               onClick={handleGoogleLogin}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-3 px-5 py-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-slate-900/20 hover:shadow-xl hover:shadow-slate-900/30 active:scale-[0.98] group"
+              className="w-full flex items-center justify-center gap-3 px-5 py-4 bg-teal-500 hover:bg-teal-400 text-slate-900 font-semibold rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] group"
             >
               {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-slate-900/30 border-t-slate-900 rounded-full animate-spin" />
               ) : (
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -192,19 +189,19 @@ export default function LoginPage() {
             </button>
 
             {/* Workspace hint */}
-            <p className="mt-4 text-center text-sm text-slate-400">
+            <p className="mt-4 text-center text-sm text-slate-500">
               Use your company Google Workspace
             </p>
             
             {/* Divider */}
             <div className="my-6 flex items-center gap-4">
-              <div className="flex-1 h-px bg-slate-200" />
-              <span className="text-xs text-slate-400 uppercase tracking-wider">Secure</span>
-              <div className="flex-1 h-px bg-slate-200" />
+              <div className="flex-1 h-px bg-slate-700" />
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Secure</span>
+              <div className="flex-1 h-px bg-slate-700" />
             </div>
             
             {/* Trust Indicators */}
-            <div className="flex items-center justify-center gap-6 text-slate-400 text-xs">
+            <div className="flex items-center justify-center gap-6 text-slate-500 text-xs">
               <div className="flex items-center gap-1.5">
                 <Shield className="w-4 h-4 text-teal-500" />
                 <span>SSO Login</span>
@@ -221,11 +218,11 @@ export default function LoginPage() {
           </div>
 
           {/* Footer */}
-          <p className="mt-8 text-center text-xs text-slate-400">
+          <p className="mt-8 text-center text-xs text-slate-600">
             By signing in, you agree to our{' '}
-            <a href="/terms" className="text-slate-500 hover:text-orange-500 underline underline-offset-2 transition-colors">Terms</a>
+            <a href="/terms" className="text-slate-500 hover:text-teal-400 underline underline-offset-2 transition-colors">Terms</a>
             {' '}and{' '}
-            <a href="/privacy" className="text-slate-500 hover:text-orange-500 underline underline-offset-2 transition-colors">Privacy Policy</a>
+            <a href="/privacy" className="text-slate-500 hover:text-teal-400 underline underline-offset-2 transition-colors">Privacy Policy</a>
           </p>
         </div>
       </div>
