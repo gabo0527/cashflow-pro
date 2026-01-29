@@ -241,21 +241,29 @@ export default function TimesheetPage() {
     setSuccess('')
 
     try {
+      // Get assignment details for bill_rate
+      const assignmentMap = new Map(assignments.map(a => [a.project_id, a]))
+      
       const entriesToInsert = Object.values(entries)
         .filter(e => parseFloat(e.hours) > 0)
-        .map(e => ({
-          company_id: member.company_id,
-          team_member_id: member.id,
-          project_id: e.project_id,
-          week_start: weekDates.start.toISOString().split('T')[0],
-          hours: parseFloat(e.hours),
-          notes: e.notes || null,
-          status: 'submitted'
-        }))
+        .map(e => {
+          const assignment = assignmentMap.get(e.project_id)
+          return {
+            company_id: member.company_id,
+            contractor_id: member.id,
+            project_id: e.project_id,
+            date: weekDates.start.toISOString().split('T')[0],
+            hours: parseFloat(e.hours),
+            billable: true,
+            bill_rate: assignment?.rate || 0,
+            description: e.notes || null,
+            status: 'pending'
+          }
+        })
 
       const { error } = await supabase
-  .from('time_entries')
-  .insert(entriesToInsert)
+        .from('time_entries')
+        .insert(entriesToInsert)
 
       if (error) throw error
 
