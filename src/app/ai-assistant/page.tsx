@@ -125,6 +125,12 @@ YOUR IDENTITY:
 - Personality: Direct, insightful, proactive. You're a trusted partner who tells it like it is.
 - Style: Concise but thorough. Lead with the answer, then explain. Use specific numbers.
 
+KNOWN ALIASES & SHORTCUTS:
+When users mention these terms, they mean:
+- "CADC" or "Clean Arc" = Clean Arc Data Center (client)
+- "P1" or "Point One" = Point One, LLC (client)
+- Add more aliases as you learn them from context
+
 YOUR CAPABILITIES:
 1. ANALYZE - Deep dive into KPIs, trends, variances, profitability by client/project/team member
 2. ADVISE - Strategic recommendations based on the data. Challenge assumptions constructively.
@@ -132,10 +138,32 @@ YOUR CAPABILITIES:
 4. FORECAST - Help with projections and scenario planning
 5. OPERATE - Guide on categorization, time tracking review, invoice follow-ups
 6. NAVIGATE - Direct users to relevant parts of Vantage (Reports, Forecast, specific pages)
-7. VISUALIZE - Create charts when asked. Use the special chart format below.
+7. VISUALIZE - Create charts AND tables when asked. Use the special formats below.
+
+CLARIFYING QUESTIONS:
+When the user asks for a visual, table, chart, or report, ASK CLARIFYING QUESTIONS first if the request is ambiguous:
+- "Which time period would you like to see?"
+- "Should I group this by client, project, or team member?"
+- "Do you want a table or a chart for this?"
+- "Should I include all projects or just active ones?"
+Only skip clarifying questions if the request is very specific and clear.
+
+TABLE GENERATION:
+When the user asks for a TABLE (not a chart), use this format:
+
+\`\`\`sage-table
+{
+  "title": "Billing Rates by Project",
+  "headers": ["Team Member", "Project", "Rate", "Hours"],
+  "rows": [
+    ["Travis Swank", "VA-1", "$250/hr", "29.0"],
+    ["Emily Goitia", "DAL-1", "$240/hr", "9.0"]
+  ]
+}
+\`\`\`
 
 CHART GENERATION:
-When the user asks for a chart, visualization, or graph, include a JSON chart block in your response using this exact format:
+When the user asks for a CHART, visualization, or graph, use this format:
 
 \`\`\`sage-chart
 {
@@ -164,8 +192,16 @@ RESPONSE GUIDELINES:
 3. Be concise - finance people are busy
 4. Lead with insights, not summaries
 5. Always suggest a next action or follow-up question
-6. Use bold for key numbers and metrics
+6. For emphasis, use simple formatting - avoid excessive asterisks
 7. When appropriate, mention relevant Vantage features: [View in Reports →] or [Open Forecast →]
+8. ASK CLARIFYING QUESTIONS before building complex visuals
+
+FORMATTING RULES:
+- Do NOT use markdown asterisks like **text** - the interface doesn't render them
+- Instead, just state numbers and key terms clearly
+- Use bullet points (•) for lists
+- Keep tables and charts clean with proper structure
+- For emphasis, you can use ALL CAPS sparingly or just present data clearly
 
 Remember: You're not just answering questions - you're a strategic partner helping run this business.`
 
@@ -327,6 +363,22 @@ KEY METRICS:
 === CLIENTS (${data.clients?.length || 0}) ===
 ${data.clients?.map(c => `• ${c.name} | ${c.status || 'active'}`).join('\n') || 'No clients'}
 
+=== CLIENT ALIASES ===
+${data.clients?.map(c => {
+  const name = c.name || ''
+  const aliases = []
+  // Generate common abbreviations
+  if (name.includes(' ')) {
+    const words = name.split(' ')
+    const acronym = words.map((w: string) => w[0]).join('').toUpperCase()
+    aliases.push(acronym)
+  }
+  // Special known aliases
+  if (name.toLowerCase().includes('clean arc')) aliases.push('CADC', 'Clean Arc')
+  if (name.toLowerCase().includes('point one')) aliases.push('P1', 'Point One')
+  return aliases.length > 0 ? `• "${aliases.join('", "')}" = ${name}` : null
+}).filter(Boolean).join('\n') || 'No aliases'}
+
 === PROJECTS (${data.projects?.length || 0}) ===
 ${data.projects?.map(p => `• ${p.name} | ${data.clients?.find(c => c.id === p.client_id)?.name || 'No Client'} | ${p.status || 'active'}`).join('\n') || 'No projects'}
 
@@ -368,6 +420,41 @@ ${data.projectAssignments?.map(a => {
   return `• ${member?.name || 'Unknown'} → ${project?.name || 'Unknown Project'} (${client?.name || 'No Client'}): $${a.rate || 0}/hr | ${a.service || 'General'} | ${a.payment_type || 'hourly'}`
 }).join('\n') || 'No project assignments'}
 `
+}
+
+// ============ TABLE COMPONENT ============
+interface TableData {
+  title: string
+  headers: string[]
+  rows: string[][]
+}
+
+function TableRenderer({ table }: { table: TableData }) {
+  if (!table || !table.headers || !table.rows) return null
+
+  return (
+    <div className="my-4 p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 overflow-x-auto">
+      <h4 className="text-sm font-medium text-slate-200 mb-4">{table.title}</h4>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-slate-700">
+            {table.headers.map((header, i) => (
+              <th key={i} className="text-left py-2 px-3 text-slate-300 font-medium">{header}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {table.rows.map((row, rowIndex) => (
+            <tr key={rowIndex} className="border-b border-slate-700/50 hover:bg-slate-800/50">
+              {row.map((cell, cellIndex) => (
+                <td key={cellIndex} className="py-2 px-3 text-slate-200">{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
 }
 
 // ============ CHART COMPONENT ============
@@ -414,22 +501,37 @@ function ChartRenderer({ chart }: { chart: ChartData }) {
 function ChatMessage({ message }: { message: Message }) {
   const isUser = message.role === 'user'
   
-  const parseChart = (content: string): { text: string, chart: ChartData | null } => {
-    const chartMatch = content.match(/```sage-chart\s*([\s\S]*?)```/)
+  const parseVisuals = (content: string): { text: string, chart: ChartData | null, table: TableData | null } => {
+    let text = content
+    let chart: ChartData | null = null
+    let table: TableData | null = null
+    
+    // Parse chart
+    const chartMatch = text.match(/```sage-chart\s*([\s\S]*?)```/)
     if (chartMatch) {
       try {
-        const chart = JSON.parse(chartMatch[1].trim())
-        const text = content.replace(/```sage-chart[\s\S]*?```/, '').trim()
-        return { text, chart }
+        chart = JSON.parse(chartMatch[1].trim())
+        text = text.replace(/```sage-chart[\s\S]*?```/, '').trim()
       } catch (e) { console.error('Failed to parse chart:', e) }
     }
-    return { text: content, chart: null }
+    
+    // Parse table
+    const tableMatch = text.match(/```sage-table\s*([\s\S]*?)```/)
+    if (tableMatch) {
+      try {
+        table = JSON.parse(tableMatch[1].trim())
+        text = text.replace(/```sage-table[\s\S]*?```/, '').trim()
+      } catch (e) { console.error('Failed to parse table:', e) }
+    }
+    
+    return { text, chart, table }
   }
 
-  const { text, chart } = isUser ? { text: message.content, chart: null } : parseChart(message.content)
+  const { text, chart, table } = isUser ? { text: message.content, chart: null, table: null } : parseVisuals(message.content)
   
   const formatContent = (content: string) => {
     return content.split('\n').map((line, i) => {
+      // Handle navigation links
       if (line.includes('[View') || line.includes('→]')) {
         const linkMatch = line.match(/\[(.*?)\s*→\]/)
         if (linkMatch) {
@@ -437,10 +539,19 @@ function ChatMessage({ message }: { message: Message }) {
           return <p key={i} className="my-1"><Link href={href} className="text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1">{linkMatch[1]} <ChevronRight size={12} /></Link></p>
         }
       }
-      if (line.trim().startsWith('- ') || line.trim().startsWith('• ')) return <p key={i} className="my-0.5 pl-2">• {line.replace(/^[-•]\s*/, '')}</p>
-      if (/^\d+\.\s/.test(line.trim())) return <p key={i} className="my-0.5 pl-2">{line}</p>
-      const boldProcessed = line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>')
-      return <p key={i} className="my-1" dangerouslySetInnerHTML={{ __html: boldProcessed }} />
+      // Handle bullet points
+      if (line.trim().startsWith('- ') || line.trim().startsWith('• ')) {
+        const cleanLine = line.replace(/^[-•]\s*/, '').replace(/\*\*/g, '')
+        return <p key={i} className="my-0.5 pl-2">• {cleanLine}</p>
+      }
+      // Handle numbered lists
+      if (/^\d+\.\s/.test(line.trim())) {
+        const cleanLine = line.replace(/\*\*/g, '')
+        return <p key={i} className="my-0.5 pl-2">{cleanLine}</p>
+      }
+      // Clean up asterisks and render text
+      const cleanLine = line.replace(/\*\*/g, '')
+      return <p key={i} className="my-1">{cleanLine}</p>
     })
   }
   
@@ -463,6 +574,7 @@ function ChatMessage({ message }: { message: Message }) {
             </div>
           )}
           <div className="text-sm leading-relaxed whitespace-pre-wrap">{formatContent(text)}</div>
+          {table && <TableRenderer table={table} />}
           {chart && <ChartRenderer chart={chart} />}
         </div>
         <p className="text-xs text-slate-500 mt-1.5 px-2">{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
