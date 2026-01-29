@@ -546,7 +546,8 @@ export default function ExpensesPage() {
     const loadData = async () => {
       try {
         // Get current user and company
-        const user = await getCurrentUser()
+        const result = await getCurrentUser()
+        const user = result?.user
         if (!user) {
           console.error('No user found')
           setLoading(false)
