@@ -90,6 +90,7 @@ interface CompanyData {
   clients: any[]
   teamMembers: any[]
   timeEntries: any[]
+  projectAssignments: any[]
 }
 
 interface KPISummary {
@@ -155,7 +156,7 @@ Chart types:
 Always use REAL data from the financial snapshot. Never use placeholder or example data.
 
 YOUR DATA ACCESS:
-You have COMPLETE access to ALL historical data including transactions, invoices, projects, clients, team members, and all time entries.
+You have COMPLETE access to ALL historical data including transactions, invoices, projects, clients, team members, time entries, AND project-specific billing rates for each team member on each project. You can see exactly what rate each person is billed at for each project they're assigned to.
 
 RESPONSE GUIDELINES:
 1. Always use SPECIFIC NUMBERS from the data provided
@@ -229,8 +230,11 @@ function getClientProfitability(data: CompanyData): any[] {
   data.timeEntries?.forEach(entry => {
     const project = data.projects?.find(p => p.id === entry.project_id)
     if (project?.client_id && clientData[project.client_id]) {
+      // Get rate from project assignment first, then fall back to team member rate or entry rate
+      const assignment = data.projectAssignments?.find(a => a.team_member_id === entry.contractor_id && a.project_id === entry.project_id)
       const team = data.teamMembers?.find(t => t.id === entry.contractor_id)
-      clientData[project.client_id].cost += (entry.hours || 0) * (team?.cost_rate || entry.cost_rate || 50)
+      const rate = assignment?.rate || team?.cost_rate || entry.cost_rate || 50
+      clientData[project.client_id].cost += (entry.hours || 0) * rate
       clientData[project.client_id].hours += entry.hours || 0
     }
   })
@@ -244,11 +248,19 @@ function getProjectPerformance(data: CompanyData): any[] {
     const revenue = projectInvoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + (inv.amount || 0), 0)
     const hours = projectTime.reduce((sum, t) => sum + (t.hours || 0), 0)
     const cost = projectTime.reduce((sum, t) => {
+      // Get rate from project assignment first, then fall back to team member rate or entry rate
+      const assignment = data.projectAssignments?.find(a => a.team_member_id === t.contractor_id && a.project_id === t.project_id)
       const team = data.teamMembers?.find(tm => tm.id === t.contractor_id)
-      return sum + (t.hours || 0) * (team?.cost_rate || t.cost_rate || 50)
+      const rate = assignment?.rate || team?.cost_rate || t.cost_rate || 50
+      return sum + (t.hours || 0) * rate
     }, 0)
     const client = data.clients?.find(c => c.id === project.client_id)
-    return { id: project.id, name: project.name, client: client?.name || 'No Client', status: project.status, revenue, cost, hours, profit: revenue - cost, margin: revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0 }
+    // Get all team members assigned to this project with their rates
+    const assignedTeam = data.projectAssignments?.filter(a => a.project_id === project.id).map(a => {
+      const member = data.teamMembers?.find(m => m.id === a.team_member_id)
+      return { name: member?.name || 'Unknown', rate: a.rate || 0, service: a.service }
+    }) || []
+    return { id: project.id, name: project.name, client: client?.name || 'No Client', status: project.status, revenue, cost, hours, profit: revenue - cost, margin: revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0, assignedTeam }
   }).sort((a, b) => b.revenue - a.revenue) || []
 }
 
@@ -347,6 +359,14 @@ ${clientProfit.slice(0, 10).map((c, i) => `${i + 1}. ${c.name}: ${formatCurrency
 
 === PROJECT PERFORMANCE ===
 ${projectPerf.slice(0, 10).map((p, i) => `${i + 1}. ${p.name}: ${formatCurrency(p.revenue)} rev, ${p.hours.toFixed(1)} hrs`).join('\n') || 'No data'}
+
+=== PROJECT BILLING RATES BY TEAM MEMBER ===
+${data.projectAssignments?.map(a => {
+  const member = data.teamMembers?.find(m => m.id === a.team_member_id)
+  const project = data.projects?.find(p => p.id === a.project_id)
+  const client = data.clients?.find(c => c.id === project?.client_id)
+  return `• ${member?.name || 'Unknown'} → ${project?.name || 'Unknown Project'} (${client?.name || 'No Client'}): $${a.rate || 0}/hr | ${a.service || 'General'} | ${a.payment_type || 'hourly'}`
+}).join('\n') || 'No project assignments'}
 `
 }
 
@@ -519,15 +539,16 @@ export default function SageAssistantPage() {
         const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
         if (profile?.company_id) {
           setCompanyId(profile.company_id)
-          const [transactions, invoices, projects, clients, teamMembers, timeEntries] = await Promise.all([
+          const [transactions, invoices, projects, clients, teamMembers, timeEntries, projectAssignments] = await Promise.all([
             supabase.from('transactions').select('*').eq('company_id', profile.company_id),
             supabase.from('invoices').select('*').eq('company_id', profile.company_id),
             supabase.from('projects').select('*').eq('company_id', profile.company_id),
             supabase.from('clients').select('*').eq('company_id', profile.company_id),
             supabase.from('team_members').select('*').eq('company_id', profile.company_id),
             supabase.from('time_entries').select('*').eq('company_id', profile.company_id),
+            supabase.from('team_project_assignments').select('*').eq('company_id', profile.company_id),
           ])
-          const data: CompanyData = { transactions: transactions.data || [], invoices: invoices.data || [], projects: projects.data || [], clients: clients.data || [], teamMembers: teamMembers.data || [], timeEntries: timeEntries.data || [] }
+          const data: CompanyData = { transactions: transactions.data || [], invoices: invoices.data || [], projects: projects.data || [], clients: clients.data || [], teamMembers: teamMembers.data || [], timeEntries: timeEntries.data || [], projectAssignments: projectAssignments.data || [] }
           setCompanyData(data)
           setKpis(calculateKPIs(data))
           const { data: convos } = await supabase.from('sage_conversations').select('*').eq('user_id', user.id).order('updated_at', { ascending: false })
