@@ -30,7 +30,6 @@ interface Project {
   is_change_order?: boolean
   co_number?: number
   description?: string
-  // CFO-level fields
   budgeted_hours?: number
   actual_hours?: number
   billed_hours?: number
@@ -84,11 +83,11 @@ const BUDGET_TYPES = [
 ]
 
 const getStatusStyle = (status: string) => {
-  const styles: Record<string, { bg: string; text: string; border: string }> = {
-    active: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
-    completed: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
-    on_hold: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
-    archived: { bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' },
+  const styles: Record<string, { bg: string; text: string }> = {
+    active: { bg: 'bg-emerald-500/20', text: 'text-emerald-400' },
+    completed: { bg: 'bg-blue-500/20', text: 'text-blue-400' },
+    on_hold: { bg: 'bg-amber-500/20', text: 'text-amber-400' },
+    archived: { bg: 'bg-slate-500/20', text: 'text-slate-400' },
   }
   return styles[status] || styles.active
 }
@@ -106,7 +105,7 @@ const calculateHealthScore = (project: Project): number => {
   
   // Burn rate vs completion (30 points)
   const burnRate = project.budget > 0 ? (project.spent / project.budget) * 100 : 0
-  const completion = project.percent_complete || burnRate * 0.9 // Estimate if not set
+  const completion = project.percent_complete || burnRate * 0.9
   const burnDelta = burnRate - completion
   if (burnDelta > 20) score -= 30
   else if (burnDelta > 10) score -= 20
@@ -132,112 +131,36 @@ const calculateHealthScore = (project: Project): number => {
 }
 
 const getHealthColor = (score: number) => {
-  if (score >= 80) return { bg: 'bg-emerald-100', text: 'text-emerald-700', fill: '#10b981' }
-  if (score >= 60) return { bg: 'bg-amber-100', text: 'text-amber-700', fill: '#f59e0b' }
-  return { bg: 'bg-rose-100', text: 'text-rose-700', fill: '#ef4444' }
+  if (score >= 80) return { bg: 'bg-emerald-500/20', text: 'text-emerald-400', fill: '#10b981' }
+  if (score >= 60) return { bg: 'bg-amber-500/20', text: 'text-amber-400', fill: '#f59e0b' }
+  return { bg: 'bg-rose-500/20', text: 'text-rose-400', fill: '#ef4444' }
 }
 
-// Collapsible Section Component
-function CollapsibleSection({ 
-  title, 
-  children, 
-  defaultExpanded = true,
-  badge,
-  badgeColor,
-  icon
-}: { 
-  title: string
-  children: React.ReactNode
-  defaultExpanded?: boolean
-  badge?: string | number
-  badgeColor?: string
-  icon?: React.ReactNode
-}) {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded)
-  
-  return (
-    <div className="rounded-xl border bg-white border-slate-200 shadow-sm overflow-hidden">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          {icon && <span className="text-slate-500">{icon}</span>}
-          <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
-          {badge !== undefined && (
-            <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${badgeColor || 'bg-slate-100 text-slate-600'}`}>
-              {badge}
-            </span>
-          )}
-        </div>
-        {isExpanded ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
-      </button>
-      {isExpanded && <div className="px-5 pb-5 pt-1">{children}</div>}
-    </div>
-  )
-}
-
-// KPI Card Component
+// KPI Card Component - matching Expenses style
 function KPICard({ 
   label, 
   value, 
   subValue, 
-  icon, 
-  trend, 
-  trendValue,
-  color = 'slate',
-  size = 'normal'
+  icon,
+  valueColor = 'text-slate-100'
 }: { 
   label: string
   value: string | number
   subValue?: string
   icon?: React.ReactNode
-  trend?: 'up' | 'down' | 'neutral'
-  trendValue?: string
-  color?: 'slate' | 'emerald' | 'amber' | 'rose' | 'blue' | 'orange'
-  size?: 'normal' | 'large'
+  valueColor?: string
 }) {
-  const colorStyles = {
-    slate: 'text-slate-800',
-    emerald: 'text-emerald-600',
-    amber: 'text-amber-600',
-    rose: 'text-rose-600',
-    blue: 'text-blue-600',
-    orange: 'text-orange-500'
-  }
-  
   return (
-    <div className={`p-4 rounded-xl bg-slate-50/50 border border-slate-100 ${size === 'large' ? 'col-span-2' : ''}`}>
+    <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</p>
-          <p className={`${size === 'large' ? 'text-3xl' : 'text-2xl'} font-bold mt-1 ${colorStyles[color]}`}>{value}</p>
+          <p className="text-sm text-slate-400">{label}</p>
+          <p className={`text-2xl font-semibold mt-1 ${valueColor}`}>{value}</p>
           {subValue && <p className="text-xs text-slate-500 mt-0.5">{subValue}</p>}
         </div>
-        {icon && <div className="p-2 rounded-lg bg-white shadow-sm">{icon}</div>}
+        {icon && <div className="text-slate-500">{icon}</div>}
       </div>
-      {trend && trendValue && (
-        <div className={`flex items-center gap-1 mt-2 text-xs font-medium ${trend === 'up' ? 'text-emerald-600' : trend === 'down' ? 'text-rose-600' : 'text-slate-500'}`}>
-          {trend === 'up' ? <ArrowUpRight size={14} /> : trend === 'down' ? <ArrowDownRight size={14} /> : null}
-          {trendValue}
-        </div>
-      )}
     </div>
-  )
-}
-
-// Risk Badge Component
-function RiskBadge({ level }: { level: 'low' | 'medium' | 'high' }) {
-  const styles = {
-    low: 'bg-emerald-100 text-emerald-700',
-    medium: 'bg-amber-100 text-amber-700',
-    high: 'bg-rose-100 text-rose-700'
-  }
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${styles[level]}`}>
-      {level === 'high' && <AlertTriangle size={10} />}
-      {level.charAt(0).toUpperCase() + level.slice(1)}
-    </span>
   )
 }
 
@@ -256,7 +179,6 @@ export default function ProjectsPage() {
   const [selectedYear, setSelectedYear] = useState<string>('all')
   const [selectedRisk, setSelectedRisk] = useState<string>('all')
   const [showFilters, setShowFilters] = useState(false)
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [groupByClient, setGroupByClient] = useState(true)
 
   // Modal state
@@ -264,7 +186,6 @@ export default function ProjectsPage() {
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [isAddingCO, setIsAddingCO] = useState(false)
   const [parentProjectId, setParentProjectId] = useState<string | null>(null)
-  const [selectedProjectDetail, setSelectedProjectDetail] = useState<Project | null>(null)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -307,7 +228,6 @@ export default function ProjectsPage() {
 
         setCompanyId(profile.company_id)
 
-        // Fetch projects, clients, and timesheet data
         const [projRes, clientRes, timesheetRes] = await Promise.all([
           fetchProjects(profile.company_id),
           fetchClients(profile.company_id),
@@ -442,10 +362,8 @@ export default function ProjectsPage() {
     const activeProjects = enrichedProjects.filter(p => p.status === 'active' && !p.is_change_order)
     const allProjects = enrichedProjects.filter(p => !p.is_change_order)
     
-    // Total values
     const totalContractValue = allProjects.reduce((sum, p) => sum + (p.budget || 0), 0)
     const totalSpent = allProjects.reduce((sum, p) => sum + (p.spent || 0), 0)
-    const totalBudgetedHours = allProjects.reduce((sum, p) => sum + (p.budgeted_hours || 0), 0)
     const totalActualHours = allProjects.reduce((sum, p) => sum + (p.actual_hours || 0), 0)
     const totalBilledHours = allProjects.reduce((sum, p) => sum + (p.billed_hours || 0), 0)
     
@@ -454,20 +372,16 @@ export default function ProjectsPage() {
       ? allProjects.reduce((sum, p) => sum + (p.margin * (p.budget / totalContractValue)), 0)
       : 0
     
-    // Utilization Rate (billable hours / available hours)
-    // Assuming 40hr weeks, estimating from resources
+    // Utilization Rate
     const totalResources = activeProjects.reduce((sum, p) => sum + (p.resources || 0), 0)
-    const availableHours = totalResources * 160 // monthly estimate
+    const availableHours = totalResources * 160
     const utilizationRate = availableHours > 0 ? (totalActualHours / availableHours) * 100 : 0
     
-    // Realization Rate (billed hours / worked hours)
+    // Realization Rate
     const realizationRate = totalActualHours > 0 ? (totalBilledHours / totalActualHours) * 100 : 0
     
     // At-Risk Projects
     const atRiskProjects = activeProjects.filter(p => p.healthScore < 60)
-    
-    // Effective Rate
-    const portfolioEffectiveRate = totalActualHours > 0 ? totalSpent / totalActualHours : 0
     
     // Average Health Score
     const avgHealthScore = activeProjects.length > 0
@@ -478,16 +392,13 @@ export default function ProjectsPage() {
       activeCount: activeProjects.length,
       totalContractValue,
       totalSpent,
-      remaining: totalContractValue - totalSpent,
       weightedMargin,
       utilizationRate,
       realizationRate,
       atRiskCount: atRiskProjects.length,
       atRiskProjects,
       totalResources,
-      portfolioEffectiveRate,
       avgHealthScore,
-      totalBudgetedHours,
       totalActualHours,
     }
   }, [enrichedProjects])
@@ -501,17 +412,17 @@ export default function ProjectsPage() {
     })
     
     const total = Array.from(clientTotals.values()).reduce((a, b) => a + b, 0)
-    const sorted = Array.from(clientTotals.entries())
+    const colors = ['#f97316', '#06b6d4', '#10b981', '#8b5cf6', '#ec4899', '#64748b']
+    
+    return Array.from(clientTotals.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 6)
-      .map(([name, value]) => ({
-        name: name.length > 15 ? name.substring(0, 15) + '...' : name,
+      .map(([name, value], idx) => ({
+        name: name.length > 12 ? name.substring(0, 12) + '...' : name,
         value,
         percent: total > 0 ? (value / total) * 100 : 0,
-        fill: value / total > 0.3 ? '#ef4444' : value / total > 0.2 ? '#f59e0b' : '#10b981'
+        fill: colors[idx % colors.length]
       }))
-    
-    return sorted
   }, [organizedProjects])
 
   // Health Distribution Data
@@ -526,15 +437,14 @@ export default function ProjectsPage() {
     ]
   }, [enrichedProjects])
 
-  // Margin by Project Chart
+  // Margin Chart Data
   const marginChartData = useMemo(() => {
     return organizedProjects
       .filter(p => !p.is_change_order && p.budget > 0)
       .slice(0, 8)
       .map(p => ({
-        name: p.name.length > 18 ? p.name.substring(0, 18) + '...' : p.name,
+        name: p.name.length > 15 ? p.name.substring(0, 15) + '...' : p.name,
         margin: Math.round(p.margin * 10) / 10,
-        health: p.healthScore,
         fill: p.healthScore >= 80 ? '#10b981' : p.healthScore >= 60 ? '#f59e0b' : '#ef4444'
       }))
       .sort((a, b) => b.margin - a.margin)
@@ -717,24 +627,24 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="space-y-6 p-6 bg-slate-50 min-h-screen">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Project Analytics</h1>
-          <p className="text-sm mt-1 text-slate-500">CFO-level portfolio insights and profitability tracking</p>
+          <h1 className="text-2xl font-semibold text-slate-100">Project Analytics</h1>
+          <p className="text-sm mt-1 text-slate-400">CFO-level portfolio insights and profitability tracking</p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={exportToExcel}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-sm font-medium transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg text-sm font-medium text-slate-200 transition-colors"
           >
-            <Download size={18} className="text-slate-500" />
+            <Download size={18} />
             Export
           </button>
           <button
             onClick={openAddProject}
-            className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 rounded-lg text-sm font-medium text-white transition-colors"
           >
             <Plus size={18} />
             Add Project
@@ -742,68 +652,70 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {/* CFO Metrics Dashboard */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      {/* KPI Cards Row */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <KPICard 
           label="Active Projects" 
           value={cfoMetrics.activeCount}
           subValue={`${formatCompactCurrency(cfoMetrics.totalContractValue)} total value`}
-          icon={<FolderOpen size={20} className="text-blue-500" />}
-          color="blue"
+          icon={<FolderOpen size={20} />}
+          valueColor="text-blue-400"
         />
         <KPICard 
           label="Portfolio Margin" 
           value={formatPercent(cfoMetrics.weightedMargin)}
           subValue="Weighted average"
-          icon={<TrendingUp size={20} className={cfoMetrics.weightedMargin >= 20 ? 'text-emerald-500' : 'text-amber-500'} />}
-          color={cfoMetrics.weightedMargin >= 20 ? 'emerald' : cfoMetrics.weightedMargin >= 10 ? 'amber' : 'rose'}
+          icon={<TrendingUp size={20} />}
+          valueColor={cfoMetrics.weightedMargin >= 20 ? 'text-emerald-400' : cfoMetrics.weightedMargin >= 10 ? 'text-amber-400' : 'text-rose-400'}
         />
         <KPICard 
           label="Utilization" 
           value={formatPercent(cfoMetrics.utilizationRate)}
           subValue={`${cfoMetrics.totalActualHours.toLocaleString()} hrs logged`}
-          icon={<Activity size={20} className="text-blue-500" />}
-          color={cfoMetrics.utilizationRate >= 75 ? 'emerald' : cfoMetrics.utilizationRate >= 60 ? 'amber' : 'rose'}
+          icon={<Activity size={20} />}
+          valueColor={cfoMetrics.utilizationRate >= 75 ? 'text-emerald-400' : cfoMetrics.utilizationRate >= 60 ? 'text-amber-400' : 'text-rose-400'}
         />
         <KPICard 
           label="Realization" 
           value={formatPercent(cfoMetrics.realizationRate)}
           subValue="Billed / Worked"
-          icon={<Zap size={20} className="text-amber-500" />}
-          color={cfoMetrics.realizationRate >= 90 ? 'emerald' : cfoMetrics.realizationRate >= 80 ? 'amber' : 'rose'}
+          icon={<Zap size={20} />}
+          valueColor={cfoMetrics.realizationRate >= 90 ? 'text-emerald-400' : cfoMetrics.realizationRate >= 80 ? 'text-amber-400' : 'text-rose-400'}
         />
         <KPICard 
           label="At-Risk Projects" 
           value={cfoMetrics.atRiskCount}
-          subValue={cfoMetrics.atRiskCount > 0 ? 'Requires attention' : 'All healthy'}
-          icon={<AlertTriangle size={20} className={cfoMetrics.atRiskCount > 0 ? 'text-rose-500' : 'text-emerald-500'} />}
-          color={cfoMetrics.atRiskCount > 0 ? 'rose' : 'emerald'}
+          subValue={cfoMetrics.atRiskCount > 0 ? 'Needs attention' : 'All healthy'}
+          icon={<AlertTriangle size={20} />}
+          valueColor={cfoMetrics.atRiskCount > 0 ? 'text-rose-400' : 'text-emerald-400'}
         />
         <KPICard 
           label="Avg Health Score" 
           value={Math.round(cfoMetrics.avgHealthScore)}
           subValue="Portfolio health"
-          icon={<Target size={20} className={cfoMetrics.avgHealthScore >= 80 ? 'text-emerald-500' : 'text-amber-500'} />}
-          color={cfoMetrics.avgHealthScore >= 80 ? 'emerald' : cfoMetrics.avgHealthScore >= 60 ? 'amber' : 'rose'}
+          icon={<Target size={20} />}
+          valueColor={cfoMetrics.avgHealthScore >= 80 ? 'text-emerald-400' : cfoMetrics.avgHealthScore >= 60 ? 'text-amber-400' : 'text-rose-400'}
         />
       </div>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Margin by Project */}
-        <CollapsibleSection title="Margin by Project" icon={<BarChart3 size={16} />} defaultExpanded={true}>
-          <div className="h-64">
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-slate-100 mb-4">Margin by Project</h3>
+          <div className="h-56">
             {marginChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={marginChartData} layout="vertical" margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis type="number" tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
-                  <YAxis type="category" dataKey="name" width={90} tick={{ fill: '#64748b', fontSize: 11 }} />
+                <BarChart data={marginChartData} layout="vertical" margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
+                  <YAxis type="category" dataKey="name" width={80} tick={{ fill: '#94a3b8', fontSize: 10 }} />
                   <Tooltip 
-                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} 
-                    formatter={(value: number, name: string) => [`${value}%`, 'Margin']}
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} 
+                    formatter={(value: number) => [`${value}%`, 'Margin']}
+                    labelStyle={{ color: '#e2e8f0' }}
                   />
-                  <Bar dataKey="margin" name="Margin %" radius={[0, 4, 4, 0]}>
+                  <Bar dataKey="margin" radius={[0, 4, 4, 0]}>
                     {marginChartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
@@ -811,14 +723,20 @@ export default function ProjectsPage() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-full text-slate-400">No project data</div>
+              <div className="flex items-center justify-center h-full text-slate-500">No project data</div>
             )}
           </div>
-        </CollapsibleSection>
+        </div>
 
         {/* Client Concentration */}
-        <CollapsibleSection title="Client Concentration" badge={clientConcentrationData.some(c => c.percent > 30) ? '⚠️ Risk' : ''} badgeColor="bg-amber-100 text-amber-700" icon={<PieChart size={16} />} defaultExpanded={true}>
-          <div className="h-64">
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <h3 className="text-sm font-semibold text-slate-100">Client Concentration</h3>
+            {clientConcentrationData.some(c => c.percent > 30) && (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-amber-500/20 text-amber-400">⚠️ Risk</span>
+            )}
+          </div>
+          <div className="h-56">
             {clientConcentrationData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <RechartsPie>
@@ -826,8 +744,8 @@ export default function ProjectsPage() {
                     data={clientConcentrationData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
+                    innerRadius={45}
+                    outerRadius={75}
                     dataKey="value"
                     label={({ name, percent }) => `${name} ${percent.toFixed(0)}%`}
                     labelLine={false}
@@ -837,189 +755,165 @@ export default function ProjectsPage() {
                     ))}
                   </Pie>
                   <Tooltip 
-                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }} 
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} 
                     formatter={(value: number) => formatCurrency(value)}
+                    labelStyle={{ color: '#e2e8f0' }}
                   />
                 </RechartsPie>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-full text-slate-400">No client data</div>
+              <div className="flex items-center justify-center h-full text-slate-500">No client data</div>
             )}
           </div>
-          {clientConcentrationData.some(c => c.percent > 30) && (
-            <p className="text-xs text-amber-600 mt-2">⚠️ High concentration risk: Single client &gt;30% of portfolio</p>
-          )}
-        </CollapsibleSection>
+        </div>
 
-        {/* Health Distribution */}
-        <CollapsibleSection title="Portfolio Health" icon={<Activity size={16} />} defaultExpanded={true}>
-          <div className="h-64 flex flex-col justify-center">
-            <div className="space-y-4">
-              {healthDistribution.map((item, idx) => (
+        {/* Portfolio Health */}
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-slate-100 mb-4">Portfolio Health</h3>
+          <div className="space-y-4">
+            {healthDistribution.map((item, idx) => {
+              const total = healthDistribution.reduce((a, b) => a + b.value, 0) || 1
+              const percent = (item.value / total) * 100
+              return (
                 <div key={idx} className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full`} style={{ backgroundColor: item.fill }} />
-                  <span className="text-sm text-slate-600 w-20">{item.name}</span>
-                  <div className="flex-1 bg-slate-100 rounded-full h-6 overflow-hidden">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.fill }} />
+                  <span className="text-sm text-slate-300 w-16">{item.name}</span>
+                  <div className="flex-1 bg-slate-700 rounded-full h-5 overflow-hidden">
                     <div 
-                      className="h-full rounded-full transition-all duration-500 flex items-center justify-end pr-2"
-                      style={{ width: `${(item.value / (healthDistribution.reduce((a, b) => a + b.value, 0) || 1)) * 100}%`, backgroundColor: item.fill }}
+                      className="h-full rounded-full flex items-center justify-end pr-2 transition-all duration-500"
+                      style={{ width: `${Math.max(percent, 8)}%`, backgroundColor: item.fill }}
                     >
                       <span className="text-xs font-medium text-white">{item.value}</span>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-            <div className="mt-6 pt-4 border-t border-slate-100">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Average Score</span>
-                <span className={`font-semibold ${cfoMetrics.avgHealthScore >= 80 ? 'text-emerald-600' : cfoMetrics.avgHealthScore >= 60 ? 'text-amber-600' : 'text-rose-600'}`}>
-                  {Math.round(cfoMetrics.avgHealthScore)}/100
-                </span>
-              </div>
+              )
+            })}
+          </div>
+          <div className="mt-6 pt-4 border-t border-slate-700">
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-400">Average Score</span>
+              <span className={`font-semibold ${cfoMetrics.avgHealthScore >= 80 ? 'text-emerald-400' : cfoMetrics.avgHealthScore >= 60 ? 'text-amber-400' : 'text-rose-400'}`}>
+                {Math.round(cfoMetrics.avgHealthScore)}/100
+              </span>
             </div>
           </div>
-        </CollapsibleSection>
+        </div>
       </div>
 
-      {/* At-Risk Projects Alert */}
-      {cfoMetrics.atRiskCount > 0 && (
-        <div className="bg-rose-50 border border-rose-200 rounded-xl p-4">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="text-rose-500 flex-shrink-0 mt-0.5" size={20} />
-            <div>
-              <h4 className="font-semibold text-rose-800">Attention Required: {cfoMetrics.atRiskCount} At-Risk Project{cfoMetrics.atRiskCount > 1 ? 's' : ''}</h4>
-              <div className="mt-2 space-y-1">
-                {cfoMetrics.atRiskProjects.slice(0, 3).map(p => (
-                  <div key={p.id} className="flex items-center gap-2 text-sm text-rose-700">
-                    <span className="font-medium">{p.name}</span>
-                    <span className="text-rose-500">—</span>
-                    <span>Health: {calculateHealthScore(p)}</span>
-                    <span className="text-rose-500">|</span>
-                    <span>Margin: {formatPercent(((p.budget - p.spent) / p.budget) * 100)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+      {/* Projects Table Section */}
+      <div className="bg-slate-800 border border-slate-700 rounded-xl">
+        {/* Table Header */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-slate-100">All Projects</h3>
+            <span className="px-2 py-0.5 text-xs rounded-full bg-slate-700 text-slate-300">{organizedProjects.length}</span>
           </div>
-        </div>
-      )}
-
-      {/* Projects Table */}
-      <CollapsibleSection 
-        title="Projects" 
-        badge={organizedProjects.length} 
-        badgeColor="bg-slate-100 text-slate-600"
-        icon={<FolderOpen size={16} />}
-      >
-        {/* Filters */}
-        <div className="space-y-3 mb-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type="text"
-                placeholder="Search projects or clients..."
+                placeholder="Search projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                className="pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 w-64"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setGroupByClient(!groupByClient)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${groupByClient ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-              >
-                <Users size={16} />
-                Group by Client
-              </button>
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${showFilters || hasActiveFilters ? 'bg-orange-500 text-white' : 'bg-white border border-slate-200 hover:bg-slate-50 text-slate-600'}`}
-              >
-                <Filter size={16} />
-                Filters
-              </button>
-              {hasActiveFilters && (
-                <button onClick={clearFilters} className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-white border border-slate-200 hover:bg-slate-50 text-slate-600">
-                  <X size={16} /> Clear
-                </button>
-              )}
-            </div>
+            <button
+              onClick={() => setGroupByClient(!groupByClient)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${groupByClient ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+            >
+              <Users size={16} />
+              Group by Client
+            </button>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${showFilters || hasActiveFilters ? 'bg-orange-500 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+            >
+              <Filter size={16} />
+              Filters
+            </button>
           </div>
-
-          {showFilters && (
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-200">
-              <select
-                value={selectedClient}
-                onChange={(e) => setSelectedClient(e.target.value)}
-                className="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
-              >
-                <option value="all">All Clients</option>
-                {clients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-              </select>
-              <select
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
-              >
-                <option value="all">All Statuses</option>
-                {STATUS_OPTIONS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-              </select>
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-                className="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
-              >
-                <option value="all">All Years</option>
-                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-              <select
-                value={selectedRisk}
-                onChange={(e) => setSelectedRisk(e.target.value)}
-                className="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
-              >
-                <option value="all">All Risk Levels</option>
-                <option value="low">Low Risk</option>
-                <option value="medium">Medium Risk</option>
-                <option value="high">High Risk</option>
-              </select>
-            </div>
-          )}
         </div>
 
+        {/* Filters */}
+        {showFilters && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 border-b border-slate-700 bg-slate-800/50">
+            <select
+              value={selectedClient}
+              onChange={(e) => setSelectedClient(e.target.value)}
+              className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+            >
+              <option value="all">All Clients</option>
+              {clients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+            </select>
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+            >
+              <option value="all">All Statuses</option>
+              {STATUS_OPTIONS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+            </select>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+            >
+              <option value="all">All Years</option>
+              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <select
+              value={selectedRisk}
+              onChange={(e) => setSelectedRisk(e.target.value)}
+              className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+            >
+              <option value="all">All Risk Levels</option>
+              <option value="low">Low Risk (80+)</option>
+              <option value="medium">Medium Risk (60-79)</option>
+              <option value="high">High Risk (&lt;60)</option>
+            </select>
+            {hasActiveFilters && (
+              <button onClick={clearFilters} className="col-span-full md:col-span-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-300">
+                <X size={16} /> Clear Filters
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Table */}
-        <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-4 py-3 text-left font-semibold text-slate-600">Project</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-600">Client</th>
-                <th className="px-4 py-3 text-center font-semibold text-slate-600">Status</th>
-                <th className="px-4 py-3 text-center font-semibold text-slate-600">Health</th>
-                <th className="px-4 py-3 text-right font-semibold text-slate-600">Contract</th>
-                <th className="px-4 py-3 text-right font-semibold text-slate-600">Spent</th>
-                <th className="px-4 py-3 text-right font-semibold text-slate-600">Margin</th>
-                <th className="px-4 py-3 text-center font-semibold text-slate-600">Burn %</th>
-                <th className="px-4 py-3 text-center font-semibold text-slate-600">Hours</th>
-                <th className="px-4 py-3 text-right font-semibold text-slate-600">$/hr</th>
-                <th className="px-4 py-3 text-center font-semibold text-slate-600">Actions</th>
+              <tr className="border-b border-slate-700">
+                <th className="px-4 py-3 text-left font-medium text-slate-400">Project</th>
+                <th className="px-4 py-3 text-left font-medium text-slate-400">Client</th>
+                <th className="px-4 py-3 text-center font-medium text-slate-400">Status</th>
+                <th className="px-4 py-3 text-center font-medium text-slate-400">Health</th>
+                <th className="px-4 py-3 text-right font-medium text-slate-400">Contract</th>
+                <th className="px-4 py-3 text-right font-medium text-slate-400">Spent</th>
+                <th className="px-4 py-3 text-right font-medium text-slate-400">Margin</th>
+                <th className="px-4 py-3 text-center font-medium text-slate-400">Burn %</th>
+                <th className="px-4 py-3 text-center font-medium text-slate-400">Hours</th>
+                <th className="px-4 py-3 text-right font-medium text-slate-400">$/hr</th>
+                <th className="px-4 py-3 text-center font-medium text-slate-400">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {groupByClient ? (
                 projectsByClient.map(([clientName, clientProjects]) => (
                   <React.Fragment key={clientName}>
                     {/* Client Header Row */}
-                    <tr className="bg-slate-50/50">
+                    <tr className="bg-slate-900/50">
                       <td colSpan={11} className="px-4 py-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Users size={14} className="text-slate-400" />
-                            <span className="font-semibold text-slate-700">{clientName}</span>
+                            <Users size={14} className="text-slate-500" />
+                            <span className="font-medium text-slate-200">{clientName}</span>
                             <span className="text-xs text-slate-500">({clientProjects.length} project{clientProjects.length !== 1 ? 's' : ''})</span>
                           </div>
-                          <span className="text-sm font-medium text-slate-600">
+                          <span className="text-sm font-medium text-slate-400">
                             {formatCurrency(clientProjects.reduce((sum, p) => sum + p.budget, 0))}
                           </span>
                         </div>
@@ -1033,65 +927,65 @@ export default function ProjectsPage() {
                       
                       return (
                         <React.Fragment key={project.id}>
-                          <tr className="hover:bg-orange-50/30 transition-colors">
+                          <tr className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors">
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
-                                <span className="font-medium text-slate-800">{project.name}</span>
-                                {project.riskLevel === 'high' && <AlertTriangle size={14} className="text-rose-500" />}
+                                <span className="font-medium text-slate-100">{project.name}</span>
+                                {project.riskLevel === 'high' && <AlertTriangle size={14} className="text-rose-400" />}
                               </div>
                             </td>
-                            <td className="px-4 py-3 text-slate-600">{project.client}</td>
+                            <td className="px-4 py-3 text-slate-400">{project.client}</td>
                             <td className="px-4 py-3 text-center">
-                              <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
                                 {STATUS_OPTIONS.find(s => s.id === project.status)?.label}
                               </span>
                             </td>
                             <td className="px-4 py-3 text-center">
-                              <span className={`inline-flex items-center justify-center w-10 h-6 rounded-full text-xs font-bold ${healthColor.bg} ${healthColor.text}`}>
+                              <span className={`inline-flex items-center justify-center w-9 h-6 rounded text-xs font-bold ${healthColor.bg} ${healthColor.text}`}>
                                 {project.healthScore}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-right font-medium text-slate-800">{formatCurrency(project.budget)}</td>
-                            <td className="px-4 py-3 text-right text-rose-600">{formatCurrency(project.spent)}</td>
-                            <td className={`px-4 py-3 text-right font-semibold ${project.margin >= 20 ? 'text-emerald-600' : project.margin >= 10 ? 'text-amber-600' : 'text-rose-600'}`}>
+                            <td className="px-4 py-3 text-right font-medium text-slate-100">{formatCurrency(project.budget)}</td>
+                            <td className="px-4 py-3 text-right text-rose-400">{formatCurrency(project.spent)}</td>
+                            <td className={`px-4 py-3 text-right font-semibold ${project.margin >= 20 ? 'text-emerald-400' : project.margin >= 10 ? 'text-amber-400' : 'text-rose-400'}`}>
                               {formatPercent(project.margin)}
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center justify-center gap-2">
-                                <div className="w-16 bg-slate-100 rounded-full h-2 overflow-hidden">
+                                <div className="w-14 bg-slate-700 rounded-full h-1.5 overflow-hidden">
                                   <div 
                                     className={`h-full rounded-full ${burnRate > 100 ? 'bg-rose-500' : burnRate > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
                                     style={{ width: `${Math.min(burnRate, 100)}%` }}
                                   />
                                 </div>
-                                <span className="text-xs text-slate-500 w-10">{burnRate.toFixed(0)}%</span>
+                                <span className="text-xs text-slate-500 w-8">{burnRate.toFixed(0)}%</span>
                               </div>
                             </td>
-                            <td className="px-4 py-3 text-center text-slate-600 text-xs">
+                            <td className="px-4 py-3 text-center text-slate-400 text-xs">
                               {project.actual_hours || 0}/{project.budgeted_hours || '—'}
                             </td>
-                            <td className="px-4 py-3 text-right text-slate-600">
+                            <td className="px-4 py-3 text-right text-slate-400">
                               {project.effectiveRate > 0 ? `$${project.effectiveRate.toFixed(0)}` : '—'}
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center justify-center gap-1">
                                 <button 
                                   onClick={() => openAddCO(project.id, project.name)}
-                                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                                  className="p-1.5 rounded hover:bg-slate-600 text-slate-500 hover:text-slate-300"
                                   title="Add Change Order"
                                 >
                                   <Plus size={14} />
                                 </button>
                                 <button 
                                   onClick={() => openEditProject(project)} 
-                                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                                  className="p-1.5 rounded hover:bg-slate-600 text-slate-500 hover:text-slate-300"
                                   title="Edit"
                                 >
                                   <Edit2 size={14} />
                                 </button>
                                 <button 
                                   onClick={() => deleteProject(project.id, project.name)}
-                                  className="p-1.5 rounded-lg hover:bg-rose-100 text-slate-400 hover:text-rose-600"
+                                  className="p-1.5 rounded hover:bg-rose-500/20 text-slate-500 hover:text-rose-400"
                                   title="Delete"
                                 >
                                   <Trash2 size={14} />
@@ -1105,39 +999,39 @@ export default function ProjectsPage() {
                             const coHealthColor = getHealthColor(co.healthScore)
                             const coBurnRate = co.budget > 0 ? (co.spent / co.budget) * 100 : 0
                             return (
-                              <tr key={co.id} className="bg-slate-50/30 hover:bg-orange-50/20">
+                              <tr key={co.id} className="border-b border-slate-700/30 bg-slate-900/30 hover:bg-slate-700/20">
                                 <td className="px-4 py-2">
                                   <div className="flex items-center gap-2 pl-6">
-                                    <GitBranch size={12} className="text-slate-400" />
-                                    <span className="text-slate-600 text-xs">{co.name}</span>
-                                    <span className="px-1.5 py-0.5 text-xs rounded bg-amber-100 text-amber-700">CO{co.co_number}</span>
+                                    <GitBranch size={12} className="text-slate-600" />
+                                    <span className="text-slate-400 text-xs">{co.name}</span>
+                                    <span className="px-1.5 py-0.5 text-xs rounded bg-amber-500/20 text-amber-400">CO{co.co_number}</span>
                                   </div>
                                 </td>
                                 <td className="px-4 py-2 text-slate-500 text-xs">{co.client}</td>
                                 <td className="px-4 py-2 text-center">
-                                  <span className={`px-2 py-0.5 rounded-full text-xs ${coStatusStyle.bg} ${coStatusStyle.text}`}>
+                                  <span className={`px-2 py-0.5 rounded text-xs ${coStatusStyle.bg} ${coStatusStyle.text}`}>
                                     {STATUS_OPTIONS.find(s => s.id === co.status)?.label}
                                   </span>
                                 </td>
                                 <td className="px-4 py-2 text-center">
-                                  <span className={`inline-flex items-center justify-center w-8 h-5 rounded-full text-xs font-medium ${coHealthColor.bg} ${coHealthColor.text}`}>
+                                  <span className={`inline-flex items-center justify-center w-7 h-5 rounded text-xs font-medium ${coHealthColor.bg} ${coHealthColor.text}`}>
                                     {co.healthScore}
                                   </span>
                                 </td>
-                                <td className="px-4 py-2 text-right text-slate-600 text-xs">{formatCurrency(co.budget)}</td>
-                                <td className="px-4 py-2 text-right text-rose-500 text-xs">{formatCurrency(co.spent)}</td>
-                                <td className={`px-4 py-2 text-right text-xs font-medium ${co.margin >= 20 ? 'text-emerald-600' : co.margin >= 10 ? 'text-amber-600' : 'text-rose-600'}`}>
+                                <td className="px-4 py-2 text-right text-slate-400 text-xs">{formatCurrency(co.budget)}</td>
+                                <td className="px-4 py-2 text-right text-rose-400/70 text-xs">{formatCurrency(co.spent)}</td>
+                                <td className={`px-4 py-2 text-right text-xs font-medium ${co.margin >= 20 ? 'text-emerald-400' : co.margin >= 10 ? 'text-amber-400' : 'text-rose-400'}`}>
                                   {formatPercent(co.margin)}
                                 </td>
                                 <td className="px-4 py-2">
                                   <div className="flex items-center justify-center gap-2">
-                                    <div className="w-12 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                    <div className="w-10 bg-slate-700 rounded-full h-1 overflow-hidden">
                                       <div 
-                                        className={`h-full rounded-full ${coBurnRate > 100 ? 'bg-rose-500' : 'bg-slate-400'}`}
+                                        className={`h-full rounded-full ${coBurnRate > 100 ? 'bg-rose-500' : 'bg-slate-500'}`}
                                         style={{ width: `${Math.min(coBurnRate, 100)}%` }}
                                       />
                                     </div>
-                                    <span className="text-xs text-slate-400 w-8">{coBurnRate.toFixed(0)}%</span>
+                                    <span className="text-xs text-slate-600 w-6">{coBurnRate.toFixed(0)}%</span>
                                   </div>
                                 </td>
                                 <td className="px-4 py-2 text-center text-slate-500 text-xs">
@@ -1149,7 +1043,7 @@ export default function ProjectsPage() {
                                 <td className="px-4 py-2">
                                   <button 
                                     onClick={() => openEditProject(co)} 
-                                    className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 mx-auto block"
+                                    className="p-1 rounded hover:bg-slate-600 text-slate-600 hover:text-slate-400 mx-auto block"
                                   >
                                     <Edit2 size={12} />
                                   </button>
@@ -1169,63 +1063,63 @@ export default function ProjectsPage() {
                   const burnRate = project.budget > 0 ? (project.spent / project.budget) * 100 : 0
                   
                   return (
-                    <tr key={project.id} className="hover:bg-orange-50/30 transition-colors">
+                    <tr key={project.id} className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-slate-800">{project.name}</span>
-                          {project.riskLevel === 'high' && <AlertTriangle size={14} className="text-rose-500" />}
+                          <span className="font-medium text-slate-100">{project.name}</span>
+                          {project.riskLevel === 'high' && <AlertTriangle size={14} className="text-rose-400" />}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{project.client}</td>
+                      <td className="px-4 py-3 text-slate-400">{project.client}</td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
                           {STATUS_OPTIONS.find(s => s.id === project.status)?.label}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex items-center justify-center w-10 h-6 rounded-full text-xs font-bold ${healthColor.bg} ${healthColor.text}`}>
+                        <span className={`inline-flex items-center justify-center w-9 h-6 rounded text-xs font-bold ${healthColor.bg} ${healthColor.text}`}>
                           {project.healthScore}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right font-medium text-slate-800">{formatCurrency(project.budget)}</td>
-                      <td className="px-4 py-3 text-right text-rose-600">{formatCurrency(project.spent)}</td>
-                      <td className={`px-4 py-3 text-right font-semibold ${project.margin >= 20 ? 'text-emerald-600' : project.margin >= 10 ? 'text-amber-600' : 'text-rose-600'}`}>
+                      <td className="px-4 py-3 text-right font-medium text-slate-100">{formatCurrency(project.budget)}</td>
+                      <td className="px-4 py-3 text-right text-rose-400">{formatCurrency(project.spent)}</td>
+                      <td className={`px-4 py-3 text-right font-semibold ${project.margin >= 20 ? 'text-emerald-400' : project.margin >= 10 ? 'text-amber-400' : 'text-rose-400'}`}>
                         {formatPercent(project.margin)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-2">
-                          <div className="w-16 bg-slate-100 rounded-full h-2 overflow-hidden">
+                          <div className="w-14 bg-slate-700 rounded-full h-1.5 overflow-hidden">
                             <div 
                               className={`h-full rounded-full ${burnRate > 100 ? 'bg-rose-500' : burnRate > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
                               style={{ width: `${Math.min(burnRate, 100)}%` }}
                             />
                           </div>
-                          <span className="text-xs text-slate-500 w-10">{burnRate.toFixed(0)}%</span>
+                          <span className="text-xs text-slate-500 w-8">{burnRate.toFixed(0)}%</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center text-slate-600 text-xs">
+                      <td className="px-4 py-3 text-center text-slate-400 text-xs">
                         {project.actual_hours || 0}/{project.budgeted_hours || '—'}
                       </td>
-                      <td className="px-4 py-3 text-right text-slate-600">
+                      <td className="px-4 py-3 text-right text-slate-400">
                         {project.effectiveRate > 0 ? `$${project.effectiveRate.toFixed(0)}` : '—'}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-1">
                           <button 
                             onClick={() => openAddCO(project.id, project.name)}
-                            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                            className="p-1.5 rounded hover:bg-slate-600 text-slate-500 hover:text-slate-300"
                           >
                             <Plus size={14} />
                           </button>
                           <button 
                             onClick={() => openEditProject(project)} 
-                            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                            className="p-1.5 rounded hover:bg-slate-600 text-slate-500 hover:text-slate-300"
                           >
                             <Edit2 size={14} />
                           </button>
                           <button 
                             onClick={() => deleteProject(project.id, project.name)}
-                            className="p-1.5 rounded-lg hover:bg-rose-100 text-slate-400 hover:text-rose-600"
+                            className="p-1.5 rounded hover:bg-rose-500/20 text-slate-500 hover:text-rose-400"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -1236,7 +1130,7 @@ export default function ProjectsPage() {
                 })
               )}
               {organizedProjects.length === 0 && (
-                <tr><td colSpan={11} className="px-4 py-12 text-center text-slate-400">No projects found</td></tr>
+                <tr><td colSpan={11} className="px-4 py-12 text-center text-slate-500">No projects found</td></tr>
               )}
             </tbody>
           </table>
@@ -1244,47 +1138,47 @@ export default function ProjectsPage() {
 
         {/* Pagination */}
         {!groupByClient && totalPages > 1 && (
-          <div className="flex items-center justify-between pt-4">
-            <p className="text-sm text-slate-500">Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, organizedProjects.length)} of {organizedProjects.length}</p>
+          <div className="flex items-center justify-between p-4 border-t border-slate-700">
+            <p className="text-sm text-slate-400">Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, organizedProjects.length)} of {organizedProjects.length}</p>
             <div className="flex items-center gap-2">
-              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-50">
                 <ChevronLeft size={18} />
               </button>
-              <span className="text-sm text-slate-600 px-3">Page {currentPage} of {totalPages}</span>
-              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+              <span className="text-sm text-slate-400 px-3">Page {currentPage} of {totalPages}</span>
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-50">
                 <ChevronRight size={18} />
               </button>
             </div>
           </div>
         )}
-      </CollapsibleSection>
+      </div>
 
       {/* Project Modal */}
       {showProjectModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl">
-            <h3 className="text-lg font-bold text-slate-800 mb-4">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-slate-100 mb-4">
               {editingProject ? 'Edit Project' : isAddingCO ? 'Add Change Order' : 'Add Project'}
             </h3>
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">Project Name *</label>
+                <label className="block text-sm text-slate-400 mb-1">Project Name *</label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
                   placeholder="Enter project name"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">Client</label>
+                <label className="block text-sm text-slate-400 mb-1">Client</label>
                 <select
                   value={formData.client_id}
                   onChange={(e) => setFormData(prev => ({ ...prev, client_id: e.target.value }))}
-                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
                   disabled={isAddingCO}
                 >
                   <option value="">Select client...</option>
@@ -1294,21 +1188,21 @@ export default function ProjectsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">Status</label>
+                  <label className="block text-sm text-slate-400 mb-1">Status</label>
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
                   >
                     {STATUS_OPTIONS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">Budget Type</label>
+                  <label className="block text-sm text-slate-400 mb-1">Budget Type</label>
                   <select
                     value={formData.budget_type}
                     onChange={(e) => setFormData(prev => ({ ...prev, budget_type: e.target.value as any }))}
-                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
                   >
                     {BUDGET_TYPES.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
                   </select>
@@ -1317,22 +1211,22 @@ export default function ProjectsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">Contract Value</label>
+                  <label className="block text-sm text-slate-400 mb-1">Contract Value</label>
                   <input
                     type="number"
                     value={formData.budget}
                     onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
-                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
                     placeholder="0"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">Spent</label>
+                  <label className="block text-sm text-slate-400 mb-1">Spent</label>
                   <input
                     type="number"
                     value={formData.spent}
                     onChange={(e) => setFormData(prev => ({ ...prev, spent: e.target.value }))}
-                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
                     placeholder="0"
                   />
                 </div>
@@ -1340,22 +1234,22 @@ export default function ProjectsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">Budgeted Hours</label>
+                  <label className="block text-sm text-slate-400 mb-1">Budgeted Hours</label>
                   <input
                     type="number"
                     value={formData.budgeted_hours}
                     onChange={(e) => setFormData(prev => ({ ...prev, budgeted_hours: e.target.value }))}
-                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
                     placeholder="0"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">% Complete</label>
+                  <label className="block text-sm text-slate-400 mb-1">% Complete</label>
                   <input
                     type="number"
                     value={formData.percent_complete}
                     onChange={(e) => setFormData(prev => ({ ...prev, percent_complete: e.target.value }))}
-                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
                     placeholder="0"
                     min="0"
                     max="100"
@@ -1365,42 +1259,42 @@ export default function ProjectsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">Start Date</label>
+                  <label className="block text-sm text-slate-400 mb-1">Start Date</label>
                   <input
                     type="date"
                     value={formData.start_date}
                     onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
-                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">End Date</label>
+                  <label className="block text-sm text-slate-400 mb-1">End Date</label>
                   <input
                     type="date"
                     value={formData.end_date}
                     onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
-                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">Resources (headcount)</label>
+                <label className="block text-sm text-slate-400 mb-1">Resources (headcount)</label>
                 <input
                   type="number"
                   value={formData.resources}
                   onChange={(e) => setFormData(prev => ({ ...prev, resources: e.target.value }))}
-                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
                   placeholder="0"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">Description</label>
+                <label className="block text-sm text-slate-400 mb-1">Description</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 resize-none"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 resize-none"
                   rows={2}
                   placeholder="Brief description..."
                 />
@@ -1410,13 +1304,13 @@ export default function ProjectsPage() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowProjectModal(false)}
-                className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
+                className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={saveProject}
-                className="flex-1 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 rounded-lg text-sm font-medium text-white transition-colors"
+                className="flex-1 px-4 py-2 bg-orange-500 hover:bg-orange-600 rounded-lg text-sm font-medium text-white transition-colors"
               >
                 {editingProject ? 'Save Changes' : 'Create Project'}
               </button>
