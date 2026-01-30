@@ -101,41 +101,67 @@ const formatShortDate = (dateStr: string): string => {
 // Date utilities
 const getDateRange = (preset: DatePreset, customStart?: string, customEnd?: string): { start: string; end: string } => {
   const today = new Date()
-  let start: Date
-  let end: Date = today
+  // Use UTC to avoid timezone shifts
+  const year = today.getFullYear()
+  const month = today.getMonth()
+  const day = today.getDate()
+  
+  let startStr: string
+  let endStr: string
 
   switch (preset) {
     case 'this_week':
-      start = new Date(today)
-      const dayOfWeek = start.getDay()
-      start.setDate(start.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
+      const thisWeekStart = new Date(year, month, day)
+      const dow = thisWeekStart.getDay()
+      thisWeekStart.setDate(thisWeekStart.getDate() - (dow === 0 ? 6 : dow - 1)) // Monday
+      const thisWeekEnd = new Date(thisWeekStart)
+      thisWeekEnd.setDate(thisWeekEnd.getDate() + 6) // Sunday
+      startStr = `${thisWeekStart.getFullYear()}-${String(thisWeekStart.getMonth() + 1).padStart(2, '0')}-${String(thisWeekStart.getDate()).padStart(2, '0')}`
+      endStr = `${thisWeekEnd.getFullYear()}-${String(thisWeekEnd.getMonth() + 1).padStart(2, '0')}-${String(thisWeekEnd.getDate()).padStart(2, '0')}`
       break
     case 'last_week':
-      start = new Date(today)
-      start.setDate(start.getDate() - start.getDay() - 6)
-      end = new Date(start)
-      end.setDate(end.getDate() + 6)
+      const lastWeekEnd = new Date(year, month, day)
+      const ldow = lastWeekEnd.getDay()
+      lastWeekEnd.setDate(lastWeekEnd.getDate() - (ldow === 0 ? 7 : ldow)) // Last Sunday
+      const lastWeekStart = new Date(lastWeekEnd)
+      lastWeekStart.setDate(lastWeekStart.getDate() - 6) // Monday before
+      startStr = `${lastWeekStart.getFullYear()}-${String(lastWeekStart.getMonth() + 1).padStart(2, '0')}-${String(lastWeekStart.getDate()).padStart(2, '0')}`
+      endStr = `${lastWeekEnd.getFullYear()}-${String(lastWeekEnd.getMonth() + 1).padStart(2, '0')}-${String(lastWeekEnd.getDate()).padStart(2, '0')}`
       break
     case 'mtd':
-      start = new Date(today.getFullYear(), today.getMonth(), 1)
+      // Full calendar month
+      startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`
+      const lastDay = new Date(year, month + 1, 0).getDate()
+      endStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
       break
     case 'last_month':
-      start = new Date(today.getFullYear(), today.getMonth() - 1, 1)
-      end = new Date(today.getFullYear(), today.getMonth(), 0)
+      const lmYear = month === 0 ? year - 1 : year
+      const lmMonth = month === 0 ? 12 : month
+      startStr = `${lmYear}-${String(lmMonth).padStart(2, '0')}-01`
+      const lmLastDay = new Date(lmYear, lmMonth, 0).getDate()
+      endStr = `${lmYear}-${String(lmMonth).padStart(2, '0')}-${String(lmLastDay).padStart(2, '0')}`
       break
     case 'qtd':
-      const quarter = Math.floor(today.getMonth() / 3)
-      start = new Date(today.getFullYear(), quarter * 3, 1)
+      const quarter = Math.floor(month / 3)
+      const qStartMonth = quarter * 3
+      startStr = `${year}-${String(qStartMonth + 1).padStart(2, '0')}-01`
+      const qEndMonth = qStartMonth + 2
+      const qLastDay = new Date(year, qEndMonth + 1, 0).getDate()
+      endStr = `${year}-${String(qEndMonth + 1).padStart(2, '0')}-${String(qLastDay).padStart(2, '0')}`
       break
     case 'ytd':
-      start = new Date(today.getFullYear(), 0, 1)
+      startStr = `${year}-01-01`
+      endStr = `${year}-12-31`
       break
     case 'custom':
-      return { start: customStart || today.toISOString().split('T')[0], end: customEnd || today.toISOString().split('T')[0] }
+      startStr = customStart || `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      endStr = customEnd || `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      break
     default:
-      start = new Date(today.getFullYear(), today.getMonth(), 1)
+      startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`
+      endStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
   }
-  return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0] }
+  return { start: startStr, end: endStr }
 }
 
 const getPriorPeriodRange = (start: string, end: string): { start: string; end: string } => {
@@ -410,11 +436,16 @@ export default function TimeTrackingPage() {
     return Object.values(employeeData).sort((a, b) => b.totalHours - a.totalHours)
   }, [filteredEntries])
 
-  const revenueByClientData = useMemo(() => dataByClient.map((c, i) => ({ name: c.name.length > 15 ? c.name.substring(0, 15) + '...' : c.name, value: c.totalRevenue, fill: CHART_COLORS[i % CHART_COLORS.length] })), [dataByClient])
+  const revenueByClientData = useMemo(() => dataByClient.map((c, i) => ({ name: c.name, value: c.totalRevenue, fill: CHART_COLORS[i % CHART_COLORS.length] })), [dataByClient])
 
   const weeklyTrendData = useMemo(() => weekColumns.map(week => {
-    const weekEnd = new Date(week.start); weekEnd.setDate(weekEnd.getDate() + 6); const weekEndStr = weekEnd.toISOString().split('T')[0]
-    const weekEntries = filteredEntries.filter(e => e.date >= week.start && e.date <= weekEndStr)
+    const weekEntries = filteredEntries.filter(e => {
+      const entryDate = new Date(e.date)
+      const weekStart = new Date(week.start)
+      const weekEnd = new Date(week.end)
+      weekEnd.setHours(23, 59, 59)
+      return entryDate >= weekStart && entryDate <= weekEnd
+    })
     return { week: week.label, hours: weekEntries.reduce((sum, e) => sum + e.hours, 0), revenue: weekEntries.reduce((sum, e) => sum + (e.hours * e.bill_rate), 0) }
   }), [weekColumns, filteredEntries])
 
@@ -593,9 +624,18 @@ export default function TimeTrackingPage() {
             <div className="h-64">
               {revenueByClientData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <RechartsPie><Pie data={revenueByClientData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
-                    {revenueByClientData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
-                  </Pie><Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} /></RechartsPie>
+                  <RechartsPie>
+                    <Pie data={revenueByClientData} cx="35%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value">
+                      {revenueByClientData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} />
+                    <Legend layout="vertical" align="right" verticalAlign="middle" formatter={(value, entry: any) => {
+                      const item = revenueByClientData.find(d => d.name === value)
+                      const total = revenueByClientData.reduce((sum, d) => sum + d.value, 0)
+                      const pct = item ? ((item.value / total) * 100).toFixed(0) : 0
+                      return <span className="text-slate-300 text-sm">{value} ({pct}%)</span>
+                    }} />
+                  </RechartsPie>
                 </ResponsiveContainer>
               ) : <div className="flex items-center justify-center h-full text-slate-400">No data</div>}
             </div>
