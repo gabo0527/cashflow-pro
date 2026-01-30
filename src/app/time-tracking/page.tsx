@@ -3,10 +3,14 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { 
   Search, Filter, Download, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
-  Clock, Plus, Edit2, X, Check, Trash2, Calendar, Users, DollarSign, BarChart3
+  Clock, Plus, Edit2, X, Check, Trash2, Calendar, Users, DollarSign, BarChart3,
+  TrendingUp, TrendingDown, Target, PieChart, Activity, Building2, User, Briefcase
 } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { getCurrentUser, fetchProjects, fetchClients } from '@/lib/supabase'
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  PieChart as RechartsPie, Pie, LineChart, Line, Legend, Area, AreaChart
+} from 'recharts'
+import { getCurrentUser } from '@/lib/supabase'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
@@ -21,9 +25,9 @@ interface TimeEntry {
   hours: number
   team_member_id: string
   team_member_name: string
-  team_member_email: string
   project_id: string
   project_name: string
+  client_id: string
   client_name: string
   bill_rate: number
   notes: string | null
@@ -40,6 +44,7 @@ interface Project {
   id: string
   name: string
   client: string
+  client_id: string
   bill_rate?: number
 }
 
@@ -47,6 +52,31 @@ interface Client {
   id: string
   name: string
 }
+
+// Date presets
+type DatePreset = 'this_week' | 'last_week' | 'mtd' | 'last_month' | 'qtd' | 'ytd' | 'custom'
+
+const DATE_PRESETS: { id: DatePreset; label: string }[] = [
+  { id: 'this_week', label: 'This Week' },
+  { id: 'last_week', label: 'Last Week' },
+  { id: 'mtd', label: 'Month to Date' },
+  { id: 'last_month', label: 'Last Month' },
+  { id: 'qtd', label: 'Quarter to Date' },
+  { id: 'ytd', label: 'Year to Date' },
+  { id: 'custom', label: 'Custom Range' },
+]
+
+// View tabs
+type ViewTab = 'trends' | 'byClient' | 'byEmployee' | 'detailed'
+
+const VIEW_TABS: { id: ViewTab; label: string; icon: React.ReactNode }[] = [
+  { id: 'trends', label: 'Trends', icon: <Activity size={16} /> },
+  { id: 'byClient', label: 'By Client', icon: <Building2 size={16} /> },
+  { id: 'byEmployee', label: 'By Employee', icon: <Users size={16} /> },
+  { id: 'detailed', label: 'Detailed', icon: <Calendar size={16} /> },
+]
+
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
 
 const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('en-US', {
@@ -59,79 +89,162 @@ const formatCurrency = (value: number): string => {
 
 const formatDate = (dateStr: string): string => {
   if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleDateString('en-US', { 
-    month: 'short', 
-    day: 'numeric',
-    year: 'numeric'
-  })
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-const getWeekDates = (date: Date): { start: string; end: string } => {
-  const d = new Date(date)
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  const monday = new Date(d.setDate(diff))
-  const sunday = new Date(monday)
-  sunday.setDate(monday.getDate() + 6)
-  return {
-    start: monday.toISOString().split('T')[0],
-    end: sunday.toISOString().split('T')[0]
+const formatShortDate = (dateStr: string): string => {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  return `${d.getMonth() + 1}/${d.getDate()}`
+}
+
+// Date utilities
+const getDateRange = (preset: DatePreset, customStart?: string, customEnd?: string): { start: string; end: string } => {
+  const today = new Date()
+  let start: Date
+  let end: Date = today
+
+  switch (preset) {
+    case 'this_week':
+      start = new Date(today)
+      const dayOfWeek = start.getDay()
+      start.setDate(start.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
+      break
+    case 'last_week':
+      start = new Date(today)
+      start.setDate(start.getDate() - start.getDay() - 6)
+      end = new Date(start)
+      end.setDate(end.getDate() + 6)
+      break
+    case 'mtd':
+      start = new Date(today.getFullYear(), today.getMonth(), 1)
+      break
+    case 'last_month':
+      start = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+      end = new Date(today.getFullYear(), today.getMonth(), 0)
+      break
+    case 'qtd':
+      const quarter = Math.floor(today.getMonth() / 3)
+      start = new Date(today.getFullYear(), quarter * 3, 1)
+      break
+    case 'ytd':
+      start = new Date(today.getFullYear(), 0, 1)
+      break
+    case 'custom':
+      return { start: customStart || today.toISOString().split('T')[0], end: customEnd || today.toISOString().split('T')[0] }
+    default:
+      start = new Date(today.getFullYear(), today.getMonth(), 1)
   }
+  return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0] }
 }
 
-const getMonthDates = (date: Date): { start: string; end: string } => {
-  const year = date.getFullYear()
-  const month = date.getMonth()
-  const start = new Date(year, month, 1)
-  const end = new Date(year, month + 1, 0)
-  return {
-    start: start.toISOString().split('T')[0],
-    end: end.toISOString().split('T')[0]
+const getPriorPeriodRange = (start: string, end: string): { start: string; end: string } => {
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+  const duration = endDate.getTime() - startDate.getTime()
+  const priorEnd = new Date(startDate.getTime() - 1)
+  const priorStart = new Date(priorEnd.getTime() - duration)
+  return { start: priorStart.toISOString().split('T')[0], end: priorEnd.toISOString().split('T')[0] }
+}
+
+const getWeekColumns = (start: string, end: string): { start: string; label: string }[] => {
+  const weeks: { start: string; label: string }[] = []
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+  let current = new Date(startDate)
+  const dayOfWeek = current.getDay()
+  current.setDate(current.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
+  while (current <= endDate) {
+    weeks.push({ start: current.toISOString().split('T')[0], label: formatShortDate(current.toISOString().split('T')[0]) })
+    current.setDate(current.getDate() + 7)
   }
+  return weeks
 }
 
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+// KPI Card
+function KPICard({ title, value, format = 'number', trend, trendLabel, icon, color = 'blue' }: { 
+  title: string; value: number; format?: 'number' | 'currency' | 'percent' | 'hours'
+  trend?: number; trendLabel?: string; icon?: React.ReactNode; color?: 'blue' | 'emerald' | 'amber' | 'purple' | 'rose'
+}) {
+  const colorClasses = { blue: 'text-blue-500', emerald: 'text-emerald-500', amber: 'text-amber-500', purple: 'text-purple-500', rose: 'text-rose-500' }
+  const formatValue = () => {
+    switch (format) {
+      case 'currency': return formatCurrency(value)
+      case 'percent': return `${value.toFixed(1)}%`
+      case 'hours': return `${value.toFixed(1)}`
+      default: return value.toLocaleString()
+    }
+  }
+  return (
+    <div className="p-4 rounded-xl bg-slate-800 border border-slate-700">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">{title}</span>
+        {icon && <span className="text-slate-500">{icon}</span>}
+      </div>
+      <p className={`text-2xl font-bold ${colorClasses[color]}`}>{formatValue()}</p>
+      {trend !== undefined && (
+        <div className="flex items-center gap-1 mt-1">
+          {trend >= 0 ? <TrendingUp size={14} className="text-emerald-500" /> : <TrendingDown size={14} className="text-rose-500" />}
+          <span className={`text-xs font-medium ${trend >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{trend >= 0 ? '+' : ''}{trend.toFixed(1)}%</span>
+          {trendLabel && <span className="text-xs text-slate-500">{trendLabel}</span>}
+        </div>
+      )}
+    </div>
+  )
+}
 
-// Collapsible Section Component
-function CollapsibleSection({ 
-  title, 
-  children, 
-  defaultExpanded = true,
-  badge,
-  icon
-}: { 
-  title: string
-  children: React.ReactNode
-  defaultExpanded?: boolean
-  badge?: string | number
-  icon?: React.ReactNode
+// Collapsible Section
+function CollapsibleSection({ title, children, defaultExpanded = true, badge, badgeColor = 'slate', rightContent, icon }: { 
+  title: string; children: React.ReactNode; defaultExpanded?: boolean; badge?: string | number
+  badgeColor?: 'slate' | 'blue' | 'emerald' | 'amber'; rightContent?: React.ReactNode; icon?: React.ReactNode
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
-  
+  const badgeColors = { slate: 'bg-slate-700 text-slate-300', blue: 'bg-blue-500/20 text-blue-400', emerald: 'bg-emerald-500/20 text-emerald-400', amber: 'bg-amber-500/20 text-amber-400' }
   return (
     <div className="rounded-xl border bg-slate-800 border-slate-700 overflow-hidden">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-700/50 transition-colors"
-      >
+      <button onClick={() => setIsExpanded(!isExpanded)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-700/50 transition-colors">
         <div className="flex items-center gap-2">
           {icon && <span className="text-slate-400">{icon}</span>}
           <h3 className="text-sm font-medium text-slate-100">{title}</h3>
-          {badge !== undefined && (
-            <span className="px-2 py-0.5 text-xs rounded-full bg-slate-700 text-slate-300">
-              {badge}
-            </span>
-          )}
+          {badge !== undefined && <span className={`px-2 py-0.5 text-xs rounded-full ${badgeColors[badgeColor]}`}>{badge}</span>}
         </div>
-        {isExpanded ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
+        <div className="flex items-center gap-3">
+          {rightContent}
+          {isExpanded ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
+        </div>
       </button>
       {isExpanded && <div className="px-4 pb-4 pt-1">{children}</div>}
     </div>
   )
 }
 
+// Editable Cell
+function EditableCell({ value, onSave }: { value: number; onSave: (newValue: number) => void }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editValue, setEditValue] = useState(value.toString())
+  const handleSave = () => {
+    const newValue = parseFloat(editValue) || 0
+    if (newValue !== value) onSave(newValue)
+    setIsEditing(false)
+  }
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSave()
+    if (e.key === 'Escape') { setEditValue(value.toString()); setIsEditing(false) }
+  }
+  if (isEditing) {
+    return (
+      <input type="number" value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={handleSave} onKeyDown={handleKeyDown}
+        className="w-16 px-1 py-0.5 text-right bg-slate-900 border border-blue-500 rounded text-sm text-slate-100 focus:outline-none" autoFocus step="0.5" />
+    )
+  }
+  return (
+    <button onClick={() => { setEditValue(value.toString()); setIsEditing(true) }} className="px-1 py-0.5 rounded hover:bg-slate-600 text-slate-300 transition-colors" title="Click to edit">
+      {value.toFixed(1)}
+    </button>
+  )
+}
+
 export default function TimeTrackingPage() {
-  // Data state
   const [loading, setLoading] = useState(true)
   const [entries, setEntries] = useState<TimeEntry[]>([])
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
@@ -139,948 +252,485 @@ export default function TimeTrackingPage() {
   const [clients, setClients] = useState<Client[]>([])
   const [companyId, setCompanyId] = useState<string | null>(null)
 
-  // View state
-  const [viewMode, setViewMode] = useState<'weekly' | 'monthly'>('weekly')
-  const [displayMode, setDisplayMode] = useState<'table' | 'byClient'>('table')
-  const [currentDate, setCurrentDate] = useState(new Date())
-
-  // Filter state
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedTeamMember, setSelectedTeamMember] = useState<string>('all')
-  const [selectedProject, setSelectedProject] = useState<string>('all')
+  const [datePreset, setDatePreset] = useState<DatePreset>('mtd')
+  const [customStartDate, setCustomStartDate] = useState('')
+  const [customEndDate, setCustomEndDate] = useState('')
   const [selectedClient, setSelectedClient] = useState<string>('all')
-  const [showFilters, setShowFilters] = useState(false)
+  const [selectedEmployee, setSelectedEmployee] = useState<string>('all')
+  const [selectedProject, setSelectedProject] = useState<string>('all')
+  const [showDatePicker, setShowDatePicker] = useState(false)
 
-  // Modal state
+  const [activeTab, setActiveTab] = useState<ViewTab>('byClient')
+  const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set())
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
+
   const [showEntryModal, setShowEntryModal] = useState(false)
-  const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null)
+  const [formData, setFormData] = useState({ date: new Date().toISOString().split('T')[0], team_member_id: '', project_id: '', hours: '', notes: '' })
 
-  // Form state
-  const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
-    team_member_id: '',
-    project_id: '',
-    hours: '',
-    notes: '',
-  })
+  const dateRange = useMemo(() => getDateRange(datePreset, customStartDate, customEndDate), [datePreset, customStartDate, customEndDate])
+  const priorPeriod = useMemo(() => getPriorPeriodRange(dateRange.start, dateRange.end), [dateRange])
 
-  // Load data
   useEffect(() => {
     const loadData = async () => {
       try {
         const { user } = await getCurrentUser()
         if (!user) return
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single()
-
-        if (!profile?.company_id) {
-          setLoading(false)
-          return
-        }
-
+        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
+        if (!profile?.company_id) { setLoading(false); return }
         setCompanyId(profile.company_id)
 
-        // Fetch team members
-        const { data: teamData } = await supabase
-          .from('team_members')
-          .select('*')
-          .eq('company_id', profile.company_id)
+        const { data: teamData } = await supabase.from('team_members').select('*').eq('company_id', profile.company_id)
+        const { data: projData } = await supabase.from('projects').select('*').eq('company_id', profile.company_id)
+        const { data: clientData } = await supabase.from('clients').select('*').eq('company_id', profile.company_id)
+        const { data: entriesData } = await supabase.from('time_entries').select('*').eq('company_id', profile.company_id).order('date', { ascending: false })
 
-        // Fetch projects
-        const { data: projData } = await supabase
-          .from('projects')
-          .select('*')
-          .eq('company_id', profile.company_id)
+        const projectMap: Record<string, any> = {}; (projData || []).forEach((p: any) => { projectMap[p.id] = p })
+        const clientMap: Record<string, any> = {}; (clientData || []).forEach((c: any) => { clientMap[c.id] = c })
+        const teamMemberMap: Record<string, any> = {}; (teamData || []).forEach((t: any) => { teamMemberMap[t.id] = t })
 
-        // Fetch clients
-        const { data: clientData } = await supabase
-          .from('clients')
-          .select('*')
-          .eq('company_id', profile.company_id)
-
-        // Fetch time entries (no joins - fetch related data separately)
-        const { data: entriesData } = await supabase
-          .from('time_entries')
-          .select('*')
-          .eq('company_id', profile.company_id)
-          .order('date', { ascending: false })
-
-        // Build lookup maps for projects and clients
-        const projectMap: Record<string, any> = {}
-        ;(projData || []).forEach((p: any) => { projectMap[p.id] = p })
-        
-        const clientMap: Record<string, string> = {}
-        ;(clientData || []).forEach((c: any) => { clientMap[c.id] = c.name })
-        // Build team member lookup
-const teamMemberMap: Record<string, any> = {}
-;(teamData || []).forEach((t: any) => { teamMemberMap[t.id] = t })
-        // Transform entries
         const transformedEntries = (entriesData || []).map((e: any) => {
           const project = projectMap[e.project_id]
-          const clientName = project?.client_id ? clientMap[project.client_id] : ''
+          const clientId = project?.client_id || ''
+          const clientName = clientId ? clientMap[clientId]?.name || '' : ''
           return {
-            id: e.id,
-            date: e.date,
-            hours: e.hours || 0,
-            team_member_id: e.contractor_id || e.user_id || '',
-            team_member_name: teamMemberMap[e.contractor_id]?.name || 'Unknown',
-            team_member_email: teamMemberMap[e.contractor_id]?.email || '',
-            project_id: e.project_id,
-            project_name: project?.name || 'Unknown',
-            client_name: clientName,
-            bill_rate: e.bill_rate || 0,
-            notes: e.description || null,
+            id: e.id, date: e.date, hours: e.hours || 0, team_member_id: e.contractor_id || e.user_id || '',
+            team_member_name: teamMemberMap[e.contractor_id]?.name || 'Unknown', project_id: e.project_id,
+            project_name: project?.name || 'Unknown', client_id: clientId, client_name: clientName, bill_rate: e.bill_rate || 0, notes: e.description || null
           }
         })
 
-        setTeamMembers((teamData || []).map((t: any) => ({
-          id: t.id,
-          name: t.name || '',
-          email: t.email || '',
-          status: t.status || 'active',
-        })))
-
-        setProjects((projData || []).map((p: any) => ({
-          id: p.id,
-          name: p.name || '',
-          client: p.client || '',
-          bill_rate: p.bill_rate || 0,
-        })))
-
-        setClients((clientData || []).map((c: any) => ({
-          id: c.id,
-          name: c.name || '',
-        })))
-
+        setTeamMembers((teamData || []).map((t: any) => ({ id: t.id, name: t.name || '', email: t.email || '', status: t.status || 'active' })))
+        setProjects((projData || []).map((p: any) => ({ id: p.id, name: p.name || '', client: p.client || '', client_id: p.client_id || '', bill_rate: p.bill_rate || 0 })))
+        setClients((clientData || []).map((c: any) => ({ id: c.id, name: c.name || '' })))
         setEntries(transformedEntries)
-      } catch (error) {
-        console.error('Error loading data:', error)
-      } finally {
-        setLoading(false)
-      }
+        if (clientData && clientData.length > 0) setExpandedClients(new Set([clientData[0].id]))
+      } catch (error) { console.error('Error loading data:', error) }
+      finally { setLoading(false) }
     }
     loadData()
   }, [])
 
-  // Date range based on view mode
-  const dateRange = useMemo(() => {
-    if (viewMode === 'weekly') {
-      return getWeekDates(currentDate)
-    } else {
-      return getMonthDates(currentDate)
-    }
-  }, [viewMode, currentDate])
+  const filteredEntries = useMemo(() => entries.filter(entry => {
+    if (entry.date < dateRange.start || entry.date > dateRange.end) return false
+    if (selectedClient !== 'all' && entry.client_id !== selectedClient) return false
+    if (selectedEmployee !== 'all' && entry.team_member_id !== selectedEmployee) return false
+    if (selectedProject !== 'all' && entry.project_id !== selectedProject) return false
+    return true
+  }), [entries, dateRange, selectedClient, selectedEmployee, selectedProject])
 
-  // Filtered entries
-  const filteredEntries = useMemo(() => {
-    return entries.filter(entry => {
-      // Date range filter
-      if (entry.date < dateRange.start || entry.date > dateRange.end) return false
+  const priorPeriodEntries = useMemo(() => entries.filter(entry => {
+    if (entry.date < priorPeriod.start || entry.date > priorPeriod.end) return false
+    if (selectedClient !== 'all' && entry.client_id !== selectedClient) return false
+    if (selectedEmployee !== 'all' && entry.team_member_id !== selectedEmployee) return false
+    if (selectedProject !== 'all' && entry.project_id !== selectedProject) return false
+    return true
+  }), [entries, priorPeriod, selectedClient, selectedEmployee, selectedProject])
 
-      // Search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase()
-        if (!entry.team_member_name?.toLowerCase().includes(query) && 
-            !entry.project_name?.toLowerCase().includes(query) &&
-            !entry.notes?.toLowerCase().includes(query)) return false
-      }
-
-      // Team member filter
-      if (selectedTeamMember !== 'all' && entry.team_member_id !== selectedTeamMember) return false
-
-      // Project filter
-      if (selectedProject !== 'all' && entry.project_id !== selectedProject) return false
-
-      // Client filter
-      if (selectedClient !== 'all' && entry.client_name !== selectedClient) return false
-
-      return true
-    }).sort((a, b) => b.date.localeCompare(a.date))
-  }, [entries, dateRange, searchQuery, selectedTeamMember, selectedProject, selectedClient])
-
-  // Summary calculations
-  const summary = useMemo(() => {
+  const kpis = useMemo(() => {
     const totalHours = filteredEntries.reduce((sum, e) => sum + e.hours, 0)
-    const billableAmount = filteredEntries.reduce((sum, e) => sum + (e.hours * e.bill_rate), 0)
-    const uniqueProjects = new Set(filteredEntries.map(e => e.project_id)).size
-    const uniqueMembers = new Set(filteredEntries.map(e => e.team_member_id)).size
+    const totalRevenue = filteredEntries.reduce((sum, e) => sum + (e.hours * e.bill_rate), 0)
+    const avgRate = totalHours > 0 ? totalRevenue / totalHours : 0
+    const priorHours = priorPeriodEntries.reduce((sum, e) => sum + e.hours, 0)
+    const priorRevenue = priorPeriodEntries.reduce((sum, e) => sum + (e.hours * e.bill_rate), 0)
+    const activeMembers = teamMembers.filter(m => m.status === 'active')
+    const totalCapacity = activeMembers.length * 160
+    const utilization = totalCapacity > 0 ? (totalHours / totalCapacity) * 100 : 0
+    const hoursTrend = priorHours > 0 ? ((totalHours - priorHours) / priorHours) * 100 : 0
+    const revenueTrend = priorRevenue > 0 ? ((totalRevenue - priorRevenue) / priorRevenue) * 100 : 0
+    return { totalHours, totalRevenue, avgRate, utilization, hoursTrend, revenueTrend, uniqueClients: new Set(filteredEntries.map(e => e.client_id).filter(Boolean)).size }
+  }, [filteredEntries, priorPeriodEntries, teamMembers])
 
-    return {
-      totalHours,
-      billableAmount,
-      uniqueProjects,
-      uniqueMembers,
-      avgRate: totalHours > 0 ? billableAmount / totalHours : 0,
-    }
-  }, [filteredEntries])
+  const weekColumns = useMemo(() => getWeekColumns(dateRange.start, dateRange.end), [dateRange])
 
-  // Chart data - Hours by Project
-  const hoursByProjectData = useMemo(() => {
-    const byProject: Record<string, number> = {}
-    filteredEntries.forEach(e => {
-      byProject[e.project_name] = (byProject[e.project_name] || 0) + e.hours
-    })
-    return Object.entries(byProject)
-      .map(([name, hours]) => ({ name: name.length > 15 ? name.substring(0, 15) + '...' : name, hours }))
-      .sort((a, b) => b.hours - a.hours)
-      .slice(0, 8)
-  }, [filteredEntries])
-
-  // Chart data - Hours by Team Member
-  const hoursByMemberData = useMemo(() => {
-    const byMember: Record<string, number> = {}
-    filteredEntries.forEach(e => {
-      byMember[e.team_member_name] = (byMember[e.team_member_name] || 0) + e.hours
-    })
-    return Object.entries(byMember)
-      .map(([name, hours]) => ({ name, hours }))
-      .sort((a, b) => b.hours - a.hours)
-      .slice(0, 8)
-  }, [filteredEntries])
-
-  // Get week start dates for the current month (for By Client view)
-  const weekColumns = useMemo(() => {
-    const { start, end } = getMonthDates(currentDate)
-    const weeks: { start: string; label: string }[] = []
-    const startDate = new Date(start)
-    const endDate = new Date(end)
-    
-    // Find the first Monday of or before the month start
-    let current = new Date(startDate)
-    const dayOfWeek = current.getDay()
-    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
-    current.setDate(current.getDate() + diff)
-    
-    while (current <= endDate) {
-      const weekStart = current.toISOString().split('T')[0]
-      const label = `${current.getMonth() + 1}/${current.getDate()}`
-      weeks.push({ start: weekStart, label })
-      current.setDate(current.getDate() + 7)
-    }
-    
-    return weeks
-  }, [currentDate])
-
-  // Build pivot data for By Client view
-  const pivotData = useMemo(() => {
-    // Only use monthly date range for By Client view
-    const { start, end } = getMonthDates(currentDate)
-    const monthEntries = entries.filter(e => e.date >= start && e.date <= end)
-    
-    // Group by Client -> Project -> Team Member
-    const clientData: Record<string, {
-      name: string
-      projects: Record<string, {
-        name: string
-        members: Record<string, {
-          name: string
-          rate: number
-          weekHours: Record<string, number>
-          totalHours: number
-          totalBilling: number
-        }>
-        totalHours: number
-        totalBilling: number
-      }>
-      totalHours: number
-      totalBilling: number
+  const dataByClient = useMemo(() => {
+    const clientData: Record<string, { id: string; name: string; totalHours: number; totalRevenue: number
+      projects: Record<string, { id: string; name: string; members: Record<string, { id: string; name: string; rate: number; weekHours: Record<string, number>; totalHours: number; totalRevenue: number; entryIds: Record<string, string> }>; totalHours: number; totalRevenue: number }>
     }> = {}
 
-    monthEntries.forEach(entry => {
+    filteredEntries.forEach(entry => {
+      const clientId = entry.client_id || 'unassigned'
       const clientName = entry.client_name || 'Unassigned'
-      const projectName = entry.project_name
-      const memberName = entry.team_member_name
-      const rate = entry.bill_rate || 0
-
-      // Initialize client
-      if (!clientData[clientName]) {
-        clientData[clientName] = { name: clientName, projects: {}, totalHours: 0, totalBilling: 0 }
-      }
-
-      // Initialize project
-      if (!clientData[clientName].projects[projectName]) {
-        clientData[clientName].projects[projectName] = { 
-          name: projectName, 
-          members: {}, 
-          totalHours: 0, 
-          totalBilling: 0 
-        }
-      }
-
-      // Initialize member
-      if (!clientData[clientName].projects[projectName].members[memberName]) {
-        clientData[clientName].projects[projectName].members[memberName] = {
-          name: memberName,
-          rate: rate,
-          weekHours: {},
-          totalHours: 0,
-          totalBilling: 0
-        }
-      }
-
-      // Find which week this entry belongs to
-      const entryDate = new Date(entry.date)
-      const weekColumn = weekColumns.find((w, i) => {
-        const weekStart = new Date(w.start)
-        const nextWeekStart = weekColumns[i + 1] ? new Date(weekColumns[i + 1].start) : new Date(end)
-        nextWeekStart.setDate(nextWeekStart.getDate() + 1)
-        return entryDate >= weekStart && entryDate < nextWeekStart
+      if (!clientData[clientId]) clientData[clientId] = { id: clientId, name: clientName, totalHours: 0, totalRevenue: 0, projects: {} }
+      if (!clientData[clientId].projects[entry.project_id]) clientData[clientId].projects[entry.project_id] = { id: entry.project_id, name: entry.project_name, members: {}, totalHours: 0, totalRevenue: 0 }
+      const project = clientData[clientId].projects[entry.project_id]
+      if (!project.members[entry.team_member_id]) project.members[entry.team_member_id] = { id: entry.team_member_id, name: entry.team_member_name, rate: entry.bill_rate, weekHours: {}, totalHours: 0, totalRevenue: 0, entryIds: {} }
+      const member = project.members[entry.team_member_id]
+      const weekCol = weekColumns.find((w, i) => {
+        const weekStart = new Date(w.start); const nextWeek = weekColumns[i + 1]
+        const nextWeekStart = nextWeek ? new Date(nextWeek.start) : new Date(dateRange.end); nextWeekStart.setDate(nextWeekStart.getDate() + 1)
+        const entryDate = new Date(entry.date); return entryDate >= weekStart && entryDate < nextWeekStart
       })
-
-      if (weekColumn) {
-        const member = clientData[clientName].projects[projectName].members[memberName]
-        member.weekHours[weekColumn.start] = (member.weekHours[weekColumn.start] || 0) + entry.hours
-        member.totalHours += entry.hours
-        member.totalBilling += entry.hours * rate
-        
-        // Update rate if this entry has a higher rate (use max rate seen)
-        if (rate > member.rate) member.rate = rate
-      }
+      if (weekCol) { member.weekHours[weekCol.start] = (member.weekHours[weekCol.start] || 0) + entry.hours; member.entryIds[weekCol.start] = entry.id }
+      member.totalHours += entry.hours; member.totalRevenue += entry.hours * entry.bill_rate
+      if (entry.bill_rate > member.rate) member.rate = entry.bill_rate
     })
 
-    // Calculate project and client totals
     Object.values(clientData).forEach(client => {
       Object.values(client.projects).forEach(project => {
-        Object.values(project.members).forEach(member => {
-          project.totalHours += member.totalHours
-          project.totalBilling += member.totalBilling
-        })
-        client.totalHours += project.totalHours
-        client.totalBilling += project.totalBilling
+        Object.values(project.members).forEach(member => { project.totalHours += member.totalHours; project.totalRevenue += member.totalRevenue })
+        client.totalHours += project.totalHours; client.totalRevenue += project.totalRevenue
       })
     })
+    return Object.values(clientData).sort((a, b) => b.totalRevenue - a.totalRevenue)
+  }, [filteredEntries, weekColumns, dateRange])
 
-    // Sort clients by total billing (descending)
-    return Object.values(clientData).sort((a, b) => b.totalBilling - a.totalBilling)
-  }, [entries, currentDate, weekColumns])
-
-  // Grand totals for By Client view
-  const grandTotals = useMemo(() => {
-    return pivotData.reduce((acc, client) => ({
-      hours: acc.hours + client.totalHours,
-      billing: acc.billing + client.totalBilling
-    }), { hours: 0, billing: 0 })
-  }, [pivotData])
-
-  // Navigation
-  const navigatePeriod = (direction: 'prev' | 'next') => {
-    const newDate = new Date(currentDate)
-    if (viewMode === 'weekly') {
-      newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7))
-    } else {
-      newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1))
-    }
-    setCurrentDate(newDate)
-  }
-
-  const getPeriodLabel = () => {
-    if (viewMode === 'weekly') {
-      const { start, end } = dateRange
-      return `${formatDate(start)} - ${formatDate(end)}`
-    } else {
-      return currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-    }
-  }
-
-  // Form handlers
-  const openAddEntry = () => {
-    setEditingEntry(null)
-    setFormData({
-      date: new Date().toISOString().split('T')[0],
-      team_member_id: '',
-      project_id: '',
-      hours: '',
-      notes: '',
+  const dataByEmployee = useMemo(() => {
+    const employeeData: Record<string, { id: string; name: string; totalHours: number; totalRevenue: number; clients: Record<string, { name: string; hours: number; revenue: number }> }> = {}
+    filteredEntries.forEach(entry => {
+      if (!employeeData[entry.team_member_id]) employeeData[entry.team_member_id] = { id: entry.team_member_id, name: entry.team_member_name, totalHours: 0, totalRevenue: 0, clients: {} }
+      const emp = employeeData[entry.team_member_id]; emp.totalHours += entry.hours; emp.totalRevenue += entry.hours * entry.bill_rate
+      const clientKey = entry.client_id || 'unassigned'
+      if (!emp.clients[clientKey]) emp.clients[clientKey] = { name: entry.client_name || 'Unassigned', hours: 0, revenue: 0 }
+      emp.clients[clientKey].hours += entry.hours; emp.clients[clientKey].revenue += entry.hours * entry.bill_rate
     })
-    setShowEntryModal(true)
-  }
+    return Object.values(employeeData).sort((a, b) => b.totalHours - a.totalHours)
+  }, [filteredEntries])
 
-  const openEditEntry = (entry: TimeEntry) => {
-    setEditingEntry(entry)
-    setFormData({
-      date: entry.date,
-      team_member_id: entry.team_member_id,
-      project_id: entry.project_id,
-      hours: entry.hours.toString(),
-      notes: entry.notes || '',
-    })
-    setShowEntryModal(true)
-  }
+  const revenueByClientData = useMemo(() => dataByClient.map((c, i) => ({ name: c.name.length > 15 ? c.name.substring(0, 15) + '...' : c.name, value: c.totalRevenue, fill: CHART_COLORS[i % CHART_COLORS.length] })), [dataByClient])
 
-  const saveEntry = async () => {
-    if (!companyId || !formData.team_member_id || !formData.project_id || !formData.hours) return
+  const weeklyTrendData = useMemo(() => weekColumns.map(week => {
+    const weekEnd = new Date(week.start); weekEnd.setDate(weekEnd.getDate() + 6); const weekEndStr = weekEnd.toISOString().split('T')[0]
+    const weekEntries = filteredEntries.filter(e => e.date >= week.start && e.date <= weekEndStr)
+    return { week: week.label, hours: weekEntries.reduce((sum, e) => sum + e.hours, 0), revenue: weekEntries.reduce((sum, e) => sum + (e.hours * e.bill_rate), 0) }
+  }), [weekColumns, filteredEntries])
 
-    const project = projects.find(p => p.id === formData.project_id)
-    
+  const updateEntryHours = async (entryId: string, newHours: number) => {
+    if (!companyId) return
     try {
-      const entryData = {
-        company_id: companyId,
-        date: formData.date,
-        team_member_id: formData.team_member_id,
-        project_id: formData.project_id,
-        hours: parseFloat(formData.hours) || 0,
-        bill_rate: project?.bill_rate || 0,
-        notes: formData.notes || null,
-      }
-
-      if (editingEntry) {
-        const { error } = await supabase
-          .from('time_entries')
-          .update(entryData)
-          .eq('id', editingEntry.id)
-
-        if (error) throw error
-
-        // Refresh data
-        const teamMember = teamMembers.find(t => t.id === formData.team_member_id)
-        setEntries(prev => prev.map(e => 
-          e.id === editingEntry.id ? {
-            ...e,
-            ...entryData,
-            team_member_name: teamMember?.name || '',
-            team_member_email: teamMember?.email || '',
-            project_name: project?.name || '',
-            client_name: project?.client || '',
-          } : e
-        ))
-      } else {
-        const { data, error } = await supabase
-          .from('time_entries')
-          .insert(entryData)
-          .select()
-          .single()
-
-        if (error) throw error
-
-        const teamMember = teamMembers.find(t => t.id === formData.team_member_id)
-        const newEntry: TimeEntry = {
-          id: data.id,
-          date: data.date,
-          hours: data.hours,
-          team_member_id: data.team_member_id,
-          team_member_name: teamMember?.name || '',
-          team_member_email: teamMember?.email || '',
-          project_id: data.project_id,
-          project_name: project?.name || '',
-          client_name: project?.client || '',
-          bill_rate: data.bill_rate,
-          notes: data.notes,
-        }
-        setEntries(prev => [newEntry, ...prev])
-      }
-
-      setShowEntryModal(false)
-    } catch (error) {
-      console.error('Error saving entry:', error)
-    }
-  }
-
-  const deleteEntry = async (entryId: string) => {
-    if (!confirm('Delete this time entry?')) return
-
-    try {
-      const { error } = await supabase
-        .from('time_entries')
-        .delete()
-        .eq('id', entryId)
-
+      const { error } = await supabase.from('time_entries').update({ hours: newHours }).eq('id', entryId)
       if (error) throw error
-
-      setEntries(prev => prev.filter(e => e.id !== entryId))
-    } catch (error) {
-      console.error('Error deleting entry:', error)
-    }
+      setEntries(prev => prev.map(e => e.id === entryId ? { ...e, hours: newHours } : e))
+    } catch (error) { console.error('Error updating entry:', error) }
   }
 
-  // Export
+  const toggleClient = (clientId: string) => setExpandedClients(prev => { const next = new Set(prev); if (next.has(clientId)) next.delete(clientId); else next.add(clientId); return next })
+  const toggleProject = (projectId: string) => setExpandedProjects(prev => { const next = new Set(prev); if (next.has(projectId)) next.delete(projectId); else next.add(projectId); return next })
+
   const exportToExcel = () => {
-    const headers = ['Date', 'Team Member', 'Email', 'Project', 'Client', 'Hours', 'Rate', 'Amount', 'Notes']
-    const rows = filteredEntries.map(e => [
-      e.date, e.team_member_name, e.team_member_email, e.project_name, e.client_name,
-      e.hours, e.bill_rate, e.hours * e.bill_rate, e.notes || ''
-    ])
+    const headers = ['Date', 'Employee', 'Client', 'Project', 'Hours', 'Rate', 'Amount']
+    const rows = filteredEntries.map(e => [e.date, e.team_member_name, e.client_name, e.project_name, e.hours, e.bill_rate, e.hours * e.bill_rate])
     const csvContent = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n')
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `time-entries-${dateRange.start}-${dateRange.end}.csv`
-    link.click()
+    const link = document.createElement('a'); link.href = URL.createObjectURL(blob)
+    link.download = `time-analytics-${dateRange.start}-to-${dateRange.end}.csv`; link.click()
   }
 
-  const clearFilters = () => {
-    setSearchQuery('')
-    setSelectedTeamMember('all')
-    setSelectedProject('all')
-    setSelectedClient('all')
+  const getFilterTitle = () => {
+    if (selectedClient !== 'all') return clients.find(c => c.id === selectedClient)?.name || 'Selected Client'
+    if (selectedEmployee !== 'all') return teamMembers.find(t => t.id === selectedEmployee)?.name || 'Selected Employee'
+    return 'All Activity'
   }
 
-  const hasActiveFilters = searchQuery || selectedTeamMember !== 'all' || selectedProject !== 'all' || selectedClient !== 'all'
-
-  // Get unique clients from projects
-  const uniqueClients = useMemo(() => {
-    const clientSet = new Set(projects.map(p => p.client).filter(Boolean))
-    return Array.from(clientSet)
-  }, [projects])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
 
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-100">Time Tracking</h1>
-          <p className="text-sm mt-1 text-slate-400">Track hours and billable time</p>
+          <h1 className="text-2xl font-semibold text-slate-100">Time Analytics</h1>
+          <p className="text-sm mt-1 text-slate-400">CFO-grade insights for {getFilterTitle()}</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={exportToExcel}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors"
-          >
-            <Download size={18} />
-            Export
-          </button>
-          <button
-            onClick={openAddEntry}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-medium transition-colors"
-          >
-            <Plus size={18} />
-            Add Entry
-          </button>
+          <button onClick={exportToExcel} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors"><Download size={18} />Export</button>
+          <button onClick={() => setShowEntryModal(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-medium transition-colors"><Plus size={18} />Add Entry</button>
         </div>
       </div>
 
-      {/* Period Navigation */}
-      <div className="flex items-center justify-between p-4 rounded-xl border bg-slate-800 border-slate-700">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => navigatePeriod('prev')}
-            className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <span className="text-lg font-medium text-slate-100 min-w-[200px] text-center">
-            {getPeriodLabel()}
-          </span>
-          <button
-            onClick={() => navigatePeriod('next')}
-            className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors"
-          >
-            <ChevronRight size={18} />
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { setViewMode('weekly'); setDisplayMode('table') }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              viewMode === 'weekly' && displayMode === 'table' ? 'bg-blue-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-100'
-            }`}
-          >
-            Weekly
-          </button>
-          <button
-            onClick={() => { setViewMode('monthly'); setDisplayMode('table') }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              viewMode === 'monthly' && displayMode === 'table' ? 'bg-blue-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-100'
-            }`}
-          >
-            Monthly
-          </button>
-          <button
-            onClick={() => { setViewMode('monthly'); setDisplayMode('byClient') }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              displayMode === 'byClient' ? 'bg-emerald-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-100'
-            }`}
-          >
-            By Client
-          </button>
-        </div>
-      </div>
-
-      {/* Summary Cards */}
-      <CollapsibleSection title="Summary" badge={`${summary.totalHours} hrs`} icon={<Clock size={16} />}>
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-          <div className="p-4 rounded-lg bg-slate-900/50">
-            <p className="text-xs font-medium text-slate-400">Total Hours</p>
-            <p className="text-xl font-semibold mt-1 text-blue-500">{summary.totalHours.toFixed(1)}</p>
-          </div>
-          <div className="p-4 rounded-lg bg-slate-900/50">
-            <p className="text-xs font-medium text-slate-400">Billable Amount</p>
-            <p className="text-xl font-semibold mt-1 text-emerald-500">{formatCurrency(summary.billableAmount)}</p>
-          </div>
-          <div className="p-4 rounded-lg bg-slate-900/50">
-            <p className="text-xs font-medium text-slate-400">Avg Rate</p>
-            <p className="text-xl font-semibold mt-1 text-slate-100">{formatCurrency(summary.avgRate)}/hr</p>
-          </div>
-          <div className="p-4 rounded-lg bg-slate-900/50">
-            <p className="text-xs font-medium text-slate-400">Projects</p>
-            <p className="text-xl font-semibold mt-1 text-slate-100">{summary.uniqueProjects}</p>
-          </div>
-          <div className="p-4 rounded-lg bg-slate-900/50">
-            <p className="text-xs font-medium text-slate-400">Team Members</p>
-            <p className="text-xl font-semibold mt-1 text-slate-100">{summary.uniqueMembers}</p>
-          </div>
-        </div>
-      </CollapsibleSection>
-
-      {/* Charts - only show in table view */}
-      {displayMode === 'table' && (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <CollapsibleSection title="Hours by Project" icon={<BarChart3 size={16} />}>
-          <div className="h-48">
-            {hoursByProjectData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={hoursByProjectData} layout="vertical" margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                  <YAxis type="category" dataKey="name" width={100} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} />
-                  <Bar dataKey="hours" name="Hours" fill="#3b82f6" radius={[0, 4, 4, 0]}>
-                    {hoursByProjectData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-full text-slate-400">No data</div>
-            )}
-          </div>
-        </CollapsibleSection>
-
-        <CollapsibleSection title="Hours by Team Member" icon={<Users size={16} />}>
-          <div className="h-48">
-            {hoursByMemberData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={hoursByMemberData} layout="vertical" margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                  <YAxis type="category" dataKey="name" width={100} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} />
-                  <Bar dataKey="hours" name="Hours" fill="#10b981" radius={[0, 4, 4, 0]}>
-                    {hoursByMemberData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-full text-slate-400">No data</div>
-            )}
-          </div>
-        </CollapsibleSection>
-      </div>
-      )}
-
-      {/* By Client Pivot View */}
-      {displayMode === 'byClient' && (
-        <div className="space-y-4">
-          {/* Monthly Summary Header */}
-          <div className="p-4 rounded-xl border bg-slate-800 border-slate-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-100">
-                  {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Summary
-                </h3>
-                <p className="text-sm text-slate-400 mt-1">Billing breakdown by client and project</p>
-              </div>
-              <div className="flex items-center gap-6 text-right">
-                <div>
-                  <p className="text-xs text-slate-400">Total Hours</p>
-                  <p className="text-xl font-semibold text-blue-500">{grandTotals.hours.toFixed(1)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400">Total Billing</p>
-                  <p className="text-xl font-semibold text-emerald-500">{formatCurrency(grandTotals.billing)}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Client/Project Tables */}
-          {pivotData.map((client, clientIndex) => (
-            <div key={client.name} className="rounded-xl border bg-slate-800 border-slate-700 overflow-hidden">
-              {/* Client Header */}
-              <div className="px-4 py-3 bg-slate-700/50 border-b border-slate-700">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-slate-100">{client.name}</h3>
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="text-slate-400">{client.totalHours.toFixed(1)} hrs</span>
-                    <span className="text-emerald-500 font-medium">{formatCurrency(client.totalBilling)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Projects */}
-              <div className="divide-y divide-slate-700">
-                {Object.values(client.projects).map((project, projectIndex) => (
-                  <div key={project.name} className="p-4">
-                    {/* Project Header */}
-                    <div className={`inline-block px-3 py-1 rounded text-sm font-medium mb-3 ${
-                      ['bg-blue-500/20 text-blue-400', 'bg-emerald-500/20 text-emerald-400', 'bg-amber-500/20 text-amber-400', 'bg-purple-500/20 text-purple-400', 'bg-rose-500/20 text-rose-400'][projectIndex % 5]
-                    }`}>
-                      {project.name}
-                    </div>
-
-                    {/* Project Table */}
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-slate-700">
-                            <th className="px-3 py-2 text-left text-slate-400 font-medium w-36">Name</th>
-                            <th className="px-3 py-2 text-right text-slate-400 font-medium w-20">Rate</th>
-                            {weekColumns.map(week => (
-                              <th key={week.start} className="px-3 py-2 text-right text-slate-400 font-medium w-16">{week.label}</th>
-                            ))}
-                            <th className="px-3 py-2 text-right text-slate-400 font-medium w-20">Total Hrs</th>
-                            <th className="px-3 py-2 text-right text-slate-400 font-medium w-24">Total $</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Object.values(project.members).sort((a, b) => b.totalHours - a.totalHours).map(member => (
-                            <tr key={member.name} className="border-b border-slate-700/50 hover:bg-slate-700/20">
-                              <td className="px-3 py-2 text-slate-100">{member.name}</td>
-                              <td className="px-3 py-2 text-right text-slate-400">{formatCurrency(member.rate)}</td>
-                              {weekColumns.map(week => (
-                                <td key={week.start} className="px-3 py-2 text-right text-slate-300">
-                                  {member.weekHours[week.start]?.toFixed(1) || '0.0'}
-                                </td>
-                              ))}
-                              <td className="px-3 py-2 text-right text-blue-500 font-medium">{member.totalHours.toFixed(1)}</td>
-                              <td className="px-3 py-2 text-right text-emerald-500 font-medium">{formatCurrency(member.totalBilling)}</td>
-                            </tr>
-                          ))}
-                          {/* Project Subtotal */}
-                          <tr className="bg-slate-900/30 font-medium">
-                            <td className="px-3 py-2 text-slate-300">SITE TOTAL</td>
-                            <td className="px-3 py-2"></td>
-                            {weekColumns.map(week => {
-                              const weekTotal = Object.values(project.members).reduce((sum, m) => sum + (m.weekHours[week.start] || 0), 0)
-                              return <td key={week.start} className="px-3 py-2 text-right text-slate-300">{weekTotal.toFixed(1)}</td>
-                            })}
-                            <td className="px-3 py-2 text-right text-blue-400">{project.totalHours.toFixed(1)}</td>
-                            <td className="px-3 py-2 text-right text-emerald-400">{formatCurrency(project.totalBilling)}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-
-          {pivotData.length === 0 && (
-            <div className="text-center py-12 text-slate-400">
-              No time entries for this month
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Regular Table View */}
-      {displayMode === 'table' && (
-        <>
-      {/* Time Entries Table */}
-      <CollapsibleSection title="Time Entries" badge={filteredEntries.length} icon={<Calendar size={16} />}>
-        {/* Search and Filters */}
-        <div className="space-y-3 mb-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search entries..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-              />
-            </div>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${showFilters || hasActiveFilters ? 'bg-blue-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-100'}`}
-            >
-              <Filter size={16} />
-              Filters
+      {/* Date Range & Filters */}
+      <div className="p-4 rounded-xl border bg-slate-800 border-slate-700">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="relative">
+            <button onClick={() => setShowDatePicker(!showDatePicker)} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors">
+              <Calendar size={16} />{DATE_PRESETS.find(p => p.id === datePreset)?.label}<ChevronDown size={16} />
             </button>
-            {hasActiveFilters && (
-              <button onClick={clearFilters} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-100">
-                <X size={16} /> Clear
-              </button>
+            {showDatePicker && (
+              <div className="absolute top-full left-0 mt-2 w-64 p-3 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50">
+                <div className="space-y-1">
+                  {DATE_PRESETS.map(preset => (
+                    <button key={preset.id} onClick={() => { setDatePreset(preset.id); if (preset.id !== 'custom') setShowDatePicker(false) }}
+                      className={`w-full text-left px-3 py-2 rounded text-sm ${datePreset === preset.id ? 'bg-blue-500 text-white' : 'text-slate-300 hover:bg-slate-700'}`}>{preset.label}</button>
+                  ))}
+                </div>
+                {datePreset === 'custom' && (
+                  <div className="mt-3 pt-3 border-t border-slate-700 space-y-2">
+                    <div><label className="text-xs text-slate-400">Start</label><input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className="w-full mt-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-sm text-slate-100" /></div>
+                    <div><label className="text-xs text-slate-400">End</label><input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className="w-full mt-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-sm text-slate-100" /></div>
+                    <button onClick={() => setShowDatePicker(false)} className="w-full mt-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded text-sm font-medium">Apply</button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
+          <span className="text-slate-400 text-sm">{formatDate(dateRange.start)} — {formatDate(dateRange.end)}</span>
+          <div className="h-6 w-px bg-slate-700" />
+          <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-slate-100">
+            <option value="all">All Clients</option>
+            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)} className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-slate-100">
+            <option value="all">All Employees</option>
+            {teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+          <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-slate-100">
+            <option value="all">All Projects</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          {(selectedClient !== 'all' || selectedEmployee !== 'all' || selectedProject !== 'all') && (
+            <button onClick={() => { setSelectedClient('all'); setSelectedEmployee('all'); setSelectedProject('all') }} className="flex items-center gap-1 px-3 py-2 text-sm text-slate-400 hover:text-slate-200"><X size={14} />Clear</button>
+          )}
+        </div>
+      </div>
 
-          {showFilters && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-700">
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Team Member</label>
-                <select value={selectedTeamMember} onChange={(e) => setSelectedTeamMember(e.target.value)} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100">
-                  <option value="all">All Team Members</option>
-                  {teamMembers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Project</label>
-                <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100">
-                  <option value="all">All Projects</option>
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Client</label>
-                <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100">
-                  <option value="all">All Clients</option>
-                  {uniqueClients.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <KPICard title="Total Hours" value={kpis.totalHours} format="hours" trend={kpis.hoursTrend} trendLabel="vs prior" icon={<Clock size={16} />} color="blue" />
+        <KPICard title="Revenue" value={kpis.totalRevenue} format="currency" trend={kpis.revenueTrend} trendLabel="vs prior" icon={<DollarSign size={16} />} color="emerald" />
+        <KPICard title="Utilization" value={kpis.utilization} format="percent" icon={<Target size={16} />} color="amber" />
+        <KPICard title="Avg Rate" value={kpis.avgRate} format="currency" icon={<TrendingUp size={16} />} color="purple" />
+        <KPICard title="Active Clients" value={kpis.uniqueClients} icon={<Building2 size={16} />} color="blue" />
+      </div>
+
+      {/* View Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-700 pb-2">
+        {VIEW_TABS.map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-blue-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
+            {tab.icon}{tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Trends View */}
+      {activeTab === 'trends' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <CollapsibleSection title="Revenue by Client" icon={<PieChart size={16} />}>
+            <div className="h-64">
+              {revenueByClientData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsPie><Pie data={revenueByClientData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                    {revenueByClientData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                  </Pie><Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} /></RechartsPie>
+                </ResponsiveContainer>
+              ) : <div className="flex items-center justify-center h-full text-slate-400">No data</div>}
+            </div>
+          </CollapsibleSection>
+          <CollapsibleSection title="Weekly Trend" icon={<Activity size={16} />}>
+            <div className="h-64">
+              {weeklyTrendData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={weeklyTrendData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="week" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <YAxis yAxisId="hours" orientation="left" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <YAxis yAxisId="revenue" orientation="right" tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} formatter={(value: number, name: string) => [name === 'revenue' ? formatCurrency(value) : `${value.toFixed(1)} hrs`, name === 'revenue' ? 'Revenue' : 'Hours']} />
+                    <Area yAxisId="hours" type="monotone" dataKey="hours" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} name="Hours" />
+                    <Area yAxisId="revenue" type="monotone" dataKey="revenue" stroke="#10b981" fill="#10b981" fillOpacity={0.2} name="Revenue" />
+                    <Legend />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : <div className="flex items-center justify-center h-full text-slate-400">No data</div>}
+            </div>
+          </CollapsibleSection>
+          <CollapsibleSection title="Hours by Employee" icon={<Users size={16} />}>
+            <div className="h-64">
+              {dataByEmployee.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dataByEmployee.slice(0, 8)} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <YAxis type="category" dataKey="name" width={100} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} formatter={(value: number) => [`${value.toFixed(1)} hrs`, 'Hours']} />
+                    <Bar dataKey="totalHours" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : <div className="flex items-center justify-center h-full text-slate-400">No data</div>}
+            </div>
+          </CollapsibleSection>
+          <CollapsibleSection title="Hours by Project" icon={<Briefcase size={16} />}>
+            <div className="h-64">
+              {filteredEntries.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={Object.values(filteredEntries.reduce((acc, e) => { if (!acc[e.project_id]) acc[e.project_id] = { name: e.project_name.substring(0, 15), hours: 0 }; acc[e.project_id].hours += e.hours; return acc }, {} as Record<string, { name: string; hours: number }>)).sort((a, b) => b.hours - a.hours).slice(0, 8)} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <YAxis type="category" dataKey="name" width={100} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} formatter={(value: number) => [`${value.toFixed(1)} hrs`, 'Hours']} />
+                    <Bar dataKey="hours" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : <div className="flex items-center justify-center h-full text-slate-400">No data</div>}
+            </div>
+          </CollapsibleSection>
+        </div>
+      )}
+
+      {/* By Client View */}
+      {activeTab === 'byClient' && (
+        <div className="space-y-3">
+          {dataByClient.length > 0 ? dataByClient.map((client, clientIndex) => (
+            <div key={client.id} className="rounded-xl border bg-slate-800 border-slate-700 overflow-hidden">
+              <button onClick={() => toggleClient(client.id)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-700/50 transition-colors">
+                <div className="flex items-center gap-3">
+                  {expandedClients.has(client.id) ? <ChevronDown size={18} className="text-slate-400" /> : <ChevronRight size={18} className="text-slate-400" />}
+                  <Building2 size={18} style={{ color: CHART_COLORS[clientIndex % CHART_COLORS.length] }} />
+                  <h3 className="text-base font-semibold text-slate-100">{client.name}</h3>
+                </div>
+                <div className="flex items-center gap-6">
+                  <span className="text-sm text-blue-400">{client.totalHours.toFixed(1)} hrs</span>
+                  <span className="text-sm font-medium text-emerald-400">{formatCurrency(client.totalRevenue)}</span>
+                </div>
+              </button>
+              {expandedClients.has(client.id) && (
+                <div className="border-t border-slate-700">
+                  {Object.values(client.projects).map((project, projectIndex) => (
+                    <div key={project.id} className="border-b border-slate-700/50 last:border-b-0">
+                      <button onClick={() => toggleProject(project.id)} className="w-full flex items-center justify-between px-6 py-2 hover:bg-slate-700/30 transition-colors">
+                        <div className="flex items-center gap-2">
+                          {expandedProjects.has(project.id) ? <ChevronDown size={14} className="text-slate-500" /> : <ChevronRight size={14} className="text-slate-500" />}
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${['bg-blue-500/20 text-blue-400', 'bg-emerald-500/20 text-emerald-400', 'bg-amber-500/20 text-amber-400', 'bg-purple-500/20 text-purple-400', 'bg-rose-500/20 text-rose-400'][projectIndex % 5]}`}>{project.name}</span>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs">
+                          <span className="text-slate-400">{project.totalHours.toFixed(1)} hrs</span>
+                          <span className="text-emerald-400">{formatCurrency(project.totalRevenue)}</span>
+                        </div>
+                      </button>
+                      {expandedProjects.has(project.id) && (
+                        <div className="px-6 pb-3 overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead><tr className="border-b border-slate-700">
+                              <th className="px-2 py-2 text-left text-slate-400 font-medium w-32">Name</th>
+                              <th className="px-2 py-2 text-right text-slate-400 font-medium w-20">Rate</th>
+                              {weekColumns.map(week => <th key={week.start} className="px-2 py-2 text-right text-slate-400 font-medium w-16">{week.label}</th>)}
+                              <th className="px-2 py-2 text-right text-slate-400 font-medium w-20">Total</th>
+                              <th className="px-2 py-2 text-right text-slate-400 font-medium w-24">Amount</th>
+                            </tr></thead>
+                            <tbody>
+                              {Object.values(project.members).sort((a, b) => b.totalHours - a.totalHours).map(member => (
+                                <tr key={member.id} className="border-b border-slate-700/30 hover:bg-slate-700/20">
+                                  <td className="px-2 py-2 text-slate-200">{member.name}</td>
+                                  <td className="px-2 py-2 text-right text-slate-400">{formatCurrency(member.rate)}</td>
+                                  {weekColumns.map(week => (
+                                    <td key={week.start} className="px-2 py-2 text-right">
+                                      <EditableCell value={member.weekHours[week.start] || 0} onSave={(newValue) => { const entryId = member.entryIds[week.start]; if (entryId) updateEntryHours(entryId, newValue) }} />
+                                    </td>
+                                  ))}
+                                  <td className="px-2 py-2 text-right text-blue-400 font-medium">{member.totalHours.toFixed(1)}</td>
+                                  <td className="px-2 py-2 text-right text-emerald-400 font-medium">{formatCurrency(member.totalRevenue)}</td>
+                                </tr>
+                              ))}
+                              <tr className="bg-slate-900/30 font-medium">
+                                <td className="px-2 py-2 text-slate-300">SITE TOTAL</td>
+                                <td className="px-2 py-2"></td>
+                                {weekColumns.map(week => { const weekTotal = Object.values(project.members).reduce((sum, m) => sum + (m.weekHours[week.start] || 0), 0); return <td key={week.start} className="px-2 py-2 text-right text-slate-300">{weekTotal.toFixed(1)}</td> })}
+                                <td className="px-2 py-2 text-right text-blue-400">{project.totalHours.toFixed(1)}</td>
+                                <td className="px-2 py-2 text-right text-emerald-400">{formatCurrency(project.totalRevenue)}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )) : <div className="text-center py-12 text-slate-400">No time entries for this period</div>}
+          {dataByClient.length > 0 && (
+            <div className="p-4 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-between">
+              <span className="text-lg font-semibold text-slate-100">GRAND TOTAL</span>
+              <div className="flex items-center gap-8">
+                <span className="text-lg font-semibold text-blue-400">{kpis.totalHours.toFixed(1)} hrs</span>
+                <span className="text-lg font-semibold text-emerald-400">{formatCurrency(kpis.totalRevenue)}</span>
               </div>
             </div>
           )}
         </div>
+      )}
 
-        {/* Table */}
-        <div className="overflow-x-auto rounded-lg border border-slate-700">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-900/50">
+      {/* By Employee View */}
+      {activeTab === 'byEmployee' && (
+        <div className="space-y-3">
+          {dataByEmployee.map((employee, index) => (
+            <CollapsibleSection key={employee.id} title={employee.name} icon={<User size={16} style={{ color: CHART_COLORS[index % CHART_COLORS.length] }} />} badge={`${employee.totalHours.toFixed(1)} hrs`} badgeColor="blue" rightContent={<span className="text-emerald-400 font-medium mr-4">{formatCurrency(employee.totalRevenue)}</span>} defaultExpanded={index === 0}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-xs font-medium text-slate-400 uppercase mb-2">By Client</h4>
+                  <div className="space-y-2">
+                    {Object.entries(employee.clients).sort((a, b) => b[1].hours - a[1].hours).map(([clientId, data], i) => (
+                      <div key={clientId} className="flex items-center justify-between p-2 rounded bg-slate-900/50">
+                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} /><span className="text-sm text-slate-200">{data.name}</span></div>
+                        <div className="flex items-center gap-4 text-sm"><span className="text-blue-400">{data.hours.toFixed(1)} hrs</span><span className="text-emerald-400">{formatCurrency(data.revenue)}</span></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-xs font-medium text-slate-400 uppercase mb-2">Distribution</h4>
+                  <div className="h-32">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsPie><Pie data={Object.entries(employee.clients).map(([id, data], i) => ({ name: data.name, value: data.hours, fill: CHART_COLORS[i % CHART_COLORS.length] }))} cx="50%" cy="50%" innerRadius={30} outerRadius={50} dataKey="value">
+                        {Object.entries(employee.clients).map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                      </Pie><Tooltip formatter={(value: number) => `${value.toFixed(1)} hrs`} /></RechartsPie>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            </CollapsibleSection>
+          ))}
+        </div>
+      )}
+
+      {/* Detailed View */}
+      {activeTab === 'detailed' && (
+        <CollapsibleSection title="Time Entries" badge={filteredEntries.length} icon={<Calendar size={16} />}>
+          <div className="overflow-x-auto rounded-lg border border-slate-700">
+            <table className="w-full text-sm">
+              <thead><tr className="bg-slate-900/50">
                 <th className="px-4 py-3 text-left font-medium text-slate-400">Date</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-400">Team Member</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-400">Project</th>
+                <th className="px-4 py-3 text-left font-medium text-slate-400">Employee</th>
                 <th className="px-4 py-3 text-left font-medium text-slate-400">Client</th>
+                <th className="px-4 py-3 text-left font-medium text-slate-400">Project</th>
                 <th className="px-4 py-3 text-right font-medium text-slate-400">Hours</th>
                 <th className="px-4 py-3 text-right font-medium text-slate-400">Rate</th>
                 <th className="px-4 py-3 text-right font-medium text-slate-400">Amount</th>
                 <th className="px-4 py-3 text-left font-medium text-slate-400">Notes</th>
-                <th className="px-4 py-3 text-center font-medium text-slate-400">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredEntries.length > 0 ? (
-                filteredEntries.map((entry) => (
+              </tr></thead>
+              <tbody>
+                {filteredEntries.length > 0 ? filteredEntries.slice(0, 100).map((entry) => (
                   <tr key={entry.id} className="border-t border-slate-700 hover:bg-slate-700/30">
                     <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{formatDate(entry.date)}</td>
                     <td className="px-4 py-3 text-slate-100">{entry.team_member_name}</td>
-                    <td className="px-4 py-3 text-slate-100">{entry.project_name}</td>
                     <td className="px-4 py-3 text-slate-400">{entry.client_name || '—'}</td>
+                    <td className="px-4 py-3 text-slate-100">{entry.project_name}</td>
                     <td className="px-4 py-3 text-right text-blue-500 font-medium">{entry.hours}</td>
                     <td className="px-4 py-3 text-right text-slate-400">{formatCurrency(entry.bill_rate)}</td>
                     <td className="px-4 py-3 text-right text-emerald-500 font-medium">{formatCurrency(entry.hours * entry.bill_rate)}</td>
-                    <td className="px-4 py-3 text-slate-400 text-xs max-w-[150px] truncate" title={entry.notes || ''}>{entry.notes || '—'}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => openEditEntry(entry)} className="p-1.5 rounded bg-slate-700 text-slate-300 hover:bg-slate-600" title="Edit">
-                          <Edit2 size={14} />
-                        </button>
-                        <button onClick={() => deleteEntry(entry.id)} className="p-1.5 rounded bg-rose-500/20 text-rose-500 hover:bg-rose-500/30" title="Delete">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
+                    <td className="px-4 py-3 text-slate-400 text-xs max-w-[150px] truncate">{entry.notes || '—'}</td>
                   </tr>
-                ))
-              ) : (
-                <tr><td colSpan={9} className="px-4 py-12 text-center text-slate-400">No time entries found</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </CollapsibleSection>
-        </>
+                )) : <tr><td colSpan={8} className="px-4 py-12 text-center text-slate-400">No time entries found</td></tr>}
+              </tbody>
+            </table>
+          </div>
+          {filteredEntries.length > 100 && <p className="text-center text-sm text-slate-400 mt-2">Showing first 100 of {filteredEntries.length} entries</p>}
+        </CollapsibleSection>
       )}
 
       {/* Entry Modal */}
       {showEntryModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-slate-100 mb-4">
-              {editingEntry ? 'Edit Time Entry' : 'Add Time Entry'}
-            </h3>
-            
+            <h3 className="text-lg font-semibold text-slate-100 mb-4">Add Time Entry</h3>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Date *</label>
-                <input
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Team Member *</label>
-                <select
-                  value={formData.team_member_id}
-                  onChange={(e) => setFormData(prev => ({ ...prev, team_member_id: e.target.value }))}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
-                >
-                  <option value="">Select team member...</option>
-                  {teamMembers.filter(t => t.status === 'active').map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Project *</label>
-                <select
-                  value={formData.project_id}
-                  onChange={(e) => setFormData(prev => ({ ...prev, project_id: e.target.value }))}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
-                >
-                  <option value="">Select project...</option>
-                  {projects.map(p => (
-                    <option key={p.id} value={p.id}>{p.client ? `${p.client} - ` : ''}{p.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Hours *</label>
-                <input
-                  type="text"
-                  value={formData.hours}
-                  onChange={(e) => setFormData(prev => ({ ...prev, hours: e.target.value }))}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
-                  placeholder="8"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Notes (optional)</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 resize-none"
-                  rows={2}
-                  placeholder="Description of work..."
-                />
-              </div>
+              <div><label className="block text-sm text-slate-400 mb-1">Date *</label><input type="date" value={formData.date} onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100" /></div>
+              <div><label className="block text-sm text-slate-400 mb-1">Employee *</label><select value={formData.team_member_id} onChange={(e) => setFormData(prev => ({ ...prev, team_member_id: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"><option value="">Select...</option>{teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+              <div><label className="block text-sm text-slate-400 mb-1">Project *</label><select value={formData.project_id} onChange={(e) => setFormData(prev => ({ ...prev, project_id: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"><option value="">Select...</option>{projects.map(p => <option key={p.id} value={p.id}>{p.client ? `${p.client} - ` : ''}{p.name}</option>)}</select></div>
+              <div><label className="block text-sm text-slate-400 mb-1">Hours *</label><input type="number" value={formData.hours} onChange={(e) => setFormData(prev => ({ ...prev, hours: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100" placeholder="8" step="0.5" /></div>
+              <div><label className="block text-sm text-slate-400 mb-1">Notes</label><textarea value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 resize-none" rows={2} placeholder="Description..." /></div>
             </div>
-
             <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setShowEntryModal(false)}
-                className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveEntry}
-                className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-medium transition-colors"
-              >
-                {editingEntry ? 'Save Changes' : 'Add Entry'}
-              </button>
+              <button onClick={() => setShowEntryModal(false)} className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium">Cancel</button>
+              <button onClick={() => setShowEntryModal(false)} className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-medium">Add Entry</button>
             </div>
           </div>
         </div>
