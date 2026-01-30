@@ -344,7 +344,7 @@ export default function TimeTrackingPage() {
 
   const dataByClient = useMemo(() => {
     const clientData: Record<string, { id: string; name: string; totalHours: number; totalRevenue: number
-      projects: Record<string, { id: string; name: string; members: Record<string, { id: string; name: string; rate: number; weekHours: Record<string, number>; totalHours: number; totalRevenue: number; entryIds: Record<string, string> }>; totalHours: number; totalRevenue: number }>
+      projects: Record<string, { id: string; name: string; members: Record<string, { id: string; name: string; rate: number; weekHours: Record<string, number>; totalHours: number; totalRevenue: number; weekEntries: Record<string, { id: string; hours: number }[]> }>; totalHours: number; totalRevenue: number }>
     }> = {}
 
     filteredEntries.forEach(entry => {
@@ -353,14 +353,18 @@ export default function TimeTrackingPage() {
       if (!clientData[clientId]) clientData[clientId] = { id: clientId, name: clientName, totalHours: 0, totalRevenue: 0, projects: {} }
       if (!clientData[clientId].projects[entry.project_id]) clientData[clientId].projects[entry.project_id] = { id: entry.project_id, name: entry.project_name, members: {}, totalHours: 0, totalRevenue: 0 }
       const project = clientData[clientId].projects[entry.project_id]
-      if (!project.members[entry.team_member_id]) project.members[entry.team_member_id] = { id: entry.team_member_id, name: entry.team_member_name, rate: entry.bill_rate, weekHours: {}, totalHours: 0, totalRevenue: 0, entryIds: {} }
+      if (!project.members[entry.team_member_id]) project.members[entry.team_member_id] = { id: entry.team_member_id, name: entry.team_member_name, rate: entry.bill_rate, weekHours: {}, totalHours: 0, totalRevenue: 0, weekEntries: {} }
       const member = project.members[entry.team_member_id]
       const weekCol = weekColumns.find((w, i) => {
         const weekStart = new Date(w.start); const nextWeek = weekColumns[i + 1]
         const nextWeekStart = nextWeek ? new Date(nextWeek.start) : new Date(dateRange.end); nextWeekStart.setDate(nextWeekStart.getDate() + 1)
         const entryDate = new Date(entry.date); return entryDate >= weekStart && entryDate < nextWeekStart
       })
-      if (weekCol) { member.weekHours[weekCol.start] = (member.weekHours[weekCol.start] || 0) + entry.hours; member.entryIds[weekCol.start] = entry.id }
+      if (weekCol) { 
+        member.weekHours[weekCol.start] = (member.weekHours[weekCol.start] || 0) + entry.hours
+        if (!member.weekEntries[weekCol.start]) member.weekEntries[weekCol.start] = []
+        member.weekEntries[weekCol.start].push({ id: entry.id, hours: entry.hours })
+      }
       member.totalHours += entry.hours; member.totalRevenue += entry.hours * entry.bill_rate
       if (entry.bill_rate > member.rate) member.rate = entry.bill_rate
     })
@@ -394,12 +398,25 @@ export default function TimeTrackingPage() {
     return { week: week.label, hours: weekEntries.reduce((sum, e) => sum + e.hours, 0), revenue: weekEntries.reduce((sum, e) => sum + (e.hours * e.bill_rate), 0) }
   }), [weekColumns, filteredEntries])
 
-  const updateEntryHours = async (entryId: string, newHours: number) => {
-    if (!companyId) return
+  const updateEntryHours = async (weekEntries: { id: string; hours: number }[], newTotalHours: number) => {
+    if (!companyId || !weekEntries || weekEntries.length === 0) return
     try {
-      const { error } = await supabase.from('time_entries').update({ hours: newHours }).eq('id', entryId)
-      if (error) throw error
-      setEntries(prev => prev.map(e => e.id === entryId ? { ...e, hours: newHours } : e))
+      const currentTotal = weekEntries.reduce((sum, e) => sum + e.hours, 0)
+      if (currentTotal === newTotalHours) return
+      
+      if (weekEntries.length === 1) {
+        // Single entry - update directly
+        const { error } = await supabase.from('time_entries').update({ hours: newTotalHours }).eq('id', weekEntries[0].id)
+        if (error) throw error
+        setEntries(prev => prev.map(e => e.id === weekEntries[0].id ? { ...e, hours: newTotalHours } : e))
+      } else {
+        // Multiple entries - adjust the first entry to make up the difference
+        const diff = newTotalHours - currentTotal
+        const newFirstHours = Math.max(0, weekEntries[0].hours + diff)
+        const { error } = await supabase.from('time_entries').update({ hours: newFirstHours }).eq('id', weekEntries[0].id)
+        if (error) throw error
+        setEntries(prev => prev.map(e => e.id === weekEntries[0].id ? { ...e, hours: newFirstHours } : e))
+      }
     } catch (error) { console.error('Error updating entry:', error) }
   }
 
@@ -416,9 +433,9 @@ export default function TimeTrackingPage() {
   }
 
   const getFilterTitle = () => {
-    if (selectedClient !== 'all') return clients.find(c => c.id === selectedClient)?.name || 'Selected Client'
-    if (selectedEmployee !== 'all') return teamMembers.find(t => t.id === selectedEmployee)?.name || 'Selected Employee'
-    return 'All Activity'
+    if (selectedClient !== 'all') return clients.find(c => c.id === selectedClient)?.name || ''
+    if (selectedEmployee !== 'all') return teamMembers.find(t => t.id === selectedEmployee)?.name || ''
+    return 'All Clients'
   }
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -429,7 +446,7 @@ export default function TimeTrackingPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-100">Time Analytics</h1>
-          <p className="text-sm mt-1 text-slate-400">CFO-grade insights for {getFilterTitle()}</p>
+          <p className="text-sm mt-1 text-slate-400">{getFilterTitle()}</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={exportToExcel} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors"><Download size={18} />Export</button>
@@ -612,7 +629,7 @@ export default function TimeTrackingPage() {
                                   <td className="px-2 py-2 text-right text-slate-400">{formatCurrency(member.rate)}</td>
                                   {weekColumns.map(week => (
                                     <td key={week.start} className="px-2 py-2 text-right">
-                                      <EditableCell value={member.weekHours[week.start] || 0} onSave={(newValue) => { const entryId = member.entryIds[week.start]; if (entryId) updateEntryHours(entryId, newValue) }} />
+                                      <EditableCell value={member.weekHours[week.start] || 0} onSave={(newValue) => { const entries = member.weekEntries[week.start]; if (entries && entries.length > 0) updateEntryHours(entries, newValue) }} />
                                     </td>
                                   ))}
                                   <td className="px-2 py-2 text-right text-blue-400 font-medium">{member.totalHours.toFixed(1)}</td>
