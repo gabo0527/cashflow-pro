@@ -59,10 +59,10 @@ type DatePreset = 'this_week' | 'last_week' | 'mtd' | 'last_month' | 'qtd' | 'yt
 const DATE_PRESETS: { id: DatePreset; label: string }[] = [
   { id: 'this_week', label: 'This Week' },
   { id: 'last_week', label: 'Last Week' },
-  { id: 'mtd', label: 'Month to Date' },
+  { id: 'mtd', label: 'This Month' },
   { id: 'last_month', label: 'Last Month' },
-  { id: 'qtd', label: 'Quarter to Date' },
-  { id: 'ytd', label: 'Year to Date' },
+  { id: 'qtd', label: 'This Quarter' },
+  { id: 'ytd', label: 'This Year' },
   { id: 'custom', label: 'Custom Range' },
 ]
 
@@ -147,17 +147,35 @@ const getPriorPeriodRange = (start: string, end: string): { start: string; end: 
   return { start: priorStart.toISOString().split('T')[0], end: priorEnd.toISOString().split('T')[0] }
 }
 
-const getWeekColumns = (start: string, end: string): { start: string; label: string }[] => {
-  const weeks: { start: string; label: string }[] = []
+const getWeekColumns = (start: string, end: string): { start: string; end: string; label: string }[] => {
+  const weeks: { start: string; end: string; label: string }[] = []
   const startDate = new Date(start)
   const endDate = new Date(end)
+  
+  // Find the first Sunday on or after the start date (week ending)
   let current = new Date(startDate)
   const dayOfWeek = current.getDay()
-  current.setDate(current.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
-  while (current <= endDate) {
-    weeks.push({ start: current.toISOString().split('T')[0], label: formatShortDate(current.toISOString().split('T')[0]) })
-    current.setDate(current.getDate() + 7)
+  if (dayOfWeek !== 0) {
+    current.setDate(current.getDate() + (7 - dayOfWeek)) // Move to next Sunday
   }
+  
+  // Generate week-ending columns
+  while (current <= endDate || (current.getMonth() === endDate.getMonth() && current.getFullYear() === endDate.getFullYear())) {
+    const weekEnd = current.toISOString().split('T')[0]
+    const weekStart = new Date(current)
+    weekStart.setDate(weekStart.getDate() - 6) // Monday of that week
+    
+    weeks.push({ 
+      start: weekStart.toISOString().split('T')[0], 
+      end: weekEnd,
+      label: formatShortDate(weekEnd) // Show week-ending date
+    })
+    current.setDate(current.getDate() + 7)
+    
+    // Stop if we've gone past the end date's month (unless custom range)
+    if (current > endDate) break
+  }
+  
   return weeks
 }
 
@@ -355,15 +373,17 @@ export default function TimeTrackingPage() {
       const project = clientData[clientId].projects[entry.project_id]
       if (!project.members[entry.team_member_id]) project.members[entry.team_member_id] = { id: entry.team_member_id, name: entry.team_member_name, rate: entry.bill_rate, weekHours: {}, totalHours: 0, totalRevenue: 0, weekEntries: {} }
       const member = project.members[entry.team_member_id]
-      const weekCol = weekColumns.find((w, i) => {
-        const weekStart = new Date(w.start); const nextWeek = weekColumns[i + 1]
-        const nextWeekStart = nextWeek ? new Date(nextWeek.start) : new Date(dateRange.end); nextWeekStart.setDate(nextWeekStart.getDate() + 1)
-        const entryDate = new Date(entry.date); return entryDate >= weekStart && entryDate < nextWeekStart
+      const weekCol = weekColumns.find(w => {
+        const entryDate = new Date(entry.date)
+        const weekStart = new Date(w.start)
+        const weekEnd = new Date(w.end)
+        weekEnd.setHours(23, 59, 59) // Include entire end day
+        return entryDate >= weekStart && entryDate <= weekEnd
       })
       if (weekCol) { 
-        member.weekHours[weekCol.start] = (member.weekHours[weekCol.start] || 0) + entry.hours
-        if (!member.weekEntries[weekCol.start]) member.weekEntries[weekCol.start] = []
-        member.weekEntries[weekCol.start].push({ id: entry.id, hours: entry.hours })
+        member.weekHours[weekCol.end] = (member.weekHours[weekCol.end] || 0) + entry.hours
+        if (!member.weekEntries[weekCol.end]) member.weekEntries[weekCol.end] = []
+        member.weekEntries[weekCol.end].push({ id: entry.id, hours: entry.hours })
       }
       member.totalHours += entry.hours; member.totalRevenue += entry.hours * entry.bill_rate
       if (entry.bill_rate > member.rate) member.rate = entry.bill_rate
@@ -398,6 +418,45 @@ export default function TimeTrackingPage() {
     return { week: week.label, hours: weekEntries.reduce((sum, e) => sum + e.hours, 0), revenue: weekEntries.reduce((sum, e) => sum + (e.hours * e.bill_rate), 0) }
   }), [weekColumns, filteredEntries])
 
+  const saveNewEntry = async () => {
+    if (!companyId || !formData.team_member_id || !formData.project_id || !formData.hours) return
+    try {
+      const project = projects.find(p => p.id === formData.project_id)
+      const teamMember = teamMembers.find(t => t.id === formData.team_member_id)
+      const billRate = project?.bill_rate || 0
+      
+      const { data, error } = await supabase.from('time_entries').insert({
+        company_id: companyId,
+        date: formData.date,
+        contractor_id: formData.team_member_id,
+        project_id: formData.project_id,
+        hours: parseFloat(formData.hours),
+        bill_rate: billRate,
+        description: formData.notes || null
+      }).select().single()
+      
+      if (error) throw error
+      
+      // Add to local state
+      const newEntry: TimeEntry = {
+        id: data.id,
+        date: formData.date,
+        hours: parseFloat(formData.hours),
+        team_member_id: formData.team_member_id,
+        team_member_name: teamMember?.name || 'Unknown',
+        project_id: formData.project_id,
+        project_name: project?.name || 'Unknown',
+        client_id: project?.client_id || '',
+        client_name: clients.find(c => c.id === project?.client_id)?.name || '',
+        bill_rate: billRate,
+        notes: formData.notes || null
+      }
+      setEntries(prev => [newEntry, ...prev])
+      setShowEntryModal(false)
+      setFormData({ date: new Date().toISOString().split('T')[0], team_member_id: '', project_id: '', hours: '', notes: '' })
+    } catch (error) { console.error('Error saving entry:', error) }
+  }
+
   const updateEntryHours = async (weekEntries: { id: string; hours: number }[], newTotalHours: number) => {
     if (!companyId || !weekEntries || weekEntries.length === 0) return
     try {
@@ -418,6 +477,16 @@ export default function TimeTrackingPage() {
         setEntries(prev => prev.map(e => e.id === weekEntries[0].id ? { ...e, hours: newFirstHours } : e))
       }
     } catch (error) { console.error('Error updating entry:', error) }
+  }
+
+  const deleteEntry = async (entryId: string) => {
+    if (!companyId) return
+    if (!confirm('Delete this time entry?')) return
+    try {
+      const { error } = await supabase.from('time_entries').delete().eq('id', entryId)
+      if (error) throw error
+      setEntries(prev => prev.filter(e => e.id !== entryId))
+    } catch (error) { console.error('Error deleting entry:', error) }
   }
 
   const toggleClient = (clientId: string) => setExpandedClients(prev => { const next = new Set(prev); if (next.has(clientId)) next.delete(clientId); else next.add(clientId); return next })
@@ -618,7 +687,7 @@ export default function TimeTrackingPage() {
                             <thead><tr className="border-b border-slate-700">
                               <th className="px-2 py-2 text-left text-slate-400 font-medium w-32">Name</th>
                               <th className="px-2 py-2 text-right text-slate-400 font-medium w-20">Rate</th>
-                              {weekColumns.map(week => <th key={week.start} className="px-2 py-2 text-right text-slate-400 font-medium w-16">{week.label}</th>)}
+                              {weekColumns.map(week => <th key={week.end} className="px-2 py-2 text-right text-slate-400 font-medium w-16">{week.label}</th>)}
                               <th className="px-2 py-2 text-right text-slate-400 font-medium w-20">Total</th>
                               <th className="px-2 py-2 text-right text-slate-400 font-medium w-24">Amount</th>
                             </tr></thead>
@@ -628,8 +697,8 @@ export default function TimeTrackingPage() {
                                   <td className="px-2 py-2 text-slate-200">{member.name}</td>
                                   <td className="px-2 py-2 text-right text-slate-400">{formatCurrency(member.rate)}</td>
                                   {weekColumns.map(week => (
-                                    <td key={week.start} className="px-2 py-2 text-right">
-                                      <EditableCell value={member.weekHours[week.start] || 0} onSave={(newValue) => { const entries = member.weekEntries[week.start]; if (entries && entries.length > 0) updateEntryHours(entries, newValue) }} />
+                                    <td key={week.end} className="px-2 py-2 text-right text-slate-300">
+                                      {(member.weekHours[week.end] || 0).toFixed(1)}
                                     </td>
                                   ))}
                                   <td className="px-2 py-2 text-right text-blue-400 font-medium">{member.totalHours.toFixed(1)}</td>
@@ -639,7 +708,7 @@ export default function TimeTrackingPage() {
                               <tr className="bg-slate-900/30 font-medium">
                                 <td className="px-2 py-2 text-slate-300">SITE TOTAL</td>
                                 <td className="px-2 py-2"></td>
-                                {weekColumns.map(week => { const weekTotal = Object.values(project.members).reduce((sum, m) => sum + (m.weekHours[week.start] || 0), 0); return <td key={week.start} className="px-2 py-2 text-right text-slate-300">{weekTotal.toFixed(1)}</td> })}
+                                {weekColumns.map(week => { const weekTotal = Object.values(project.members).reduce((sum, m) => sum + (m.weekHours[week.end] || 0), 0); return <td key={week.end} className="px-2 py-2 text-right text-slate-300">{weekTotal.toFixed(1)}</td> })}
                                 <td className="px-2 py-2 text-right text-blue-400">{project.totalHours.toFixed(1)}</td>
                                 <td className="px-2 py-2 text-right text-emerald-400">{formatCurrency(project.totalRevenue)}</td>
                               </tr>
@@ -712,6 +781,7 @@ export default function TimeTrackingPage() {
                 <th className="px-4 py-3 text-right font-medium text-slate-400">Rate</th>
                 <th className="px-4 py-3 text-right font-medium text-slate-400">Amount</th>
                 <th className="px-4 py-3 text-left font-medium text-slate-400">Notes</th>
+                <th className="px-4 py-3 text-center font-medium text-slate-400">Actions</th>
               </tr></thead>
               <tbody>
                 {filteredEntries.length > 0 ? filteredEntries.slice(0, 100).map((entry) => (
@@ -720,12 +790,21 @@ export default function TimeTrackingPage() {
                     <td className="px-4 py-3 text-slate-100">{entry.team_member_name}</td>
                     <td className="px-4 py-3 text-slate-400">{entry.client_name || '—'}</td>
                     <td className="px-4 py-3 text-slate-100">{entry.project_name}</td>
-                    <td className="px-4 py-3 text-right text-blue-500 font-medium">{entry.hours}</td>
+                    <td className="px-4 py-3 text-right">
+                      <EditableCell value={entry.hours} onSave={(newValue) => updateEntryHours([{ id: entry.id, hours: entry.hours }], newValue)} />
+                    </td>
                     <td className="px-4 py-3 text-right text-slate-400">{formatCurrency(entry.bill_rate)}</td>
                     <td className="px-4 py-3 text-right text-emerald-500 font-medium">{formatCurrency(entry.hours * entry.bill_rate)}</td>
                     <td className="px-4 py-3 text-slate-400 text-xs max-w-[150px] truncate">{entry.notes || '—'}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-1">
+                        <button onClick={() => deleteEntry(entry.id)} className="p-1.5 rounded bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-colors" title="Delete">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
-                )) : <tr><td colSpan={8} className="px-4 py-12 text-center text-slate-400">No time entries found</td></tr>}
+                )) : <tr><td colSpan={9} className="px-4 py-12 text-center text-slate-400">No time entries found</td></tr>}
               </tbody>
             </table>
           </div>
@@ -747,7 +826,7 @@ export default function TimeTrackingPage() {
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={() => setShowEntryModal(false)} className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium">Cancel</button>
-              <button onClick={() => setShowEntryModal(false)} className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-medium">Add Entry</button>
+              <button onClick={saveNewEntry} className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-medium">Add Entry</button>
             </div>
           </div>
         </div>
