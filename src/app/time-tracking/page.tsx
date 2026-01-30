@@ -141,6 +141,7 @@ export default function TimeTrackingPage() {
 
   // View state
   const [viewMode, setViewMode] = useState<'weekly' | 'monthly'>('weekly')
+  const [displayMode, setDisplayMode] = useState<'table' | 'byClient'>('table')
   const [currentDate, setCurrentDate] = useState(new Date())
 
   // Filter state
@@ -340,6 +341,130 @@ const teamMemberMap: Record<string, any> = {}
       .sort((a, b) => b.hours - a.hours)
       .slice(0, 8)
   }, [filteredEntries])
+
+  // Get week start dates for the current month (for By Client view)
+  const weekColumns = useMemo(() => {
+    const { start, end } = getMonthDates(currentDate)
+    const weeks: { start: string; label: string }[] = []
+    const startDate = new Date(start)
+    const endDate = new Date(end)
+    
+    // Find the first Monday of or before the month start
+    let current = new Date(startDate)
+    const dayOfWeek = current.getDay()
+    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+    current.setDate(current.getDate() + diff)
+    
+    while (current <= endDate) {
+      const weekStart = current.toISOString().split('T')[0]
+      const label = `${current.getMonth() + 1}/${current.getDate()}`
+      weeks.push({ start: weekStart, label })
+      current.setDate(current.getDate() + 7)
+    }
+    
+    return weeks
+  }, [currentDate])
+
+  // Build pivot data for By Client view
+  const pivotData = useMemo(() => {
+    // Only use monthly date range for By Client view
+    const { start, end } = getMonthDates(currentDate)
+    const monthEntries = entries.filter(e => e.date >= start && e.date <= end)
+    
+    // Group by Client -> Project -> Team Member
+    const clientData: Record<string, {
+      name: string
+      projects: Record<string, {
+        name: string
+        members: Record<string, {
+          name: string
+          rate: number
+          weekHours: Record<string, number>
+          totalHours: number
+          totalBilling: number
+        }>
+        totalHours: number
+        totalBilling: number
+      }>
+      totalHours: number
+      totalBilling: number
+    }> = {}
+
+    monthEntries.forEach(entry => {
+      const clientName = entry.client_name || 'Unassigned'
+      const projectName = entry.project_name
+      const memberName = entry.team_member_name
+      const rate = entry.bill_rate || 0
+
+      // Initialize client
+      if (!clientData[clientName]) {
+        clientData[clientName] = { name: clientName, projects: {}, totalHours: 0, totalBilling: 0 }
+      }
+
+      // Initialize project
+      if (!clientData[clientName].projects[projectName]) {
+        clientData[clientName].projects[projectName] = { 
+          name: projectName, 
+          members: {}, 
+          totalHours: 0, 
+          totalBilling: 0 
+        }
+      }
+
+      // Initialize member
+      if (!clientData[clientName].projects[projectName].members[memberName]) {
+        clientData[clientName].projects[projectName].members[memberName] = {
+          name: memberName,
+          rate: rate,
+          weekHours: {},
+          totalHours: 0,
+          totalBilling: 0
+        }
+      }
+
+      // Find which week this entry belongs to
+      const entryDate = new Date(entry.date)
+      const weekColumn = weekColumns.find((w, i) => {
+        const weekStart = new Date(w.start)
+        const nextWeekStart = weekColumns[i + 1] ? new Date(weekColumns[i + 1].start) : new Date(end)
+        nextWeekStart.setDate(nextWeekStart.getDate() + 1)
+        return entryDate >= weekStart && entryDate < nextWeekStart
+      })
+
+      if (weekColumn) {
+        const member = clientData[clientName].projects[projectName].members[memberName]
+        member.weekHours[weekColumn.start] = (member.weekHours[weekColumn.start] || 0) + entry.hours
+        member.totalHours += entry.hours
+        member.totalBilling += entry.hours * rate
+        
+        // Update rate if this entry has a higher rate (use max rate seen)
+        if (rate > member.rate) member.rate = rate
+      }
+    })
+
+    // Calculate project and client totals
+    Object.values(clientData).forEach(client => {
+      Object.values(client.projects).forEach(project => {
+        Object.values(project.members).forEach(member => {
+          project.totalHours += member.totalHours
+          project.totalBilling += member.totalBilling
+        })
+        client.totalHours += project.totalHours
+        client.totalBilling += project.totalBilling
+      })
+    })
+
+    // Sort clients by total billing (descending)
+    return Object.values(clientData).sort((a, b) => b.totalBilling - a.totalBilling)
+  }, [entries, currentDate, weekColumns])
+
+  // Grand totals for By Client view
+  const grandTotals = useMemo(() => {
+    return pivotData.reduce((acc, client) => ({
+      hours: acc.hours + client.totalHours,
+      billing: acc.billing + client.totalBilling
+    }), { hours: 0, billing: 0 })
+  }, [pivotData])
 
   // Navigation
   const navigatePeriod = (direction: 'prev' | 'next') => {
@@ -557,20 +682,28 @@ const teamMemberMap: Record<string, any> = {}
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setViewMode('weekly')}
+            onClick={() => { setViewMode('weekly'); setDisplayMode('table') }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              viewMode === 'weekly' ? 'bg-blue-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-100'
+              viewMode === 'weekly' && displayMode === 'table' ? 'bg-blue-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-100'
             }`}
           >
             Weekly
           </button>
           <button
-            onClick={() => setViewMode('monthly')}
+            onClick={() => { setViewMode('monthly'); setDisplayMode('table') }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              viewMode === 'monthly' ? 'bg-blue-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-100'
+              viewMode === 'monthly' && displayMode === 'table' ? 'bg-blue-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-100'
             }`}
           >
             Monthly
+          </button>
+          <button
+            onClick={() => { setViewMode('monthly'); setDisplayMode('byClient') }}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              displayMode === 'byClient' ? 'bg-emerald-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-100'
+            }`}
+          >
+            By Client
           </button>
         </div>
       </div>
@@ -601,7 +734,8 @@ const teamMemberMap: Record<string, any> = {}
         </div>
       </CollapsibleSection>
 
-      {/* Charts */}
+      {/* Charts - only show in table view */}
+      {displayMode === 'table' && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <CollapsibleSection title="Hours by Project" icon={<BarChart3 size={16} />}>
           <div className="h-48">
@@ -647,7 +781,117 @@ const teamMemberMap: Record<string, any> = {}
           </div>
         </CollapsibleSection>
       </div>
+      )}
 
+      {/* By Client Pivot View */}
+      {displayMode === 'byClient' && (
+        <div className="space-y-4">
+          {/* Monthly Summary Header */}
+          <div className="p-4 rounded-xl border bg-slate-800 border-slate-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-100">
+                  {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Summary
+                </h3>
+                <p className="text-sm text-slate-400 mt-1">Billing breakdown by client and project</p>
+              </div>
+              <div className="flex items-center gap-6 text-right">
+                <div>
+                  <p className="text-xs text-slate-400">Total Hours</p>
+                  <p className="text-xl font-semibold text-blue-500">{grandTotals.hours.toFixed(1)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Total Billing</p>
+                  <p className="text-xl font-semibold text-emerald-500">{formatCurrency(grandTotals.billing)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Client/Project Tables */}
+          {pivotData.map((client, clientIndex) => (
+            <div key={client.name} className="rounded-xl border bg-slate-800 border-slate-700 overflow-hidden">
+              {/* Client Header */}
+              <div className="px-4 py-3 bg-slate-700/50 border-b border-slate-700">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-slate-100">{client.name}</h3>
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="text-slate-400">{client.totalHours.toFixed(1)} hrs</span>
+                    <span className="text-emerald-500 font-medium">{formatCurrency(client.totalBilling)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Projects */}
+              <div className="divide-y divide-slate-700">
+                {Object.values(client.projects).map((project, projectIndex) => (
+                  <div key={project.name} className="p-4">
+                    {/* Project Header */}
+                    <div className={`inline-block px-3 py-1 rounded text-sm font-medium mb-3 ${
+                      ['bg-blue-500/20 text-blue-400', 'bg-emerald-500/20 text-emerald-400', 'bg-amber-500/20 text-amber-400', 'bg-purple-500/20 text-purple-400', 'bg-rose-500/20 text-rose-400'][projectIndex % 5]
+                    }`}>
+                      {project.name}
+                    </div>
+
+                    {/* Project Table */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-700">
+                            <th className="px-3 py-2 text-left text-slate-400 font-medium w-36">Name</th>
+                            <th className="px-3 py-2 text-right text-slate-400 font-medium w-20">Rate</th>
+                            {weekColumns.map(week => (
+                              <th key={week.start} className="px-3 py-2 text-right text-slate-400 font-medium w-16">{week.label}</th>
+                            ))}
+                            <th className="px-3 py-2 text-right text-slate-400 font-medium w-20">Total Hrs</th>
+                            <th className="px-3 py-2 text-right text-slate-400 font-medium w-24">Total $</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Object.values(project.members).sort((a, b) => b.totalHours - a.totalHours).map(member => (
+                            <tr key={member.name} className="border-b border-slate-700/50 hover:bg-slate-700/20">
+                              <td className="px-3 py-2 text-slate-100">{member.name}</td>
+                              <td className="px-3 py-2 text-right text-slate-400">{formatCurrency(member.rate)}</td>
+                              {weekColumns.map(week => (
+                                <td key={week.start} className="px-3 py-2 text-right text-slate-300">
+                                  {member.weekHours[week.start]?.toFixed(1) || '0.0'}
+                                </td>
+                              ))}
+                              <td className="px-3 py-2 text-right text-blue-500 font-medium">{member.totalHours.toFixed(1)}</td>
+                              <td className="px-3 py-2 text-right text-emerald-500 font-medium">{formatCurrency(member.totalBilling)}</td>
+                            </tr>
+                          ))}
+                          {/* Project Subtotal */}
+                          <tr className="bg-slate-900/30 font-medium">
+                            <td className="px-3 py-2 text-slate-300">SITE TOTAL</td>
+                            <td className="px-3 py-2"></td>
+                            {weekColumns.map(week => {
+                              const weekTotal = Object.values(project.members).reduce((sum, m) => sum + (m.weekHours[week.start] || 0), 0)
+                              return <td key={week.start} className="px-3 py-2 text-right text-slate-300">{weekTotal.toFixed(1)}</td>
+                            })}
+                            <td className="px-3 py-2 text-right text-blue-400">{project.totalHours.toFixed(1)}</td>
+                            <td className="px-3 py-2 text-right text-emerald-400">{formatCurrency(project.totalBilling)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {pivotData.length === 0 && (
+            <div className="text-center py-12 text-slate-400">
+              No time entries for this month
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Regular Table View */}
+      {displayMode === 'table' && (
+        <>
       {/* Time Entries Table */}
       <CollapsibleSection title="Time Entries" badge={filteredEntries.length} icon={<Calendar size={16} />}>
         {/* Search and Filters */}
@@ -751,6 +995,8 @@ const teamMemberMap: Record<string, any> = {}
           </table>
         </div>
       </CollapsibleSection>
+        </>
+      )}
 
       {/* Entry Modal */}
       {showEntryModal && (
