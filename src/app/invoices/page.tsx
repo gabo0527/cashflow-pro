@@ -17,11 +17,11 @@ import { createClient } from '@supabase/supabase-js'
 import { getCurrentUser } from '@/lib/supabase'
 
 const supabase = createClient(
-  'https://jmahfgpbtjeomuepfozf.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptYWhmZ3BidGplb211ZXBmb3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0OTAxNzcsImV4cCI6MjA4MTA2NjE3N30.3SVDvWCGIYYHV57BpKjpDJVCZLKzuRv8B_VietQDxUQ'
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
-// ============ DESIGN SYSTEM ============
+// ============ DESIGN SYSTEM - V2 LIGHT THEME ============
 const COLORS = {
   emerald: '#10b981',
   emeraldLight: '#34d399',
@@ -34,22 +34,23 @@ const COLORS = {
   purple: '#8b5cf6',
   cyan: '#06b6d4',
   orange: '#f97316',
-  slate: {
-    50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1',
-    400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155',
-    800: '#1e293b', 900: '#0f172a'
+  // V2 theme - monochrome with emerald accent
+  gray: {
+    50: '#f9fafb', 100: '#f3f4f6', 200: '#e5e7eb', 300: '#d1d5db',
+    400: '#9ca3af', 500: '#6b7280', 600: '#4b5563', 700: '#374151',
+    800: '#1f2937', 900: '#111827'
   }
 }
 
-// Status colors and labels
+// Status colors and labels - Updated for light theme
 const STATUS_CONFIG = {
-  paid: { label: 'Paid', color: COLORS.emerald, bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30' },
-  partial: { label: 'Partial', color: COLORS.blue, bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30' },
-  current: { label: 'Current', color: COLORS.slate[400], bg: 'bg-slate-500/10', text: 'text-slate-400', border: 'border-slate-500/30' },
-  overdue_1_30: { label: 'Overdue', color: COLORS.amber, bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30' },
-  overdue_31_60: { label: 'Overdue 30+', color: COLORS.orange, bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/30' },
-  overdue_61_90: { label: 'Overdue 60+', color: COLORS.rose, bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/30' },
-  overdue_90_plus: { label: 'Overdue 90+', color: '#be123c', bg: 'bg-rose-600/10', text: 'text-rose-500', border: 'border-rose-600/30' },
+  paid: { label: 'Paid', color: COLORS.emerald, bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+  partial: { label: 'Partial', color: COLORS.blue, bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+  current: { label: 'Current', color: COLORS.gray[400], bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200' },
+  overdue_1_30: { label: 'Overdue', color: COLORS.amber, bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+  overdue_31_60: { label: 'Overdue 30+', color: COLORS.orange, bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
+  overdue_61_90: { label: 'Overdue 60+', color: COLORS.rose, bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
+  overdue_90_plus: { label: 'Overdue 90+', color: '#be123c', bg: 'bg-rose-100', text: 'text-rose-800', border: 'border-rose-300' },
 }
 
 // ============ UTILITY FUNCTIONS ============
@@ -93,7 +94,7 @@ const getDaysOverdue = (dueDate: string): number => {
 
 // ============ COMPONENTS ============
 
-// Metric Card
+// Metric Card - V2 Light Theme
 function MetricCard({ 
   label, 
   value, 
@@ -110,40 +111,40 @@ function MetricCard({
   color?: 'emerald' | 'blue' | 'rose' | 'amber' | 'purple' | 'slate' | 'cyan'
 }) {
   const colorMap = {
-    emerald: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400', icon: 'text-emerald-500' },
-    blue: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-400', icon: 'text-blue-500' },
-    rose: { bg: 'bg-rose-500/10', border: 'border-rose-500/20', text: 'text-rose-400', icon: 'text-rose-500' },
-    amber: { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-400', icon: 'text-amber-500' },
-    purple: { bg: 'bg-purple-500/10', border: 'border-purple-500/20', text: 'text-purple-400', icon: 'text-purple-500' },
-    slate: { bg: 'bg-slate-500/10', border: 'border-slate-500/20', text: 'text-slate-300', icon: 'text-slate-400' },
-    cyan: { bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', text: 'text-cyan-400', icon: 'text-cyan-500' }
+    emerald: { text: 'text-emerald-600', icon: 'text-gray-400' },
+    blue: { text: 'text-blue-600', icon: 'text-gray-400' },
+    rose: { text: 'text-rose-500', icon: 'text-gray-400' },
+    amber: { text: 'text-amber-600', icon: 'text-gray-400' },
+    purple: { text: 'text-purple-600', icon: 'text-gray-400' },
+    slate: { text: 'text-gray-600', icon: 'text-gray-400' },
+    cyan: { text: 'text-cyan-600', icon: 'text-gray-400' }
   }
   const c = colorMap[color]
 
   return (
-    <div className={`${c.bg} ${c.border} border rounded-xl p-5`}>
+    <div className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md hover:border-gray-300 transition-all" style={{ boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.05)' }}>
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm font-medium text-slate-400">{label}</p>
-          <p className={`text-2xl font-bold ${c.text} mt-1`}>{value}</p>
-          {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
+          <p className="text-sm font-medium text-gray-500">{label}</p>
+          <p className={`text-2xl font-semibold ${c.text} mt-1`}>{value}</p>
+          {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
           {trend && (
             <div className="flex items-center gap-1 mt-2">
               {trend.value >= 0 ? <TrendingUp size={14} className="text-emerald-500" /> : <TrendingDown size={14} className="text-rose-500" />}
-              <span className={`text-xs font-medium ${trend.value >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{Math.abs(trend.value).toFixed(1)}%</span>
-              <span className="text-xs text-slate-500">{trend.label}</span>
+              <span className={`text-xs font-medium ${trend.value >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>{Math.abs(trend.value).toFixed(1)}%</span>
+              <span className="text-xs text-gray-400">{trend.label}</span>
             </div>
           )}
         </div>
-        <div className={`${c.bg} p-2.5 rounded-lg`}>
-          <Icon size={20} className={c.icon} />
+        <div className="p-2.5 rounded-lg bg-gray-50">
+          <Icon size={20} className={c.icon} strokeWidth={1.5} />
         </div>
       </div>
     </div>
   )
 }
 
-// Status Badge
+// Status Badge - V2 Light Theme
 function StatusBadge({ status, daysOverdue }: { status: string; daysOverdue?: number }) {
   const config = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.current
   
@@ -157,7 +158,7 @@ function StatusBadge({ status, daysOverdue }: { status: string; daysOverdue?: nu
   )
 }
 
-// Aging Bar
+// Aging Bar - V2 Light Theme
 function AgingBar({ 
   label, 
   amount, 
@@ -174,35 +175,35 @@ function AgingBar({
   const percent = total > 0 ? (amount / total) * 100 : 0
   
   return (
-    <div className="flex items-center gap-4 py-2">
+    <div className="flex items-center gap-4 py-2.5">
       <div className="w-24 shrink-0">
-        <p className="text-sm text-slate-400">{label}</p>
+        <p className="text-sm text-gray-600">{label}</p>
       </div>
-      <div className="flex-1 h-5 bg-slate-700/30 rounded-full overflow-hidden">
+      <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
         <div 
           className="h-full rounded-full transition-all duration-500"
           style={{ width: `${percent}%`, backgroundColor: color }}
         />
       </div>
       <div className="w-28 text-right shrink-0">
-        <p className="text-sm font-semibold text-slate-200">{formatCurrency(amount)}</p>
+        <p className="text-sm font-semibold text-gray-900">{formatCurrency(amount)}</p>
       </div>
       <div className="w-16 text-right shrink-0">
-        <p className="text-xs text-slate-500">{count} inv</p>
+        <p className="text-xs text-gray-400">{count} inv</p>
       </div>
       <div className="w-12 text-right shrink-0">
-        <p className="text-xs text-slate-400">{percent.toFixed(0)}%</p>
+        <p className="text-xs text-gray-500">{percent.toFixed(0)}%</p>
       </div>
     </div>
   )
 }
 
-// Custom Tooltip
+// Custom Tooltip - V2 Light Theme
 const CustomTooltip = ({ active, payload, label, formatter }: any) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 shadow-xl">
-      <p className="text-xs text-slate-400 mb-1">{label}</p>
+    <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-lg">
+      <p className="text-xs text-gray-500 mb-1">{label}</p>
       {payload.map((entry: any, index: number) => (
         <p key={index} className="text-sm font-medium" style={{ color: entry.color }}>
           {entry.name}: {formatter ? formatter(entry.value) : entry.value}
@@ -212,7 +213,7 @@ const CustomTooltip = ({ active, payload, label, formatter }: any) => {
   )
 }
 
-// Editable Select Component
+// Editable Select Component - V2 Light Theme
 function EditableSelect({ 
   value, 
   options, 
@@ -237,30 +238,30 @@ function EditableSelect({
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 text-sm text-slate-300 hover:text-slate-100 transition-colors group"
+        className="flex items-center gap-1 text-sm text-gray-700 hover:text-gray-900 transition-colors group"
       >
-        <span className={selectedOption ? '' : 'text-slate-500 italic'}>{selectedOption?.name || placeholder}</span>
-        <Edit2 size={12} className="text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+        <span className={selectedOption ? '' : 'text-gray-400 italic'}>{selectedOption?.name || placeholder}</span>
+        <Edit2 size={12} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
       </button>
       
       {isOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-          <div className="absolute top-full left-0 mt-1 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
-            <div className="p-2 border-b border-slate-700">
+          <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
+            <div className="p-2 border-b border-gray-100">
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search..."
-                className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+                className="w-full bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 autoFocus
               />
             </div>
             <div className="max-h-48 overflow-y-auto">
               <button
                 onClick={() => { onChange(''); setIsOpen(false); setSearch(''); }}
-                className="w-full px-3 py-2 text-left text-sm text-slate-500 hover:bg-slate-700/50 transition-colors"
+                className="w-full px-3 py-2 text-left text-sm text-gray-400 hover:bg-gray-50 transition-colors"
               >
                 — None —
               </button>
@@ -268,15 +269,15 @@ function EditableSelect({
                 <button
                   key={opt.id}
                   onClick={() => { onChange(opt.id); setIsOpen(false); setSearch(''); }}
-                  className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-700/50 transition-colors ${
-                    opt.id === value ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-300'
+                  className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 transition-colors ${
+                    opt.id === value ? 'text-emerald-600 bg-emerald-50' : 'text-gray-700'
                   }`}
                 >
                   {opt.name}
                 </button>
               ))}
               {filteredOptions.length === 0 && (
-                <p className="px-3 py-2 text-sm text-slate-500">No matches</p>
+                <p className="px-3 py-2 text-sm text-gray-400">No matches</p>
               )}
             </div>
           </div>
@@ -286,7 +287,7 @@ function EditableSelect({
   )
 }
 
-// Invoice Row Component
+// Invoice Row Component - V2 Light Theme
 function InvoiceRow({ 
   invoice, 
   clients,
@@ -308,30 +309,30 @@ function InvoiceRow({
   const project = projects.find(p => p.id === invoice.project_id)
   
   return (
-    <div className={`flex items-center gap-3 py-3 px-4 hover:bg-slate-800/30 transition-colors border-b border-slate-700/30 ${isSelected ? 'bg-emerald-500/5' : ''}`}>
+    <div className={`flex items-center gap-3 py-3 px-4 hover:bg-gray-50 transition-colors border-b border-gray-100 ${isSelected ? 'bg-emerald-50' : 'bg-white'}`}>
       {/* Checkbox */}
       <div className="w-8 shrink-0">
         <input
           type="checkbox"
           checked={isSelected}
           onChange={() => onSelect(invoice.id)}
-          className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0"
+          className="w-4 h-4 rounded border-gray-300 bg-white text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0"
         />
       </div>
       
       {/* Invoice # */}
       <div className="w-20 shrink-0">
-        <p className="text-sm font-medium text-emerald-400">#{invoice.invoice_number}</p>
+        <p className="text-sm font-medium text-emerald-600">#{invoice.invoice_number}</p>
       </div>
       
       {/* Date */}
       <div className="w-24 shrink-0">
-        <p className="text-sm text-slate-400">{formatDateShort(invoice.invoice_date)}</p>
+        <p className="text-sm text-gray-500">{formatDateShort(invoice.invoice_date)}</p>
       </div>
       
       {/* Due Date */}
       <div className="w-24 shrink-0">
-        <p className={`text-sm ${status.includes('overdue') ? 'text-rose-400' : 'text-slate-400'}`}>
+        <p className={`text-sm ${status.includes('overdue') ? 'text-rose-500 font-medium' : 'text-gray-500'}`}>
           {formatDateShort(invoice.due_date)}
         </p>
       </div>
@@ -358,24 +359,24 @@ function InvoiceRow({
       
       {/* QBO Customer (Original) */}
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-slate-500 truncate" title={invoice.qbo_customer}>
+        <p className="text-xs text-gray-400 truncate" title={invoice.qbo_customer}>
           {invoice.qbo_customer || '—'}
         </p>
       </div>
       
       {/* Amount */}
       <div className="w-24 text-right shrink-0">
-        <p className="text-sm font-medium text-slate-200">{formatCurrency(invoice.amount)}</p>
+        <p className="text-sm font-medium text-gray-900">{formatCurrency(invoice.amount)}</p>
       </div>
       
       {/* Paid */}
       <div className="w-20 text-right shrink-0">
-        <p className="text-sm text-slate-500">{formatCurrency(invoice.amount - invoice.balance)}</p>
+        <p className="text-sm text-gray-400">{formatCurrency(invoice.amount - invoice.balance)}</p>
       </div>
       
       {/* Balance */}
       <div className="w-24 text-right shrink-0">
-        <p className={`text-sm font-semibold ${invoice.balance > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+        <p className={`text-sm font-semibold ${invoice.balance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
           {formatCurrency(invoice.balance)}
         </p>
       </div>
@@ -389,21 +390,21 @@ function InvoiceRow({
       <div className="w-20 shrink-0 flex items-center justify-end gap-1">
         {invoice.balance > 0 && (
           <button 
-            className="px-2 py-1 text-xs font-medium text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded transition-colors"
+            className="px-2 py-1 text-xs font-medium text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded transition-colors"
             title="Record Payment"
           >
             + Pay
           </button>
         )}
-        <button className="p-1 hover:bg-slate-700 rounded transition-colors" title="More actions">
-          <MoreHorizontal size={16} className="text-slate-500" />
+        <button className="p-1 hover:bg-gray-100 rounded transition-colors" title="More actions">
+          <MoreHorizontal size={16} className="text-gray-400" />
         </button>
       </div>
     </div>
   )
 }
 
-// Record Payment Modal
+// Record Payment Modal - V2 Light Theme
 function RecordPaymentModal({ 
   isOpen, 
   onClose, 
@@ -432,56 +433,56 @@ function RecordPaymentModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md mx-4 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
-          <h3 className="text-lg font-semibold text-slate-100">Record Payment</h3>
-          <button onClick={onClose} className="p-1 hover:bg-slate-700 rounded-lg transition-colors">
-            <X size={20} className="text-slate-400" />
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-md mx-4 overflow-hidden shadow-xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-900">Record Payment</h3>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+            <X size={20} className="text-gray-400" />
           </button>
         </div>
         
         <div className="p-6 space-y-4">
-          <div className="bg-slate-700/30 rounded-lg p-4">
+          <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400">Invoice #{invoice.invoice_number}</p>
-                <p className="text-lg font-semibold text-slate-100 mt-1">{invoice.qbo_customer}</p>
+                <p className="text-sm text-gray-500">Invoice #{invoice.invoice_number}</p>
+                <p className="text-lg font-semibold text-gray-900 mt-1">{invoice.qbo_customer}</p>
               </div>
               <div className="text-right">
-                <p className="text-sm text-slate-400">Balance Due</p>
-                <p className="text-lg font-bold text-amber-400">{formatCurrency(invoice.balance)}</p>
+                <p className="text-sm text-gray-500">Balance Due</p>
+                <p className="text-lg font-bold text-amber-600">{formatCurrency(invoice.balance)}</p>
               </div>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-400 mb-1.5">Payment Amount</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Payment Amount</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
               <input
                 type="number"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full bg-slate-700/50 border border-slate-600 rounded-lg pl-7 pr-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+                className="w-full bg-white border border-gray-200 rounded-lg pl-7 pr-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-400 mb-1.5">Payment Date</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Payment Date</label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+              className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             />
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-700 bg-slate-800/50">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
             Cancel
           </button>
           <button 
@@ -500,70 +501,129 @@ function RecordPaymentModal({
 // ============ MAIN PAGE ============
 export default function InvoicesPage() {
   const [loading, setLoading] = useState(true)
+  const [invoices, setInvoices] = useState<any[]>([])
+  const [clients, setClients] = useState<any[]>([])
+  const [projects, setProjects] = useState<any[]>([])
   const [selectedYear, setSelectedYear] = useState<number | 'all'>('all')
-  const [filterStatus, setFilterStatus] = useState<string>('all')
-  const [filterClient, setFilterClient] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [filterStatus, setFilterStatus] = useState('all')
+  const [filterClient, setFilterClient] = useState('all')
+  const [sortField, setSortField] = useState('due_date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([])
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<any>(null)
-  const [sortField, setSortField] = useState<string>('due_date')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
-  // Sample clients - will connect to your clients table
-  const [clients, setClients] = useState([
-    { id: 'c1', name: 'GOOGL' },
-    { id: 'c2', name: 'YONDR' },
-    { id: 'c3', name: 'SDP' },
-    { id: 'c4', name: 'CADC' },
-    { id: 'c5', name: 'P1' },
-  ])
-
-  // Sample projects - will connect to your projects table
-  const [projects, setProjects] = useState([
-    { id: 'p1', name: 'gCLS - Doc Control', client_id: 'c1' },
-    { id: 'p2', name: 'gCLS - QA/QC', client_id: 'c1' },
-    { id: 'p3', name: 'gCLS - Commissioning', client_id: 'c1' },
-    { id: 'p4', name: 'Yondr Supply Chain', client_id: 'c2' },
-    { id: 'p5', name: 'SDP Buildout', client_id: 'c3' },
-    { id: 'p6', name: 'CADC Phase 1', client_id: 'c4' },
-    { id: 'p7', name: 'P1 - OFCI Management', client_id: 'c5' },
-  ])
-
-  // Sample invoices (matches your screenshot)
-  const [invoices, setInvoices] = useState([
-    { id: '1', invoice_number: '5166', invoice_date: '2025-11-29', due_date: '2026-01-28', qbo_customer: 'Google Cable Landing Stations', amount: 76170, balance: 76170, client_id: 'c1', project_id: 'p1' },
-    { id: '2', invoice_number: '5165', invoice_date: '2025-11-29', due_date: '2026-01-28', qbo_customer: 'Google Cable Landing Stations', amount: 62575, balance: 62575, client_id: 'c1', project_id: 'p2' },
-    { id: '3', invoice_number: '5160', invoice_date: '2025-11-29', due_date: '2026-01-28', qbo_customer: 'Google Cable Landing Stations', amount: 84644, balance: 84644, client_id: 'c1', project_id: '' },
-    { id: '4', invoice_number: '5162', invoice_date: '2025-11-29', due_date: '2026-01-28', qbo_customer: 'Google Cable Landing Stations', amount: 78330, balance: 78330, client_id: 'c1', project_id: '' },
-    { id: '5', invoice_number: '5161', invoice_date: '2025-11-29', due_date: '2026-01-28', qbo_customer: 'Google Cable Landing Stations', amount: 30673, balance: 30673, client_id: 'c1', project_id: '' },
-    { id: '6', invoice_number: '5159', invoice_date: '2025-11-29', due_date: '2025-12-29', qbo_customer: 'CADC', amount: 2700, balance: 0, client_id: 'c4', project_id: 'p6' },
-    { id: '7', invoice_number: '5152', invoice_date: '2025-11-29', due_date: '2025-12-29', qbo_customer: 'SDP', amount: 29050, balance: 29050, client_id: 'c3', project_id: 'p5' },
-    { id: '8', invoice_number: '5141', invoice_date: '2025-10-27', due_date: '2025-12-11', qbo_customer: 'Yondr Supply Chain Support', amount: 7787, balance: 7787, client_id: 'c2', project_id: 'p4' },
-    { id: '9', invoice_number: '5147', invoice_date: '2025-10-30', due_date: '2025-11-29', qbo_customer: 'P1 - OFCI & Schedule Management', amount: 29151, balance: 29151, client_id: 'c5', project_id: 'p7' },
-    { id: '10', invoice_number: '5133', invoice_date: '2025-09-29', due_date: '2025-10-29', qbo_customer: 'P1 - OFCI & Schedule Management', amount: 26683, balance: 26683, client_id: 'c5', project_id: 'p7' },
-    { id: '11', invoice_number: '5132', invoice_date: '2025-09-29', due_date: '2025-10-29', qbo_customer: 'P1 - OFCI & Schedule Management', amount: 6643, balance: 6642, client_id: 'c5', project_id: 'p7' },
-  ])
-
+  // Data loading
   useEffect(() => {
-    setTimeout(() => setLoading(false), 500)
+    const loadData = async () => {
+      try {
+        const result = await getCurrentUser()
+        const user = result?.user
+        if (!user) { setLoading(false); return }
+
+        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
+        if (!profile?.company_id) { setLoading(false); return }
+
+        const [invRes, clientRes, projRes] = await Promise.all([
+          supabase.from('invoices').select('*').eq('company_id', profile.company_id).order('invoice_date', { ascending: false }),
+          supabase.from('clients').select('*').eq('company_id', profile.company_id).order('name'),
+          supabase.from('projects').select('*').eq('company_id', profile.company_id).order('name')
+        ])
+
+        // Transform invoices to ensure proper field mapping
+        const transformedInvoices = (invRes.data || []).map(inv => ({
+          ...inv,
+          amount: parseFloat(inv.total_amount || inv.amount || 0),
+          balance: parseFloat(inv.balance_due || inv.balance || inv.total_amount || inv.amount || 0),
+          qbo_customer: inv.customer_name || inv.qbo_customer || ''
+        }))
+
+        setInvoices(transformedInvoices)
+        setClients(clientRes.data || [])
+        setProjects(projRes.data || [])
+      } catch (error) {
+        console.error('Error loading invoices:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
   }, [])
 
-  // Calculate AR metrics
+  // Filtered & sorted invoices
+  const filteredInvoices = useMemo(() => {
+    let result = [...invoices]
+
+    // Year filter
+    if (selectedYear !== 'all') {
+      result = result.filter(inv => {
+        const year = new Date(inv.invoice_date).getFullYear()
+        return year === selectedYear
+      })
+    }
+
+    // Search filter
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter(inv => 
+        inv.invoice_number?.toString().toLowerCase().includes(q) ||
+        inv.qbo_customer?.toLowerCase().includes(q) ||
+        clients.find(c => c.id === inv.client_id)?.name?.toLowerCase().includes(q)
+      )
+    }
+
+    // Status filter
+    if (filterStatus !== 'all') {
+      result = result.filter(inv => {
+        const status = getInvoiceStatus(inv.due_date, inv.amount, inv.balance)
+        if (filterStatus === 'unpaid') return inv.balance > 0
+        if (filterStatus === 'paid') return inv.balance === 0
+        if (filterStatus === 'current') return status === 'current'
+        if (filterStatus === 'overdue') return status.includes('overdue')
+        return true
+      })
+    }
+
+    // Client filter
+    if (filterClient !== 'all') {
+      result = result.filter(inv => inv.client_id === filterClient)
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      let aVal = a[sortField]
+      let bVal = b[sortField]
+      
+      if (sortField === 'invoice_date' || sortField === 'due_date') {
+        aVal = new Date(aVal).getTime()
+        bVal = new Date(bVal).getTime()
+      }
+      
+      if (sortDir === 'asc') {
+        return aVal > bVal ? 1 : -1
+      } else {
+        return aVal < bVal ? 1 : -1
+      }
+    })
+
+    return result
+  }, [invoices, selectedYear, searchQuery, filterStatus, filterClient, sortField, sortDir, clients])
+
+  // AR Metrics
   const arMetrics = useMemo(() => {
-    const unpaidInvoices = invoices.filter(inv => inv.balance > 0)
-    const totalAR = unpaidInvoices.reduce((sum, inv) => sum + inv.balance, 0)
+    const unpaid = invoices.filter(inv => inv.balance > 0)
+    const totalAR = unpaid.reduce((sum, inv) => sum + inv.balance, 0)
     
-    // Aging buckets
     const aging = {
       current: { amount: 0, count: 0 },
       days_1_30: { amount: 0, count: 0 },
       days_31_60: { amount: 0, count: 0 },
       days_61_90: { amount: 0, count: 0 },
-      days_90_plus: { amount: 0, count: 0 },
+      days_90_plus: { amount: 0, count: 0 }
     }
-    
-    unpaidInvoices.forEach(inv => {
+
+    unpaid.forEach(inv => {
       const status = getInvoiceStatus(inv.due_date, inv.amount, inv.balance)
       if (status === 'current') { aging.current.amount += inv.balance; aging.current.count++ }
       else if (status === 'overdue_1_30') { aging.days_1_30.amount += inv.balance; aging.days_1_30.count++ }
@@ -571,81 +631,54 @@ export default function InvoicesPage() {
       else if (status === 'overdue_61_90') { aging.days_61_90.amount += inv.balance; aging.days_61_90.count++ }
       else if (status === 'overdue_90_plus') { aging.days_90_plus.amount += inv.balance; aging.days_90_plus.count++ }
     })
-    
+
     const overdueTotal = aging.days_1_30.amount + aging.days_31_60.amount + aging.days_61_90.amount + aging.days_90_plus.amount
-    
-    // Calculate DSO
-    const totalSales = invoices.reduce((sum, inv) => sum + inv.amount, 0)
-    const dso = totalSales > 0 ? (totalAR / totalSales) * 365 : 0
-    
-    // Collection rate
-    const last90Days = new Date()
-    last90Days.setDate(last90Days.getDate() - 90)
-    const recentInvoices = invoices.filter(inv => new Date(inv.invoice_date) >= last90Days)
+
+    // DSO calculation
+    const paidInvoices = invoices.filter(inv => inv.balance === 0 && inv.paid_date && inv.invoice_date)
+    const dso = paidInvoices.length > 0 
+      ? paidInvoices.reduce((sum, inv) => {
+          const days = Math.floor((new Date(inv.paid_date).getTime() - new Date(inv.invoice_date).getTime()) / (1000 * 60 * 60 * 24))
+          return sum + Math.max(0, days)
+        }, 0) / paidInvoices.length
+      : 0
+
+    // Collection rate (paid within 90 days)
+    const recentInvoices = invoices.filter(inv => {
+      const invoiceDate = new Date(inv.invoice_date)
+      const ninetyDaysAgo = new Date()
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 180)
+      return invoiceDate >= ninetyDaysAgo
+    })
     const paidOnTime = recentInvoices.filter(inv => {
-      const status = getInvoiceStatus(inv.due_date, inv.amount, inv.balance)
-      return status === 'paid'
-    }).length
-    const collectionRate = recentInvoices.length > 0 ? (paidOnTime / recentInvoices.length) * 100 : 0
-    
-    return { totalAR, aging, overdueTotal, dso, collectionRate, unpaidCount: unpaidInvoices.length }
+      if (inv.balance > 0) return false
+      if (!inv.paid_date) return false
+      const daysToPay = Math.floor((new Date(inv.paid_date).getTime() - new Date(inv.due_date).getTime()) / (1000 * 60 * 60 * 24))
+      return daysToPay <= 0
+    })
+    const collectionRate = recentInvoices.length > 0 ? (paidOnTime.length / recentInvoices.length) * 100 : 0
+
+    return {
+      totalAR,
+      unpaidCount: unpaid.length,
+      overdueTotal,
+      aging,
+      dso,
+      collectionRate
+    }
   }, [invoices])
 
-  // Filtered invoices
-  const filteredInvoices = useMemo(() => {
-    let filtered = [...invoices]
-    
-    if (selectedYear !== 'all') {
-      filtered = filtered.filter(inv => new Date(inv.invoice_date).getFullYear() === selectedYear)
-    }
-    
-    if (filterStatus !== 'all') {
-      filtered = filtered.filter(inv => {
-        const status = getInvoiceStatus(inv.due_date, inv.amount, inv.balance)
-        if (filterStatus === 'unpaid') return inv.balance > 0
-        if (filterStatus === 'paid') return status === 'paid'
-        if (filterStatus === 'overdue') return status.includes('overdue')
-        if (filterStatus === 'current') return status === 'current'
-        return true
-      })
-    }
-    
-    if (filterClient !== 'all') {
-      filtered = filtered.filter(inv => inv.client_id === filterClient)
-    }
-    
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase()
-      filtered = filtered.filter(inv => 
-        inv.invoice_number.toLowerCase().includes(q) ||
-        inv.qbo_customer.toLowerCase().includes(q) ||
-        clients.find(c => c.id === inv.client_id)?.name.toLowerCase().includes(q) ||
-        projects.find(p => p.id === inv.project_id)?.name.toLowerCase().includes(q)
-      )
-    }
-    
-    filtered.sort((a, b) => {
-      let aVal: any = a[sortField as keyof typeof a]
-      let bVal: any = b[sortField as keyof typeof b]
-      if (sortField === 'due_date' || sortField === 'invoice_date') {
-        aVal = new Date(aVal as string).getTime()
-        bVal = new Date(bVal as string).getTime()
-      }
-      if (sortDir === 'asc') return aVal > bVal ? 1 : -1
-      return aVal < bVal ? 1 : -1
-    })
-    
-    return filtered
-  }, [invoices, selectedYear, filterStatus, filterClient, searchQuery, sortField, sortDir, clients, projects])
-
-  // AR by client chart data
+  // AR by Client
   const arByClient = useMemo(() => {
-    const byClient: { [key: string]: number } = {}
+    const clientAR: { [key: string]: number } = {}
+    
     invoices.filter(inv => inv.balance > 0).forEach(inv => {
-      const clientName = clients.find(c => c.id === inv.client_id)?.name || 'Unassigned'
-      byClient[clientName] = (byClient[clientName] || 0) + inv.balance
+      const client = clients.find(c => c.id === inv.client_id)
+      const clientName = client?.name || inv.qbo_customer || 'Unassigned'
+      clientAR[clientName] = (clientAR[clientName] || 0) + inv.balance
     })
-    return Object.entries(byClient)
+
+    return Object.entries(clientAR)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
   }, [invoices, clients])
@@ -693,37 +726,43 @@ export default function InvoicesPage() {
       <div className="flex items-center justify-center h-[60vh]">
         <div className="text-center">
           <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" />
-          <p className="text-slate-400 text-sm">Loading invoices...</p>
+          <p className="text-gray-500 text-sm">Loading invoices...</p>
         </div>
       </div>
     )
   }
+
+  // Pie chart colors - monochrome with emerald
+  const pieColors = [COLORS.emerald, COLORS.gray[500], COLORS.gray[400], COLORS.gray[300], COLORS.gray[200]]
 
   return (
     <div className="space-y-6 pb-8">
       {/* ============ HEADER ============ */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Invoices & AR</h1>
-          <p className="text-sm text-slate-400 mt-1">Accounts receivable management & aging analysis</p>
+          <h1 className="text-xl font-semibold text-gray-900">Invoices & AR</h1>
+          <p className="text-sm text-gray-500 mt-1">Accounts receivable management & aging analysis</p>
         </div>
         <div className="flex items-center gap-2">
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
-          >
-            <option value="all">All Time</option>
-            {[2026, 2025, 2024, 2023].map(year => (
-              <option key={year} value={year}>{year}</option>
-            ))}
-          </select>
-          <button className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 hover:border-slate-600 transition-colors">
-            <RefreshCw size={16} />
+          <div className="relative">
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+              className="appearance-none bg-white border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer"
+            >
+              <option value="all">All Time</option>
+              {[2026, 2025, 2024, 2023].map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors">
+            <RefreshCw size={14} />
             Sync QBO
           </button>
-          <button className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 hover:border-slate-600 transition-colors">
-            <Download size={16} />
+          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors">
+            <Download size={14} />
             Export
           </button>
         </div>
@@ -769,18 +808,18 @@ export default function InvoicesPage() {
       </div>
 
       {/* ============ AGING & CHARTS ============ */}
-      <div className="grid grid-cols-12 gap-4">
+      <div className="grid grid-cols-12 gap-6">
         {/* Aging Breakdown */}
         <div className="col-span-12 lg:col-span-8">
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-6" style={{ boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.05)' }}>
+            <div className="flex items-center justify-between mb-5">
               <div>
-                <h2 className="text-lg font-semibold text-slate-100">AR Aging</h2>
-                <p className="text-sm text-slate-500 mt-0.5">Outstanding balance by age</p>
+                <h2 className="text-sm font-semibold text-gray-900">AR Aging</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Outstanding balance by age</p>
               </div>
               <div className="text-right">
-                <p className="text-sm text-slate-400">Total Outstanding</p>
-                <p className="text-xl font-bold text-amber-400">{formatCurrency(arMetrics.totalAR)}</p>
+                <p className="text-xs text-gray-500">Total Outstanding</p>
+                <p className="text-xl font-semibold text-amber-600">{formatCurrency(arMetrics.totalAR)}</p>
               </div>
             </div>
             <div className="space-y-1">
@@ -795,8 +834,8 @@ export default function InvoicesPage() {
 
         {/* AR by Client */}
         <div className="col-span-12 lg:col-span-4">
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 h-full">
-            <h2 className="text-lg font-semibold text-slate-100 mb-4">AR by Client</h2>
+          <div className="bg-white border border-gray-200 rounded-xl p-6 h-full" style={{ boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.05)' }}>
+            <h2 className="text-sm font-semibold text-gray-900 mb-4">AR by Client</h2>
             {arByClient.length > 0 ? (
               <>
                 <div className="h-40">
@@ -812,7 +851,7 @@ export default function InvoicesPage() {
                         dataKey="value"
                       >
                         {arByClient.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={[COLORS.amber, COLORS.blue, COLORS.purple, COLORS.cyan, COLORS.emerald][index % 5]} />
+                          <Cell key={`cell-${index}`} fill={pieColors[index % pieColors.length]} />
                         ))}
                       </Pie>
                       <Tooltip content={<CustomTooltip formatter={(v: number) => formatCurrency(v)} />} />
@@ -823,44 +862,44 @@ export default function InvoicesPage() {
                   {arByClient.slice(0, 5).map((item, i) => (
                     <div key={i} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: [COLORS.amber, COLORS.blue, COLORS.purple, COLORS.cyan, COLORS.emerald][i % 5] }} />
-                        <span className="text-xs text-slate-400">{item.name}</span>
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: pieColors[i % pieColors.length] }} />
+                        <span className="text-xs text-gray-600 truncate max-w-24">{item.name}</span>
                       </div>
-                      <span className="text-xs font-medium text-slate-200">{formatCurrency(item.value)}</span>
+                      <span className="text-xs font-semibold text-gray-900">{formatCurrency(item.value)}</span>
                     </div>
                   ))}
                 </div>
               </>
             ) : (
-              <div className="flex items-center justify-center h-40 text-slate-500 text-sm">No outstanding AR</div>
+              <div className="flex items-center justify-center h-40 text-gray-400 text-sm">No outstanding AR</div>
             )}
           </div>
         </div>
       </div>
 
       {/* ============ INVOICE TABLE ============ */}
-      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden" style={{ boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.05)' }}>
         {/* Table Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-5 py-4 border-b border-slate-700/50">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold text-slate-100">Invoices</h2>
-            <span className="px-2 py-0.5 bg-slate-700 rounded text-xs font-medium text-slate-300">{filteredInvoices.length}</span>
+            <h2 className="text-sm font-semibold text-gray-900">Invoices</h2>
+            <span className="px-2 py-0.5 bg-gray-100 rounded text-xs font-medium text-gray-600">{filteredInvoices.length}</span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search invoices..."
-                className="bg-slate-700/50 border border-slate-600 rounded-lg pl-9 pr-3 py-1.5 text-sm text-slate-200 w-48 focus:outline-none focus:border-emerald-500"
+                className="bg-white border border-gray-200 rounded-lg pl-9 pr-3 py-1.5 text-sm text-gray-700 w-48 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               />
             </div>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+              className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             >
               <option value="all">All Status</option>
               <option value="unpaid">Unpaid</option>
@@ -871,7 +910,7 @@ export default function InvoicesPage() {
             <select
               value={filterClient}
               onChange={(e) => setFilterClient(e.target.value)}
-              className="bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+              className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             >
               <option value="all">All Clients</option>
               {clients.map(client => (
@@ -883,42 +922,42 @@ export default function InvoicesPage() {
 
         {/* Bulk Actions Bar */}
         {selectedInvoices.length > 0 && (
-          <div className="flex items-center gap-4 px-5 py-3 bg-emerald-500/10 border-b border-emerald-500/20">
-            <span className="text-sm text-emerald-400">{selectedInvoices.length} selected</span>
-            <button className="text-sm text-slate-300 hover:text-white transition-colors">Mark as Paid</button>
-            <button className="text-sm text-slate-300 hover:text-white transition-colors">Assign Client</button>
-            <button className="text-sm text-slate-300 hover:text-white transition-colors">Assign Project</button>
-            <button className="text-sm text-slate-300 hover:text-white transition-colors">Export</button>
+          <div className="flex items-center gap-4 px-6 py-3 bg-emerald-50 border-b border-emerald-100">
+            <span className="text-sm font-medium text-emerald-700">{selectedInvoices.length} selected</span>
+            <button className="text-sm text-gray-600 hover:text-gray-900 transition-colors">Mark as Paid</button>
+            <button className="text-sm text-gray-600 hover:text-gray-900 transition-colors">Assign Client</button>
+            <button className="text-sm text-gray-600 hover:text-gray-900 transition-colors">Assign Project</button>
+            <button className="text-sm text-gray-600 hover:text-gray-900 transition-colors">Export</button>
           </div>
         )}
         
         {/* Column Headers */}
-        <div className="flex items-center gap-3 py-2 px-4 bg-slate-800/80 border-b border-slate-700/50 text-xs font-medium text-slate-500 uppercase tracking-wider">
+        <div className="flex items-center gap-3 py-2.5 px-4 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
           <div className="w-8 shrink-0">
             <input
               type="checkbox"
               checked={selectedInvoices.length === filteredInvoices.length && filteredInvoices.length > 0}
               onChange={handleSelectAll}
-              className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500"
+              className="w-4 h-4 rounded border-gray-300 bg-white text-emerald-500 focus:ring-emerald-500"
             />
           </div>
-          <button onClick={() => handleSort('invoice_number')} className="w-20 shrink-0 flex items-center gap-1 hover:text-slate-300 transition-colors">
+          <button onClick={() => handleSort('invoice_number')} className="w-20 shrink-0 flex items-center gap-1 hover:text-gray-700 transition-colors">
             Inv # {sortField === 'invoice_number' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
           </button>
-          <button onClick={() => handleSort('invoice_date')} className="w-24 shrink-0 flex items-center gap-1 hover:text-slate-300 transition-colors">
+          <button onClick={() => handleSort('invoice_date')} className="w-24 shrink-0 flex items-center gap-1 hover:text-gray-700 transition-colors">
             Date {sortField === 'invoice_date' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
           </button>
-          <button onClick={() => handleSort('due_date')} className="w-24 shrink-0 flex items-center gap-1 hover:text-slate-300 transition-colors">
+          <button onClick={() => handleSort('due_date')} className="w-24 shrink-0 flex items-center gap-1 hover:text-gray-700 transition-colors">
             Due {sortField === 'due_date' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
           </button>
           <div className="w-28 shrink-0">Client</div>
           <div className="w-40 shrink-0">Project</div>
           <div className="flex-1">QBO Customer</div>
-          <button onClick={() => handleSort('amount')} className="w-24 text-right shrink-0 flex items-center justify-end gap-1 hover:text-slate-300 transition-colors">
+          <button onClick={() => handleSort('amount')} className="w-24 text-right shrink-0 flex items-center justify-end gap-1 hover:text-gray-700 transition-colors">
             Amount {sortField === 'amount' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
           </button>
           <div className="w-20 text-right shrink-0">Paid</div>
-          <button onClick={() => handleSort('balance')} className="w-24 text-right shrink-0 flex items-center justify-end gap-1 hover:text-slate-300 transition-colors">
+          <button onClick={() => handleSort('balance')} className="w-24 text-right shrink-0 flex items-center justify-end gap-1 hover:text-gray-700 transition-colors">
             Balance {sortField === 'balance' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
           </button>
           <div className="w-28 shrink-0">Status</div>
@@ -940,25 +979,25 @@ export default function InvoicesPage() {
               />
             ))
           ) : (
-            <div className="flex items-center justify-center py-12 text-slate-500">
+            <div className="flex items-center justify-center py-12 text-gray-400">
               No invoices found
             </div>
           )}
         </div>
 
         {/* Footer Summary */}
-        <div className="flex items-center justify-between px-5 py-3 bg-slate-800/80 border-t border-slate-700/50">
-          <p className="text-sm text-slate-400">
+        <div className="flex items-center justify-between px-6 py-3 bg-gray-50 border-t border-gray-200">
+          <p className="text-sm text-gray-500">
             Showing {filteredInvoices.length} of {invoices.length} invoices
           </p>
           <div className="flex items-center gap-6 text-sm">
             <div>
-              <span className="text-slate-500">Total Amount: </span>
-              <span className="font-semibold text-slate-200">{formatCurrency(filteredInvoices.reduce((sum, inv) => sum + inv.amount, 0))}</span>
+              <span className="text-gray-500">Total Amount: </span>
+              <span className="font-semibold text-gray-900">{formatCurrency(filteredInvoices.reduce((sum, inv) => sum + inv.amount, 0))}</span>
             </div>
             <div>
-              <span className="text-slate-500">Total Balance: </span>
-              <span className="font-semibold text-amber-400">{formatCurrency(filteredInvoices.reduce((sum, inv) => sum + inv.balance, 0))}</span>
+              <span className="text-gray-500">Total Balance: </span>
+              <span className="font-semibold text-amber-600">{formatCurrency(filteredInvoices.reduce((sum, inv) => sum + inv.balance, 0))}</span>
             </div>
           </div>
         </div>
