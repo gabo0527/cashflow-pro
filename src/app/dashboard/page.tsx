@@ -141,7 +141,8 @@ function Section({
   action, 
   children, 
   badge,
-  noPadding = false 
+  noPadding = false,
+  fillHeight = false
 }: { 
   title: string
   subtitle?: string
@@ -149,10 +150,11 @@ function Section({
   children: React.ReactNode
   badge?: string | number
   noPadding?: boolean
+  fillHeight?: boolean
 }) {
   return (
     <div 
-      className="rounded-xl flex flex-col"
+      className={`rounded-xl flex flex-col ${fillHeight ? 'h-full' : ''}`}
       style={{ 
         backgroundColor: '#FFFFFF',
         border: '1px solid #E5E7EB',
@@ -186,7 +188,7 @@ function Section({
         )}
       </div>
       <div 
-        className={noPadding ? '' : 'p-5'}
+        className={`${fillHeight ? 'flex-1' : ''} ${noPadding ? '' : 'p-5'}`}
         style={{ backgroundColor: '#FFFFFF' }}
       >
         {children}
@@ -662,8 +664,8 @@ export default function DashboardPage() {
       <div className="grid grid-cols-12 gap-4 mb-6">
         {/* Revenue vs Expenses */}
         <div className="col-span-12 lg:col-span-8">
-          <Section title="Revenue vs Expenses" subtitle="Monthly comparison">
-            <div className="h-64">
+          <Section title="Revenue vs Expenses" subtitle="Monthly comparison" fillHeight>
+            <div className="h-52">
               {revenueExpenseData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={revenueExpenseData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
@@ -695,7 +697,7 @@ export default function DashboardPage() {
         {/* Health + AR */}
         <div className="col-span-12 lg:col-span-4 space-y-4">
           {/* Health Score */}
-          <Section title="Financial Health">
+          <Section title="Financial Health" fillHeight>
             <div className="flex items-center gap-5">
               <HealthRing score={metrics.healthScore} size={90} />
               <div className="flex-1 space-y-2">
@@ -716,7 +718,7 @@ export default function DashboardPage() {
           </Section>
 
           {/* AR Aging - No chart, clean list display */}
-          <Section title="AR Aging">
+          <Section title="AR Aging" fillHeight>
             {arAgingData.length > 0 ? (
               <div className="space-y-3">
                 {arAgingData.map((item, i) => (
@@ -746,7 +748,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-12 gap-4 mb-6">
         {/* Team Utilization */}
         <div className="col-span-12 lg:col-span-6">
-          <Section title="Team Utilization" subtitle="Hours logged this period" action={{ label: 'View Team', href: '/team' }}>
+          <Section title="Team Utilization" subtitle="Hours logged this period" action={{ label: 'View Team', href: '/team' }} fillHeight>
             <div>
               {teamUtilization.length > 0 ? (
                 <div>
@@ -770,7 +772,7 @@ export default function DashboardPage() {
 
         {/* Cash Forecast */}
         <div className="col-span-12 lg:col-span-6">
-          <Section title="90-Day Cash Forecast" subtitle="Projected cash position">
+          <Section title="90-Day Cash Forecast" subtitle="Projected cash position" fillHeight>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={cashForecastData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
@@ -807,7 +809,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-12 gap-4">
         {/* Alerts */}
         <div className="col-span-12 lg:col-span-4">
-          <Section title="Alerts" badge={alerts.filter(a => a.type !== 'success').length || undefined}>
+          <Section title="Alerts" badge={alerts.filter(a => a.type !== 'success').length || undefined} fillHeight>
             <div className="space-y-2">
               {alerts.map((alert, i) => (
                 <AlertRow key={i} {...alert} />
@@ -818,7 +820,7 @@ export default function DashboardPage() {
 
         {/* Open Invoices */}
         <div className="col-span-12 lg:col-span-8">
-          <Section title="Open Invoices" badge={metrics.openInvoicesCount} action={{ label: 'View All', href: '/invoices' }} noPadding>
+          <Section title="Open Invoices" badge={metrics.openInvoicesCount} action={{ label: 'View All', href: '/invoices' }} noPadding fillHeight>
             <div>
               {recentInvoices.length > 0 ? (
                 <div>
