@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Sun, Moon, User, ChevronDown, Bell, Search, MessageSquare } from 'lucide-react'
+import { Sun, Moon, User, ChevronDown, Bell, Search, MessageSquare, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface HeaderProps {
@@ -26,13 +26,17 @@ export default function Header({
   
   const isDark = theme === 'dark'
   
-  // Theme classes
-  const bgClass = isDark ? 'bg-slate-900' : 'bg-white'
-  const borderClass = isDark ? 'border-slate-700' : 'border-slate-200'
-  const textClass = isDark ? 'text-slate-100' : 'text-slate-800'
-  const textMutedClass = isDark ? 'text-slate-400' : 'text-slate-500'
-  const hoverClass = isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
-  const inputBgClass = isDark ? 'bg-slate-800' : 'bg-slate-100'
+  // Option B Theme styles
+  const styles = {
+    bg: isDark ? 'bg-slate-900' : 'bg-white',
+    border: isDark ? 'border-slate-700' : 'border-slate-200',
+    text: isDark ? 'text-slate-100' : 'text-slate-700',
+    textMuted: isDark ? 'text-slate-400' : 'text-slate-400',
+    hover: isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-50',
+    inputBg: isDark ? 'bg-slate-800' : 'bg-slate-50',
+    inputBorder: isDark ? 'border-slate-700' : 'border-slate-200',
+    inputFocus: 'focus:ring-2 focus:ring-slate-300 focus:border-slate-300',
+  }
 
   // Close menu on outside click
   useEffect(() => {
@@ -52,39 +56,40 @@ export default function Header({
     <header
       className={cn(
         'fixed top-0 right-0 h-16 z-30 flex items-center justify-between px-6 border-b transition-all duration-300',
-        bgClass,
-        borderClass,
+        styles.bg,
+        styles.border,
         sidebarCollapsed ? 'left-16' : 'left-60'
       )}
     >
       {/* Left section - Search */}
       <div className="flex items-center gap-4 flex-1">
-        <div className={cn('relative max-w-md flex-1')}>
-          <Search className={cn('absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4', textMutedClass)} />
+        <div className="relative max-w-md flex-1">
+          <Search className={cn('absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4', styles.textMuted)} />
           <input
             type="text"
             placeholder="Search..."
             className={cn(
-              'w-full pl-10 pr-4 py-2 rounded-lg text-sm outline-none transition-colors',
-              inputBgClass,
-              textClass,
-              'placeholder:' + textMutedClass,
-              'focus:ring-2 focus:ring-blue-500/50'
+              'w-full pl-10 pr-4 py-2 rounded-lg text-sm outline-none transition-all border',
+              styles.inputBg,
+              styles.inputBorder,
+              styles.text,
+              styles.inputFocus,
+              'placeholder:text-slate-400'
             )}
           />
         </div>
       </div>
 
       {/* Right section */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         {/* AI Chat Quick Access */}
         <button
           onClick={onOpenChat}
           className={cn(
-            'p-2 rounded-lg transition-colors',
-            hoverClass,
-            textMutedClass,
-            'hover:text-blue-500'
+            'p-2.5 rounded-lg transition-colors',
+            styles.hover,
+            styles.textMuted,
+            'hover:text-slate-700'
           )}
           title="Open AI Assistant"
         >
@@ -94,75 +99,88 @@ export default function Header({
         {/* Notifications */}
         <button
           className={cn(
-            'p-2 rounded-lg transition-colors relative',
-            hoverClass,
-            textMutedClass
+            'p-2.5 rounded-lg transition-colors relative',
+            styles.hover,
+            styles.textMuted,
+            'hover:text-slate-700'
           )}
           title="Notifications"
         >
           <Bell size={20} />
-          {/* Notification dot */}
-          {/* <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" /> */}
         </button>
 
         {/* Theme Toggle */}
         <button
           onClick={onThemeToggle}
           className={cn(
-            'p-2 rounded-lg transition-colors',
-            hoverClass,
-            textMutedClass
+            'p-2.5 rounded-lg transition-colors',
+            styles.hover,
+            styles.textMuted,
+            'hover:text-slate-700'
           )}
           title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
           {isDark ? <Sun size={20} /> : <Moon size={20} />}
         </button>
 
+        {/* Divider */}
+        <div className={cn('w-px h-8 mx-2', isDark ? 'bg-slate-700' : 'bg-slate-200')} />
+
         {/* User Menu */}
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setUserMenuOpen(!userMenuOpen)}
             className={cn(
-              'flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg transition-colors',
-              hoverClass
+              'flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-lg transition-colors',
+              styles.hover
             )}
           >
-            <div className={cn(
-              'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium',
-              'bg-blue-500 text-white'
-            )}>
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium bg-slate-800 text-white">
               {initials}
             </div>
-            <span className={cn('text-sm font-medium hidden sm:block', textClass)}>
+            <span className={cn('text-sm font-medium hidden sm:block', styles.text)}>
               {displayName}
             </span>
-            <ChevronDown size={16} className={textMutedClass} />
+            <ChevronDown size={16} className={styles.textMuted} />
           </button>
 
           {/* Dropdown Menu */}
           {userMenuOpen && (
             <div className={cn(
-              'absolute right-0 top-full mt-2 w-56 rounded-lg shadow-lg border py-1',
-              bgClass,
-              borderClass
+              'absolute right-0 top-full mt-2 w-56 rounded-xl shadow-lg border py-1 overflow-hidden',
+              styles.bg,
+              styles.border
             )}>
-              <div className={cn('px-4 py-2 border-b', borderClass)}>
-                <p className={cn('text-sm font-medium', textClass)}>{displayName}</p>
+              <div className={cn('px-4 py-3 border-b', styles.border)}>
+                <p className={cn('text-sm font-semibold', styles.text)}>{displayName}</p>
                 {userEmail && (
-                  <p className={cn('text-xs', textMutedClass)}>{userEmail}</p>
+                  <p className={cn('text-xs mt-0.5', styles.textMuted)}>{userEmail}</p>
                 )}
               </div>
-              <a
-                href="/settings"
-                className={cn(
-                  'flex items-center gap-2 px-4 py-2 text-sm transition-colors',
-                  textClass,
-                  hoverClass
-                )}
-              >
-                <User size={16} />
-                Account Settings
-              </a>
+              <div className="py-1">
+                <a
+                  href="/settings"
+                  className={cn(
+                    'flex items-center gap-3 px-4 py-2.5 text-sm transition-colors',
+                    styles.text,
+                    styles.hover
+                  )}
+                >
+                  <Settings size={16} className={styles.textMuted} />
+                  Account Settings
+                </a>
+                <a
+                  href="/settings"
+                  className={cn(
+                    'flex items-center gap-3 px-4 py-2.5 text-sm transition-colors',
+                    styles.text,
+                    styles.hover
+                  )}
+                >
+                  <User size={16} className={styles.textMuted} />
+                  Profile
+                </a>
+              </div>
             </div>
           )}
         </div>
