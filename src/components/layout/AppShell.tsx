@@ -29,15 +29,17 @@ export default function AppShell({ children }: AppShellProps) {
   const [companyName, setCompanyName] = useState<string>('')
   const [loading, setLoading] = useState(true)
   
-  // UI state
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark')
+  // UI state - Default to LIGHT mode for Option B
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
 
-  // Theme classes
+  // Option B Theme classes
   const isDark = theme === 'dark'
-  const bgClass = isDark ? 'bg-slate-950' : 'bg-slate-50'
-  const textClass = isDark ? 'text-slate-100' : 'text-slate-800'
+  const styles = {
+    bg: isDark ? 'bg-slate-950' : 'bg-slate-50',
+    text: isDark ? 'text-slate-100' : 'text-slate-800',
+  }
 
   // Load theme from localStorage
   useEffect(() => {
@@ -45,6 +47,8 @@ export default function AppShell({ children }: AppShellProps) {
     if (savedTheme) {
       setTheme(savedTheme)
     }
+    // If no saved theme, default stays as 'light'
+    
     const savedCollapsed = localStorage.getItem('vantage-sidebar-collapsed')
     if (savedCollapsed === 'true') {
       setSidebarCollapsed(true)
@@ -120,20 +124,23 @@ export default function AppShell({ children }: AppShellProps) {
     return <>{children}</>
   }
 
-  // Loading state
+  // Loading state - Option B themed
   if (loading) {
     return (
-      <div className={cn('min-h-screen flex items-center justify-center', bgClass)}>
+      <div className={cn('min-h-screen flex items-center justify-center', styles.bg)}>
         <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className={cn('text-sm', isDark ? 'text-slate-400' : 'text-slate-500')}>Loading...</p>
+          {/* Emerald spinner to match logo */}
+          <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          <p className={cn('text-sm font-medium', isDark ? 'text-slate-400' : 'text-slate-500')}>
+            Loading...
+          </p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className={cn('min-h-screen', bgClass, textClass)}>
+    <div className={cn('min-h-screen', styles.bg, styles.text)}>
       {/* Sidebar */}
       <Sidebar
         collapsed={sidebarCollapsed}
@@ -160,21 +167,19 @@ export default function AppShell({ children }: AppShellProps) {
           sidebarCollapsed ? 'pl-16' : 'pl-60'
         )}
       >
-        <div className="p-6">
-          {/* Pass context to children */}
-          {React.Children.map(children, child => {
-            if (React.isValidElement(child)) {
-              return React.cloneElement(child, {
-                // @ts-ignore - passing props to page components
-                companyId,
-                theme,
-                user,
-                profile
-              })
-            }
-            return child
-          })}
-        </div>
+        {/* Removed extra padding wrapper - pages handle their own padding */}
+        {React.Children.map(children, child => {
+          if (React.isValidElement(child)) {
+            return React.cloneElement(child, {
+              // @ts-ignore - passing props to page components
+              companyId,
+              theme,
+              user,
+              profile
+            })
+          }
+          return child
+        })}
       </main>
 
       {/* AI Chat Panel */}
