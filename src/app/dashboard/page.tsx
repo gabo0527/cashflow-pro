@@ -152,8 +152,14 @@ function Section({
 }) {
   return (
     <div 
-      className="bg-white border border-gray-200 rounded-xl overflow-hidden h-full flex flex-col"
-      style={{ boxShadow: THEME.cardShadow }}
+      className="bg-white border border-gray-200 rounded-xl overflow-hidden h-full flex flex-col relative"
+      style={{ 
+        boxShadow: THEME.cardShadow, 
+        isolation: 'isolate',
+        zIndex: 1,
+        backfaceVisibility: 'hidden',
+        transform: 'translateZ(0)', // Force GPU layer
+      }}
     >
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
         <div>
@@ -574,7 +580,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen p-6" style={{ backgroundColor: THEME.pageBg }}>
+    <div className="min-h-screen p-6 relative" style={{ backgroundColor: THEME.pageBg }}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
