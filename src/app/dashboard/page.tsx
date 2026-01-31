@@ -789,7 +789,7 @@ export default function DashboardPage() {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-gray-100">>
+            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-gray-100">
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: THEME.chart.primary }} />
                 <span className="text-xs text-gray-400">Projected</span>
