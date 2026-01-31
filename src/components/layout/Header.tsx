@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Sun, Moon, User, ChevronDown, Bell, Search, MessageSquare, Settings } from 'lucide-react'
+import { Sun, Moon, User, ChevronDown, Bell, Search, MessageSquare, Settings, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface HeaderProps {
@@ -23,22 +23,7 @@ export default function Header({
 }: HeaderProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
-  
-  const isDark = theme === 'dark'
-  
-  // Option B Theme styles
-  const styles = {
-    bg: isDark ? 'bg-slate-900' : 'bg-white',
-    border: isDark ? 'border-slate-700' : 'border-slate-200',
-    text: isDark ? 'text-slate-100' : 'text-slate-700',
-    textMuted: isDark ? 'text-slate-400' : 'text-slate-400',
-    hover: isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-50',
-    inputBg: isDark ? 'bg-slate-800' : 'bg-slate-50',
-    inputBorder: isDark ? 'border-slate-700' : 'border-slate-200',
-    inputFocus: 'focus:ring-2 focus:ring-slate-300 focus:border-slate-300',
-  }
 
-  // Close menu on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -55,129 +40,88 @@ export default function Header({
   return (
     <header
       className={cn(
-        'fixed top-0 right-0 h-16 z-30 flex items-center justify-between px-6 border-b transition-all duration-300',
-        styles.bg,
-        styles.border,
-        sidebarCollapsed ? 'left-16' : 'left-60'
+        'fixed top-0 right-0 h-14 z-30 flex items-center justify-between px-4 bg-white border-b border-gray-200 transition-all duration-300',
+        sidebarCollapsed ? 'left-16' : 'left-56'
       )}
     >
-      {/* Left section - Search */}
-      <div className="flex items-center gap-4 flex-1">
-        <div className="relative max-w-md flex-1">
-          <Search className={cn('absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4', styles.textMuted)} />
+      {/* Search */}
+      <div className="flex items-center flex-1 max-w-md">
+        <div className="relative w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
             placeholder="Search..."
-            className={cn(
-              'w-full pl-10 pr-4 py-2 rounded-lg text-sm outline-none transition-all border',
-              styles.inputBg,
-              styles.inputBorder,
-              styles.text,
-              styles.inputFocus,
-              'placeholder:text-slate-400'
-            )}
+            className="w-full pl-9 pr-4 py-1.5 rounded-lg text-sm bg-gray-50 border border-gray-200 text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-300 transition-all"
           />
         </div>
       </div>
 
       {/* Right section */}
       <div className="flex items-center gap-1">
-        {/* AI Chat Quick Access */}
+        {/* AI Chat */}
         <button
           onClick={onOpenChat}
-          className={cn(
-            'p-2.5 rounded-lg transition-colors',
-            styles.hover,
-            styles.textMuted,
-            'hover:text-slate-700'
-          )}
-          title="Open AI Assistant"
+          className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
+          title="AI Assistant"
         >
-          <MessageSquare size={20} />
+          <MessageSquare size={18} strokeWidth={1.75} />
         </button>
 
         {/* Notifications */}
         <button
-          className={cn(
-            'p-2.5 rounded-lg transition-colors relative',
-            styles.hover,
-            styles.textMuted,
-            'hover:text-slate-700'
-          )}
+          className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
           title="Notifications"
         >
-          <Bell size={20} />
+          <Bell size={18} strokeWidth={1.75} />
         </button>
 
         {/* Theme Toggle */}
         <button
           onClick={onThemeToggle}
-          className={cn(
-            'p-2.5 rounded-lg transition-colors',
-            styles.hover,
-            styles.textMuted,
-            'hover:text-slate-700'
-          )}
-          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
+          title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
         >
-          {isDark ? <Sun size={20} /> : <Moon size={20} />}
+          {theme === 'dark' ? <Sun size={18} strokeWidth={1.75} /> : <Moon size={18} strokeWidth={1.75} />}
         </button>
 
         {/* Divider */}
-        <div className={cn('w-px h-8 mx-2', isDark ? 'bg-slate-700' : 'bg-slate-200')} />
+        <div className="w-px h-6 bg-gray-200 mx-2" />
 
         {/* User Menu */}
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className={cn(
-              'flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-lg transition-colors',
-              styles.hover
-            )}
+            className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium bg-slate-800 text-white">
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold bg-gray-900 text-white">
               {initials}
             </div>
-            <span className={cn('text-sm font-medium hidden sm:block', styles.text)}>
+            <span className="text-sm font-medium text-gray-700 hidden sm:block">
               {displayName}
             </span>
-            <ChevronDown size={16} className={styles.textMuted} />
+            <ChevronDown size={14} className="text-gray-400" />
           </button>
 
-          {/* Dropdown Menu */}
+          {/* Dropdown */}
           {userMenuOpen && (
-            <div className={cn(
-              'absolute right-0 top-full mt-2 w-56 rounded-xl shadow-lg border py-1 overflow-hidden',
-              styles.bg,
-              styles.border
-            )}>
-              <div className={cn('px-4 py-3 border-b', styles.border)}>
-                <p className={cn('text-sm font-semibold', styles.text)}>{displayName}</p>
-                {userEmail && (
-                  <p className={cn('text-xs mt-0.5', styles.textMuted)}>{userEmail}</p>
-                )}
+            <div className="absolute right-0 top-full mt-1.5 w-52 bg-white border border-gray-200 rounded-lg shadow-lg py-1 overflow-hidden">
+              <div className="px-3 py-2 border-b border-gray-100">
+                <p className="text-sm font-semibold text-gray-900">{displayName}</p>
+                {userEmail && <p className="text-xs text-gray-400 truncate">{userEmail}</p>}
               </div>
               <div className="py-1">
                 <a
                   href="/settings"
-                  className={cn(
-                    'flex items-center gap-3 px-4 py-2.5 text-sm transition-colors',
-                    styles.text,
-                    styles.hover
-                  )}
+                  className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
                 >
-                  <Settings size={16} className={styles.textMuted} />
-                  Account Settings
+                  <Settings size={15} className="text-gray-400" />
+                  Settings
                 </a>
                 <a
                   href="/settings"
-                  className={cn(
-                    'flex items-center gap-3 px-4 py-2.5 text-sm transition-colors',
-                    styles.text,
-                    styles.hover
-                  )}
+                  className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
                 >
-                  <User size={16} className={styles.textMuted} />
+                  <User size={15} className="text-gray-400" />
                   Profile
                 </a>
               </div>
