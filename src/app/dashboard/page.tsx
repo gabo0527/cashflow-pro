@@ -160,6 +160,8 @@ function Section({
         position: 'relative',
         zIndex: 1,
         overflow: 'hidden',
+        contain: 'layout paint',
+        isolation: 'isolate',
       }}
     >
       <div 
@@ -745,9 +747,17 @@ export default function DashboardPage() {
       </div>
 
       {/* Charts Row 2 */}
-      <div className="grid grid-cols-12 gap-4 mb-6">
+      <div 
+        className="grid grid-cols-12 gap-4 pb-6"
+        style={{ 
+          position: 'relative', 
+          zIndex: 20,
+          backgroundColor: '#F9FAFB',
+          marginBottom: '1px', // Force repaint
+        }}
+      >
         {/* Team Utilization */}
-        <div className="col-span-12 lg:col-span-6">
+        <div className="col-span-12 lg:col-span-6" style={{ position: 'relative', zIndex: 1 }}>
           <Section title="Team Utilization" subtitle="Hours logged this period" action={{ label: 'View Team', href: '/team' }}>
             <div className="min-h-[200px]">
               {teamUtilization.length > 0 ? (
@@ -771,9 +781,9 @@ export default function DashboardPage() {
         </div>
 
         {/* Cash Forecast */}
-        <div className="col-span-12 lg:col-span-6">
+        <div className="col-span-12 lg:col-span-6" style={{ position: 'relative', zIndex: 1 }}>
           <Section title="90-Day Cash Forecast" subtitle="Projected cash position">
-            <div className="h-48 overflow-hidden">
+            <div className="h-48 overflow-hidden" style={{ backgroundColor: '#FFFFFF', position: 'relative' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={cashForecastData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                   <defs>
@@ -791,7 +801,7 @@ export default function DashboardPage() {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-gray-100">
+            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-gray-100" style={{ backgroundColor: '#FFFFFF' }}>
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: THEME.chart.primary }} />
                 <span className="text-xs text-gray-400">Projected</span>
@@ -806,7 +816,14 @@ export default function DashboardPage() {
       </div>
 
       {/* Bottom Row */}
-      <div className="grid grid-cols-12 gap-4">
+      <div 
+        className="grid grid-cols-12 gap-4 mt-6"
+        style={{ 
+          position: 'relative', 
+          zIndex: 1,
+          contain: 'layout paint',
+        }}
+      >
         {/* Alerts */}
         <div className="col-span-12 lg:col-span-4">
           <Section title="Alerts" badge={alerts.filter(a => a.type !== 'success').length || undefined}>
@@ -823,40 +840,38 @@ export default function DashboardPage() {
           <Section title="Open Invoices" badge={metrics.openInvoicesCount} action={{ label: 'View All', href: '/invoices' }} noPadding>
             <div className="min-h-[180px]">
               {recentInvoices.length > 0 ? (
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-100">
-                      <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-5 py-2">Client</th>
-                      <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-5 py-2">Invoice</th>
-                      <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider px-5 py-2">Due</th>
-                      <th className="text-right text-xs font-medium text-gray-400 uppercase tracking-wider px-5 py-2">Amount</th>
-                      <th className="text-right text-xs font-medium text-gray-400 uppercase tracking-wider px-5 py-2">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentInvoices.map((inv) => (
-                      <tr key={inv.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                        <td className="px-5 py-3 text-sm text-gray-800 font-medium">{inv.client_name || '—'}</td>
-                        <td className="px-5 py-3 text-sm text-gray-500">{inv.invoice_number || inv.doc_number || 'Draft'}</td>
-                        <td className="px-5 py-3 text-sm text-gray-500">{formatDate(inv.due_date)}</td>
-                        <td className="px-5 py-3 text-sm text-gray-800 font-medium text-right tabular-nums">
-                          {formatCurrency(parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0)}
-                        </td>
-                        <td className="px-5 py-3 text-right">
-                          {inv.daysOverdue > 0 ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600">
-                              {inv.daysOverdue}d overdue
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
-                              Current
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div>
+                  {/* Header */}
+                  <div className="flex items-center px-5 py-2 bg-gray-50" style={{ borderBottom: '1px solid #E5E7EB' }}>
+                    <div className="flex-1 text-xs font-medium text-gray-400 uppercase tracking-wider">Client</div>
+                    <div className="w-24 text-xs font-medium text-gray-400 uppercase tracking-wider">Invoice</div>
+                    <div className="w-24 text-xs font-medium text-gray-400 uppercase tracking-wider">Due</div>
+                    <div className="w-28 text-xs font-medium text-gray-400 uppercase tracking-wider text-right">Amount</div>
+                    <div className="w-24 text-xs font-medium text-gray-400 uppercase tracking-wider text-right">Status</div>
+                  </div>
+                  {/* Rows */}
+                  {recentInvoices.map((inv) => (
+                    <div key={inv.id} className="flex items-center px-5 py-3 hover:bg-gray-50 transition-colors" style={{ backgroundColor: '#FFFFFF', borderBottom: '1px solid #F9FAFB' }}>
+                      <div className="flex-1 text-sm text-gray-800 font-medium truncate">{inv.client_name || '—'}</div>
+                      <div className="w-24 text-sm text-gray-500">{inv.invoice_number || inv.doc_number || 'Draft'}</div>
+                      <div className="w-24 text-sm text-gray-500">{formatDate(inv.due_date)}</div>
+                      <div className="w-28 text-sm text-gray-800 font-medium text-right tabular-nums">
+                        {formatCurrency(parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0)}
+                      </div>
+                      <div className="w-24 text-right">
+                        {inv.daysOverdue > 0 ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600">
+                            {inv.daysOverdue}d
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                            Current
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-400 text-sm py-12">No open invoices</div>
               )}
