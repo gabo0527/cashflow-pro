@@ -152,16 +152,20 @@ function Section({
 }) {
   return (
     <div 
-      className="bg-white border border-gray-200 rounded-xl overflow-hidden h-full flex flex-col relative"
+      className="rounded-xl h-full flex flex-col"
       style={{ 
-        boxShadow: THEME.cardShadow, 
-        isolation: 'isolate',
+        backgroundColor: '#FFFFFF',
+        border: '1px solid #E5E7EB',
+        boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.04)',
+        position: 'relative',
         zIndex: 1,
-        backfaceVisibility: 'hidden',
-        transform: 'translateZ(0)', // Force GPU layer
+        overflow: 'hidden',
       }}
     >
-      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+      <div 
+        className="flex items-center justify-between px-5 py-4"
+        style={{ borderBottom: '1px solid #F3F4F6', backgroundColor: '#FFFFFF' }}
+      >
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
@@ -183,7 +187,10 @@ function Section({
           </Link>
         )}
       </div>
-      <div className={`flex-1 ${noPadding ? '' : 'p-5'}`}>
+      <div 
+        className={`flex-1 ${noPadding ? '' : 'p-5'}`}
+        style={{ backgroundColor: '#FFFFFF', overflow: 'hidden' }}
+      >
         {children}
       </div>
     </div>
@@ -658,7 +665,7 @@ export default function DashboardPage() {
         {/* Revenue vs Expenses */}
         <div className="col-span-12 lg:col-span-8">
           <Section title="Revenue vs Expenses" subtitle="Monthly comparison">
-            <div className="h-64">
+            <div className="h-64 overflow-hidden">
               {revenueExpenseData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={revenueExpenseData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
@@ -766,7 +773,7 @@ export default function DashboardPage() {
         {/* Cash Forecast */}
         <div className="col-span-12 lg:col-span-6">
           <Section title="90-Day Cash Forecast" subtitle="Projected cash position">
-            <div className="h-48">
+            <div className="h-48 overflow-hidden">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={cashForecastData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                   <defs>
