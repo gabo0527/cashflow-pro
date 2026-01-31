@@ -664,7 +664,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-12 gap-4 mb-6">
         {/* Revenue vs Expenses */}
         <div className="col-span-12 lg:col-span-8">
-          <Section title="Revenue vs Expenses" subtitle="Monthly comparison" fillHeight>
+          <Section title="Revenue vs Expenses" subtitle="Monthly comparison">
             <div className="h-52">
               {revenueExpenseData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -697,7 +697,7 @@ export default function DashboardPage() {
         {/* Health + AR */}
         <div className="col-span-12 lg:col-span-4 space-y-4">
           {/* Health Score */}
-          <Section title="Financial Health" fillHeight>
+          <Section title="Financial Health">
             <div className="flex items-center gap-5">
               <HealthRing score={metrics.healthScore} size={90} />
               <div className="flex-1 space-y-2">
@@ -718,7 +718,7 @@ export default function DashboardPage() {
           </Section>
 
           {/* AR Aging - No chart, clean list display */}
-          <Section title="AR Aging" fillHeight>
+          <Section title="AR Aging">
             {arAgingData.length > 0 ? (
               <div className="space-y-3">
                 {arAgingData.map((item, i) => (
