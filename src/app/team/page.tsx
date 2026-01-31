@@ -143,7 +143,43 @@ export default function TeamPage() {
       {activeTab === 'groups' && <div className="space-y-4"><p className="text-slate-400 text-sm mb-4">Sub-contractor teams with distributed costs by proposed hours.</p>{resourceGroups.length === 0 ? <div className="bg-slate-800 border border-slate-700 rounded-xl p-8 text-center"><Layers size={48} className="mx-auto text-slate-600 mb-4" /><p className="text-slate-400 mb-4">No groups yet</p><button onClick={() => { resetGroupForm(); setShowGroupModal(true) }} className="px-4 py-2 bg-orange-500 rounded-lg text-sm font-medium">Create First Group</button></div> : resourceGroups.map(g => { const th = g.members?.reduce((s, m) => s + (m.is_active ? m.proposed_hours : 0), 0) || 0; return <div key={g.id} className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden"><div className="p-4 border-b border-slate-700 flex justify-between"><div><div className="flex items-center gap-3 mb-2"><Layers size={20} className="text-purple-400" /><h3 className="text-lg font-medium text-slate-100">{g.name}</h3><span className={`px-2 py-0.5 text-xs rounded ${g.cost_type === 'Lump Sum' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'}`}>{g.cost_type}</span></div><div className="grid grid-cols-4 gap-4 text-sm"><span className="text-slate-400">Prime: <span className="text-slate-100">{g.prime_contractor_name || '—'}</span></span><span className="text-slate-400">Client: <span className="text-slate-100">{g.client_name || 'All'}</span></span><span className="text-slate-400">Total: <span className="text-orange-400 font-medium">{formatCurrency(g.cost_amount)}/mo</span></span><span className="text-slate-400">Members: <span className="text-slate-100">{g.members?.filter(m => m.is_active).length || 0}</span></span></div></div><div className="flex gap-2"><button onClick={() => openEditGroup(g)} className="p-2 rounded hover:bg-slate-700"><Edit2 size={16} className="text-slate-400" /></button><button onClick={() => deleteResourceGroup(g.id)} className="p-2 rounded hover:bg-slate-700"><Trash2 size={16} className="text-rose-400" /></button></div></div>{g.members && g.members.length > 0 && <table className="w-full"><thead><tr className="border-b border-slate-700/50"><th className="text-left px-4 py-2 text-xs text-slate-400">Resource</th><th className="text-right px-4 py-2 text-xs text-slate-400">Proposed Hrs</th><th className="text-right px-4 py-2 text-xs text-slate-400">Allocation</th><th className="text-right px-4 py-2 text-xs text-slate-400">Cost/mo</th></tr></thead><tbody>{g.members.filter(m => m.is_active).map(m => { const pct = th > 0 ? (m.proposed_hours / th) * 100 : 0; return <tr key={m.id} className="border-b border-slate-700/30"><td className="px-4 py-2 text-sm text-slate-100">{m.team_member_name}</td><td className="px-4 py-2 text-sm text-slate-300 text-right">{m.proposed_hours}</td><td className="px-4 py-2 text-sm text-slate-300 text-right">{pct.toFixed(1)}%</td><td className="px-4 py-2 text-sm text-orange-400 text-right font-medium">{formatCurrency(g.cost_amount * pct / 100)}</td></tr> })}<tr className="bg-slate-900/50"><td className="px-4 py-2 text-sm text-slate-400 font-medium">TOTAL</td><td className="px-4 py-2 text-sm text-slate-100 text-right font-medium">{th}</td><td className="px-4 py-2 text-sm text-slate-100 text-right font-medium">100%</td><td className="px-4 py-2 text-sm text-orange-400 text-right font-medium">{formatCurrency(g.cost_amount)}</td></tr></tbody></table>}</div> })}</div>}
 
       {activeTab === 'profitability' && <div className="space-y-6">
-        <div className="flex items-center gap-4"><span className="text-slate-400 text-sm">Compare:</span><input type="month" value={selectedMonth1.substring(0, 7)} onChange={e => setSelectedMonth1(e.target.value + '-01')} className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100" /><span className="text-slate-400">vs</span><input type="month" value={selectedMonth2.substring(0, 7)} onChange={e => setSelectedMonth2(e.target.value + '-01')} className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100" /></div>
+        {/* Enhanced Date Controls */}
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 text-sm">View:</span>
+              <select value={selectedMonth1.substring(0, 4)} onChange={e => setSelectedMonth1(e.target.value + selectedMonth1.substring(4))} className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100">
+                {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+              <select value={selectedMonth1.substring(5, 7)} onChange={e => setSelectedMonth1(selectedMonth1.substring(0, 5) + e.target.value + '-01')} className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100">
+                <option value="01">January</option><option value="02">February</option><option value="03">March</option>
+                <option value="04">April</option><option value="05">May</option><option value="06">June</option>
+                <option value="07">July</option><option value="08">August</option><option value="09">September</option>
+                <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 text-sm">vs</span>
+              <select value={selectedMonth2.substring(0, 4)} onChange={e => setSelectedMonth2(e.target.value + selectedMonth2.substring(4))} className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100">
+                {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+              <select value={selectedMonth2.substring(5, 7)} onChange={e => setSelectedMonth2(selectedMonth2.substring(0, 5) + e.target.value + '-01')} className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100">
+                <option value="01">January</option><option value="02">February</option><option value="03">March</option>
+                <option value="04">April</option><option value="05">May</option><option value="06">June</option>
+                <option value="07">July</option><option value="08">August</option><option value="09">September</option>
+                <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+              </select>
+            </div>
+            <div className="h-6 w-px bg-slate-700" />
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 text-sm">Quick:</span>
+              <button onClick={() => { const now = new Date(); setSelectedMonth1(getMonthStart(now)); const prev = new Date(); prev.setMonth(prev.getMonth() - 1); setSelectedMonth2(getMonthStart(prev)); }} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300">This Month</button>
+              <button onClick={() => { const now = new Date(); const q = Math.floor(now.getMonth() / 3); const qStart = new Date(now.getFullYear(), q * 3, 1); setSelectedMonth1(getMonthStart(qStart)); const prevQ = new Date(now.getFullYear(), (q - 1) * 3, 1); setSelectedMonth2(getMonthStart(prevQ)); }} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300">This Quarter</button>
+              <button onClick={() => { const now = new Date(); setSelectedMonth1(getMonthStart(now)); const lastYear = new Date(now.getFullYear() - 1, now.getMonth(), 1); setSelectedMonth2(getMonthStart(lastYear)); }} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300">vs Last Year</button>
+              <button onClick={() => { setSelectedMonth1(new Date().getFullYear() + '-01-01'); setSelectedMonth2((new Date().getFullYear() - 1) + '-01-01'); }} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300">YTD</button>
+            </div>
+          </div>
+        </div>
         
         <div className="grid grid-cols-2 gap-6">
           <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
@@ -166,7 +202,7 @@ export default function TeamPage() {
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={profitabilityData.filter(d => d.month1.revenue > 0)} layout="vertical" margin={{ top: 10, right: 30, left: 80, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => `${v}%`} domain={[-100, 100]} />
+                <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => `${Math.round(v)}%`} domain={['dataMin - 10', 'dataMax + 10']} />
                 <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} width={75} />
                 <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} formatter={(v: number) => `${v.toFixed(1)}%`} />
                 <Bar dataKey="month1.margin" name="Margin %" radius={[0, 4, 4, 0]}>
@@ -182,9 +218,9 @@ export default function TeamPage() {
         <div className="grid grid-cols-2 gap-6">
           <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
             <h3 className="text-sm font-medium text-slate-300 mb-4">Cost Distribution — {getMonthLabel(selectedMonth1)}</h3>
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={220}>
               <PieChart>
-                <Pie data={profitabilityData.filter(d => d.month1.cost > 0)} dataKey="month1.cost" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, percent }) => `${name.split(' ')[0]} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                <Pie data={profitabilityData.filter(d => d.month1.cost > 0)} dataKey="month1.cost" nameKey="name" cx="50%" cy="50%" outerRadius={65} innerRadius={30} paddingAngle={2} label={({ cx, cy, midAngle, outerRadius, name, percent }) => { const RADIAN = Math.PI / 180; const radius = outerRadius + 25; const x = cx + radius * Math.cos(-midAngle * RADIAN); const y = cy + radius * Math.sin(-midAngle * RADIAN); return <text x={x} y={y} fill="#e2e8f0" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={11}>{`${name.split(' ')[0]} ${(percent * 100).toFixed(0)}%`}</text> }} labelLine={{ stroke: '#64748b' }}>
                   {profitabilityData.filter(d => d.month1.cost > 0).map((_, i) => <Cell key={`cell-${i}`} fill={['#f97316', '#3b82f6', '#22c55e', '#a855f7', '#ec4899', '#14b8a6'][i % 6]} />)}
                 </Pie>
                 <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} formatter={(v: number) => formatCurrency(v)} />
@@ -193,17 +229,19 @@ export default function TeamPage() {
           </div>
           
           <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
-            <h3 className="text-sm font-medium text-slate-300 mb-4">Month-over-Month Change</h3>
+            <h3 className="text-sm font-medium text-slate-300 mb-4">{getMonthLabel(selectedMonth1)} vs {getMonthLabel(selectedMonth2)}</h3>
             <div className="space-y-3">
-              {profitabilityData.slice(0, 4).map(d => {
+              {profitabilityData.slice(0, 5).map(d => {
                 const revChange = d.month2.revenue > 0 ? ((d.month1.revenue - d.month2.revenue) / d.month2.revenue * 100) : d.month1.revenue > 0 ? 100 : 0
                 const costChange = d.month2.cost > 0 ? ((d.month1.cost - d.month2.cost) / d.month2.cost * 100) : 0
+                const marginDelta = d.month1.margin - d.month2.margin
                 return (
                   <div key={d.id} className="flex items-center justify-between p-2 bg-slate-900/50 rounded-lg">
-                    <span className="text-sm text-slate-300">{d.name}</span>
-                    <div className="flex gap-4">
-                      <span className={`text-xs px-2 py-1 rounded ${revChange >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>Rev {revChange >= 0 ? '+' : ''}{revChange.toFixed(0)}%</span>
-                      <span className={`text-xs px-2 py-1 rounded ${costChange <= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>Cost {costChange >= 0 ? '+' : ''}{costChange.toFixed(0)}%</span>
+                    <span className="text-sm text-slate-300 w-24 truncate">{d.name.split(' ')[0]}</span>
+                    <div className="flex gap-2">
+                      <span className={`text-xs px-2 py-1 rounded ${revChange >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>Rev {revChange >= 0 ? '↑' : '↓'}{Math.abs(revChange).toFixed(0)}%</span>
+                      <span className={`text-xs px-2 py-1 rounded ${costChange <= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>Cost {costChange >= 0 ? '↑' : '↓'}{Math.abs(costChange).toFixed(0)}%</span>
+                      <span className={`text-xs px-2 py-1 rounded ${marginDelta >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>Margin {marginDelta >= 0 ? '↑' : '↓'}{Math.abs(marginDelta).toFixed(0)}pt</span>
                     </div>
                   </div>
                 )
