@@ -29,25 +29,18 @@ export default function AppShell({ children }: AppShellProps) {
   const [companyName, setCompanyName] = useState<string>('')
   const [loading, setLoading] = useState(true)
   
-  // UI state - Default to LIGHT mode for Option B
+  // UI state - Light mode is the default and primary theme
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
 
-  // Option B Theme classes
-  const isDark = theme === 'dark'
-  const styles = {
-    bg: isDark ? 'bg-slate-950' : 'bg-slate-50',
-    text: isDark ? 'text-slate-100' : 'text-slate-800',
-  }
-
-  // Load theme from localStorage
+  // Load preferences
   useEffect(() => {
     const savedTheme = localStorage.getItem('vantage-theme') as 'light' | 'dark' | null
+    // Only use saved theme if it exists, otherwise keep light
     if (savedTheme) {
       setTheme(savedTheme)
     }
-    // If no saved theme, default stays as 'light'
     
     const savedCollapsed = localStorage.getItem('vantage-sidebar-collapsed')
     if (savedCollapsed === 'true') {
@@ -55,14 +48,12 @@ export default function AppShell({ children }: AppShellProps) {
     }
   }, [])
 
-  // Save theme to localStorage
   const handleThemeToggle = useCallback(() => {
     const newTheme = theme === 'dark' ? 'light' : 'dark'
     setTheme(newTheme)
     localStorage.setItem('vantage-theme', newTheme)
   }, [theme])
 
-  // Save sidebar state
   const handleSidebarToggle = useCallback(() => {
     const newCollapsed = !sidebarCollapsed
     setSidebarCollapsed(newCollapsed)
@@ -103,7 +94,6 @@ export default function AppShell({ children }: AppShellProps) {
     
     checkAuth()
     
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         router.push('/login')
@@ -113,35 +103,34 @@ export default function AppShell({ children }: AppShellProps) {
     return () => subscription.unsubscribe()
   }, [router])
 
-  // Handle sign out
   const handleSignOut = async () => {
     await signOut()
     router.push('/login')
   }
 
-  // Skip shell for login page
+  // Skip shell for login
   if (pathname === '/login') {
     return <>{children}</>
   }
 
-  // Loading state - Option B themed
+  // Loading - premium minimal
   if (loading) {
     return (
-      <div className={cn('min-h-screen flex items-center justify-center', styles.bg)}>
-        <div className="flex flex-col items-center gap-4">
-          {/* Emerald spinner to match logo */}
-          <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-          <p className={cn('text-sm font-medium', isDark ? 'text-slate-400' : 'text-slate-500')}>
-            Loading...
-          </p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-3">
+          {/* Subtle loading indicator */}
+          <div className="w-8 h-8 border-2 border-gray-200 border-t-emerald-500 rounded-full animate-spin" />
+          <p className="text-sm text-gray-400 font-medium">Loading</p>
         </div>
       </div>
     )
   }
 
+  // Page background matches sidebar/header
+  const pageBg = theme === 'dark' ? 'bg-slate-950' : 'bg-[#F9FAFB]'
+
   return (
-    <div className={cn('min-h-screen', styles.bg, styles.text)}>
-      {/* Sidebar */}
+    <div className={cn('min-h-screen', pageBg)}>
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={handleSidebarToggle}
@@ -150,7 +139,6 @@ export default function AppShell({ children }: AppShellProps) {
         onSignOut={handleSignOut}
       />
       
-      {/* Header */}
       <Header
         theme={theme}
         onThemeToggle={handleThemeToggle}
@@ -160,18 +148,17 @@ export default function AppShell({ children }: AppShellProps) {
         sidebarCollapsed={sidebarCollapsed}
       />
       
-      {/* Main Content */}
+      {/* Main content - header is h-14, sidebar is w-56 or w-16 */}
       <main
         className={cn(
-          'pt-16 min-h-screen transition-all duration-300',
-          sidebarCollapsed ? 'pl-16' : 'pl-60'
+          'pt-14 min-h-screen transition-all duration-300',
+          sidebarCollapsed ? 'pl-16' : 'pl-56'
         )}
       >
-        {/* Removed extra padding wrapper - pages handle their own padding */}
         {React.Children.map(children, child => {
           if (React.isValidElement(child)) {
             return React.cloneElement(child, {
-              // @ts-ignore - passing props to page components
+              // @ts-ignore
               companyId,
               theme,
               user,
@@ -182,7 +169,6 @@ export default function AppShell({ children }: AppShellProps) {
         })}
       </main>
 
-      {/* AI Chat Panel */}
       <ChatPanel
         isOpen={chatOpen}
         onClose={() => setChatOpen(false)}
