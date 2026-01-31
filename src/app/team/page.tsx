@@ -102,7 +102,7 @@ export default function TeamPage() {
   const getMemberRevenueForMonth = (id: string, monthStart: string) => { const end = new Date(monthStart); end.setMonth(end.getMonth() + 1); return timeEntries.filter(e => e.contractor_id === id && e.date >= monthStart && e.date < end.toISOString().split('T')[0]).reduce((s, e) => s + e.hours * e.bill_rate, 0) }
   const getMemberCostForMonth = (id: string, monthStart: string) => { const m = teamMembers.find(x => x.id === id); if (!m) return 0; for (const g of resourceGroups) { const gm = g.members?.find(x => x.team_member_id === id && x.is_active); if (gm && g.is_active) { const total = g.members?.reduce((s, x) => s + (x.is_active ? x.proposed_hours : 0), 0) || 1; return g.cost_amount * (gm.proposed_hours / total) } } const ms = schedules.filter(s => s.team_member_id === id && s.is_active && s.effective_start <= monthStart && (!s.effective_end || s.effective_end >= monthStart)); if (ms.length > 0) return ms.reduce((s, x) => s + (x.cost_type === 'Lump Sum' ? x.cost_amount : getMemberHoursForMonth(id, monthStart) * x.cost_amount), 0); if (m.cost_amount) return m.cost_type === 'T&M' ? getMemberHoursForMonth(id, monthStart) * m.cost_amount : m.cost_amount; return 0 }
   const summaryStats = useMemo(() => { const cost = activeMembers.reduce((s, m) => s + getMemberCostForMonth(m.id, selectedMonth1), 0); const hrs = activeMembers.reduce((s, m) => s + getMemberHoursForMonth(m.id, selectedMonth1), 0); return { active: activeMembers.length, totalCost: cost, totalHours: hrs, costPerHour: hrs > 0 ? cost / hrs : 0 } }, [activeMembers, selectedMonth1, timeEntries, schedules, resourceGroups])
-  const profitabilityData = useMemo(() => activeMembers.map(m => { const h1 = getMemberHoursForMonth(m.id, selectedMonth1), r1 = getMemberRevenueForMonth(m.id, selectedMonth1), c1 = getMemberCostForMonth(m.id, selectedMonth1); const h2 = getMemberHoursForMonth(m.id, selectedMonth2), r2 = getMemberRevenueForMonth(m.id, selectedMonth2), c2 = getMemberCostForMonth(m.id, selectedMonth2); const calcMargin = (rev: number, cost: number) => { if (rev > 0) return Math.max(-100, Math.min(100, ((rev - cost) / rev) * 100)); return cost > 0 ? -100 : 0 }; return { id: m.id, name: m.name, role: m.role, month1: { hours: h1, revenue: r1, cost: c1, margin: calcMargin(r1, c1) }, month2: { hours: h2, revenue: r2, cost: c2, margin: calcMargin(r2, c2) } } }).sort((a, b) => b.month1.revenue - a.month1.revenue), [activeMembers, selectedMonth1, selectedMonth2, timeEntries, schedules, resourceGroups])
+  const profitabilityData = useMemo(() => activeMembers.map(m => { const h1 = getMemberHoursForMonth(m.id, selectedMonth1), r1 = getMemberRevenueForMonth(m.id, selectedMonth1), c1 = getMemberCostForMonth(m.id, selectedMonth1); const h2 = getMemberHoursForMonth(m.id, selectedMonth2), r2 = getMemberRevenueForMonth(m.id, selectedMonth2), c2 = getMemberCostForMonth(m.id, selectedMonth2); const calcMargin = (rev: number, cost: number) => { if (rev > 0) return ((rev - cost) / rev) * 100; if (cost > 0) return -((cost - rev) / cost) * 100; return 0 }; return { id: m.id, name: m.name, role: m.role, month1: { hours: h1, revenue: r1, cost: c1, margin: calcMargin(r1, c1) }, month2: { hours: h2, revenue: r2, cost: c2, margin: calcMargin(r2, c2) } } }).sort((a, b) => b.month1.revenue - a.month1.revenue), [activeMembers, selectedMonth1, selectedMonth2, timeEntries, schedules, resourceGroups])
 
   const resetForm = () => setFormData({ name: '', email: '', phone: '', role: '', status: 'active', start_date: '', services: [], bank_name: '', account_type: '', routing_number: '', account_number: '', payment_method: '', cost_type: 'Lump Sum', cost_amount: '' })
   const resetScheduleForm = () => setScheduleForm({ team_member_id: '', client_id: '', project_id: '', schedule_name: '', cost_type: 'Lump Sum' as 'Lump Sum' | 'T&M', cost_amount: '', allocation_method: 'auto' as 'auto' | 'fixed_percent' | 'fixed_amount', allocation_value: '', effective_start: new Date().toISOString().split('T')[0], effective_end: '', notes: '' })
@@ -189,7 +189,7 @@ export default function TeamPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                 <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} angle={-45} textAnchor="end" height={60} />
                 <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} formatter={(v: number) => formatCurrency(v)} />
+                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#e2e8f0' }} labelStyle={{ color: '#e2e8f0' }} formatter={(v: number) => formatCurrency(v)} />
                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
                 <Bar dataKey="month1.revenue" name="Revenue" fill="#34d399" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="month1.cost" name="Cost" fill="#fb923c" radius={[4, 4, 0, 0]} />
@@ -202,9 +202,9 @@ export default function TeamPage() {
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={profitabilityData.filter(d => d.month1.revenue > 0 || d.month1.cost > 0)} layout="vertical" margin={{ top: 10, right: 30, left: 80, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={true} vertical={false} />
-                <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => `${Math.round(v)}%`} ticks={[-100, -50, 0, 50, 100]} domain={[-100, 100]} />
+                <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => `${Math.round(v)}%`} />
                 <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} width={75} />
-                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} formatter={(v: number) => `${v.toFixed(1)}%`} />
+                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#e2e8f0' }} labelStyle={{ color: '#e2e8f0' }} formatter={(v: number) => [`${v.toFixed(1)}%`, 'Margin']} />
                 <Bar dataKey="month1.margin" name="Margin %" radius={[0, 4, 4, 0]} background={{ fill: 'transparent' }}>
                   {profitabilityData.filter(d => d.month1.revenue > 0 || d.month1.cost > 0).map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.month1.margin >= 35 ? '#34d399' : entry.month1.margin >= 20 ? '#fbbf24' : entry.month1.margin >= 0 ? '#fb923c' : '#f87171'} />
@@ -224,30 +224,37 @@ export default function TeamPage() {
                 <Pie data={profitabilityData.filter(d => d.month1.cost > 0)} dataKey="month1.cost" nameKey="name" cx="50%" cy="50%" outerRadius={65} innerRadius={30} paddingAngle={2} label={({ cx, cy, midAngle, outerRadius, name, percent }) => { const RADIAN = Math.PI / 180; const radius = outerRadius + 25; const x = cx + radius * Math.cos(-midAngle * RADIAN); const y = cy + radius * Math.sin(-midAngle * RADIAN); return <text x={x} y={y} fill="#e2e8f0" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={11}>{`${name.split(' ')[0]} ${(percent * 100).toFixed(0)}%`}</text> }} labelLine={{ stroke: '#64748b' }}>
                   {profitabilityData.filter(d => d.month1.cost > 0).map((_, i) => <Cell key={`cell-${i}`} fill={['#f97316', '#3b82f6', '#22c55e', '#a855f7', '#ec4899', '#14b8a6'][i % 6]} />)}
                 </Pie>
-                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} formatter={(v: number) => formatCurrency(v)} />
+                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#e2e8f0' }} itemStyle={{ color: '#e2e8f0' }} labelStyle={{ color: '#e2e8f0' }} formatter={(v: number, name: string) => [formatCurrency(v), name]} />
               </PieChart>
             </ResponsiveContainer>
           </div>
           
           <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
-            <h3 className="text-sm font-medium text-slate-300 mb-4">{getMonthLabel(selectedMonth1)} vs {getMonthLabel(selectedMonth2)}</h3>
-            <div className="space-y-3">
-              {profitabilityData.slice(0, 5).map(d => {
-                const revChange = d.month2.revenue > 0 ? ((d.month1.revenue - d.month2.revenue) / d.month2.revenue * 100) : d.month1.revenue > 0 ? 100 : 0
-                const costChange = d.month2.cost > 0 ? ((d.month1.cost - d.month2.cost) / d.month2.cost * 100) : 0
-                const marginDelta = d.month1.margin - d.month2.margin
+            <h3 className="text-sm font-medium text-slate-300 mb-3">{getMonthLabel(selectedMonth1)} vs {getMonthLabel(selectedMonth2)}</h3>
+            <div className="text-xs text-slate-500 mb-3 grid grid-cols-4 gap-2 px-2"><span></span><span className="text-center">Revenue Δ</span><span className="text-center">Cost Δ</span><span className="text-center">Profit Δ</span></div>
+            <div className="space-y-1">
+              {profitabilityData.filter(d => d.month1.revenue > 0 || d.month1.cost > 0).slice(0, 5).map(d => {
+                const revDiff = d.month1.revenue - d.month2.revenue
+                const costDiff = d.month1.cost - d.month2.cost
+                const profitDiff = (d.month1.revenue - d.month1.cost) - (d.month2.revenue - d.month2.cost)
                 return (
-                  <div key={d.id} className="flex items-center justify-between p-2 bg-slate-900/50 rounded-lg">
-                    <span className="text-sm text-slate-300 w-24 truncate">{d.name.split(' ')[0]}</span>
-                    <div className="flex gap-2">
-                      <span className={`text-xs px-2 py-1 rounded ${revChange >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>Rev {revChange >= 0 ? '↑' : '↓'}{Math.abs(revChange).toFixed(0)}%</span>
-                      <span className={`text-xs px-2 py-1 rounded ${costChange <= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>Cost {costChange >= 0 ? '↑' : '↓'}{Math.abs(costChange).toFixed(0)}%</span>
-                      <span className={`text-xs px-2 py-1 rounded ${marginDelta >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>Margin {marginDelta >= 0 ? '↑' : '↓'}{Math.abs(marginDelta).toFixed(0)}pt</span>
-                    </div>
+                  <div key={d.id} className="grid grid-cols-4 gap-2 items-center px-2 py-1.5 bg-slate-900/50 rounded text-xs">
+                    <span className="text-slate-300 truncate">{d.name.split(' ')[0]}</span>
+                    <span className={`text-center ${revDiff > 0 ? 'text-emerald-400' : revDiff < 0 ? 'text-rose-400' : 'text-slate-500'}`}>{revDiff > 0 ? '+' : ''}{revDiff !== 0 ? formatCurrency(revDiff) : '—'}</span>
+                    <span className={`text-center ${costDiff < 0 ? 'text-emerald-400' : costDiff > 0 ? 'text-amber-400' : 'text-slate-500'}`}>{costDiff > 0 ? '+' : ''}{costDiff !== 0 ? formatCurrency(costDiff) : '—'}</span>
+                    <span className={`text-center ${profitDiff > 0 ? 'text-emerald-400' : profitDiff < 0 ? 'text-rose-400' : 'text-slate-500'}`}>{profitDiff > 0 ? '+' : ''}{profitDiff !== 0 ? formatCurrency(profitDiff) : '—'}</span>
                   </div>
                 )
               })}
             </div>
+            {(() => { const tRevDiff = profitabilityData.reduce((s, d) => s + d.month1.revenue - d.month2.revenue, 0); const tCostDiff = profitabilityData.reduce((s, d) => s + d.month1.cost - d.month2.cost, 0); const tProfitDiff = profitabilityData.reduce((s, d) => s + (d.month1.revenue - d.month1.cost) - (d.month2.revenue - d.month2.cost), 0); return (
+              <div className="grid grid-cols-4 gap-2 items-center px-2 py-2 mt-2 border-t border-slate-700 text-xs font-medium">
+                <span className="text-slate-200">Total</span>
+                <span className={`text-center ${tRevDiff > 0 ? 'text-emerald-400' : tRevDiff < 0 ? 'text-rose-400' : 'text-slate-400'}`}>{tRevDiff > 0 ? '+' : ''}{formatCurrency(tRevDiff)}</span>
+                <span className={`text-center ${tCostDiff < 0 ? 'text-emerald-400' : tCostDiff > 0 ? 'text-amber-400' : 'text-slate-400'}`}>{tCostDiff > 0 ? '+' : ''}{formatCurrency(tCostDiff)}</span>
+                <span className={`text-center ${tProfitDiff > 0 ? 'text-emerald-400' : tProfitDiff < 0 ? 'text-rose-400' : 'text-slate-400'}`}>{tProfitDiff > 0 ? '+' : ''}{formatCurrency(tProfitDiff)}</span>
+              </div>
+            ) })()}
           </div>
         </div>
 
