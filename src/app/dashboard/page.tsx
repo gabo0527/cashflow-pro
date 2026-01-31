@@ -748,7 +748,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-12 gap-4 mb-6">
         {/* Team Utilization */}
         <div className="col-span-12 lg:col-span-6">
-          <Section title="Team Utilization" subtitle="Hours logged this period" action={{ label: 'View Team', href: '/team' }} fillHeight>
+          <Section title="Team Utilization" subtitle="Hours logged this period" action={{ label: 'View Team', href: '/team' }}>
             <div>
               {teamUtilization.length > 0 ? (
                 <div>
@@ -772,7 +772,7 @@ export default function DashboardPage() {
 
         {/* Cash Forecast */}
         <div className="col-span-12 lg:col-span-6">
-          <Section title="90-Day Cash Forecast" subtitle="Projected cash position" fillHeight>
+          <Section title="90-Day Cash Forecast" subtitle="Projected cash position">
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={cashForecastData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
@@ -809,7 +809,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-12 gap-4">
         {/* Alerts */}
         <div className="col-span-12 lg:col-span-4">
-          <Section title="Alerts" badge={alerts.filter(a => a.type !== 'success').length || undefined} fillHeight>
+          <Section title="Alerts" badge={alerts.filter(a => a.type !== 'success').length || undefined}>
             <div className="space-y-2">
               {alerts.map((alert, i) => (
                 <AlertRow key={i} {...alert} />
@@ -820,7 +820,7 @@ export default function DashboardPage() {
 
         {/* Open Invoices */}
         <div className="col-span-12 lg:col-span-8">
-          <Section title="Open Invoices" badge={metrics.openInvoicesCount} action={{ label: 'View All', href: '/invoices' }} noPadding fillHeight>
+          <Section title="Open Invoices" badge={metrics.openInvoicesCount} action={{ label: 'View All', href: '/invoices' }} noPadding>
             <div>
               {recentInvoices.length > 0 ? (
                 <div>
