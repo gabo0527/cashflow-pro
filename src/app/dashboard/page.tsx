@@ -17,13 +17,13 @@ import {
 import { createClient } from '@supabase/supabase-js'
 import { getCurrentUser } from '@/lib/supabase'
 
-// Supabase client - use env vars
+// Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
-// ============ VANTAGE LOGO ============
+// ============ VANTAGE LOGO (Updated for Light Theme) ============
 function VantageLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
   const sizes = {
     sm: { icon: 28, fontSize: 18 },
@@ -48,35 +48,46 @@ function VantageLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
           WebkitTextFillColor: 'transparent',
           fontWeight: 700
         }}>V</span>
-        <span className="text-slate-100">antage</span>
+        <span className="text-slate-800">antage</span>
       </span>
     </div>
   )
 }
 
-// ============ DESIGN SYSTEM ============
+// ============ DESIGN SYSTEM - Option B (Slate Navy) ============
 const COLORS = {
-  primary: '#10b981', // Updated to emerald
-  primaryLight: '#34d399',
-  primaryDark: '#059669',
-  success: '#10b981',
-  successLight: '#34d399',
-  warning: '#f59e0b',
-  warningLight: '#fbbf24',
-  danger: '#ef4444',
-  dangerLight: '#f87171',
-  purple: '#8b5cf6',
-  cyan: '#06b6d4',
-  pink: '#ec4899',
-  orange: '#f97316',
-  indigo: '#6366f1',
-  teal: '#14b8a6',
-  rose: '#f43f5e',
-  slate: {
-    50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1',
-    400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155',
-    800: '#1e293b', 900: '#0f172a'
-  }
+  // Primary accent (CTAs, active states)
+  accent: '#334155',
+  accentHover: '#1E293B',
+  accentLight: '#475569',
+  
+  // Semantic
+  positive: '#10B981',
+  positiveLight: '#ECFDF5',
+  positiveDark: '#059669',
+  negative: '#F43F5E',
+  negativeLight: '#FFF1F2',
+  warning: '#F59E0B',
+  warningLight: '#FFFBEB',
+  
+  // Text
+  textPrimary: '#0F172A',
+  textSecondary: '#475569',
+  textMuted: '#94A3B8',
+  
+  // Surfaces
+  surface: '#FFFFFF',
+  pageBg: '#F8FAFC',
+  border: '#E2E8F0',
+  borderSubtle: '#F1F5F9',
+  
+  // Chart colors (semantic)
+  chartPositive: '#10B981',
+  chartNegative: '#F43F5E',
+  chartWarning: '#F59E0B',
+  chartNeutral: '#64748B',
+  chartGrid: '#E2E8F0',
+  chartAxis: '#94A3B8',
 }
 
 // ============ UTILITY FUNCTIONS ============
@@ -100,20 +111,20 @@ const formatDate = (dateStr: string): string => {
 }
 
 const getHealthColor = (score: number): string => {
-  if (score >= 80) return COLORS.success
+  if (score >= 80) return COLORS.positive
   if (score >= 60) return COLORS.warning
-  return COLORS.danger
+  return COLORS.negative
 }
 
 const getStatusColor = (value: number, thresholds: { good: number; warning: number }, inverse = false): string => {
   if (inverse) {
-    if (value <= thresholds.good) return COLORS.success
+    if (value <= thresholds.good) return COLORS.positive
     if (value <= thresholds.warning) return COLORS.warning
-    return COLORS.danger
+    return COLORS.negative
   }
-  if (value >= thresholds.good) return COLORS.success
+  if (value >= thresholds.good) return COLORS.positive
   if (value >= thresholds.warning) return COLORS.warning
-  return COLORS.danger
+  return COLORS.negative
 }
 
 // ============ COMPONENTS ============
@@ -129,48 +140,46 @@ function HealthScoreRing({ score, size = 120 }: { score: number; size?: number }
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="transform -rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={COLORS.slate[700]} strokeWidth={strokeWidth} />
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={COLORS.border} strokeWidth={strokeWidth} />
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth={strokeWidth} strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000 ease-out" />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-bold text-slate-100">{score}</span>
+        <span className="text-3xl font-bold text-slate-800">{score}</span>
         <span className="text-xs text-slate-400">/ 100</span>
       </div>
     </div>
   )
 }
 
-// KPI Card
-function KPICard({ title, value, subtitle, trend, trendLabel, icon: Icon, color = 'green', href }: { 
-  title: string; value: string; subtitle?: string; trend?: number; trendLabel?: string; icon: any; color?: 'blue' | 'green' | 'red' | 'amber' | 'purple' | 'cyan'; href?: string
+// KPI Card - Light theme
+function KPICard({ title, value, subtitle, trend, trendLabel, icon: Icon, color = 'default', href }: { 
+  title: string; value: string; subtitle?: string; trend?: number; trendLabel?: string; icon: any; color?: 'default' | 'positive' | 'negative' | 'warning'; href?: string
 }) {
-  const colorMap = {
-    blue: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-400', icon: 'text-blue-500' },
-    green: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400', icon: 'text-emerald-500' },
-    red: { bg: 'bg-rose-500/10', border: 'border-rose-500/20', text: 'text-rose-400', icon: 'text-rose-500' },
-    amber: { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-400', icon: 'text-amber-500' },
-    purple: { bg: 'bg-purple-500/10', border: 'border-purple-500/20', text: 'text-purple-400', icon: 'text-purple-500' },
-    cyan: { bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', text: 'text-cyan-400', icon: 'text-cyan-500' }
+  const colorConfig = {
+    default: { iconBg: 'bg-slate-100', iconColor: 'text-slate-600' },
+    positive: { iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600' },
+    negative: { iconBg: 'bg-rose-50', iconColor: 'text-rose-600' },
+    warning: { iconBg: 'bg-amber-50', iconColor: 'text-amber-600' },
   }
-  const colors = colorMap[color]
+  const config = colorConfig[color]
   
   const content = (
-    <div className={`${colors.bg} ${colors.border} border rounded-xl p-5 hover:border-opacity-40 transition-all duration-200 h-full`}>
+    <div className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md hover:border-slate-300 transition-all duration-200 h-full">
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-slate-400 text-sm">{title}</p>
-          <p className={`font-bold ${colors.text} text-2xl mt-1 truncate`}>{value}</p>
-          {subtitle && <p className="text-xs text-slate-500 mt-1 truncate">{subtitle}</p>}
+          <p className="font-medium text-slate-500 text-sm">{title}</p>
+          <p className="font-bold text-slate-800 text-2xl mt-1 truncate">{value}</p>
+          {subtitle && <p className="text-xs text-slate-400 mt-1 truncate">{subtitle}</p>}
           {trend !== undefined && (
             <div className="flex items-center gap-1 mt-2">
               {trend >= 0 ? <ArrowUpRight size={14} className="text-emerald-500" /> : <ArrowDownRight size={14} className="text-rose-500" />}
-              <span className={`text-xs font-medium ${trend >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{Math.abs(trend).toFixed(1)}%</span>
-              {trendLabel && <span className="text-xs text-slate-500">{trendLabel}</span>}
+              <span className={`text-xs font-medium ${trend >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{Math.abs(trend).toFixed(1)}%</span>
+              {trendLabel && <span className="text-xs text-slate-400">{trendLabel}</span>}
             </div>
           )}
         </div>
-        <div className={`${colors.bg} p-2.5 rounded-lg ml-3`}>
-          <Icon size={20} className={colors.icon} />
+        <div className={`${config.iconBg} p-2.5 rounded-lg ml-3`}>
+          <Icon size={20} className={config.iconColor} />
         </div>
       </div>
     </div>
@@ -180,24 +189,24 @@ function KPICard({ title, value, subtitle, trend, trendLabel, icon: Icon, color 
   return content
 }
 
-// Section Container
+// Section Container - Light theme
 function Section({ title, subtitle, action, children, className = '', badge, minHeight }: { 
   title: string; subtitle?: string; action?: { label: string; href: string }; children: React.ReactNode; className?: string; badge?: string | number; minHeight?: string
 }) {
   return (
-    <div className={`bg-slate-800/50 backdrop-blur border border-slate-700/50 rounded-2xl overflow-hidden flex flex-col h-full ${className}`}>
-      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/30">
+    <div className={`bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col h-full shadow-sm ${className}`}>
+      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold text-slate-100">{title}</h2>
+            <h2 className="text-base font-semibold text-slate-800">{title}</h2>
             {badge !== undefined && (
-              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-slate-700 text-slate-300">{badge}</span>
+              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">{badge}</span>
             )}
           </div>
-          {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+          {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
         </div>
         {action && (
-          <Link href={action.href} className="text-sm text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1">
+          <Link href={action.href} className="text-sm text-slate-600 hover:text-slate-800 font-medium flex items-center gap-1 transition-colors">
             {action.label} <ChevronRight size={16} />
           </Link>
         )}
@@ -209,8 +218,8 @@ function Section({ title, subtitle, action, children, className = '', badge, min
   )
 }
 
-// Progress Bar
-function ProgressBar({ value, max = 100, color = COLORS.primary, showLabel = true, size = 'default', label }: { 
+// Progress Bar - Light theme
+function ProgressBar({ value, max = 100, color = COLORS.accent, showLabel = true, size = 'default', label }: { 
   value: number; max?: number; color?: string; showLabel?: boolean; size?: 'small' | 'default'; label?: string
 }) {
   const percentage = Math.min((value / max) * 100, 100)
@@ -220,18 +229,18 @@ function ProgressBar({ value, max = 100, color = COLORS.primary, showLabel = tru
     <div className="w-full">
       {(showLabel || label) && (
         <div className="flex justify-between items-center mb-1">
-          {label && <span className="text-xs text-slate-400">{label}</span>}
-          {showLabel && <span className="text-xs font-medium text-slate-300">{percentage.toFixed(0)}%</span>}
+          {label && <span className="text-xs text-slate-500">{label}</span>}
+          {showLabel && <span className="text-xs font-medium text-slate-600">{percentage.toFixed(0)}%</span>}
         </div>
       )}
-      <div className={`w-full ${height} bg-slate-700 rounded-full overflow-hidden`}>
+      <div className={`w-full ${height} bg-slate-100 rounded-full overflow-hidden`}>
         <div className={`${height} rounded-full transition-all duration-500`} style={{ width: `${percentage}%`, backgroundColor: color }} />
       </div>
     </div>
   )
 }
 
-// Utilization Gauge
+// Utilization Gauge - Light theme
 function UtilizationGauge({ name, hours, target = 40, rate }: { name: string; hours: number; target?: number; rate?: number }) {
   const utilization = (hours / target) * 100
   const color = getStatusColor(utilization, { good: 70, warning: 50 })
@@ -239,41 +248,41 @@ function UtilizationGauge({ name, hours, target = 40, rate }: { name: string; ho
   return (
     <div className="flex items-center gap-4 py-2.5">
       <div className="w-28 truncate">
-        <p className="text-sm font-medium text-slate-200 truncate">{name}</p>
-        {rate && <p className="text-xs text-slate-500">${rate}/hr</p>}
+        <p className="text-sm font-medium text-slate-700 truncate">{name}</p>
+        {rate && <p className="text-xs text-slate-400">${rate}/hr</p>}
       </div>
       <div className="flex-1">
         <ProgressBar value={utilization} color={color} showLabel={false} size="small" />
       </div>
       <div className="text-right w-20">
         <p className="text-sm font-semibold" style={{ color }}>{hours}h</p>
-        <p className="text-xs text-slate-500">{utilization.toFixed(0)}%</p>
+        <p className="text-xs text-slate-400">{utilization.toFixed(0)}%</p>
       </div>
     </div>
   )
 }
 
-// Alert Item
+// Alert Item - Light theme
 function AlertItem({ type, title, subtitle, action }: { type: 'danger' | 'warning' | 'info' | 'success'; title: string; subtitle?: string; action?: { label: string; href: string } }) {
   const config = {
-    danger: { bg: 'bg-rose-500/10', border: 'border-rose-500/20', icon: AlertCircle, iconColor: 'text-rose-500' },
-    warning: { bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: AlertTriangle, iconColor: 'text-amber-500' },
-    info: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: Activity, iconColor: 'text-blue-500' },
-    success: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: CheckCircle2, iconColor: 'text-emerald-500' }
+    danger: { bg: 'bg-rose-50', border: 'border-rose-100', icon: AlertCircle, iconColor: 'text-rose-500' },
+    warning: { bg: 'bg-amber-50', border: 'border-amber-100', icon: AlertTriangle, iconColor: 'text-amber-500' },
+    info: { bg: 'bg-blue-50', border: 'border-blue-100', icon: Activity, iconColor: 'text-blue-500' },
+    success: { bg: 'bg-emerald-50', border: 'border-emerald-100', icon: CheckCircle2, iconColor: 'text-emerald-500' }
   }
   const { bg, border, icon: Icon, iconColor } = config[type]
   
   return (
-    <div className={`${bg} ${border} border rounded-xl p-3 flex items-start gap-3`}>
-      <div className={`p-1.5 rounded-lg ${bg}`}>
+    <div className={`${bg} ${border} border rounded-lg p-3 flex items-start gap-3`}>
+      <div className={`p-1.5 rounded-md ${bg}`}>
         <Icon size={16} className={iconColor} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-200">{title}</p>
-        {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+        <p className="text-sm font-medium text-slate-700">{title}</p>
+        {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
       </div>
       {action && (
-        <Link href={action.href} className="text-xs text-emerald-400 hover:text-emerald-300 font-medium whitespace-nowrap">
+        <Link href={action.href} className="text-xs text-slate-600 hover:text-slate-800 font-medium whitespace-nowrap">
           {action.label}
         </Link>
       )}
@@ -281,12 +290,12 @@ function AlertItem({ type, title, subtitle, action }: { type: 'danger' | 'warnin
   )
 }
 
-// Custom Tooltip
+// Custom Tooltip - Light theme
 const CustomTooltip = ({ active, payload, label, formatter }: any) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 shadow-xl">
-      <p className="text-xs text-slate-400 mb-1">{label}</p>
+    <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-lg">
+      <p className="text-xs text-slate-500 mb-1">{label}</p>
       {payload.map((entry: any, index: number) => (
         <p key={index} className="text-sm font-medium" style={{ color: entry.color }}>
           {entry.name}: {formatter ? formatter(entry.value) : entry.value}
@@ -302,7 +311,7 @@ export default function DashboardPage() {
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [transactions, setTransactions] = useState<any[]>([])
   const [invoices, setInvoices] = useState<any[]>([])
-  const [expenses, setExpenses] = useState<any[]>([]) // NEW: expenses table
+  const [expenses, setExpenses] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
   const [clients, setClients] = useState<any[]>([])
   const [timeEntries, setTimeEntries] = useState<any[]>([])
@@ -311,7 +320,6 @@ export default function DashboardPage() {
   const [period, setPeriod] = useState<'week' | 'month' | 'quarter' | 'ytd'>('month')
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
 
-  // Available years for filter
   const availableYears = [2026, 2025, 2024, 2023]
   const currentYear = new Date().getFullYear()
   const isCurrentYear = selectedYear === currentYear
@@ -328,11 +336,10 @@ export default function DashboardPage() {
 
         setCompanyId(profile.company_id)
 
-        // Load all data including expenses
         const [txRes, invRes, expRes, projRes, clientRes, timeRes, teamRes, settingsRes] = await Promise.all([
           supabase.from('transactions').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
           supabase.from('invoices').select('*').eq('company_id', profile.company_id).order('invoice_date', { ascending: false }),
-          supabase.from('expenses').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }), // NEW
+          supabase.from('expenses').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
           supabase.from('projects').select('*').eq('company_id', profile.company_id),
           supabase.from('clients').select('*').eq('company_id', profile.company_id),
           supabase.from('time_entries').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
@@ -342,7 +349,7 @@ export default function DashboardPage() {
 
         setTransactions(txRes.data || [])
         setInvoices(invRes.data || [])
-        setExpenses(expRes.data || []) // NEW
+        setExpenses(expRes.data || [])
         setProjects(projRes.data || [])
         setClients(clientRes.data || [])
         setTimeEntries(timeRes.data || [])
@@ -402,122 +409,93 @@ export default function DashboardPage() {
         }
         break
       case 'ytd':
-        startDate = new Date(selectedYear, 0, 1)
-        if (selectedYear < currentYear) {
-          endDate = new Date(selectedYear, 11, 31, 23, 59, 59)
-          weeksInPeriod = 52
-        } else {
-          weeksInPeriod = Math.ceil((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000))
-        }
-        break
       default:
         startDate = new Date(selectedYear, 0, 1)
-        weeksInPeriod = 4
+        weeksInPeriod = Math.ceil((endDate.getTime() - startDate.getTime()) / (7 * 24 * 60 * 60 * 1000))
     }
     
     return { startDate, endDate, weeksInPeriod }
   }, [period, selectedYear, currentYear])
 
-  // ============ FILTERED DATA BY PERIOD ============
+  // ============ FILTERED DATA ============
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => {
-      if (!t.date) return false
       const txDate = new Date(t.date)
       return txDate >= periodRange.startDate && txDate <= periodRange.endDate
     })
   }, [transactions, periodRange])
 
-  // NEW: Filter expenses by period
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter(inv => {
+      const invDate = new Date(inv.invoice_date)
+      return invDate >= periodRange.startDate && invDate <= periodRange.endDate
+    })
+  }, [invoices, periodRange])
+
   const filteredExpenses = useMemo(() => {
-    return expenses.filter(e => {
-      if (!e.date) return false
-      const expDate = new Date(e.date)
+    return expenses.filter(exp => {
+      const expDate = new Date(exp.date)
       return expDate >= periodRange.startDate && expDate <= periodRange.endDate
     })
   }, [expenses, periodRange])
 
   const filteredTimeEntries = useMemo(() => {
-    return timeEntries.filter(t => {
-      if (!t.date) return false
-      const entryDate = new Date(t.date)
-      return entryDate >= periodRange.startDate && entryDate <= periodRange.endDate
+    return timeEntries.filter(te => {
+      const teDate = new Date(te.date)
+      return teDate >= periodRange.startDate && teDate <= periodRange.endDate
     })
   }, [timeEntries, periodRange])
 
-  const filteredInvoices = useMemo(() => {
-    return invoices.filter(inv => {
-      const invDate = new Date(inv.invoice_date || inv.created_at)
-      return invDate >= periodRange.startDate && invDate <= periodRange.endDate
-    })
-  }, [invoices, periodRange])
-
-  // ============ CALCULATED METRICS ============
+  // ============ METRICS CALCULATIONS ============
   const metrics = useMemo(() => {
-    // Revenue from invoices (accrual basis)
-    const revenue = filteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.amount) || parseFloat(inv.total_amount) || 0), 0)
+    // Revenue from invoices
+    const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || parseFloat(inv.total) || 0), 0)
     
-    // UPDATED: Expenses from expenses table (directCosts vs overhead)
-    const directCosts = filteredExpenses
-      .filter(e => e.category === 'directCosts')
-      .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
-    
-    const overhead = filteredExpenses
-      .filter(e => e.category === 'overhead')
-      .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
-    
+    // Expenses by category
+    const directCosts = filteredExpenses.filter(e => e.expense_type === 'direct_cost').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
+    const overhead = filteredExpenses.filter(e => e.expense_type === 'overhead').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
     const totalExpenses = directCosts + overhead
     
-    // Gross Profit & Margin (Revenue - Direct Costs)
-    const grossProfit = revenue - directCosts
-    const grossMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0
-    
-    // Net Profit & Margin (Gross Profit - Overhead)
+    // Margins
+    const grossProfit = totalRevenue - directCosts
+    const grossMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0
     const netProfit = grossProfit - overhead
-    const netMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0
-
-    // Cash metrics
-    const currentCash = companySettings?.beginning_balance || 0
-    const monthsInPeriod = Math.max(1, periodRange.weeksInPeriod / 4)
-    const monthlyBurn = totalExpenses / monthsInPeriod
-    const cashRunway = monthlyBurn > 0 ? currentCash / monthlyBurn : 99
-
-    // AR uses all invoices (current state, not period-filtered)
-    const totalAR = invoices.reduce((sum, inv) => sum + (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0), 0)
-    const overdueAR = invoices.filter(inv => (inv.days_overdue || 0) > 0).reduce((sum, inv) => sum + (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0), 0)
-    const arCurrent = invoices.filter(inv => (inv.days_overdue || 0) <= 0 && (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0) > 0).reduce((sum, inv) => sum + (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0), 0)
-    const ar30 = invoices.filter(inv => (inv.days_overdue || 0) > 0 && (inv.days_overdue || 0) <= 30).reduce((sum, inv) => sum + (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0), 0)
-    const ar60 = invoices.filter(inv => (inv.days_overdue || 0) > 30 && (inv.days_overdue || 0) <= 60).reduce((sum, inv) => sum + (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0), 0)
-    const ar90 = invoices.filter(inv => (inv.days_overdue || 0) > 60).reduce((sum, inv) => sum + (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0), 0)
-
-    const paidInvoices = filteredInvoices.filter(inv => inv.paid_date && inv.invoice_date)
-    const avgDSO = paidInvoices.length > 0 ? paidInvoices.reduce((sum, inv) => {
-      const days = Math.floor((new Date(inv.paid_date).getTime() - new Date(inv.invoice_date).getTime()) / (1000 * 60 * 60 * 24))
-      return sum + Math.max(0, days)
-    }, 0) / paidInvoices.length : 0
-
-    // Time entries
-    const totalHours = filteredTimeEntries.reduce((sum, t) => sum + (t.hours || 0), 0)
-    const billableAmount = filteredTimeEntries.reduce((sum, t) => sum + ((t.hours || 0) * (t.bill_rate || 0)), 0)
-    const activeTeamCount = teamMembers.filter(m => m.status === 'active').length
-    const availableHours = activeTeamCount * 40 * periodRange.weeksInPeriod
-    const utilization = availableHours > 0 ? (totalHours / availableHours) * 100 : 0
-
+    const netMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0
+    
+    // AR Metrics
+    const openInvoices = invoices.filter(inv => inv.status === 'open' || inv.status === 'overdue' || (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0) > 0)
+    const totalAR = openInvoices.reduce((sum, inv) => sum + (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0), 0)
+    const overdueInvoices = openInvoices.filter(inv => {
+      const dueDate = new Date(inv.due_date)
+      return dueDate < new Date()
+    })
+    const overdueAR = overdueInvoices.reduce((sum, inv) => sum + (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0), 0)
+    
+    // DSO
+    const avgDSO = openInvoices.length > 0 ? openInvoices.reduce((sum, inv) => {
+      const invDate = new Date(inv.invoice_date)
+      const daysSince = Math.floor((new Date().getTime() - invDate.getTime()) / (1000 * 60 * 60 * 24))
+      return sum + daysSince
+    }, 0) / openInvoices.length : 0
+    
+    // Team metrics
+    const totalHours = filteredTimeEntries.reduce((sum, te) => sum + (parseFloat(te.hours) || 0), 0)
+    const billableHours = filteredTimeEntries.filter(te => te.billable).reduce((sum, te) => sum + (parseFloat(te.hours) || 0), 0)
+    const billableRate = totalHours > 0 ? (billableHours / totalHours) * 100 : 0
+    
+    // Cash position (simplified - from transactions)
+    const cashIn = filteredTransactions.filter(t => t.type === 'income' || t.amount > 0).reduce((sum, t) => sum + Math.abs(parseFloat(t.amount) || 0), 0)
+    const cashOut = filteredTransactions.filter(t => t.type === 'expense' || t.amount < 0).reduce((sum, t) => sum + Math.abs(parseFloat(t.amount) || 0), 0)
+    const netCash = cashIn - cashOut
+    
     // Health Score
-    let healthScore = 50
-    if (grossMargin >= 30) healthScore += 15
-    else if (grossMargin >= 20) healthScore += 10
-    else if (grossMargin >= 10) healthScore += 5
-    if (cashRunway >= 6) healthScore += 15
-    else if (cashRunway >= 3) healthScore += 10
-    else if (cashRunway >= 1) healthScore += 5
-    if (utilization >= 70) healthScore += 10
-    else if (utilization >= 50) healthScore += 5
-    if (overdueAR === 0) healthScore += 10
-    else if (overdueAR < totalAR * 0.2) healthScore += 5
-    healthScore = Math.min(100, Math.max(0, healthScore))
-
-    return { 
-      revenue,
+    const arScore = totalAR > 0 ? Math.max(0, 100 - (overdueAR / totalAR) * 100) : 100
+    const marginScore = Math.min(100, grossMargin * 2)
+    const utilizationScore = Math.min(100, billableRate)
+    const healthScore = Math.round((arScore * 0.3) + (marginScore * 0.4) + (utilizationScore * 0.3))
+    
+    return {
+      totalRevenue,
       directCosts,
       overhead,
       totalExpenses,
@@ -525,302 +503,341 @@ export default function DashboardPage() {
       grossMargin,
       netProfit,
       netMargin,
-      currentCash, 
-      monthlyBurn, 
-      cashRunway, 
-      totalAR, 
-      overdueAR, 
-      arCurrent, 
-      ar30, 
-      ar60, 
-      ar90, 
-      avgDSO, 
-      totalHours, 
-      billableAmount, 
-      utilization, 
-      healthScore, 
-      openInvoices: invoices.filter(i => (parseFloat(i.balance_due) || parseFloat(i.balance) || 0) > 0).length 
+      totalAR,
+      overdueAR,
+      avgDSO,
+      openInvoices: openInvoices.length,
+      totalHours,
+      billableHours,
+      billableRate,
+      cashIn,
+      cashOut,
+      netCash,
+      healthScore
     }
-  }, [filteredInvoices, filteredExpenses, filteredTimeEntries, invoices, teamMembers, companySettings, periodRange])
+  }, [filteredTransactions, filteredInvoices, filteredExpenses, filteredTimeEntries, invoices])
 
-  // Cash Flow Chart Data (using invoices for revenue, expenses table for costs)
-  const cashFlowData = useMemo(() => {
-    const months: { [key: string]: { month: string; revenue: number; expenses: number; net: number } } = {}
-    const now = new Date()
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const key = d.toLocaleDateString('en-US', { month: 'short' })
-      const fullKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      months[fullKey] = { month: key, revenue: 0, expenses: 0, net: 0 }
-    }
+  // ============ CHART DATA ============
+  const revenueExpenseData = useMemo(() => {
+    const months: { [key: string]: { revenue: number; directCosts: number; overhead: number } } = {}
     
-    // Revenue from invoices
-    invoices.forEach(inv => {
-      const key = (inv.invoice_date || inv.created_at)?.substring(0, 7)
-      if (months[key]) {
-        months[key].revenue += parseFloat(inv.amount) || parseFloat(inv.total_amount) || 0
-      }
-    })
-    
-    // Expenses from expenses table
-    expenses.forEach(exp => {
-      const key = exp.date?.substring(0, 7)
-      if (months[key]) {
-        months[key].expenses += parseFloat(exp.amount) || 0
-      }
-    })
-    
-    return Object.values(months).map(m => ({ ...m, net: m.revenue - m.expenses }))
-  }, [invoices, expenses])
-
-  // Cash Forecast
-  const cashForecastData = useMemo(() => {
-    const data = []
-    let runningCash = metrics.currentCash
-    const avgWeeklyInflow = metrics.revenue / 12
-    const avgWeeklyOutflow = metrics.totalExpenses / 12
-    for (let week = 0; week <= 12; week++) {
-      const variance = 0.9 + Math.random() * 0.2
-      const weeklyNet = (avgWeeklyInflow - avgWeeklyOutflow) * variance
-      if (week > 0) runningCash += weeklyNet
-      data.push({ week: week === 0 ? 'Now' : `W${week}`, projected: Math.max(0, runningCash), threshold: companySettings?.balance_alert_threshold || 50000 })
-    }
-    return data
-  }, [metrics, companySettings])
-
-  // Project Profitability (using expenses for direct costs)
-  const projectProfitability = useMemo(() => {
-    const projectData: { [key: string]: { name: string; revenue: number; cost: number; hours: number; margin: number } } = {}
-    
-    // Get revenue from invoices by project
     filteredInvoices.forEach(inv => {
-      const project = projects.find(p => p.id === inv.project_id)
-      const projectName = project?.name || 'Unassigned'
-      if (!projectData[projectName]) projectData[projectName] = { name: projectName, revenue: 0, cost: 0, hours: 0, margin: 0 }
-      projectData[projectName].revenue += parseFloat(inv.amount) || parseFloat(inv.total_amount) || 0
+      const month = new Date(inv.invoice_date).toLocaleString('en-US', { month: 'short' })
+      if (!months[month]) months[month] = { revenue: 0, directCosts: 0, overhead: 0 }
+      months[month].revenue += parseFloat(inv.total_amount) || parseFloat(inv.total) || 0
     })
     
-    // Get direct costs from expenses by project
-    filteredExpenses.filter(e => e.category === 'directCosts' && e.project_id).forEach(exp => {
-      const project = projects.find(p => p.id === exp.project_id)
-      const projectName = project?.name || 'Unassigned'
-      if (!projectData[projectName]) projectData[projectName] = { name: projectName, revenue: 0, cost: 0, hours: 0, margin: 0 }
-      projectData[projectName].cost += parseFloat(exp.amount) || 0
+    filteredExpenses.forEach(exp => {
+      const month = new Date(exp.date).toLocaleString('en-US', { month: 'short' })
+      if (!months[month]) months[month] = { revenue: 0, directCosts: 0, overhead: 0 }
+      if (exp.expense_type === 'direct_cost') {
+        months[month].directCosts += parseFloat(exp.amount) || 0
+      } else {
+        months[month].overhead += parseFloat(exp.amount) || 0
+      }
     })
     
-    // Get hours from time entries
-    filteredTimeEntries.forEach(entry => {
-      const project = projects.find(p => p.id === entry.project_id)
-      const projectName = project?.name || 'Unassigned'
-      if (!projectData[projectName]) projectData[projectName] = { name: projectName, revenue: 0, cost: 0, hours: 0, margin: 0 }
-      projectData[projectName].hours += entry.hours || 0
-    })
-    
-    // Calculate margins
-    Object.values(projectData).forEach(p => { 
-      p.margin = p.revenue > 0 ? ((p.revenue - p.cost) / p.revenue) * 100 : 0 
-    })
-    
-    return Object.values(projectData)
-      .filter(p => p.revenue > 0 || p.cost > 0)
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 6)
-  }, [filteredInvoices, filteredExpenses, filteredTimeEntries, projects])
+    return Object.entries(months).map(([month, data]) => ({
+      month,
+      revenue: data.revenue,
+      directCosts: data.directCosts,
+      overhead: data.overhead,
+      grossProfit: data.revenue - data.directCosts
+    })).slice(-6)
+  }, [filteredInvoices, filteredExpenses])
 
-  // Team Utilization
-  const teamUtilization = useMemo(() => {
-    const memberHours: { [key: string]: { name: string; hours: number; rate: number } } = {}
-    filteredTimeEntries.forEach(entry => {
-      const member = teamMembers.find(m => m.id === entry.contractor_id)
-      const memberName = member?.name || 'Unknown'
-      if (!memberHours[memberName]) memberHours[memberName] = { name: memberName, hours: 0, rate: member?.bill_rate || 0 }
-      memberHours[memberName].hours += entry.hours || 0
+  const arAgingData = useMemo(() => {
+    const aging = { current: 0, days30: 0, days60: 0, days90: 0 }
+    const now = new Date()
+    
+    invoices.filter(inv => (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0) > 0).forEach(inv => {
+      const dueDate = new Date(inv.due_date)
+      const daysOverdue = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+      const balance = parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0
+      
+      if (daysOverdue <= 0) aging.current += balance
+      else if (daysOverdue <= 30) aging.days30 += balance
+      else if (daysOverdue <= 60) aging.days60 += balance
+      else aging.days90 += balance
     })
-    return Object.values(memberHours).sort((a, b) => b.hours - a.hours).slice(0, 5)
+    
+    return [
+      { name: 'Current', value: aging.current, color: COLORS.chartPositive },
+      { name: '1-30 Days', value: aging.days30, color: COLORS.warning },
+      { name: '31-60 Days', value: aging.days60, color: '#F97316' },
+      { name: '60+ Days', value: aging.days90, color: COLORS.chartNegative }
+    ].filter(d => d.value > 0)
+  }, [invoices])
+
+  const projectProfitability = useMemo(() => {
+    const projectData: { [key: string]: { revenue: number; costs: number } } = {}
+    
+    filteredInvoices.forEach(inv => {
+      const project = inv.project_name || inv.project || 'Unassigned'
+      if (!projectData[project]) projectData[project] = { revenue: 0, costs: 0 }
+      projectData[project].revenue += parseFloat(inv.total_amount) || parseFloat(inv.total) || 0
+    })
+    
+    filteredExpenses.filter(e => e.expense_type === 'direct_cost').forEach(exp => {
+      const project = exp.project_name || exp.project || 'Unassigned'
+      if (!projectData[project]) projectData[project] = { revenue: 0, costs: 0 }
+      projectData[project].costs += parseFloat(exp.amount) || 0
+    })
+    
+    return Object.entries(projectData)
+      .map(([name, data]) => ({
+        name: name.length > 15 ? name.substring(0, 15) + '...' : name,
+        revenue: data.revenue,
+        costs: data.costs,
+        margin: data.revenue > 0 ? ((data.revenue - data.costs) / data.revenue) * 100 : 0
+      }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5)
+  }, [filteredInvoices, filteredExpenses])
+
+  const teamUtilization = useMemo(() => {
+    const memberHours: { [key: string]: { hours: number; rate: number } } = {}
+    
+    filteredTimeEntries.forEach(te => {
+      const member = teamMembers.find(m => m.id === te.team_member_id || m.id === te.contractor_id)
+      const name = member?.name || te.contractor_name || 'Unknown'
+      if (!memberHours[name]) memberHours[name] = { hours: 0, rate: member?.hourly_rate || 0 }
+      memberHours[name].hours += parseFloat(te.hours) || 0
+    })
+    
+    return Object.entries(memberHours)
+      .map(([name, data]) => ({ name, hours: Math.round(data.hours * 10) / 10, rate: data.rate }))
+      .sort((a, b) => b.hours - a.hours)
+      .slice(0, 6)
   }, [filteredTimeEntries, teamMembers])
 
-  // AR Aging
-  const arAgingData = useMemo(() => [
-    { name: 'Current', value: metrics.arCurrent, color: COLORS.success },
-    { name: '1-30 Days', value: metrics.ar30, color: COLORS.warning },
-    { name: '31-60 Days', value: metrics.ar60, color: COLORS.orange },
-    { name: '60+ Days', value: metrics.ar90, color: COLORS.danger }
-  ].filter(d => d.value > 0), [metrics])
+  const cashForecastData = useMemo(() => {
+    const weeks = []
+    let runningCash = metrics.netCash > 0 ? metrics.netCash : 50000
+    const weeklyBurn = metrics.totalExpenses / (periodRange.weeksInPeriod || 4)
+    const weeklyIncome = metrics.totalRevenue / (periodRange.weeksInPeriod || 4)
+    
+    for (let i = 0; i < 12; i++) {
+      runningCash += (weeklyIncome * 0.9) - weeklyBurn
+      weeks.push({
+        week: `W${i + 1}`,
+        projected: Math.max(0, runningCash),
+        threshold: 50000
+      })
+    }
+    return weeks
+  }, [metrics, periodRange])
 
-  // Alerts
   const alerts = useMemo(() => {
-    const list: { type: 'danger' | 'warning' | 'info' | 'success'; title: string; subtitle?: string; action?: { label: string; href: string } }[] = []
-    if (metrics.ar90 > 0) list.push({ type: 'danger', title: `${formatCurrency(metrics.ar90)} over 60 days past due`, subtitle: 'Immediate follow-up recommended', action: { label: 'View', href: '/invoices' } })
-    if (metrics.overdueAR > 0 && metrics.ar90 === 0) list.push({ type: 'warning', title: `${formatCurrency(metrics.overdueAR)} in overdue invoices`, subtitle: `${invoices.filter(inv => (inv.days_overdue || 0) > 0).length} invoices need attention`, action: { label: 'View', href: '/invoices' } })
-    if (metrics.cashRunway < 3 && metrics.cashRunway > 0) list.push({ type: 'warning', title: `Cash runway: ${metrics.cashRunway.toFixed(1)} months`, subtitle: 'Consider reviewing expenses' })
-    if (metrics.utilization < 50 && teamMembers.length > 0) list.push({ type: 'info', title: `Team utilization at ${metrics.utilization.toFixed(0)}%`, subtitle: 'Capacity available for new projects', action: { label: 'View Team', href: '/team' } })
-    if (metrics.grossMargin < 20 && metrics.revenue > 0) list.push({ type: 'warning', title: `Gross margin at ${metrics.grossMargin.toFixed(0)}%`, subtitle: 'Review direct costs', action: { label: 'View Expenses', href: '/expenses' } })
-    if (list.length === 0) list.push({ type: 'success', title: 'All systems healthy', subtitle: 'No critical alerts at this time' })
-    return list
-  }, [metrics, invoices, teamMembers])
+    const alertList: { type: 'danger' | 'warning' | 'info' | 'success'; title: string; subtitle?: string; action?: { label: string; href: string } }[] = []
+    
+    if (metrics.overdueAR > 0) {
+      alertList.push({
+        type: 'danger',
+        title: `${formatCurrency(metrics.overdueAR)} in overdue invoices`,
+        subtitle: 'Requires immediate attention',
+        action: { label: 'Review', href: '/invoices' }
+      })
+    }
+    
+    if (metrics.grossMargin < 30) {
+      alertList.push({
+        type: 'warning',
+        title: `Gross margin at ${metrics.grossMargin.toFixed(1)}%`,
+        subtitle: 'Below 30% target threshold',
+        action: { label: 'Analyze', href: '/projects' }
+      })
+    }
+    
+    if (metrics.billableRate < 60) {
+      alertList.push({
+        type: 'warning',
+        title: `Billable utilization at ${metrics.billableRate.toFixed(0)}%`,
+        subtitle: 'Team capacity underutilized',
+        action: { label: 'View Team', href: '/team' }
+      })
+    }
+    
+    if (alertList.length === 0) {
+      alertList.push({
+        type: 'success',
+        title: 'All metrics within healthy ranges',
+        subtitle: 'No immediate action required'
+      })
+    }
+    
+    return alertList
+  }, [metrics])
 
-  // Recent Invoices
   const recentInvoices = useMemo(() => {
-    return invoices.filter(inv => (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0) > 0).slice(0, 5).map(inv => {
-      const client = clients.find(c => c.id === inv.client_id)
-      return { ...inv, client_name: client?.name || inv.customer_name || 'Unknown' }
-    })
-  }, [invoices, clients])
+    return invoices
+      .filter(inv => (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0) > 0)
+      .map(inv => ({
+        ...inv,
+        days_overdue: Math.max(0, Math.floor((new Date().getTime() - new Date(inv.due_date).getTime()) / (1000 * 60 * 60 * 24)))
+      }))
+      .sort((a, b) => b.days_overdue - a.days_overdue)
+      .slice(0, 5)
+  }, [invoices])
 
-  // Period label helper
-  const periodLabel = useMemo(() => {
-    const start = periodRange.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    const end = periodRange.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    return `${start} – ${end}`
-  }, [periodRange])
-
+  // ============ LOADING STATE ============
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[60vh]">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" />
-          <p className="text-slate-400 text-sm">Loading dashboard...</p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <RefreshCw size={32} className="text-slate-400 animate-spin" />
+          <p className="text-slate-500 font-medium">Loading dashboard...</p>
         </div>
       </div>
     )
   }
 
+  // ============ RENDER ============
   return (
-    <div className="space-y-5 pb-8">
+    <div className="min-h-screen bg-slate-50 p-6 space-y-6">
       {/* ============ HEADER ============ */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <VantageLogo size="md" />
-          <div className="h-8 w-px bg-slate-700" />
-          <div>
-            <h1 className="text-xl font-semibold text-slate-100">Dashboard</h1>
-            <p className="text-xs text-slate-400">{periodLabel}</p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
+          <p className="text-sm text-slate-500 mt-1">Financial overview for {selectedYear}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="appearance-none bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 pr-8 text-xs font-medium text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer"
-            >
-              {availableYears.map((year) => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-            <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          </div>
-          <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700">
+        
+        <div className="flex items-center gap-3">
+          {/* Year Selector */}
+          <select 
+            value={selectedYear} 
+            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+            className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
+          >
+            {availableYears.map(year => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
+          
+          {/* Period Selector */}
+          <div className="flex bg-white border border-slate-200 rounded-lg p-1">
             {(['week', 'month', 'quarter', 'ytd'] as const).map((p) => (
-              <button key={p} onClick={() => setPeriod(p)} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${period === p ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-slate-200'}`}>
-                {p === 'ytd' ? (isCurrentYear ? 'YTD' : 'Year') : p.charAt(0).toUpperCase() + p.slice(1)}
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  period === p 
+                    ? 'bg-slate-800 text-white' 
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {p === 'ytd' ? 'YTD' : p.charAt(0).toUpperCase() + p.slice(1)}
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* ============ HEALTH SCORE + PRIMARY KPIs ============ */}
-      <div className="grid grid-cols-12 gap-4">
-        {/* UPDATED: Financial Health card with Gross & Net Margin */}
-        <div className="col-span-12 lg:col-span-3">
-          <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 border border-slate-700/50 rounded-2xl p-5 h-full">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h3 className="text-sm font-medium text-slate-400">Financial Health</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Overall score</p>
-              </div>
-              <Zap size={18} className="text-emerald-500" />
-            </div>
-            <div className="flex items-center justify-center py-2">
-              <HealthScoreRing score={metrics.healthScore} size={130} />
-            </div>
-            <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-slate-700/50">
-              <div className="text-center">
-                <p className={`text-lg font-bold ${metrics.grossMargin >= 20 ? 'text-emerald-400' : metrics.grossMargin >= 10 ? 'text-amber-400' : 'text-rose-400'}`}>
-                  {metrics.grossMargin.toFixed(0)}%
-                </p>
-                <p className="text-xs text-slate-500">Gross Margin</p>
-              </div>
-              <div className="text-center">
-                <p className={`text-lg font-bold ${metrics.netMargin >= 10 ? 'text-emerald-400' : metrics.netMargin >= 0 ? 'text-amber-400' : 'text-rose-400'}`}>
-                  {metrics.netMargin.toFixed(0)}%
-                </p>
-                <p className="text-xs text-slate-500">Net Margin</p>
-              </div>
-            </div>
-            <div className="mt-3 pt-3 border-t border-slate-700/50 text-center">
-              <p className="text-lg font-bold text-slate-100">{metrics.cashRunway.toFixed(1)}mo</p>
-              <p className="text-xs text-slate-500">Cash Runway</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-span-12 lg:col-span-9">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 h-full">
-            <KPICard title="Revenue" value={formatCurrency(metrics.revenue, true)} icon={TrendingUp} color="green" href="/invoices" />
-            {/* UPDATED: Show breakdown of Direct Costs + Overhead */}
-            <KPICard 
-              title="Expenses" 
-              value={formatCurrency(metrics.totalExpenses, true)} 
-              subtitle={`Direct: ${formatCurrency(metrics.directCosts, true)} • OH: ${formatCurrency(metrics.overhead, true)}`}
-              icon={TrendingDown} 
-              color="red" 
-              href="/expenses" 
-            />
-            <KPICard 
-              title="Net Profit" 
-              value={formatCurrency(metrics.netProfit, true)} 
-              subtitle={`${metrics.netMargin.toFixed(0)}% net margin`}
-              icon={DollarSign} 
-              color={metrics.netProfit >= 0 ? 'green' : 'red'} 
-              href="/cash-flow" 
-            />
-            <KPICard title="Accounts Receivable" value={formatCurrency(metrics.totalAR, true)} subtitle={metrics.overdueAR > 0 ? `${formatCurrency(metrics.overdueAR)} overdue` : 'All current'} icon={Receipt} color={metrics.overdueAR > 0 ? 'amber' : 'green'} href="/invoices" />
-            <KPICard title="Billable Hours" value={formatNumber(metrics.totalHours, 0)} subtitle={`${formatCurrency(metrics.billableAmount)} value`} icon={Clock} color="purple" href="/time-tracking" />
-            <KPICard title="Utilization" value={`${metrics.utilization.toFixed(0)}%`} subtitle={`${teamMembers.filter(m => m.status === 'active').length} active members`} icon={Users} color={metrics.utilization >= 70 ? 'green' : metrics.utilization >= 50 ? 'amber' : 'cyan'} href="/team" />
-          </div>
-        </div>
+      {/* ============ KPI ROW ============ */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard 
+          title="Revenue" 
+          value={formatCurrency(metrics.totalRevenue, true)} 
+          subtitle={`Gross Margin: ${metrics.grossMargin.toFixed(1)}%`}
+          icon={DollarSign} 
+          color="positive"
+          href="/invoices"
+        />
+        <KPICard 
+          title="Total Expenses" 
+          value={formatCurrency(metrics.totalExpenses, true)} 
+          subtitle={`Direct: ${formatCurrency(metrics.directCosts, true)} | OH: ${formatCurrency(metrics.overhead, true)}`}
+          icon={Receipt} 
+          color="negative"
+          href="/expenses"
+        />
+        <KPICard 
+          title="Outstanding AR" 
+          value={formatCurrency(metrics.totalAR, true)} 
+          subtitle={`${metrics.openInvoices} open invoices`}
+          trend={metrics.overdueAR > 0 ? -(metrics.overdueAR / metrics.totalAR * 100) : 0}
+          trendLabel={metrics.overdueAR > 0 ? 'overdue' : ''}
+          icon={Clock} 
+          color={metrics.overdueAR > 0 ? 'warning' : 'default'}
+          href="/invoices"
+        />
+        <KPICard 
+          title="Team Hours" 
+          value={`${formatNumber(metrics.totalHours, 0)}h`} 
+          subtitle={`${metrics.billableRate.toFixed(0)}% billable`}
+          icon={Users} 
+          color="default"
+          href="/team"
+        />
       </div>
 
       {/* ============ CHARTS ROW 1 ============ */}
       <div className="grid grid-cols-12 gap-4">
+        {/* Revenue & Expenses Chart */}
         <div className="col-span-12 lg:col-span-8">
-          <Section title="Cash Flow Trend" subtitle="Last 6 months" action={{ label: 'Details', href: '/cash-flow' }}>
+          <Section title="Revenue vs Expenses" subtitle="Monthly comparison">
             <div className="h-64">
-              {cashFlowData.length > 0 ? (
+              {revenueExpenseData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={cashFlowData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.slate[700]} vertical={false} />
-                    <XAxis dataKey="month" tick={{ fill: COLORS.slate[400], fontSize: 12 }} axisLine={{ stroke: COLORS.slate[700] }} tickLine={false} />
-                    <YAxis tick={{ fill: COLORS.slate[400], fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                  <ComposedChart data={revenueExpenseData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chartGrid} vertical={false} />
+                    <XAxis dataKey="month" tick={{ fill: COLORS.chartAxis, fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: COLORS.chartAxis, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
                     <Tooltip content={<CustomTooltip formatter={(v: number) => formatCurrency(v)} />} />
-                    <Bar dataKey="revenue" name="Revenue" fill={COLORS.success} radius={[4, 4, 0, 0]} barSize={24} />
-                    <Bar dataKey="expenses" name="Expenses" fill={COLORS.rose} radius={[4, 4, 0, 0]} barSize={24} />
-                    <Line type="monotone" dataKey="net" name="Net" stroke={COLORS.primaryLight} strokeWidth={2} dot={{ fill: COLORS.primaryLight, r: 4 }} />
+                    <Bar dataKey="revenue" name="Revenue" fill={COLORS.chartPositive} radius={[4, 4, 0, 0]} barSize={32} />
+                    <Bar dataKey="directCosts" name="Direct Costs" fill={COLORS.chartNegative} radius={[4, 4, 0, 0]} barSize={32} />
+                    <Bar dataKey="overhead" name="Overhead" fill={COLORS.chartNeutral} radius={[4, 4, 0, 0]} barSize={32} />
                   </ComposedChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-full text-slate-500">No transaction data available</div>
+                <div className="flex items-center justify-center h-full text-slate-400">No data for selected period</div>
               )}
+            </div>
+            <div className="flex items-center gap-6 mt-3 pt-3 border-t border-slate-100">
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: COLORS.chartPositive }} /><span className="text-xs text-slate-500">Revenue</span></div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: COLORS.chartNegative }} /><span className="text-xs text-slate-500">Direct Costs</span></div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: COLORS.chartNeutral }} /><span className="text-xs text-slate-500">Overhead</span></div>
             </div>
           </Section>
         </div>
 
-        <div className="col-span-12 lg:col-span-4">
-          <Section title="AR Aging" subtitle={`${formatCurrency(metrics.totalAR)} total`} action={{ label: 'View', href: '/invoices' }}>
-            <div className="h-40">
+        {/* Financial Health + AR Aging */}
+        <div className="col-span-12 lg:col-span-4 space-y-4">
+          {/* Health Score */}
+          <Section title="Financial Health">
+            <div className="flex items-center gap-6">
+              <HealthScoreRing score={metrics.healthScore} size={100} />
+              <div className="flex-1 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Gross Margin</span>
+                  <span className="font-semibold" style={{ color: getStatusColor(metrics.grossMargin, { good: 40, warning: 25 }) }}>{metrics.grossMargin.toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Net Margin</span>
+                  <span className="font-semibold" style={{ color: getStatusColor(metrics.netMargin, { good: 20, warning: 10 }) }}>{metrics.netMargin.toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Utilization</span>
+                  <span className="font-semibold" style={{ color: getStatusColor(metrics.billableRate, { good: 70, warning: 50 }) }}>{metrics.billableRate.toFixed(0)}%</span>
+                </div>
+              </div>
+            </div>
+          </Section>
+
+          {/* AR Aging */}
+          <Section title="AR Aging" subtitle="Outstanding by age">
+            <div className="h-32">
               {arAgingData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <RePieChart>
-                    <Pie data={arAgingData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={3} dataKey="value">
+                    <Pie data={arAgingData} cx="50%" cy="50%" innerRadius={30} outerRadius={50} paddingAngle={2} dataKey="value">
                       {arAgingData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                     </Pie>
                     <Tooltip content={<CustomTooltip formatter={(v: number) => formatCurrency(v)} />} />
                   </RePieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-full text-slate-500 text-sm">No outstanding AR</div>
+                <div className="flex items-center justify-center h-full text-slate-400 text-sm">No outstanding AR</div>
               )}
             </div>
             <div className="space-y-1.5 mt-2">
@@ -828,15 +845,15 @@ export default function DashboardPage() {
                 <div key={i} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="text-slate-400 text-xs">{item.name}</span>
+                    <span className="text-slate-500 text-xs">{item.name}</span>
                   </div>
-                  <span className="font-medium text-slate-200 text-xs">{formatCurrency(item.value)}</span>
+                  <span className="font-medium text-slate-700 text-xs">{formatCurrency(item.value)}</span>
                 </div>
               ))}
               {metrics.avgDSO > 0 && (
-                <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
-                  <span className="text-slate-500 text-xs">Avg. DSO</span>
-                  <span className="font-medium text-slate-300 text-xs">{metrics.avgDSO.toFixed(0)} days</span>
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                  <span className="text-slate-400 text-xs">Avg. DSO</span>
+                  <span className="font-medium text-slate-600 text-xs">{metrics.avgDSO.toFixed(0)} days</span>
                 </div>
               )}
             </div>
@@ -852,26 +869,26 @@ export default function DashboardPage() {
               {projectProfitability.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={projectProfitability} layout="vertical" margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.slate[700]} horizontal={false} />
-                    <XAxis type="number" tick={{ fill: COLORS.slate[400], fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-                    <YAxis dataKey="name" type="category" tick={{ fill: COLORS.slate[400], fontSize: 11 }} width={80} axisLine={false} tickLine={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chartGrid} horizontal={false} />
+                    <XAxis type="number" tick={{ fill: COLORS.chartAxis, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                    <YAxis dataKey="name" type="category" tick={{ fill: COLORS.textSecondary, fontSize: 11 }} width={80} axisLine={false} tickLine={false} />
                     <Tooltip content={<CustomTooltip formatter={(v: number) => formatCurrency(v)} />} />
-                    <Bar dataKey="revenue" name="Revenue" fill={COLORS.primary} radius={[0, 4, 4, 0]} barSize={16}>
+                    <Bar dataKey="revenue" name="Revenue" fill={COLORS.chartPositive} radius={[0, 4, 4, 0]} barSize={16}>
                       {projectProfitability.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.margin >= 40 ? COLORS.success : entry.margin >= 20 ? COLORS.primary : COLORS.warning} />
+                        <Cell key={`cell-${index}`} fill={entry.margin >= 40 ? COLORS.chartPositive : entry.margin >= 20 ? COLORS.accent : COLORS.warning} />
                       ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-full text-slate-500">No project data available</div>
+                <div className="flex items-center justify-center h-full text-slate-400">No project data available</div>
               )}
             </div>
             {projectProfitability.length > 0 && (
-              <div className="flex items-center gap-4 mt-2 pt-2 border-t border-slate-700/50">
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS.success }} /><span className="text-xs text-slate-500">40%+ margin</span></div>
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS.primary }} /><span className="text-xs text-slate-500">20-40%</span></div>
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS.warning }} /><span className="text-xs text-slate-500">&lt;20%</span></div>
+              <div className="flex items-center gap-4 mt-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS.chartPositive }} /><span className="text-xs text-slate-400">40%+ margin</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS.accent }} /><span className="text-xs text-slate-400">20-40%</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS.warning }} /><span className="text-xs text-slate-400">&lt;20%</span></div>
               </div>
             )}
           </Section>
@@ -887,15 +904,15 @@ export default function DashboardPage() {
                   ))}
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-full text-slate-500">No time entries available</div>
+                <div className="flex items-center justify-center h-full text-slate-400">No time entries available</div>
               )}
             </div>
             {teamUtilization.length > 0 && (
-              <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-700/50">
-                <span className="text-xs text-slate-500">Team Average</span>
-                <span className="text-sm font-semibold text-slate-200">
+              <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
+                <span className="text-xs text-slate-400">Team Average</span>
+                <span className="text-sm font-semibold text-slate-700">
                   {(teamUtilization.reduce((sum, m) => sum + m.hours, 0) / teamUtilization.length).toFixed(0)}h
-                  <span className="text-slate-500 font-normal ml-1">/ 40h target</span>
+                  <span className="text-slate-400 font-normal ml-1">/ 40h target</span>
                 </span>
               </div>
             )}
@@ -920,22 +937,22 @@ export default function DashboardPage() {
                 <AreaChart data={cashForecastData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                   <defs>
                     <linearGradient id="cashGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={COLORS.success} stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor={COLORS.success} stopOpacity={0}/>
+                      <stop offset="5%" stopColor={COLORS.chartPositive} stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor={COLORS.chartPositive} stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.slate[700]} vertical={false} />
-                  <XAxis dataKey="week" tick={{ fill: COLORS.slate[400], fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: COLORS.slate[400], fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chartGrid} vertical={false} />
+                  <XAxis dataKey="week" tick={{ fill: COLORS.chartAxis, fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: COLORS.chartAxis, fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
                   <Tooltip content={<CustomTooltip formatter={(v: number) => formatCurrency(v)} />} />
-                  <ReferenceLine y={cashForecastData[0]?.threshold || 50000} stroke={COLORS.warning} strokeDasharray="5 5" />
-                  <Area type="monotone" dataKey="projected" name="Projected" stroke={COLORS.success} strokeWidth={2} fill="url(#cashGradient)" />
+                  <ReferenceLine y={50000} stroke={COLORS.warning} strokeDasharray="5 5" />
+                  <Area type="monotone" dataKey="projected" name="Projected" stroke={COLORS.chartPositive} strokeWidth={2} fill="url(#cashGradient)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-slate-700/50">
-              <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500" /><span className="text-xs text-slate-500">Projected</span></div>
-              <div className="flex items-center gap-1.5"><div className="w-4 h-0.5 bg-amber-500" style={{ borderStyle: 'dashed' }} /><span className="text-xs text-slate-500">Alert threshold</span></div>
+            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-slate-100">
+              <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500" /><span className="text-xs text-slate-400">Projected</span></div>
+              <div className="flex items-center gap-1.5"><div className="w-4 h-0.5 bg-amber-500" style={{ borderStyle: 'dashed' }} /><span className="text-xs text-slate-400">Alert threshold</span></div>
             </div>
           </Section>
         </div>
@@ -946,20 +963,20 @@ export default function DashboardPage() {
               {recentInvoices.length > 0 ? (
                 <div className="space-y-0">
                   {recentInvoices.map((inv) => (
-                    <div key={inv.id} className="flex items-center justify-between py-2.5 border-b border-slate-700/50 last:border-0">
+                    <div key={inv.id} className="flex items-center justify-between py-2.5 border-b border-slate-100 last:border-0">
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-slate-200 truncate">{inv.client_name}</p>
-                        <p className="text-xs text-slate-500">{inv.invoice_number || inv.doc_number || 'Draft'} • Due {formatDate(inv.due_date)}</p>
+                        <p className="text-sm font-medium text-slate-700 truncate">{inv.client_name}</p>
+                        <p className="text-xs text-slate-400">{inv.invoice_number || inv.doc_number || 'Draft'} • Due {formatDate(inv.due_date)}</p>
                       </div>
                       <div className="text-right ml-3">
-                        <p className="text-sm font-semibold text-slate-100">{formatCurrency(parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0)}</p>
-                        {(inv.days_overdue || 0) > 0 && <p className="text-xs text-rose-400">{inv.days_overdue}d overdue</p>}
+                        <p className="text-sm font-semibold text-slate-800">{formatCurrency(parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0)}</p>
+                        {(inv.days_overdue || 0) > 0 && <p className="text-xs text-rose-500">{inv.days_overdue}d overdue</p>}
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-full text-slate-500 text-sm">No open invoices</div>
+                <div className="flex items-center justify-center h-full text-slate-400 text-sm">No open invoices</div>
               )}
             </div>
           </Section>
