@@ -102,7 +102,7 @@ export default function TeamPage() {
   const getMemberRevenueForMonth = (id: string, monthStart: string) => { const end = new Date(monthStart); end.setMonth(end.getMonth() + 1); return timeEntries.filter(e => e.contractor_id === id && e.date >= monthStart && e.date < end.toISOString().split('T')[0]).reduce((s, e) => s + e.hours * e.bill_rate, 0) }
   const getMemberCostForMonth = (id: string, monthStart: string) => { const m = teamMembers.find(x => x.id === id); if (!m) return 0; for (const g of resourceGroups) { const gm = g.members?.find(x => x.team_member_id === id && x.is_active); if (gm && g.is_active) { const total = g.members?.reduce((s, x) => s + (x.is_active ? x.proposed_hours : 0), 0) || 1; return g.cost_amount * (gm.proposed_hours / total) } } const ms = schedules.filter(s => s.team_member_id === id && s.is_active && s.effective_start <= monthStart && (!s.effective_end || s.effective_end >= monthStart)); if (ms.length > 0) return ms.reduce((s, x) => s + (x.cost_type === 'Lump Sum' ? x.cost_amount : getMemberHoursForMonth(id, monthStart) * x.cost_amount), 0); if (m.cost_amount) return m.cost_type === 'T&M' ? getMemberHoursForMonth(id, monthStart) * m.cost_amount : m.cost_amount; return 0 }
   const summaryStats = useMemo(() => { const cost = activeMembers.reduce((s, m) => s + getMemberCostForMonth(m.id, selectedMonth1), 0); const hrs = activeMembers.reduce((s, m) => s + getMemberHoursForMonth(m.id, selectedMonth1), 0); return { active: activeMembers.length, totalCost: cost, totalHours: hrs, costPerHour: hrs > 0 ? cost / hrs : 0 } }, [activeMembers, selectedMonth1, timeEntries, schedules, resourceGroups])
-  const profitabilityData = useMemo(() => activeMembers.map(m => { const h1 = getMemberHoursForMonth(m.id, selectedMonth1), r1 = getMemberRevenueForMonth(m.id, selectedMonth1), c1 = getMemberCostForMonth(m.id, selectedMonth1); const h2 = getMemberHoursForMonth(m.id, selectedMonth2), r2 = getMemberRevenueForMonth(m.id, selectedMonth2), c2 = getMemberCostForMonth(m.id, selectedMonth2); return { id: m.id, name: m.name, role: m.role, month1: { hours: h1, revenue: r1, cost: c1, margin: r1 > 0 ? ((r1 - c1) / r1) * 100 : c1 > 0 ? -100 : 0 }, month2: { hours: h2, revenue: r2, cost: c2, margin: r2 > 0 ? ((r2 - c2) / r2) * 100 : c2 > 0 ? -100 : 0 } } }).sort((a, b) => b.month1.revenue - a.month1.revenue), [activeMembers, selectedMonth1, selectedMonth2, timeEntries, schedules, resourceGroups])
+  const profitabilityData = useMemo(() => activeMembers.map(m => { const h1 = getMemberHoursForMonth(m.id, selectedMonth1), r1 = getMemberRevenueForMonth(m.id, selectedMonth1), c1 = getMemberCostForMonth(m.id, selectedMonth1); const h2 = getMemberHoursForMonth(m.id, selectedMonth2), r2 = getMemberRevenueForMonth(m.id, selectedMonth2), c2 = getMemberCostForMonth(m.id, selectedMonth2); const calcMargin = (rev: number, cost: number) => { if (rev > 0) return Math.max(-100, Math.min(100, ((rev - cost) / rev) * 100)); return cost > 0 ? -100 : 0 }; return { id: m.id, name: m.name, role: m.role, month1: { hours: h1, revenue: r1, cost: c1, margin: calcMargin(r1, c1) }, month2: { hours: h2, revenue: r2, cost: c2, margin: calcMargin(r2, c2) } } }).sort((a, b) => b.month1.revenue - a.month1.revenue), [activeMembers, selectedMonth1, selectedMonth2, timeEntries, schedules, resourceGroups])
 
   const resetForm = () => setFormData({ name: '', email: '', phone: '', role: '', status: 'active', start_date: '', services: [], bank_name: '', account_type: '', routing_number: '', account_number: '', payment_method: '', cost_type: 'Lump Sum', cost_amount: '' })
   const resetScheduleForm = () => setScheduleForm({ team_member_id: '', client_id: '', project_id: '', schedule_name: '', cost_type: 'Lump Sum' as 'Lump Sum' | 'T&M', cost_amount: '', allocation_method: 'auto' as 'auto' | 'fixed_percent' | 'fixed_amount', allocation_value: '', effective_start: new Date().toISOString().split('T')[0], effective_end: '', notes: '' })
@@ -200,18 +200,19 @@ export default function TeamPage() {
           <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
             <h3 className="text-sm font-medium text-slate-300 mb-4">Margin by Employee — {getMonthLabel(selectedMonth1)}</h3>
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={profitabilityData.filter(d => d.month1.revenue > 0)} layout="vertical" margin={{ top: 10, right: 30, left: 80, bottom: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => `${Math.round(v)}%`} domain={['dataMin - 10', 'dataMax + 10']} />
+              <BarChart data={profitabilityData.filter(d => d.month1.revenue > 0 || d.month1.cost > 0)} layout="vertical" margin={{ top: 10, right: 30, left: 80, bottom: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={true} vertical={false} />
+                <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => `${Math.round(v)}%`} ticks={[-100, -50, 0, 50, 100]} domain={[-100, 100]} />
                 <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} width={75} />
                 <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} formatter={(v: number) => `${v.toFixed(1)}%`} />
-                <Bar dataKey="month1.margin" name="Margin %" radius={[0, 4, 4, 0]}>
-                  {profitabilityData.filter(d => d.month1.revenue > 0).map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.month1.margin >= 35 ? '#34d399' : entry.month1.margin >= 20 ? '#fbbf24' : '#f87171'} />
+                <Bar dataKey="month1.margin" name="Margin %" radius={[0, 4, 4, 0]} background={{ fill: 'transparent' }}>
+                  {profitabilityData.filter(d => d.month1.revenue > 0 || d.month1.cost > 0).map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.month1.margin >= 35 ? '#34d399' : entry.month1.margin >= 20 ? '#fbbf24' : entry.month1.margin >= 0 ? '#fb923c' : '#f87171'} />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            {profitabilityData.some(d => d.month1.margin < 0) && <p className="text-xs text-rose-400 mt-2">⚠️ Negative margins = Cost exceeds Revenue</p>}
           </div>
         </div>
 
