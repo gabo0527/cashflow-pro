@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { 
-  TrendingUp, TrendingDown, DollarSign, CreditCard, Wallet, PiggyBank,
-  ChevronRight, ChevronDown, Plus, RefreshCw, Building2, ArrowUpRight, 
-  ArrowDownRight, Percent, MoreHorizontal, ExternalLink
+  TrendingUp, TrendingDown, DollarSign, CreditCard, Wallet, Building2,
+  ChevronRight, ChevronDown, ChevronUp, Plus, RefreshCw, ArrowUpRight, 
+  ArrowDownRight, Percent, Receipt, PiggyBank
 } from 'lucide-react'
 import Link from 'next/link'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell
+  PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts'
 import { createClient } from '@supabase/supabase-js'
 import { getCurrentUser } from '@/lib/supabase'
@@ -21,22 +21,11 @@ const supabase = createClient(
 
 // ============ THEME ============
 const THEME = {
-  pageBg: '#F9FAFB',
-  cardBg: '#FFFFFF',
-  cardBorder: '#E5E7EB',
-  cardShadow: '0 1px 3px 0 rgb(0 0 0 / 0.04)',
-  textPrimary: '#111827',
-  textSecondary: '#6B7280',
-  textMuted: '#9CA3AF',
-  accent: '#10B981',
-  accentLight: '#D1FAE5',
-  positive: '#10B981',
-  negative: '#EF4444',
-  warning: '#F59E0B',
+  cardShadow: '0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05)',
+  cardShadowHover: '0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05)',
   chart: {
     primary: '#10B981',
     secondary: '#6B7280',
-    tertiary: '#D1D5DB',
     negative: '#EF4444',
     grid: '#F3F4F6',
     axis: '#9CA3AF',
@@ -61,8 +50,8 @@ const formatDate = (dateStr: string): string => {
 
 // ============ COMPONENTS ============
 
-// KPI Card - Light theme
-function KPICard({ 
+// Premium KPI Card
+function MetricCard({ 
   label, 
   value, 
   subValue, 
@@ -70,7 +59,7 @@ function KPICard({
   trendLabel,
   icon: Icon,
   href,
-  valueColor
+  valueColor = 'text-gray-900'
 }: { 
   label: string
   value: string
@@ -83,15 +72,15 @@ function KPICard({
 }) {
   const content = (
     <div 
-      className="bg-white border border-gray-200 rounded-xl p-5 transition-all duration-200 hover:shadow-md hover:border-gray-300"
+      className="bg-white border border-gray-200 rounded-xl p-6 transition-all duration-200 hover:shadow-md hover:border-gray-300 group"
       style={{ boxShadow: THEME.cardShadow }}
     >
       <div className="flex items-start justify-between">
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <p className="text-sm font-medium text-gray-500">{label}</p>
-          <p className={`text-2xl font-semibold tracking-tight ${valueColor || 'text-gray-900'}`}>{value}</p>
+          <p className={`text-2xl font-semibold tracking-tight ${valueColor}`}>{value}</p>
           {subValue && (
-            <p className="text-xs text-gray-400">{subValue}</p>
+            <p className="text-xs text-gray-400 mt-1">{subValue}</p>
           )}
           {trend !== undefined && (
             <div className="flex items-center gap-1.5 pt-1">
@@ -107,7 +96,7 @@ function KPICard({
             </div>
           )}
         </div>
-        <div className="p-2">
+        <div className="p-2.5 rounded-lg bg-gray-50 group-hover:bg-gray-100 transition-colors">
           <Icon size={20} className="text-gray-400" strokeWidth={1.5} />
         </div>
       </div>
@@ -125,68 +114,90 @@ function Section({
   action, 
   children,
   noPadding = false,
-  headerRight
+  collapsible = false,
+  defaultExpanded = true,
+  badge
 }: { 
   title: string
   subtitle?: string
   action?: { label: string; href?: string; onClick?: () => void }
   children: React.ReactNode
   noPadding?: boolean
-  headerRight?: React.ReactNode
+  collapsible?: boolean
+  defaultExpanded?: boolean
+  badge?: string | number
 }) {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded)
+
   return (
     <div 
-      className="rounded-xl flex flex-col bg-white border border-gray-200"
+      className="rounded-xl bg-white border border-gray-200 overflow-hidden"
       style={{ boxShadow: THEME.cardShadow }}
     >
-      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-          {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
-        </div>
-        <div className="flex items-center gap-2">
-          {headerRight}
-          {action && (
-            action.onClick ? (
-              <button 
-                onClick={action.onClick}
-                className="text-xs font-medium text-gray-500 hover:text-gray-700 flex items-center gap-0.5 transition-colors"
-              >
-                {action.label}
-                <ChevronRight size={14} />
-              </button>
-            ) : (
-              <Link 
-                href={action.href || '#'} 
-                className="text-xs font-medium text-gray-500 hover:text-gray-700 flex items-center gap-0.5 transition-colors"
-              >
-                {action.label}
-                <ChevronRight size={14} />
-              </Link>
-            )
+      <div 
+        className={`flex items-center justify-between px-6 py-4 border-b border-gray-100 ${collapsible ? 'cursor-pointer hover:bg-gray-50 transition-colors' : ''}`}
+        onClick={collapsible ? () => setIsExpanded(!isExpanded) : undefined}
+      >
+        <div className="flex items-center gap-3">
+          {collapsible && (
+            <div className="text-gray-400">
+              {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+            </div>
           )}
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+              {badge !== undefined && (
+                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600">{badge}</span>
+              )}
+            </div>
+            {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+          </div>
         </div>
+        {action && !collapsible && (
+          action.onClick ? (
+            <button 
+              onClick={action.onClick}
+              className="text-xs font-medium text-gray-500 hover:text-gray-700 flex items-center gap-0.5 transition-colors"
+            >
+              {action.label}
+              <ChevronRight size={14} />
+            </button>
+          ) : (
+            <Link 
+              href={action.href || '#'} 
+              className="text-xs font-medium text-gray-500 hover:text-gray-700 flex items-center gap-0.5 transition-colors"
+            >
+              {action.label}
+              <ChevronRight size={14} />
+            </Link>
+          )
+        )}
       </div>
-      <div className={noPadding ? '' : 'p-5'}>
-        {children}
-      </div>
+      {(!collapsible || isExpanded) && (
+        <div className={noPadding ? '' : 'p-6'}>
+          {children}
+        </div>
+      )}
     </div>
   )
 }
 
-// Profit/Loss Row
+// P&L Row
 function PLRow({ 
   label, 
   value, 
   percentage, 
-  color,
-  indent = false
+  type,
+  indent = false,
+  bold = false
 }: { 
   label: string
   value: number
   percentage?: number
-  color: 'positive' | 'negative' | 'neutral' | 'muted'
+  type: 'positive' | 'negative' | 'neutral' | 'muted'
   indent?: boolean
+  bold?: boolean
 }) {
   const colorMap = {
     positive: 'text-emerald-600',
@@ -198,91 +209,37 @@ function PLRow({
     positive: '#10B981',
     negative: '#EF4444',
     neutral: '#6B7280',
-    muted: '#D1D5DB'
+    muted: '#E5E7EB'
   }
   
   return (
-    <div className={`flex items-center justify-between py-3 border-b border-gray-50 last:border-0 ${indent ? 'pl-4' : ''}`}>
-      <div className="flex items-center gap-3 flex-1">
-        <span className={`text-sm ${indent ? 'text-gray-500' : 'font-medium text-gray-700'}`}>{label}</span>
+    <div className={`flex items-center justify-between py-3.5 ${indent ? 'pl-6' : ''}`}>
+      <div className="flex items-center gap-4 flex-1 min-w-0">
+        <span className={`text-sm ${bold ? 'font-semibold text-gray-900' : indent ? 'text-gray-500' : 'font-medium text-gray-700'}`}>
+          {label}
+        </span>
         {percentage !== undefined && (
-          <div className="flex-1 max-w-32">
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div className="flex-1 max-w-40 hidden sm:block">
+            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
               <div 
-                className="h-full rounded-full transition-all"
+                className="h-full rounded-full transition-all duration-500"
                 style={{ 
                   width: `${Math.min(Math.abs(percentage), 100)}%`,
-                  backgroundColor: barColorMap[color]
+                  backgroundColor: barColorMap[type]
                 }}
               />
             </div>
           </div>
         )}
       </div>
-      <div className="text-right">
-        <span className={`text-sm font-semibold tabular-nums ${colorMap[color]}`}>
+      <div className="flex items-center gap-3 shrink-0">
+        <span className={`text-sm tabular-nums ${bold ? 'font-bold' : 'font-semibold'} ${colorMap[type]}`}>
           {formatCurrency(value)}
         </span>
         {percentage !== undefined && (
-          <span className="text-xs text-gray-400 ml-2">{percentage.toFixed(0)}%</span>
+          <span className="text-xs text-gray-400 w-12 text-right tabular-nums">{percentage.toFixed(1)}%</span>
         )}
       </div>
-    </div>
-  )
-}
-
-// Account Row
-function AccountRow({ 
-  name, 
-  balance, 
-  type,
-  isManual
-}: { 
-  name: string
-  balance: number
-  type: 'checking' | 'credit' | 'savings'
-  isManual?: boolean
-}) {
-  const typeConfig = {
-    checking: { color: 'bg-emerald-500', icon: Building2 },
-    credit: { color: 'bg-rose-500', icon: CreditCard },
-    savings: { color: 'bg-blue-500', icon: PiggyBank }
-  }
-  const config = typeConfig[type]
-  
-  return (
-    <div className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
-      <div className="flex items-center gap-3">
-        <div className={`w-2 h-2 rounded-full ${config.color}`} />
-        <span className="text-sm text-gray-700">{name}</span>
-        {isManual && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">Manual</span>
-        )}
-      </div>
-      <span className={`text-sm font-semibold tabular-nums ${balance < 0 ? 'text-red-500' : 'text-gray-900'}`}>
-        {formatCurrency(balance)}
-      </span>
-    </div>
-  )
-}
-
-// Expense Category Card
-function ExpenseCard({ 
-  category, 
-  amount, 
-  color 
-}: { 
-  category: string
-  amount: number
-  color: string
-}) {
-  return (
-    <div className="bg-gray-50 border border-gray-100 rounded-lg p-4">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-        <span className="text-xs text-gray-500">{category}</span>
-      </div>
-      <span className="text-lg font-semibold text-gray-900">{formatCurrency(amount)}</span>
     </div>
   )
 }
@@ -306,17 +263,20 @@ const ChartTooltip = ({ active, payload, label, formatter }: any) => {
 export default function CashFlowPage() {
   const [loading, setLoading] = useState(true)
   const [companyId, setCompanyId] = useState<string | null>(null)
+  const [transactions, setTransactions] = useState<any[]>([])
   const [invoices, setInvoices] = useState<any[]>([])
   const [expenses, setExpenses] = useState<any[]>([])
-  const [transactions, setTransactions] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
-  const [accounts, setAccounts] = useState<any[]>([])
+  const [clients, setClients] = useState<any[]>([])
+  const [companySettings, setCompanySettings] = useState<any>(null)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('en-US', { month: 'long' }))
+  const [showAllTransactions, setShowAllTransactions] = useState(false)
 
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
   const years = [2026, 2025, 2024, 2023]
 
+  // Data fetching - matches original page tables
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -329,21 +289,24 @@ export default function CashFlowPage() {
 
         setCompanyId(profile.company_id)
 
-        const [invRes, expRes, txRes, projRes, accRes] = await Promise.all([
-          supabase.from('invoices').select('*').eq('company_id', profile.company_id),
-          supabase.from('expenses').select('*').eq('company_id', profile.company_id),
+        // Pull from same tables as original Cash Flow page
+        const [txRes, invRes, expRes, projRes, clientRes, settingsRes] = await Promise.all([
           supabase.from('transactions').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
+          supabase.from('invoices').select('*').eq('company_id', profile.company_id).order('invoice_date', { ascending: false }),
+          supabase.from('expenses').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
           supabase.from('projects').select('*').eq('company_id', profile.company_id),
-          supabase.from('accounts').select('*').eq('company_id', profile.company_id)
+          supabase.from('clients').select('*').eq('company_id', profile.company_id),
+          supabase.from('company_settings').select('*').eq('company_id', profile.company_id).single()
         ])
 
+        setTransactions(txRes.data || [])
         setInvoices(invRes.data || [])
         setExpenses(expRes.data || [])
-        setTransactions(txRes.data || [])
         setProjects(projRes.data || [])
-        setAccounts(accRes.data || [])
+        setClients(clientRes.data || [])
+        setCompanySettings(settingsRes.data)
       } catch (error) {
-        console.error('Error loading data:', error)
+        console.error('Error loading cash flow:', error)
       } finally {
         setLoading(false)
       }
@@ -360,7 +323,7 @@ export default function CashFlowPage() {
   }, [selectedYear, selectedMonth])
 
   const filteredInvoices = useMemo(() => invoices.filter(inv => {
-    const d = new Date(inv.invoice_date)
+    const d = new Date(inv.invoice_date || inv.created_at)
     return d >= periodRange.startDate && d <= periodRange.endDate
   }), [invoices, periodRange])
 
@@ -369,26 +332,38 @@ export default function CashFlowPage() {
     return d >= periodRange.startDate && d <= periodRange.endDate
   }), [expenses, periodRange])
 
-  // Metrics
+  const filteredTransactions = useMemo(() => transactions.filter(tx => {
+    const d = new Date(tx.date)
+    return d >= periodRange.startDate && d <= periodRange.endDate
+  }), [transactions, periodRange])
+
+  // Metrics calculation - matches original logic
   const metrics = useMemo(() => {
-    // Cash position from accounts
-    const bankAccounts = accounts.filter(a => a.account_type === 'checking' || a.account_type === 'savings')
-    const creditCards = accounts.filter(a => a.account_type === 'credit_card')
+    // Cash position from company settings
+    const cashOnHand = companySettings?.beginning_balance || 0
     
-    const cashOnHand = bankAccounts.reduce((sum, a) => sum + (parseFloat(a.balance) || 0), 0)
-    const creditCardDebt = Math.abs(creditCards.reduce((sum, a) => sum + (parseFloat(a.balance) || 0), 0))
+    // Credit card debt from transactions (negative CC transactions)
+    const creditCardDebt = Math.abs(
+      transactions
+        .filter(tx => tx.account_type === 'credit_card' && tx.amount < 0)
+        .reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0)
+    )
+    
     const netPosition = cashOnHand - creditCardDebt
 
     // Revenue from invoices
-    const revenue = filteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || parseFloat(inv.total) || 0), 0)
+    const revenue = filteredInvoices.reduce((sum, inv) => 
+      sum + (parseFloat(inv.amount) || parseFloat(inv.total_amount) || 0), 0)
 
-    // Expenses breakdown
+    // Expenses breakdown - uses category field (directCosts vs overhead)
     const directCosts = filteredExpenses
-      .filter(e => e.expense_type === 'direct_cost')
+      .filter(e => e.category === 'directCosts')
       .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
+    
     const overhead = filteredExpenses
-      .filter(e => e.expense_type === 'overhead')
+      .filter(e => e.category === 'overhead')
       .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
+    
     const totalExpenses = directCosts + overhead
 
     // Profit calculations
@@ -397,10 +372,20 @@ export default function CashFlowPage() {
     const netProfit = grossProfit - overhead
     const netMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0
 
-    // Expense categories
+    // Open invoices (current state, not period filtered)
+    const openInvoices = invoices.filter(inv => 
+      (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0) > 0
+    )
+    const totalAR = openInvoices.reduce((sum, inv) => 
+      sum + (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0), 0)
+    const overdueAR = openInvoices
+      .filter(inv => new Date(inv.due_date) < new Date())
+      .reduce((sum, inv) => sum + (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0), 0)
+
+    // Expense by category for breakdown
     const expenseByCategory: { [key: string]: number } = {}
     filteredExpenses.forEach(exp => {
-      const cat = exp.category || 'Other'
+      const cat = exp.description || exp.vendor || 'Other'
       expenseByCategory[cat] = (expenseByCategory[cat] || 0) + (parseFloat(exp.amount) || 0)
     })
 
@@ -412,9 +397,9 @@ export default function CashFlowPage() {
     const prevEnd = new Date(prevYear, prevMonth + 1, 0, 23, 59, 59)
     
     const prevRevenue = invoices.filter(inv => {
-      const d = new Date(inv.invoice_date)
+      const d = new Date(inv.invoice_date || inv.created_at)
       return d >= prevStart && d <= prevEnd
-    }).reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || parseFloat(inv.total) || 0), 0)
+    }).reduce((sum, inv) => sum + (parseFloat(inv.amount) || parseFloat(inv.total_amount) || 0), 0)
     
     const revenueChange = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : 0
 
@@ -430,10 +415,13 @@ export default function CashFlowPage() {
       grossMargin,
       netProfit,
       netMargin,
+      totalAR,
+      overdueAR,
+      openInvoicesCount: openInvoices.length,
       expenseByCategory,
       revenueChange
     }
-  }, [accounts, filteredInvoices, filteredExpenses, invoices, selectedMonth, selectedYear])
+  }, [companySettings, transactions, filteredInvoices, filteredExpenses, invoices, selectedMonth, selectedYear])
 
   // Revenue by project
   const revenueByProject = useMemo(() => {
@@ -442,10 +430,11 @@ export default function CashFlowPage() {
     filteredInvoices.forEach(inv => {
       const project = projects.find(p => p.id === inv.project_id)
       const name = project?.name || 'Unassigned'
-      projectRevenue[name] = (projectRevenue[name] || 0) + (parseFloat(inv.total_amount) || parseFloat(inv.total) || 0)
+      projectRevenue[name] = (projectRevenue[name] || 0) + (parseFloat(inv.amount) || parseFloat(inv.total_amount) || 0)
     })
 
-    const colors = [THEME.chart.primary, '#6B7280', '#9CA3AF', '#D1D5DB', '#E5E7EB', '#F3F4F6']
+    // Monochrome colors with emerald as primary
+    const colors = ['#10B981', '#6B7280', '#9CA3AF', '#D1D5DB', '#E5E7EB']
     
     return Object.entries(projectRevenue)
       .map(([name, value], i) => ({ name, value, color: colors[i % colors.length] }))
@@ -454,23 +443,13 @@ export default function CashFlowPage() {
       .slice(0, 5)
   }, [filteredInvoices, projects])
 
-  // Recent transactions
-  const recentTransactions = useMemo(() => {
-    return transactions.slice(0, 8).map(tx => ({
-      ...tx,
-      formattedDate: formatDate(tx.date)
-    }))
-  }, [transactions])
-
-  // Expense category colors - subtle palette
-  const categoryColors: { [key: string]: string } = {
-    'Contractor Labor': '#EF4444',
-    'Rent & Utilities': '#F59E0B',
-    'Materials': '#10B981',
-    'Software & Subscriptions': '#6B7280',
-    'Travel & Entertainment': '#9CA3AF',
-    'Other': '#D1D5DB'
-  }
+  // Display transactions (limited unless expanded)
+  const displayTransactions = useMemo(() => {
+    const sorted = [...filteredTransactions].sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    )
+    return showAllTransactions ? sorted : sorted.slice(0, 5)
+  }, [filteredTransactions, showAllTransactions])
 
   if (loading) {
     return (
@@ -485,140 +464,121 @@ export default function CashFlowPage() {
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      {/* Header - with proper spacing */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Cash Flow</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Real-time cash position & profitability</p>
+          <p className="text-sm text-gray-500 mt-1">Real-time cash position & profitability</p>
         </div>
         
         <div className="flex items-center gap-2">
           {/* Year selector */}
-          <select 
-            value={selectedYear} 
-            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-            className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200"
-          >
-            {years.map(year => (
-              <option key={year} value={year}>{year}</option>
-            ))}
-          </select>
+          <div className="relative">
+            <select 
+              value={selectedYear} 
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              className="appearance-none bg-white border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer"
+            >
+              {years.map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
           
           {/* Month selector */}
-          <select 
-            value={selectedMonth} 
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200"
-          >
-            {months.map(month => (
-              <option key={month} value={month}>{month}</option>
-            ))}
-          </select>
+          <div className="relative">
+            <select 
+              value={selectedMonth} 
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="appearance-none bg-white border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer"
+            >
+              {months.map(month => (
+                <option key={month} value={month}>{month}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
 
           {/* Sync button */}
-          <button className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+          <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors">
             <RefreshCw size={14} />
             Sync QBO
           </button>
 
           {/* Add Entry */}
-          <button className="flex items-center gap-2 px-3 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors">
+          <button className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors shadow-sm">
             <Plus size={14} />
             Add Entry
           </button>
         </div>
       </div>
 
-      {/* KPI Row */}
-      <div className="grid grid-cols-12 gap-4 mb-6">
-        <div className="col-span-12 lg:col-span-9">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <KPICard
-              label="Cash on Hand"
-              value={formatCurrency(metrics.cashOnHand)}
-              subValue="Bank accounts"
-              icon={Wallet}
-              valueColor="text-emerald-600"
-            />
-            <KPICard
-              label="Credit Card Debt"
-              value={formatCurrency(metrics.creditCardDebt)}
-              subValue={`${accounts.filter(a => a.account_type === 'credit_card').length} cards`}
-              icon={CreditCard}
-              valueColor="text-red-500"
-            />
-            <KPICard
-              label="Net Position"
-              value={formatCurrency(metrics.netPosition)}
-              subValue="Cash - CC debt"
-              trend={metrics.revenueChange}
-              trendLabel="vs last month"
-              icon={DollarSign}
-              valueColor={metrics.netPosition >= 0 ? 'text-emerald-600' : 'text-red-500'}
-            />
-            <KPICard
-              label="Gross Margin"
-              value={`${metrics.grossMargin.toFixed(1)}%`}
-              subValue={formatCurrency(metrics.grossProfit)}
-              icon={Percent}
-              valueColor={metrics.grossMargin >= 30 ? 'text-emerald-600' : metrics.grossMargin >= 15 ? 'text-amber-500' : 'text-red-500'}
-            />
-          </div>
-        </div>
-
-        {/* Accounts Panel */}
-        <div className="col-span-12 lg:col-span-3">
-          <Section title="Accounts" action={{ label: '+ Add', onClick: () => {} }}>
-            <div className="max-h-36 overflow-y-auto">
-              {accounts.length > 0 ? (
-                accounts.map((acc, i) => (
-                  <AccountRow
-                    key={i}
-                    name={acc.name}
-                    balance={parseFloat(acc.balance) || 0}
-                    type={acc.account_type === 'credit_card' ? 'credit' : acc.account_type === 'savings' ? 'savings' : 'checking'}
-                    isManual={acc.is_manual}
-                  />
-                ))
-              ) : (
-                <p className="text-sm text-gray-400 text-center py-4">No accounts connected</p>
-              )}
-            </div>
-          </Section>
-        </div>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard
+          label="Cash on Hand"
+          value={formatCurrency(metrics.cashOnHand)}
+          subValue="Bank accounts"
+          icon={Wallet}
+          valueColor="text-emerald-600"
+        />
+        <MetricCard
+          label="Credit Card Debt"
+          value={formatCurrency(metrics.creditCardDebt)}
+          subValue="Outstanding balance"
+          icon={CreditCard}
+          valueColor="text-red-500"
+        />
+        <MetricCard
+          label="Net Position"
+          value={formatCurrency(metrics.netPosition)}
+          subValue="Cash - CC debt"
+          trend={metrics.revenueChange}
+          trendLabel="vs last month"
+          icon={DollarSign}
+          valueColor={metrics.netPosition >= 0 ? 'text-emerald-600' : 'text-red-500'}
+        />
+        <MetricCard
+          label="Gross Margin"
+          value={`${metrics.grossMargin.toFixed(1)}%`}
+          subValue={formatCurrency(metrics.grossProfit)}
+          icon={Percent}
+          valueColor={metrics.grossMargin >= 30 ? 'text-emerald-600' : metrics.grossMargin >= 15 ? 'text-amber-500' : 'text-red-500'}
+        />
       </div>
 
       {/* P&L + Revenue by Project */}
-      <div className="grid grid-cols-12 gap-4 mb-6">
+      <div className="grid grid-cols-12 gap-6">
         {/* Profit & Loss */}
         <div className="col-span-12 lg:col-span-8">
           <Section title="Profit & Loss" subtitle={`${selectedMonth} ${selectedYear}`}>
-            <div className="space-y-0">
-              <PLRow label="Revenue" value={metrics.revenue} percentage={100} color="positive" />
-              <PLRow label="Contractor Labor" value={metrics.directCosts} percentage={metrics.revenue > 0 ? (metrics.directCosts / metrics.revenue) * 100 : 0} color="negative" indent />
-              <div className="border-t border-gray-200 my-2" />
-              <PLRow label="Gross Profit" value={metrics.grossProfit} percentage={metrics.grossMargin} color={metrics.grossProfit >= 0 ? 'positive' : 'negative'} />
-              <PLRow label="Overhead" value={metrics.overhead} percentage={metrics.revenue > 0 ? (metrics.overhead / metrics.revenue) * 100 : 0} color="muted" indent />
-              <div className="border-t border-gray-200 my-2" />
-              <PLRow label="Net Profit" value={metrics.netProfit} percentage={metrics.netMargin} color={metrics.netProfit >= 0 ? 'positive' : 'negative'} />
+            <div className="divide-y divide-gray-100">
+              <PLRow label="Revenue" value={metrics.revenue} percentage={100} type="positive" bold />
+              <PLRow label="Contractor Labor" value={metrics.directCosts} percentage={metrics.revenue > 0 ? (metrics.directCosts / metrics.revenue) * 100 : 0} type="negative" indent />
+              <div className="h-px bg-gray-200 my-1" />
+              <PLRow label="Gross Profit" value={metrics.grossProfit} percentage={metrics.grossMargin} type={metrics.grossProfit >= 0 ? 'positive' : 'negative'} bold />
+              <PLRow label="Overhead" value={metrics.overhead} percentage={metrics.revenue > 0 ? (metrics.overhead / metrics.revenue) * 100 : 0} type="muted" indent />
+              <div className="h-px bg-gray-200 my-1" />
+              <PLRow label="Net Profit" value={metrics.netProfit} percentage={metrics.netMargin} type={metrics.netProfit >= 0 ? 'positive' : 'negative'} bold />
             </div>
           </Section>
         </div>
 
         {/* Revenue by Project */}
         <div className="col-span-12 lg:col-span-4">
-          <Section title="Revenue by Project" action={{ label: '+ Add', href: '/projects' }}>
+          <Section title="Revenue by Project" action={{ label: 'View All', href: '/projects' }}>
             {revenueByProject.length > 0 ? (
               <>
-                <div className="h-40 mb-4">
+                <div className="h-44 -mx-2">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
                         data={revenueByProject}
                         cx="50%"
                         cy="50%"
-                        innerRadius={40}
-                        outerRadius={65}
+                        innerRadius={45}
+                        outerRadius={70}
                         paddingAngle={2}
                         dataKey="value"
                       >
@@ -630,21 +590,21 @@ export default function CashFlowPage() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2.5 mt-2">
                   {revenueByProject.map((project, i) => (
                     <div key={i} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: project.color }} />
-                        <span className="text-gray-600 truncate max-w-28">{project.name}</span>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: project.color }} />
+                        <span className="text-gray-600 truncate">{project.name}</span>
                       </div>
-                      <span className="font-medium text-gray-900 tabular-nums">{formatCurrency(project.value)}</span>
+                      <span className="font-semibold text-gray-900 tabular-nums shrink-0 ml-3">{formatCurrency(project.value)}</span>
                     </div>
                   ))}
                 </div>
               </>
             ) : (
-              <div className="flex items-center justify-center h-40 text-gray-400 text-sm">
-                No project revenue data
+              <div className="flex items-center justify-center h-44 text-gray-400 text-sm">
+                No project revenue this period
               </div>
             )}
           </Section>
@@ -652,55 +612,78 @@ export default function CashFlowPage() {
       </div>
 
       {/* Expense Breakdown */}
-      <div className="mb-6">
-        <Section title="Expense Breakdown" subtitle="Direct costs vs. overhead">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {Object.entries(metrics.expenseByCategory).length > 0 ? (
-              Object.entries(metrics.expenseByCategory)
-                .sort(([,a], [,b]) => b - a)
-                .slice(0, 5)
-                .map(([category, amount], i) => (
-                  <ExpenseCard
-                    key={i}
-                    category={category}
-                    amount={amount}
-                    color={categoryColors[category] || '#6B7280'}
-                  />
-                ))
-            ) : (
-              <div className="col-span-5 text-center py-8 text-gray-400 text-sm">
-                No expenses for this period
-              </div>
-            )}
+      {Object.keys(metrics.expenseByCategory).length > 0 && (
+        <Section title="Expense Breakdown" subtitle="By vendor/description">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {Object.entries(metrics.expenseByCategory)
+              .sort(([,a], [,b]) => b - a)
+              .slice(0, 5)
+              .map(([category, amount], i) => {
+                const colors = ['#EF4444', '#F59E0B', '#10B981', '#6B7280', '#9CA3AF']
+                return (
+                  <div key={i} className="bg-gray-50 border border-gray-100 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: colors[i] }} />
+                      <span className="text-xs text-gray-500 truncate">{category}</span>
+                    </div>
+                    <span className="text-lg font-semibold text-gray-900">{formatCurrency(amount)}</span>
+                  </div>
+                )
+              })}
           </div>
         </Section>
-      </div>
+      )}
 
-      {/* Transactions */}
-      <Section title="Transactions" action={{ label: 'View All', href: '/transactions' }} noPadding>
+      {/* Transactions - Collapsible */}
+      <Section 
+        title="Transactions" 
+        subtitle={`${filteredTransactions.length} this period`}
+        collapsible
+        defaultExpanded={true}
+        badge={filteredTransactions.length}
+        noPadding
+      >
         <div>
           {/* Header */}
-          <div className="flex items-center px-5 py-2 bg-gray-50 border-b border-gray-200">
-            <div className="flex-1 text-xs font-medium text-gray-400 uppercase tracking-wider">Description</div>
-            <div className="w-24 text-xs font-medium text-gray-400 uppercase tracking-wider">Date</div>
-            <div className="w-24 text-xs font-medium text-gray-400 uppercase tracking-wider">Account</div>
-            <div className="w-28 text-xs font-medium text-gray-400 uppercase tracking-wider text-right">Amount</div>
+          <div className="flex items-center px-6 py-3 bg-gray-50 border-b border-gray-200">
+            <div className="flex-1 text-xs font-medium text-gray-500 uppercase tracking-wider">Description</div>
+            <div className="w-24 text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:block">Date</div>
+            <div className="w-32 text-xs font-medium text-gray-500 uppercase tracking-wider text-right">Amount</div>
           </div>
+          
           {/* Rows */}
-          {recentTransactions.length > 0 ? (
-            recentTransactions.map((tx, i) => (
-              <div key={i} className="flex items-center px-5 py-3 bg-white border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                <div className="flex-1 text-sm text-gray-800 truncate">{tx.description || tx.name || 'Transaction'}</div>
-                <div className="w-24 text-sm text-gray-500">{tx.formattedDate}</div>
-                <div className="w-24 text-sm text-gray-500 truncate">{tx.account_name || '—'}</div>
-                <div className={`w-28 text-sm font-medium text-right tabular-nums ${(parseFloat(tx.amount) || 0) < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
-                  {formatCurrency(parseFloat(tx.amount) || 0)}
+          {displayTransactions.length > 0 ? (
+            <>
+              {displayTransactions.map((tx, i) => (
+                <div key={i} className="flex items-center px-6 py-3.5 bg-white border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800 truncate">{tx.description || tx.name || 'Transaction'}</p>
+                    <p className="text-xs text-gray-400 sm:hidden">{formatDate(tx.date)}</p>
+                  </div>
+                  <div className="w-24 text-sm text-gray-500 hidden sm:block">{formatDate(tx.date)}</div>
+                  <div className={`w-32 text-sm font-semibold text-right tabular-nums ${(parseFloat(tx.amount) || 0) < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                    {formatCurrency(parseFloat(tx.amount) || 0)}
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+              
+              {/* Show more/less toggle */}
+              {filteredTransactions.length > 5 && (
+                <button 
+                  onClick={() => setShowAllTransactions(!showAllTransactions)}
+                  className="w-full px-6 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1"
+                >
+                  {showAllTransactions ? (
+                    <>Show Less <ChevronUp size={14} /></>
+                  ) : (
+                    <>Show All {filteredTransactions.length} Transactions <ChevronDown size={14} /></>
+                  )}
+                </button>
+              )}
+            </>
           ) : (
             <div className="flex items-center justify-center py-12 text-gray-400 text-sm">
-              No transactions found
+              No transactions this period
             </div>
           )}
         </div>
