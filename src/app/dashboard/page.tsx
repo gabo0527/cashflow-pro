@@ -98,7 +98,7 @@ function MetricCard({
 }) {
   const content = (
     <div 
-      className="bg-white border border-gray-200 rounded-xl p-5 transition-all duration-200 hover:shadow-md hover:border-gray-300 h-full"
+      className="bg-white border border-gray-200 rounded-xl p-5 transition-all duration-200 hover:shadow-md hover:border-gray-300"
       style={{ boxShadow: THEME.cardShadow }}
     >
       <div className="flex items-start justify-between">
@@ -130,7 +130,7 @@ function MetricCard({
     </div>
   )
   
-  if (href) return <Link href={href} className="block h-full">{content}</Link>
+  if (href) return <Link href={href} className="block">{content}</Link>
   return content
 }
 
@@ -152,16 +152,12 @@ function Section({
 }) {
   return (
     <div 
-      className="rounded-xl h-full flex flex-col"
+      className="rounded-xl flex flex-col"
       style={{ 
         backgroundColor: '#FFFFFF',
         border: '1px solid #E5E7EB',
         boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.04)',
-        position: 'relative',
-        zIndex: 1,
         overflow: 'hidden',
-        contain: 'layout paint',
-        isolation: 'isolate',
       }}
     >
       <div 
@@ -190,8 +186,8 @@ function Section({
         )}
       </div>
       <div 
-        className={`flex-1 ${noPadding ? '' : 'p-5'}`}
-        style={{ backgroundColor: '#FFFFFF', overflow: 'hidden' }}
+        className={noPadding ? '' : 'p-5'}
+        style={{ backgroundColor: '#FFFFFF' }}
       >
         {children}
       </div>
@@ -667,7 +663,7 @@ export default function DashboardPage() {
         {/* Revenue vs Expenses */}
         <div className="col-span-12 lg:col-span-8">
           <Section title="Revenue vs Expenses" subtitle="Monthly comparison">
-            <div className="h-64 overflow-hidden">
+            <div className="h-64">
               {revenueExpenseData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={revenueExpenseData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
@@ -747,19 +743,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Charts Row 2 */}
-      <div 
-        className="grid grid-cols-12 gap-4 pb-6"
-        style={{ 
-          position: 'relative', 
-          zIndex: 20,
-          backgroundColor: '#F9FAFB',
-          marginBottom: '1px', // Force repaint
-        }}
-      >
+      <div className="grid grid-cols-12 gap-4 mb-6">
         {/* Team Utilization */}
-        <div className="col-span-12 lg:col-span-6" style={{ position: 'relative', zIndex: 1 }}>
+        <div className="col-span-12 lg:col-span-6">
           <Section title="Team Utilization" subtitle="Hours logged this period" action={{ label: 'View Team', href: '/team' }}>
-            <div className="min-h-[200px]">
+            <div>
               {teamUtilization.length > 0 ? (
                 <div>
                   {teamUtilization.map((member, i) => (
@@ -781,9 +769,9 @@ export default function DashboardPage() {
         </div>
 
         {/* Cash Forecast */}
-        <div className="col-span-12 lg:col-span-6" style={{ position: 'relative', zIndex: 1 }}>
+        <div className="col-span-12 lg:col-span-6">
           <Section title="90-Day Cash Forecast" subtitle="Projected cash position">
-            <div className="h-48 overflow-hidden" style={{ backgroundColor: '#FFFFFF', position: 'relative' }}>
+            <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={cashForecastData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                   <defs>
@@ -801,7 +789,7 @@ export default function DashboardPage() {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-gray-100" style={{ backgroundColor: '#FFFFFF' }}>
+            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-gray-100">>
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: THEME.chart.primary }} />
                 <span className="text-xs text-gray-400">Projected</span>
@@ -816,18 +804,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Bottom Row */}
-      <div 
-        className="grid grid-cols-12 gap-4 mt-6"
-        style={{ 
-          position: 'relative', 
-          zIndex: 1,
-          contain: 'layout paint',
-        }}
-      >
+      <div className="grid grid-cols-12 gap-4">
         {/* Alerts */}
         <div className="col-span-12 lg:col-span-4">
           <Section title="Alerts" badge={alerts.filter(a => a.type !== 'success').length || undefined}>
-            <div className="space-y-2 min-h-[180px]">
+            <div className="space-y-2">
               {alerts.map((alert, i) => (
                 <AlertRow key={i} {...alert} />
               ))}
@@ -838,11 +819,11 @@ export default function DashboardPage() {
         {/* Open Invoices */}
         <div className="col-span-12 lg:col-span-8">
           <Section title="Open Invoices" badge={metrics.openInvoicesCount} action={{ label: 'View All', href: '/invoices' }} noPadding>
-            <div className="min-h-[180px]">
+            <div>
               {recentInvoices.length > 0 ? (
                 <div>
                   {/* Header */}
-                  <div className="flex items-center px-5 py-2 bg-gray-50" style={{ borderBottom: '1px solid #E5E7EB' }}>
+                  <div className="flex items-center px-5 py-2 bg-gray-50 border-b border-gray-200">
                     <div className="flex-1 text-xs font-medium text-gray-400 uppercase tracking-wider">Client</div>
                     <div className="w-24 text-xs font-medium text-gray-400 uppercase tracking-wider">Invoice</div>
                     <div className="w-24 text-xs font-medium text-gray-400 uppercase tracking-wider">Due</div>
@@ -851,7 +832,7 @@ export default function DashboardPage() {
                   </div>
                   {/* Rows */}
                   {recentInvoices.map((inv) => (
-                    <div key={inv.id} className="flex items-center px-5 py-3 hover:bg-gray-50 transition-colors" style={{ backgroundColor: '#FFFFFF', borderBottom: '1px solid #F9FAFB' }}>
+                    <div key={inv.id} className="flex items-center px-5 py-3 bg-white border-b border-gray-50 hover:bg-gray-50 transition-colors">
                       <div className="flex-1 text-sm text-gray-800 font-medium truncate">{inv.client_name || '—'}</div>
                       <div className="w-24 text-sm text-gray-500">{inv.invoice_number || inv.doc_number || 'Draft'}</div>
                       <div className="w-24 text-sm text-gray-500">{formatDate(inv.due_date)}</div>
