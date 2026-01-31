@@ -1,1396 +1,157 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
-import { 
-  Search, Filter, Download, ChevronDown, ChevronUp, Plus, Edit2, X, 
-  Users, Mail, Phone, Calendar, Eye, EyeOff, Building2, Briefcase,
-  FolderOpen, DollarSign, Clock, Trash2
-} from 'lucide-react'
-import { supabase, getCurrentUser, fetchProjects } from '@/lib/supabase'
+import { Search, Filter, Download, ChevronDown, ChevronUp, Plus, Edit2, X, Users, Mail, Phone, Eye, EyeOff, Briefcase, DollarSign, Trash2, BarChart3, FileText, Layers } from 'lucide-react'
+import { supabase, getCurrentUser } from '@/lib/supabase'
 
 // Types
-interface TeamMember {
-  id: string
-  name: string
-  email: string
-  phone: string | null
-  role: string | null
-  status: 'active' | 'inactive'
-  start_date: string | null
-  services: string[]
-  bank_name: string | null
-  account_type: string | null
-  routing_number: string | null
-  account_number: string | null
-  payment_method: string | null
-  cost_type: 'hourly' | 'monthly' | 'annual'
-  cost_amount: number
-}
+interface TeamMember { id: string; name: string; email: string; phone: string | null; role: string | null; status: 'active' | 'inactive'; start_date: string | null; services: string[]; bank_name: string | null; account_type: string | null; routing_number: string | null; account_number: string | null; payment_method: string | null; cost_type: string | null; cost_amount: number | null }
+interface ProjectAssignment { id: string; team_member_id: string; project_id: string; project_name: string; client_name: string; client_id: string; service: string | null; payment_type: 'lump_sum' | 'tm'; rate: number }
+interface ContractorSchedule { id: string; company_id: string; team_member_id: string; client_id: string | null; project_id: string | null; schedule_name: string; cost_type: 'Lump Sum' | 'T&M'; cost_amount: number; allocation_method: 'auto' | 'fixed_percent' | 'fixed_amount'; allocation_value: number | null; effective_start: string; effective_end: string | null; notes: string | null; is_active: boolean; client_name?: string; project_name?: string; team_member_name?: string }
+interface ResourceGroup { id: string; company_id: string; name: string; prime_contractor_name: string | null; client_id: string | null; project_id: string | null; cost_type: 'Lump Sum' | 'T&M'; cost_amount: number; effective_start: string; effective_end: string | null; notes: string | null; is_active: boolean; client_name?: string; project_name?: string; members?: ResourceGroupMember[] }
+interface ResourceGroupMember { id: string; resource_group_id: string; team_member_id: string; proposed_hours: number; cost_allocation_percent: number | null; is_active: boolean; team_member_name?: string }
+interface Project { id: string; name: string; client: string; client_id: string }
+interface Client { id: string; name: string }
+interface TimeEntry { id: string; team_member_id: string; project_id: string; client_id: string; date: string; hours: number; bill_rate: number }
 
-interface ProjectAssignment {
-  id: string
-  team_member_id: string
-  project_id: string
-  project_name: string
-  client_name: string
-  service: string | null
-  payment_type: 'lump_sum' | 'tm'
-  rate: number
-}
+// Constants
+const TABS = [{ id: 'directory', label: 'Directory', icon: Users }, { id: 'schedules', label: 'Schedules', icon: FileText }, { id: 'groups', label: 'Resource Groups', icon: Layers }, { id: 'profitability', label: 'Profitability', icon: BarChart3 }]
+const SERVICES = ['Project Management', 'Procurement & Supply Chain', 'Project Controls', 'LDD & Permitting', 'Design Management']
+const STATUS_OPTIONS = [{ id: 'active', label: 'Active' }, { id: 'inactive', label: 'Inactive' }]
+const PAYMENT_TYPES = [{ id: 'lump_sum', label: 'Lump Sum' }, { id: 'tm', label: 'T&M' }]
+const COST_TYPES = [{ id: 'Lump Sum', label: 'Lump Sum' }, { id: 'T&M', label: 'T&M' }]
+const ALLOCATION_METHODS = [{ id: 'auto', label: 'Auto (by hours)' }, { id: 'fixed_percent', label: 'Fixed %' }, { id: 'fixed_amount', label: 'Fixed $' }]
+const ACCOUNT_TYPES = [{ id: 'checking', label: 'Checking' }, { id: 'savings', label: 'Savings' }]
+const PAYMENT_METHODS = [{ id: 'direct_deposit', label: 'Direct Deposit' }, { id: 'check', label: 'Check' }, { id: 'wire', label: 'Wire Transfer' }]
 
-interface Project {
-  id: string
-  name: string
-  client: string
-}
-
-interface TimeEntrySummary {
-  team_member_id: string
-  total_hours: number
-}
-
-interface TimeEntryDetail {
-  team_member_id: string
-  project_id: string
-  client_id: string | null
-  client_name: string
-  hours: number
-}
-
-interface ClientAllocation {
-  client_id: string
-  client_name: string
-  hours: number
-  percentage: number
-  cost: number
-}
-
-const SERVICES = [
-  'Project Management',
-  'Procurement & Supply Chain',
-  'Project Controls',
-  'LDD & Permitting',
-  'Design Management',
-]
-
-const STATUS_OPTIONS = [
-  { id: 'active', label: 'Active', color: 'emerald' },
-  { id: 'inactive', label: 'Inactive', color: 'slate' },
-]
-
-const PAYMENT_TYPES = [
-  { id: 'lump_sum', label: 'Lump Sum' },
-  { id: 'tm', label: 'T&M' },
-]
-
-const ACCOUNT_TYPES = [
-  { id: 'checking', label: 'Checking' },
-  { id: 'savings', label: 'Savings' },
-]
-
-const PAYMENT_METHODS = [
-  { id: 'direct_deposit', label: 'Direct Deposit' },
-  { id: 'check', label: 'Check' },
-  { id: 'wire', label: 'Wire Transfer' },
-]
-
-const COST_TYPES = [
-  { id: 'monthly', label: 'Monthly' },
-  { id: 'hourly', label: 'Hourly' },
-  { id: 'annual', label: 'Annual' },
-]
-
-const ALLOCATION_COLORS = [
-  'bg-emerald-500',
-  'bg-blue-500',
-  'bg-purple-500',
-  'bg-amber-500',
-  'bg-rose-500',
-  'bg-cyan-500',
-  'bg-pink-500',
-  'bg-indigo-500',
-]
-
-const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(value)
-}
-
-const maskNumber = (value: string | null): string => {
-  if (!value) return '—'
-  if (value.length <= 4) return '••••'
-  return '••••' + value.slice(-4)
-}
-
-const getStatusStyle = (status: string) => {
-  const styles: Record<string, { bg: string; text: string }> = {
-    active: { bg: 'bg-emerald-500/20', text: 'text-emerald-500' },
-    inactive: { bg: 'bg-slate-500/20', text: 'text-slate-400' },
-  }
-  return styles[status] || styles.active
-}
-
-// Collapsible Section Component
-function CollapsibleSection({ 
-  title, 
-  children, 
-  defaultExpanded = true,
-  badge,
-  icon
-}: { 
-  title: string
-  children: React.ReactNode
-  defaultExpanded?: boolean
-  badge?: string | number
-  icon?: React.ReactNode
-}) {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded)
-  
-  return (
-    <div className="rounded-xl border bg-slate-800 border-slate-700 overflow-hidden">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-700/50 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          {icon && <span className="text-slate-400">{icon}</span>}
-          <h3 className="text-sm font-medium text-slate-100">{title}</h3>
-          {badge !== undefined && (
-            <span className="px-2 py-0.5 text-xs rounded-full bg-slate-700 text-slate-300">
-              {badge}
-            </span>
-          )}
-        </div>
-        {isExpanded ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
-      </button>
-      {isExpanded && <div className="px-4 pb-4 pt-1">{children}</div>}
-    </div>
-  )
-}
+// Utilities
+const formatCurrency = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
+const maskNumber = (v: string | null) => !v ? '—' : v.length <= 4 ? '••••' : '••••' + v.slice(-4)
+const getStatusStyle = (s: string) => s === 'active' ? { bg: 'bg-emerald-500/20', text: 'text-emerald-500' } : { bg: 'bg-slate-500/20', text: 'text-slate-400' }
+const getMarginColor = (m: number) => m >= 35 ? { bg: 'bg-emerald-500/20', text: 'text-emerald-400', icon: '🟢' } : m >= 20 ? { bg: 'bg-amber-500/20', text: 'text-amber-400', icon: '🟡' } : { bg: 'bg-rose-500/20', text: 'text-rose-400', icon: '🔴' }
+const getMonthStart = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+const getMonthLabel = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
 
 export default function TeamPage() {
-  // Data state
   const [loading, setLoading] = useState(true)
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [assignments, setAssignments] = useState<ProjectAssignment[]>([])
   const [projects, setProjects] = useState<Project[]>([])
-  const [hoursSummary, setHoursSummary] = useState<TimeEntrySummary[]>([])
-  const [timeEntryDetails, setTimeEntryDetails] = useState<TimeEntryDetail[]>([])
+  const [clients, setClients] = useState<Client[]>([])
+  const [schedules, setSchedules] = useState<ContractorSchedule[]>([])
+  const [resourceGroups, setResourceGroups] = useState<ResourceGroup[]>([])
+  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [companyId, setCompanyId] = useState<string | null>(null)
-  const [clients, setClients] = useState<{id: string, name: string}[]>([])
-
-  // Filter state
+  const [activeTab, setActiveTab] = useState('directory')
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedStatus, setSelectedStatus] = useState<string>('all')
+  const [selectedStatus, setSelectedStatus] = useState('all')
   const [showFilters, setShowFilters] = useState(false)
-
-  // Modal state
   const [showMemberModal, setShowMemberModal] = useState(false)
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [showGroupModal, setShowGroupModal] = useState(false)
   const [showAssignmentsModal, setShowAssignmentsModal] = useState<TeamMember | null>(null)
   const [showBankingModal, setShowBankingModal] = useState<TeamMember | null>(null)
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
-  const [expandedMember, setExpandedMember] = useState<string | null>(null)
-
-  // Banking visibility
+  const [editingSchedule, setEditingSchedule] = useState<ContractorSchedule | null>(null)
+  const [editingGroup, setEditingGroup] = useState<ResourceGroup | null>(null)
+  const [selectedMonth1, setSelectedMonth1] = useState(getMonthStart(new Date()))
+  const [selectedMonth2, setSelectedMonth2] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return getMonthStart(d) })
+  const [expandedMembers, setExpandedMembers] = useState<Set<string>>(new Set())
   const [visibleBanking, setVisibleBanking] = useState<Record<string, boolean>>({})
+  const [formData, setFormData] = useState({ name: '', email: '', phone: '', role: '', status: 'active', start_date: '', services: [] as string[], bank_name: '', account_type: '', routing_number: '', account_number: '', payment_method: '', cost_type: 'Lump Sum', cost_amount: '' })
+  const [scheduleForm, setScheduleForm] = useState({ team_member_id: '', client_id: '', project_id: '', schedule_name: '', cost_type: 'Lump Sum' as const, cost_amount: '', allocation_method: 'auto' as const, allocation_value: '', effective_start: new Date().toISOString().split('T')[0], effective_end: '', notes: '' })
+  const [groupForm, setGroupForm] = useState({ name: '', prime_contractor_name: '', client_id: '', project_id: '', cost_type: 'Lump Sum' as const, cost_amount: '', effective_start: new Date().toISOString().split('T')[0], effective_end: '', notes: '', members: [] as { team_member_id: string; proposed_hours: string }[] })
+  const [assignmentForm, setAssignmentForm] = useState({ project_id: '', service: '', payment_type: 'tm' as const, rate: '' })
 
-  // Form state
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    role: '',
-    status: 'active',
-    start_date: '',
-    services: [] as string[],
-    bank_name: '',
-    account_type: '',
-    routing_number: '',
-    account_number: '',
-    payment_method: '',
-    cost_type: 'monthly' as 'hourly' | 'monthly' | 'annual',
-    cost_amount: '',
-  })
-
-  // Assignment form state
-  const [assignmentForm, setAssignmentForm] = useState({
-    project_id: '',
-    service: '',
-    payment_type: 'tm' as 'lump_sum' | 'tm',
-    rate: '',
-  })
-
-  // Load data
   useEffect(() => {
     const loadData = async () => {
       try {
         const { user } = await getCurrentUser()
         if (!user) return
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single()
-
-        if (!profile?.company_id) {
-          setLoading(false)
-          return
-        }
-
+        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
+        if (!profile?.company_id) { setLoading(false); return }
         setCompanyId(profile.company_id)
-
-        // Fetch team members
-        const { data: teamData } = await supabase
-          .from('team_members')
-          .select('*')
-          .eq('company_id', profile.company_id)
-          .order('name')
-
-        // Fetch projects using helper
-        const { data: projData, error: projError } = await fetchProjects(profile.company_id)
-        
-        console.log('Projects fetched:', projData?.length, 'Error:', projError)
-        
-        if (projError) {
-          console.error('Error fetching projects:', projError)
-        }
-
-        // Fetch project assignments (simplified - no join)
-        const { data: assignData, error: assignError } = await supabase
-          .from('team_project_assignments')
-          .select('*')
-          .eq('company_id', profile.company_id)
-
-        console.log('Assignments fetched:', assignData?.length, 'Error:', assignError)
-
-        // Fetch hours summary for current month
-        const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
-        const { data: hoursData, error: hoursError } = await supabase
-          .from('time_entries')
-          .select('contractor_id, project_id, hours')
-          .eq('company_id', profile.company_id)
-          .gte('date', startOfMonth)
-
-        console.log('Hours fetched:', hoursData?.length, 'Error:', hoursError)
-
-        // Fetch clients for allocation
-        const { data: clientsData } = await supabase
-          .from('clients')
-          .select('id, name')
-          .eq('company_id', profile.company_id)
-
-        // Aggregate hours by team member
-        const hoursMap: Record<string, number> = {}
-        ;(hoursData || []).forEach((entry: any) => {
-          const memberId = entry.contractor_id
-          hoursMap[memberId] = (hoursMap[memberId] || 0) + (entry.hours || 0)
-        })
-        const hoursSummaryData = Object.entries(hoursMap).map(([id, hours]) => ({
-          team_member_id: id,
-          total_hours: hours,
-        }))
-
-        // Build detailed time entries for allocation (by client)
-        const timeDetailMap: Record<string, TimeEntryDetail[]> = {}
-        ;(hoursData || []).forEach((entry: any) => {
-          const memberId = entry.contractor_id
-          const project = (projData || []).find((p: any) => p.id === entry.project_id) as any
-          const clientId = project?.client_id || 'unknown'
-          const clientName = (clientsData || []).find((c: any) => c.id === clientId)?.name || project?.client || 'Unassigned'
-          
-          if (!timeDetailMap[memberId]) timeDetailMap[memberId] = []
-          
-          const existing = timeDetailMap[memberId].find(d => d.client_id === clientId)
-          if (existing) {
-            existing.hours += entry.hours || 0
-          } else {
-            timeDetailMap[memberId].push({
-              team_member_id: memberId,
-              project_id: entry.project_id,
-              client_id: clientId,
-              client_name: clientName,
-              hours: entry.hours || 0,
-            })
-          }
-        })
-        const timeDetails = Object.values(timeDetailMap).flat()
-
-        // Transform team members
-        const transformedMembers = (teamData || []).map((t: any) => ({
-          id: t.id,
-          name: t.name || '',
-          email: t.email || '',
-          phone: t.phone || null,
-          role: t.role || null,
-          status: t.status || 'active',
-          start_date: t.start_date || null,
-          services: t.services || [],
-          bank_name: t.bank_name || null,
-          account_type: t.account_type || null,
-          routing_number: t.routing_number || null,
-          account_number: t.account_number || null,
-          payment_method: t.payment_method || null,
-          cost_type: t.cost_type || 'monthly',
-          cost_amount: t.cost_amount || 0,
-        }))
-
-        // Transform assignments (look up project names from projData)
-        const transformedAssignments = (assignData || []).map((a: any) => {
-          const project = (projData || []).find((p: any) => p.id === a.project_id) as any
-          return {
-            id: a.id,
-            team_member_id: a.team_member_id,
-            project_id: a.project_id,
-            project_name: project?.name || 'Unknown Project',
-            client_name: project?.client || '',
-            service: a.service || null,
-            payment_type: a.payment_type || 'tm',
-            rate: a.rate || 0,
-          }
-        })
-
-        setTeamMembers(transformedMembers)
-        const transformedProjects = (projData || []).map((p: any) => ({ id: p.id, name: p.name || '', client: p.client || '' }))
-        console.log('Setting projects state:', transformedProjects.length, transformedProjects)
-        setProjects(transformedProjects)
-        setAssignments(transformedAssignments)
-        setHoursSummary(hoursSummaryData)
-        setTimeEntryDetails(timeDetails)
-        setClients((clientsData || []).map((c: any) => ({ id: c.id, name: c.name })))
-      } catch (error) {
-        console.error('Error loading data:', error)
-      } finally {
+        const [membersRes, projectsRes, clientsRes, assignmentsRes, schedulesRes, groupsRes] = await Promise.all([
+          supabase.from('team_members').select('*').eq('company_id', profile.company_id).order('name'),
+          supabase.from('projects').select('id, name, client, client_id').eq('company_id', profile.company_id).order('name'),
+          supabase.from('clients').select('id, name').eq('company_id', profile.company_id).order('name'),
+          supabase.from('team_project_assignments').select('id, team_member_id, project_id, service, payment_type, rate, projects(name, client, client_id)').eq('company_id', profile.company_id),
+          supabase.from('contractor_schedules').select('*, team_members(name), clients(name), projects(name)').eq('company_id', profile.company_id).order('created_at', { ascending: false }),
+          supabase.from('resource_groups').select('*, clients(name), projects(name), resource_group_members(*, team_members(name))').eq('company_id', profile.company_id).order('created_at', { ascending: false })
+        ])
+        if (membersRes.data) setTeamMembers(membersRes.data)
+        if (projectsRes.data) setProjects(projectsRes.data)
+        if (clientsRes.data) setClients(clientsRes.data)
+        if (assignmentsRes.data) setAssignments(assignmentsRes.data.map((a: any) => ({ ...a, project_name: a.projects?.name || '', client_name: a.projects?.client || '', client_id: a.projects?.client_id || '' })))
+        if (schedulesRes.data) setSchedules(schedulesRes.data.map((s: any) => ({ ...s, team_member_name: s.team_members?.name, client_name: s.clients?.name, project_name: s.projects?.name })))
+        if (groupsRes.data) setResourceGroups(groupsRes.data.map((g: any) => ({ ...g, client_name: g.clients?.name, project_name: g.projects?.name, members: g.resource_group_members?.map((m: any) => ({ ...m, team_member_name: m.team_members?.name })) || [] })))
+        const twoMonthsAgo = new Date(); twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2)
+        const { data: timeData } = await supabase.from('time_entries').select('id, team_member_id, project_id, date, hours').eq('company_id', profile.company_id).gte('date', twoMonthsAgo.toISOString().split('T')[0])
+        if (timeData && assignmentsRes.data) setTimeEntries(timeData.map((e: any) => { const a = assignmentsRes.data.find((x: any) => x.team_member_id === e.team_member_id && x.project_id === e.project_id); const p = projectsRes.data?.find((x: any) => x.id === e.project_id); return { ...e, client_id: p?.client_id || '', bill_rate: a?.rate || 0 } }))
         setLoading(false)
-      }
+      } catch (err) { console.error(err); setLoading(false) }
     }
     loadData()
   }, [])
 
-  // Filtered team members
-  const filteredMembers = useMemo(() => {
-    return teamMembers.filter(member => {
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase()
-        if (!member.name?.toLowerCase().includes(query) && 
-            !member.email?.toLowerCase().includes(query) &&
-            !member.role?.toLowerCase().includes(query)) return false
-      }
-      if (selectedStatus !== 'all' && member.status !== selectedStatus) return false
-      return true
-    })
-  }, [teamMembers, searchQuery, selectedStatus])
+  const filteredMembers = useMemo(() => teamMembers.filter(m => (m.name.toLowerCase().includes(searchQuery.toLowerCase()) || m.email.toLowerCase().includes(searchQuery.toLowerCase())) && (selectedStatus === 'all' || m.status === selectedStatus)), [teamMembers, searchQuery, selectedStatus])
+  const activeMembers = useMemo(() => teamMembers.filter(m => m.status === 'active'), [teamMembers])
+  const getMemberAssignments = (id: string) => assignments.filter(a => a.team_member_id === id)
+  const getMemberHoursForMonth = (id: string, monthStart: string) => { const end = new Date(monthStart); end.setMonth(end.getMonth() + 1); return timeEntries.filter(e => e.team_member_id === id && e.date >= monthStart && e.date < end.toISOString().split('T')[0]).reduce((s, e) => s + e.hours, 0) }
+  const getMemberRevenueForMonth = (id: string, monthStart: string) => { const end = new Date(monthStart); end.setMonth(end.getMonth() + 1); return timeEntries.filter(e => e.team_member_id === id && e.date >= monthStart && e.date < end.toISOString().split('T')[0]).reduce((s, e) => s + e.hours * e.bill_rate, 0) }
+  const getMemberCostForMonth = (id: string, monthStart: string) => { const m = teamMembers.find(x => x.id === id); if (!m) return 0; for (const g of resourceGroups) { const gm = g.members?.find(x => x.team_member_id === id && x.is_active); if (gm && g.is_active) { const total = g.members?.reduce((s, x) => s + (x.is_active ? x.proposed_hours : 0), 0) || 1; return g.cost_amount * (gm.proposed_hours / total) } } const ms = schedules.filter(s => s.team_member_id === id && s.is_active && s.effective_start <= monthStart && (!s.effective_end || s.effective_end >= monthStart)); if (ms.length > 0) return ms.reduce((s, x) => s + (x.cost_type === 'Lump Sum' ? x.cost_amount : getMemberHoursForMonth(id, monthStart) * x.cost_amount), 0); if (m.cost_amount) return m.cost_type === 'T&M' ? getMemberHoursForMonth(id, monthStart) * m.cost_amount : m.cost_amount; return 0 }
+  const summaryStats = useMemo(() => { const cost = activeMembers.reduce((s, m) => s + getMemberCostForMonth(m.id, selectedMonth1), 0); const hrs = activeMembers.reduce((s, m) => s + getMemberHoursForMonth(m.id, selectedMonth1), 0); return { active: activeMembers.length, totalCost: cost, totalHours: hrs, costPerHour: hrs > 0 ? cost / hrs : 0 } }, [activeMembers, selectedMonth1, timeEntries, schedules, resourceGroups])
+  const profitabilityData = useMemo(() => activeMembers.map(m => { const h1 = getMemberHoursForMonth(m.id, selectedMonth1), r1 = getMemberRevenueForMonth(m.id, selectedMonth1), c1 = getMemberCostForMonth(m.id, selectedMonth1); const h2 = getMemberHoursForMonth(m.id, selectedMonth2), r2 = getMemberRevenueForMonth(m.id, selectedMonth2), c2 = getMemberCostForMonth(m.id, selectedMonth2); return { id: m.id, name: m.name, role: m.role, month1: { hours: h1, revenue: r1, cost: c1, margin: r1 > 0 ? ((r1 - c1) / r1) * 100 : c1 > 0 ? -100 : 0 }, month2: { hours: h2, revenue: r2, cost: c2, margin: r2 > 0 ? ((r2 - c2) / r2) * 100 : c2 > 0 ? -100 : 0 } } }).sort((a, b) => b.month1.revenue - a.month1.revenue), [activeMembers, selectedMonth1, selectedMonth2])
 
-  // Summary
-  const summary = useMemo(() => {
-    const active = teamMembers.filter(m => m.status === 'active').length
-    const totalHours = hoursSummary.reduce((sum, h) => sum + h.total_hours, 0)
-    
-    // Calculate total monthly labor cost
-    const totalMonthlyCost = teamMembers.filter(m => m.status === 'active').reduce((sum, m) => {
-      if (m.cost_type === 'monthly') return sum + (m.cost_amount || 0)
-      if (m.cost_type === 'annual') return sum + ((m.cost_amount || 0) / 12)
-      if (m.cost_type === 'hourly') {
-        const hours = hoursSummary.find(h => h.team_member_id === m.id)?.total_hours || 0
-        return sum + (hours * (m.cost_amount || 0))
-      }
-      return sum
-    }, 0)
-    
-    const costPerHour = totalHours > 0 ? totalMonthlyCost / totalHours : 0
-    
-    return {
-      total: teamMembers.length,
-      active,
-      totalHours,
-      totalMonthlyCost,
-      costPerHour,
-    }
-  }, [teamMembers, hoursSummary])
+  const resetForm = () => setFormData({ name: '', email: '', phone: '', role: '', status: 'active', start_date: '', services: [], bank_name: '', account_type: '', routing_number: '', account_number: '', payment_method: '', cost_type: 'Lump Sum', cost_amount: '' })
+  const resetScheduleForm = () => setScheduleForm({ team_member_id: '', client_id: '', project_id: '', schedule_name: '', cost_type: 'Lump Sum', cost_amount: '', allocation_method: 'auto', allocation_value: '', effective_start: new Date().toISOString().split('T')[0], effective_end: '', notes: '' })
+  const resetGroupForm = () => setGroupForm({ name: '', prime_contractor_name: '', client_id: '', project_id: '', cost_type: 'Lump Sum', cost_amount: '', effective_start: new Date().toISOString().split('T')[0], effective_end: '', notes: '', members: [] })
+  const openEditMember = (m: TeamMember) => { setEditingMember(m); setFormData({ name: m.name, email: m.email, phone: m.phone || '', role: m.role || '', status: m.status, start_date: m.start_date || '', services: m.services || [], bank_name: m.bank_name || '', account_type: m.account_type || '', routing_number: m.routing_number || '', account_number: m.account_number || '', payment_method: m.payment_method || '', cost_type: m.cost_type || 'Lump Sum', cost_amount: m.cost_amount?.toString() || '' }); setShowMemberModal(true) }
+  const openEditSchedule = (s: ContractorSchedule) => { setEditingSchedule(s); setScheduleForm({ team_member_id: s.team_member_id, client_id: s.client_id || '', project_id: s.project_id || '', schedule_name: s.schedule_name, cost_type: s.cost_type, cost_amount: s.cost_amount.toString(), allocation_method: s.allocation_method, allocation_value: s.allocation_value?.toString() || '', effective_start: s.effective_start, effective_end: s.effective_end || '', notes: s.notes || '' }); setShowScheduleModal(true) }
+  const openEditGroup = (g: ResourceGroup) => { setEditingGroup(g); setGroupForm({ name: g.name, prime_contractor_name: g.prime_contractor_name || '', client_id: g.client_id || '', project_id: g.project_id || '', cost_type: g.cost_type, cost_amount: g.cost_amount.toString(), effective_start: g.effective_start, effective_end: g.effective_end || '', notes: g.notes || '', members: g.members?.map(x => ({ team_member_id: x.team_member_id, proposed_hours: x.proposed_hours.toString() })) || [] }); setShowGroupModal(true) }
 
-  // Get member hours
-  const getMemberHours = (memberId: string): number => {
-    return hoursSummary.find(h => h.team_member_id === memberId)?.total_hours || 0
-  }
+  const saveMember = async () => { if (!companyId || !formData.name || !formData.email) return; const data = { company_id: companyId, name: formData.name, email: formData.email, phone: formData.phone || null, role: formData.role || null, status: formData.status, start_date: formData.start_date || null, services: formData.services, bank_name: formData.bank_name || null, account_type: formData.account_type || null, routing_number: formData.routing_number || null, account_number: formData.account_number || null, payment_method: formData.payment_method || null, cost_type: formData.cost_type || null, cost_amount: formData.cost_amount ? parseFloat(formData.cost_amount) : null }; if (editingMember) { await supabase.from('team_members').update(data).eq('id', editingMember.id); setTeamMembers(p => p.map(m => m.id === editingMember.id ? { ...m, ...data } as TeamMember : m)) } else { const { data: n } = await supabase.from('team_members').insert(data).select().single(); if (n) setTeamMembers(p => [...p, n]) }; setShowMemberModal(false); setEditingMember(null); resetForm() }
+  const saveSchedule = async () => { if (!companyId || !scheduleForm.team_member_id || !scheduleForm.schedule_name) return; const data = { company_id: companyId, team_member_id: scheduleForm.team_member_id, client_id: scheduleForm.client_id || null, project_id: scheduleForm.project_id || null, schedule_name: scheduleForm.schedule_name, cost_type: scheduleForm.cost_type, cost_amount: parseFloat(scheduleForm.cost_amount) || 0, allocation_method: scheduleForm.allocation_method, allocation_value: scheduleForm.allocation_value ? parseFloat(scheduleForm.allocation_value) : null, effective_start: scheduleForm.effective_start, effective_end: scheduleForm.effective_end || null, notes: scheduleForm.notes || null, is_active: true }; const mem = teamMembers.find(x => x.id === scheduleForm.team_member_id), cli = clients.find(x => x.id === scheduleForm.client_id), prj = projects.find(x => x.id === scheduleForm.project_id); if (editingSchedule) { await supabase.from('contractor_schedules').update(data).eq('id', editingSchedule.id); setSchedules(p => p.map(s => s.id === editingSchedule.id ? { ...s, ...data, team_member_name: mem?.name, client_name: cli?.name, project_name: prj?.name } : s)) } else { const { data: n } = await supabase.from('contractor_schedules').insert(data).select().single(); if (n) setSchedules(p => [{ ...n, team_member_name: mem?.name, client_name: cli?.name, project_name: prj?.name }, ...p]) }; setShowScheduleModal(false); setEditingSchedule(null); resetScheduleForm() }
+  const saveResourceGroup = async () => { if (!companyId || !groupForm.name) return; const data = { company_id: companyId, name: groupForm.name, prime_contractor_name: groupForm.prime_contractor_name || null, client_id: groupForm.client_id || null, project_id: groupForm.project_id || null, cost_type: groupForm.cost_type, cost_amount: parseFloat(groupForm.cost_amount) || 0, effective_start: groupForm.effective_start, effective_end: groupForm.effective_end || null, notes: groupForm.notes || null, is_active: true }; if (editingGroup) { await supabase.from('resource_groups').update(data).eq('id', editingGroup.id); await supabase.from('resource_group_members').delete().eq('resource_group_id', editingGroup.id); if (groupForm.members.length > 0) await supabase.from('resource_group_members').insert(groupForm.members.map(m => ({ resource_group_id: editingGroup.id, team_member_id: m.team_member_id, proposed_hours: parseFloat(m.proposed_hours) || 160, is_active: true, effective_start: groupForm.effective_start }))); const { data: u } = await supabase.from('resource_groups').select('*, clients(name), projects(name), resource_group_members(*, team_members(name))').eq('id', editingGroup.id).single(); if (u) setResourceGroups(p => p.map(g => g.id === editingGroup.id ? { ...u, client_name: u.clients?.name, project_name: u.projects?.name, members: u.resource_group_members?.map((m: any) => ({ ...m, team_member_name: m.team_members?.name })) || [] } : g)) } else { const { data: n } = await supabase.from('resource_groups').insert(data).select().single(); if (n) { if (groupForm.members.length > 0) await supabase.from('resource_group_members').insert(groupForm.members.map(m => ({ resource_group_id: n.id, team_member_id: m.team_member_id, proposed_hours: parseFloat(m.proposed_hours) || 160, is_active: true, effective_start: groupForm.effective_start }))); const { data: ng } = await supabase.from('resource_groups').select('*, clients(name), projects(name), resource_group_members(*, team_members(name))').eq('id', n.id).single(); if (ng) setResourceGroups(p => [{ ...ng, client_name: ng.clients?.name, project_name: ng.projects?.name, members: ng.resource_group_members?.map((m: any) => ({ ...m, team_member_name: m.team_members?.name })) || [] }, ...p]) } }; setShowGroupModal(false); setEditingGroup(null); resetGroupForm() }
+  const deleteSchedule = async (id: string) => { if (!confirm('Delete?')) return; await supabase.from('contractor_schedules').delete().eq('id', id); setSchedules(p => p.filter(s => s.id !== id)) }
+  const deleteResourceGroup = async (id: string) => { if (!confirm('Delete?')) return; await supabase.from('resource_groups').delete().eq('id', id); setResourceGroups(p => p.filter(g => g.id !== id)) }
+  const addAssignment = async () => { if (!showAssignmentsModal || !assignmentForm.project_id || !companyId) return; const p = projects.find(x => x.id === assignmentForm.project_id); const { data } = await supabase.from('team_project_assignments').insert({ company_id: companyId, team_member_id: showAssignmentsModal.id, project_id: assignmentForm.project_id, service: assignmentForm.service || null, payment_type: assignmentForm.payment_type, rate: parseFloat(assignmentForm.rate) || 0 }).select().single(); if (data) { setAssignments(prev => [...prev, { ...data, project_name: p?.name || '', client_name: p?.client || '', client_id: p?.client_id || '' }]); setAssignmentForm({ project_id: '', service: '', payment_type: 'tm', rate: '' }) } }
+  const removeAssignment = async (id: string) => { await supabase.from('team_project_assignments').delete().eq('id', id); setAssignments(p => p.filter(a => a.id !== id)) }
+  const exportCSV = () => { const h = ['Name', 'Email', 'Role', 'Status', 'Cost Type', 'Cost Amount']; const r = filteredMembers.map(m => [m.name, m.email, m.role || '', m.status, m.cost_type || '', m.cost_amount?.toString() || '']); const csv = [h.join(','), ...r.map(x => x.map(c => `"${c}"`).join(','))].join('\n'); const b = new Blob([csv], { type: 'text/csv' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'team.csv'; a.click() }
 
-  // Get member assignments
-  const getMemberAssignments = (memberId: string): ProjectAssignment[] => {
-    return assignments.filter(a => a.team_member_id === memberId)
-  }
-
-  // Get member monthly cost
-  const getMemberMonthlyCost = (member: TeamMember): number => {
-    if (member.cost_type === 'monthly') return member.cost_amount || 0
-    if (member.cost_type === 'annual') return (member.cost_amount || 0) / 12
-    if (member.cost_type === 'hourly') {
-      const hours = getMemberHours(member.id)
-      return hours * (member.cost_amount || 0)
-    }
-    return 0
-  }
-
-  // Get member client allocation
-  const getMemberAllocation = (memberId: string): ClientAllocation[] => {
-    const memberEntries = timeEntryDetails.filter(e => e.team_member_id === memberId)
-    const totalHours = memberEntries.reduce((sum, e) => sum + e.hours, 0)
-    const member = teamMembers.find(m => m.id === memberId)
-    const monthlyCost = member ? getMemberMonthlyCost(member) : 0
-    
-    // Group by client
-    const clientMap: Record<string, { hours: number, name: string }> = {}
-    memberEntries.forEach(e => {
-      if (!clientMap[e.client_id || 'unknown']) {
-        clientMap[e.client_id || 'unknown'] = { hours: 0, name: e.client_name }
-      }
-      clientMap[e.client_id || 'unknown'].hours += e.hours
-    })
-    
-    return Object.entries(clientMap)
-      .map(([clientId, data]) => ({
-        client_id: clientId,
-        client_name: data.name,
-        hours: data.hours,
-        percentage: totalHours > 0 ? (data.hours / totalHours) * 100 : 0,
-        cost: totalHours > 0 ? (data.hours / totalHours) * monthlyCost : 0,
-      }))
-      .sort((a, b) => b.percentage - a.percentage)
-  }
-
-  // Get total cost by client (for CEO view)
-  const getCostByClient = useMemo(() => {
-    const clientCosts: Record<string, { name: string, cost: number, hours: number }> = {}
-    
-    teamMembers.filter(m => m.status === 'active').forEach(member => {
-      const allocation = getMemberAllocation(member.id)
-      allocation.forEach(a => {
-        if (!clientCosts[a.client_id]) {
-          clientCosts[a.client_id] = { name: a.client_name, cost: 0, hours: 0 }
-        }
-        clientCosts[a.client_id].cost += a.cost
-        clientCosts[a.client_id].hours += a.hours
-      })
-    })
-    
-    return Object.entries(clientCosts)
-      .map(([id, data]) => ({ id, ...data }))
-      .sort((a, b) => b.cost - a.cost)
-  }, [teamMembers, timeEntryDetails])
-
-  // Form handlers
-  const openAddMember = () => {
-    setEditingMember(null)
-    setFormData({
-      name: '', email: '', phone: '', role: '', status: 'active', start_date: '',
-      services: [], bank_name: '', account_type: '', routing_number: '', account_number: '', payment_method: '',
-      cost_type: 'monthly', cost_amount: '',
-    })
-    setShowMemberModal(true)
-  }
-
-  const openEditMember = (member: TeamMember) => {
-    setEditingMember(member)
-    setFormData({
-      name: member.name,
-      email: member.email,
-      phone: member.phone || '',
-      role: member.role || '',
-      status: member.status,
-      start_date: member.start_date || '',
-      services: member.services || [],
-      bank_name: member.bank_name || '',
-      account_type: member.account_type || '',
-      routing_number: member.routing_number || '',
-      account_number: member.account_number || '',
-      payment_method: member.payment_method || '',
-      cost_type: member.cost_type || 'monthly',
-      cost_amount: member.cost_amount?.toString() || '',
-    })
-    setShowMemberModal(true)
-  }
-
-  const saveMember = async () => {
-    if (!companyId || !formData.name || !formData.email) return
-
-    try {
-      const memberData = {
-        company_id: companyId,
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone || null,
-        role: formData.role || null,
-        status: formData.status,
-        start_date: formData.start_date || null,
-        services: formData.services,
-        bank_name: formData.bank_name || null,
-        account_type: formData.account_type || null,
-        routing_number: formData.routing_number || null,
-        account_number: formData.account_number || null,
-        payment_method: formData.payment_method || null,
-        cost_type: formData.cost_type,
-        cost_amount: parseFloat(formData.cost_amount) || 0,
-      }
-
-      if (editingMember) {
-        const { error } = await supabase
-          .from('team_members')
-          .update(memberData)
-          .eq('id', editingMember.id)
-
-        if (error) throw error
-
-        setTeamMembers(prev => prev.map(m => 
-          m.id === editingMember.id ? { ...m, ...memberData } as TeamMember : m
-        ))
-      } else {
-        const { data, error } = await supabase
-          .from('team_members')
-          .insert(memberData)
-          .select()
-          .single()
-
-        if (error) throw error
-
-        setTeamMembers(prev => [...prev, data as TeamMember])
-      }
-
-      setShowMemberModal(false)
-    } catch (error) {
-      console.error('Error saving member:', error)
-    }
-  }
-
-  const archiveMember = async (memberId: string) => {
-    try {
-      const { error } = await supabase
-        .from('team_members')
-        .update({ status: 'inactive' })
-        .eq('id', memberId)
-
-      if (error) throw error
-
-      setTeamMembers(prev => prev.map(m => 
-        m.id === memberId ? { ...m, status: 'inactive' as const } : m
-      ))
-    } catch (error) {
-      console.error('Error archiving member:', error)
-    }
-  }
-
-  // Assignment handlers
-  const openAssignments = (member: TeamMember) => {
-    setShowAssignmentsModal(member)
-    setAssignmentForm({ project_id: '', service: '', payment_type: 'tm', rate: '' })
-  }
-
-  const addAssignment = async () => {
-    if (!companyId || !showAssignmentsModal || !assignmentForm.project_id) return
-
-    try {
-      const project = projects.find(p => p.id === assignmentForm.project_id)
-      const assignmentData = {
-        company_id: companyId,
-        team_member_id: showAssignmentsModal.id,
-        project_id: assignmentForm.project_id,
-        service: assignmentForm.service || null,
-        payment_type: assignmentForm.payment_type,
-        rate: parseFloat(assignmentForm.rate) || 0,
-      }
-
-      const { data, error } = await supabase
-        .from('team_project_assignments')
-        .insert(assignmentData)
-        .select()
-        .single()
-
-      if (error) throw error
-
-      const newAssignment: ProjectAssignment = {
-        id: data.id,
-        team_member_id: data.team_member_id,
-        project_id: data.project_id,
-        project_name: project?.name || '',
-        client_name: project?.client || '',
-        service: data.service,
-        payment_type: data.payment_type,
-        rate: data.rate,
-      }
-
-      setAssignments(prev => [...prev, newAssignment])
-      setAssignmentForm({ project_id: '', service: '', payment_type: 'tm', rate: '' })
-    } catch (error) {
-      console.error('Error adding assignment:', error)
-    }
-  }
-
-  const removeAssignment = async (assignmentId: string) => {
-    try {
-      const { error } = await supabase
-        .from('team_project_assignments')
-        .delete()
-        .eq('id', assignmentId)
-
-      if (error) throw error
-
-      setAssignments(prev => prev.filter(a => a.id !== assignmentId))
-    } catch (error) {
-      console.error('Error removing assignment:', error)
-    }
-  }
-
-  // Toggle service
-  const toggleService = (service: string) => {
-    setFormData(prev => ({
-      ...prev,
-      services: prev.services.includes(service)
-        ? prev.services.filter(s => s !== service)
-        : [...prev.services, service]
-    }))
-  }
-
-  // Export
-  const exportToExcel = () => {
-    const headers = ['Name', 'Email', 'Phone', 'Role', 'Status', 'Start Date', 'Services', 'Hours (MTD)']
-    const rows = teamMembers.map(m => [
-      m.name, m.email, m.phone || '', m.role || '', m.status, m.start_date || '',
-      (m.services || []).join('; '), getMemberHours(m.id)
-    ])
-    const csvContent = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `team-directory-${new Date().toISOString().split('T')[0]}.csv`
-    link.click()
-  }
-
-  const clearFilters = () => {
-    setSearchQuery('')
-    setSelectedStatus('all')
-  }
-
-  const hasActiveFilters = searchQuery || selectedStatus !== 'all'
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500" /></div>
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-100">Team</h1>
-          <p className="text-sm mt-1 text-slate-400">Manage team directory and project assignments</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={exportToExcel}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors"
-          >
-            <Download size={18} />
-            Export
-          </button>
-          <button
-            onClick={openAddMember}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-medium transition-colors"
-          >
-            <Plus size={18} />
-            Add Member
-          </button>
+    <div className="min-h-screen bg-slate-900 p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div><h1 className="text-2xl font-bold text-slate-100">Team</h1><p className="text-slate-400 text-sm">Manage directory, costs & profitability</p></div>
+        <div className="flex gap-2">
+          <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium"><Download size={16} /> Export</button>
+          {activeTab === 'directory' && <button onClick={() => { resetForm(); setEditingMember(null); setShowMemberModal(true) }} className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 rounded-lg text-sm font-medium"><Plus size={16} /> Add Member</button>}
+          {activeTab === 'schedules' && <button onClick={() => { resetScheduleForm(); setEditingSchedule(null); setShowScheduleModal(true) }} className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 rounded-lg text-sm font-medium"><Plus size={16} /> Add Schedule</button>}
+          {activeTab === 'groups' && <button onClick={() => { resetGroupForm(); setEditingGroup(null); setShowGroupModal(true) }} className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 rounded-lg text-sm font-medium"><Plus size={16} /> Add Group</button>}
         </div>
       </div>
+      <div className="flex gap-2 mb-6">{TABS.map(t => <button key={t.id} onClick={() => setActiveTab(t.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${activeTab === t.id ? 'bg-orange-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}><t.icon size={16} />{t.label}</button>)}</div>
+      {(activeTab === 'directory' || activeTab === 'profitability') && <div className="grid grid-cols-5 gap-4 mb-6"><div className="bg-slate-800 border border-slate-700 rounded-xl p-4"><p className="text-slate-400 text-xs mb-1">Total Members</p><p className="text-2xl font-bold text-slate-100">{teamMembers.length}</p></div><div className="bg-slate-800 border border-slate-700 rounded-xl p-4"><p className="text-slate-400 text-xs mb-1">Active</p><p className="text-2xl font-bold text-emerald-400">{summaryStats.active}</p></div><div className="bg-slate-800 border border-slate-700 rounded-xl p-4"><p className="text-slate-400 text-xs mb-1">Hours (MTD)</p><p className="text-2xl font-bold text-blue-400">{summaryStats.totalHours.toFixed(1)}</p></div><div className="bg-slate-800 border border-slate-700 rounded-xl p-4"><p className="text-slate-400 text-xs mb-1">Labor Cost (MTD)</p><p className="text-2xl font-bold text-orange-400">{formatCurrency(summaryStats.totalCost)}</p></div><div className="bg-slate-800 border border-slate-700 rounded-xl p-4"><p className="text-slate-400 text-xs mb-1">Cost/Hour</p><p className="text-2xl font-bold text-purple-400">{formatCurrency(summaryStats.costPerHour)}</p></div></div>}
 
-      {/* Summary Cards */}
-      <CollapsibleSection title="Summary" badge={`${summary.active} active`} icon={<Users size={16} />}>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <div className="p-4 rounded-lg bg-slate-900/50">
-            <p className="text-xs font-medium text-slate-400">Total Members</p>
-            <p className="text-xl font-semibold mt-1 text-slate-100">{summary.total}</p>
-          </div>
-          <div className="p-4 rounded-lg bg-slate-900/50">
-            <p className="text-xs font-medium text-slate-400">Active</p>
-            <p className="text-xl font-semibold mt-1 text-emerald-500">{summary.active}</p>
-          </div>
-          <div className="p-4 rounded-lg bg-slate-900/50">
-            <p className="text-xs font-medium text-slate-400">Hours (MTD)</p>
-            <p className="text-xl font-semibold mt-1 text-blue-500">{summary.totalHours.toFixed(1)}</p>
-          </div>
-          <div className="p-4 rounded-lg bg-slate-900/50">
-            <p className="text-xs font-medium text-slate-400">Labor Cost (MTD)</p>
-            <p className="text-xl font-semibold mt-1 text-amber-500">{formatCurrency(summary.totalMonthlyCost)}</p>
-          </div>
-          <div className="p-4 rounded-lg bg-slate-900/50">
-            <p className="text-xs font-medium text-slate-400">Cost per Hour</p>
-            <p className="text-xl font-semibold mt-1 text-purple-500">{formatCurrency(summary.costPerHour)}</p>
-          </div>
-        </div>
-      </CollapsibleSection>
+      {activeTab === 'directory' && <div className="space-y-4"><div className="flex items-center gap-4"><div className="relative flex-1"><Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type="text" placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100" /></div><button onClick={() => setShowFilters(!showFilters)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm ${showFilters ? 'bg-slate-700' : 'bg-slate-800'}`}><Filter size={16} /> Filters</button></div>{showFilters && <div className="p-4 bg-slate-800 border border-slate-700 rounded-lg"><label className="text-xs text-slate-400">Status</label><select value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)} className="ml-2 px-3 py-1 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100"><option value="all">All</option>{STATUS_OPTIONS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}</select></div>}<div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden"><table className="w-full"><thead><tr className="border-b border-slate-700"><th className="text-left px-4 py-3 text-xs font-medium text-slate-400">Name</th><th className="text-left px-4 py-3 text-xs font-medium text-slate-400">Role</th><th className="text-left px-4 py-3 text-xs font-medium text-slate-400">Projects</th><th className="text-left px-4 py-3 text-xs font-medium text-slate-400">Status</th><th className="text-right px-4 py-3 text-xs font-medium text-slate-400">Hours</th><th className="text-right px-4 py-3 text-xs font-medium text-slate-400">Cost</th><th className="text-right px-4 py-3 text-xs font-medium text-slate-400">Actions</th></tr></thead><tbody>{filteredMembers.map(m => { const ma = getMemberAssignments(m.id), mh = getMemberHoursForMonth(m.id, selectedMonth1), mc = getMemberCostForMonth(m.id, selectedMonth1), ss = getStatusStyle(m.status), exp = expandedMembers.has(m.id); return (<React.Fragment key={m.id}><tr className="border-b border-slate-700/50 hover:bg-slate-700/30 cursor-pointer" onClick={() => setExpandedMembers(p => { const n = new Set(p); n.has(m.id) ? n.delete(m.id) : n.add(m.id); return n })}><td className="px-4 py-3"><div className="flex items-center gap-3"><button className="text-slate-400">{exp ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</button><div><p className="text-slate-100 font-medium">{m.name}</p><p className="text-xs text-slate-400">{m.cost_type === 'Lump Sum' ? formatCurrency(m.cost_amount || 0) + '/mo' : m.cost_type === 'T&M' ? formatCurrency(m.cost_amount || 0) + '/hr' : '—'}</p></div></div></td><td className="px-4 py-3 text-sm text-slate-300">{m.role || '—'}</td><td className="px-4 py-3 text-sm text-blue-400">{ma.length} projects</td><td className="px-4 py-3"><span className={`px-2 py-1 text-xs rounded-full ${ss.bg} ${ss.text}`}>{m.status}</span></td><td className="px-4 py-3 text-right text-sm text-slate-300">{mh.toFixed(1)}</td><td className="px-4 py-3 text-right text-sm text-orange-400 font-medium">{formatCurrency(mc)}</td><td className="px-4 py-3"><div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}><button onClick={() => openEditMember(m)} className="p-1.5 rounded hover:bg-slate-600"><Edit2 size={14} className="text-slate-400" /></button><button onClick={() => setShowAssignmentsModal(m)} className="p-1.5 rounded hover:bg-slate-600"><Briefcase size={14} className="text-slate-400" /></button><button onClick={() => setShowBankingModal(m)} className="p-1.5 rounded hover:bg-slate-600"><DollarSign size={14} className="text-slate-400" /></button></div></td></tr>{exp && <tr className="bg-slate-900/50"><td colSpan={7} className="px-4 py-4"><div className="pl-8 flex gap-8"><div><p className="text-xs text-slate-400 mb-1">CONTACT</p><p className="text-sm text-slate-300 flex items-center gap-2"><Mail size={14} />{m.email}</p>{m.phone && <p className="text-sm text-slate-300 flex items-center gap-2"><Phone size={14} />{m.phone}</p>}</div><div><p className="text-xs text-slate-400 mb-1">PROJECTS</p>{ma.length > 0 ? ma.map(a => <p key={a.id} className="text-sm text-slate-300">{a.client_name} - {a.project_name} ({formatCurrency(a.rate)}{a.payment_type === 'tm' ? '/hr' : '/mo'})</p>) : <p className="text-sm text-slate-500">No assignments</p>}</div></div></td></tr>}</React.Fragment>) })}</tbody></table></div></div>}
 
-      {/* CEO View - Cost by Client */}
-      <CollapsibleSection title="Cost Distribution by Client" badge={`${getCostByClient.length} clients`} icon={<Building2 size={16} />} defaultExpanded={false}>
-        {getCostByClient.length > 0 ? (
-          <div className="space-y-3">
-            {getCostByClient.map((client, index) => {
-              const percentage = summary.totalMonthlyCost > 0 ? (client.cost / summary.totalMonthlyCost) * 100 : 0
-              return (
-                <div key={client.id} className="p-3 rounded-lg bg-slate-900/50">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${ALLOCATION_COLORS[index % ALLOCATION_COLORS.length]}`} />
-                      <span className="font-medium text-slate-100">{client.name}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-slate-100 font-medium">{formatCurrency(client.cost)}</span>
-                      <span className="text-slate-400 text-sm ml-2">({percentage.toFixed(1)}%)</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full ${ALLOCATION_COLORS[index % ALLOCATION_COLORS.length]} transition-all`}
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-slate-400 w-20 text-right">{client.hours.toFixed(1)} hrs</span>
-                  </div>
-                </div>
-              )
-            })}
-            <div className="pt-3 border-t border-slate-700 flex justify-between">
-              <span className="text-slate-400 font-medium">Total</span>
-              <span className="text-slate-100 font-semibold">{formatCurrency(summary.totalMonthlyCost)}</span>
-            </div>
-          </div>
-        ) : (
-          <p className="text-slate-400 text-center py-4">No time entries this month to calculate allocation</p>
-        )}
-      </CollapsibleSection>
+      {activeTab === 'schedules' && <div className="space-y-4"><p className="text-slate-400 text-sm mb-4">Individual contractor cost agreements per client/project.</p>{schedules.length === 0 ? <div className="bg-slate-800 border border-slate-700 rounded-xl p-8 text-center"><FileText size={48} className="mx-auto text-slate-600 mb-4" /><p className="text-slate-400 mb-4">No schedules yet</p><button onClick={() => { resetScheduleForm(); setShowScheduleModal(true) }} className="px-4 py-2 bg-orange-500 rounded-lg text-sm font-medium">Create First Schedule</button></div> : schedules.map(s => <div key={s.id} className="bg-slate-800 border border-slate-700 rounded-xl p-4"><div className="flex justify-between"><div><div className="flex items-center gap-3 mb-2"><h3 className="text-lg font-medium text-slate-100">{s.schedule_name}</h3><span className={`px-2 py-0.5 text-xs rounded ${s.cost_type === 'Lump Sum' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'}`}>{s.cost_type}</span></div><div className="grid grid-cols-4 gap-4 text-sm"><span className="text-slate-400">Employee: <span className="text-slate-100">{s.team_member_name}</span></span><span className="text-slate-400">Client: <span className="text-slate-100">{s.client_name || 'All'}</span></span><span className="text-slate-400">Cost: <span className="text-orange-400 font-medium">{formatCurrency(s.cost_amount)}{s.cost_type === 'T&M' ? '/hr' : '/mo'}</span></span><span className="text-slate-400">Allocation: <span className="text-slate-100">{s.allocation_method === 'auto' ? 'By Hours' : s.allocation_method === 'fixed_percent' ? `${s.allocation_value}%` : formatCurrency(s.allocation_value || 0)}</span></span></div><p className="mt-2 text-xs text-slate-500">Effective: {new Date(s.effective_start).toLocaleDateString()} → {s.effective_end ? new Date(s.effective_end).toLocaleDateString() : 'Ongoing'}</p></div><div className="flex gap-2"><button onClick={() => openEditSchedule(s)} className="p-2 rounded hover:bg-slate-700"><Edit2 size={16} className="text-slate-400" /></button><button onClick={() => deleteSchedule(s.id)} className="p-2 rounded hover:bg-slate-700"><Trash2 size={16} className="text-rose-400" /></button></div></div></div>)}</div>}
 
-      {/* Team Directory */}
-      <CollapsibleSection title="Directory" badge={filteredMembers.length} icon={<Briefcase size={16} />}>
-        {/* Search and Filters */}
-        <div className="space-y-3 mb-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search by name, email, or role..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-              />
-            </div>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${showFilters || hasActiveFilters ? 'bg-blue-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-100'}`}
-            >
-              <Filter size={16} />
-              Filters
-            </button>
-            {hasActiveFilters && (
-              <button onClick={clearFilters} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-100">
-                <X size={16} /> Clear
-              </button>
-            )}
-          </div>
+      {activeTab === 'groups' && <div className="space-y-4"><p className="text-slate-400 text-sm mb-4">Sub-contractor teams with distributed costs by proposed hours.</p>{resourceGroups.length === 0 ? <div className="bg-slate-800 border border-slate-700 rounded-xl p-8 text-center"><Layers size={48} className="mx-auto text-slate-600 mb-4" /><p className="text-slate-400 mb-4">No groups yet</p><button onClick={() => { resetGroupForm(); setShowGroupModal(true) }} className="px-4 py-2 bg-orange-500 rounded-lg text-sm font-medium">Create First Group</button></div> : resourceGroups.map(g => { const th = g.members?.reduce((s, m) => s + (m.is_active ? m.proposed_hours : 0), 0) || 0; return <div key={g.id} className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden"><div className="p-4 border-b border-slate-700 flex justify-between"><div><div className="flex items-center gap-3 mb-2"><Layers size={20} className="text-purple-400" /><h3 className="text-lg font-medium text-slate-100">{g.name}</h3><span className={`px-2 py-0.5 text-xs rounded ${g.cost_type === 'Lump Sum' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'}`}>{g.cost_type}</span></div><div className="grid grid-cols-4 gap-4 text-sm"><span className="text-slate-400">Prime: <span className="text-slate-100">{g.prime_contractor_name || '—'}</span></span><span className="text-slate-400">Client: <span className="text-slate-100">{g.client_name || 'All'}</span></span><span className="text-slate-400">Total: <span className="text-orange-400 font-medium">{formatCurrency(g.cost_amount)}/mo</span></span><span className="text-slate-400">Members: <span className="text-slate-100">{g.members?.filter(m => m.is_active).length || 0}</span></span></div></div><div className="flex gap-2"><button onClick={() => openEditGroup(g)} className="p-2 rounded hover:bg-slate-700"><Edit2 size={16} className="text-slate-400" /></button><button onClick={() => deleteResourceGroup(g.id)} className="p-2 rounded hover:bg-slate-700"><Trash2 size={16} className="text-rose-400" /></button></div></div>{g.members && g.members.length > 0 && <table className="w-full"><thead><tr className="border-b border-slate-700/50"><th className="text-left px-4 py-2 text-xs text-slate-400">Resource</th><th className="text-right px-4 py-2 text-xs text-slate-400">Proposed Hrs</th><th className="text-right px-4 py-2 text-xs text-slate-400">Allocation</th><th className="text-right px-4 py-2 text-xs text-slate-400">Cost/mo</th></tr></thead><tbody>{g.members.filter(m => m.is_active).map(m => { const pct = th > 0 ? (m.proposed_hours / th) * 100 : 0; return <tr key={m.id} className="border-b border-slate-700/30"><td className="px-4 py-2 text-sm text-slate-100">{m.team_member_name}</td><td className="px-4 py-2 text-sm text-slate-300 text-right">{m.proposed_hours}</td><td className="px-4 py-2 text-sm text-slate-300 text-right">{pct.toFixed(1)}%</td><td className="px-4 py-2 text-sm text-orange-400 text-right font-medium">{formatCurrency(g.cost_amount * pct / 100)}</td></tr> })}<tr className="bg-slate-900/50"><td className="px-4 py-2 text-sm text-slate-400 font-medium">TOTAL</td><td className="px-4 py-2 text-sm text-slate-100 text-right font-medium">{th}</td><td className="px-4 py-2 text-sm text-slate-100 text-right font-medium">100%</td><td className="px-4 py-2 text-sm text-orange-400 text-right font-medium">{formatCurrency(g.cost_amount)}</td></tr></tbody></table>}</div> })}</div>}
 
-          {showFilters && (
-            <div className="pt-3 border-t border-slate-700">
-              <div className="w-48">
-                <label className="block text-xs font-medium text-slate-400 mb-1">Status</label>
-                <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100">
-                  <option value="all">All</option>
-                  {STATUS_OPTIONS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                </select>
-              </div>
-            </div>
-          )}
-        </div>
+      {activeTab === 'profitability' && <div className="space-y-4"><div className="flex items-center gap-4 mb-4"><span className="text-slate-400 text-sm">Compare:</span><input type="month" value={selectedMonth1.substring(0, 7)} onChange={e => setSelectedMonth1(e.target.value + '-01')} className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100" /><span className="text-slate-400">vs</span><input type="month" value={selectedMonth2.substring(0, 7)} onChange={e => setSelectedMonth2(e.target.value + '-01')} className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100" /></div><div className="flex gap-4 text-xs text-slate-400 mb-2"><span>Margin:</span><span>🟢 ≥35%</span><span>🟡 20-34.99%</span><span>🔴 &lt;20%</span></div><div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden"><table className="w-full"><thead><tr className="border-b border-slate-700"><th className="text-left px-4 py-3 text-xs text-slate-400" rowSpan={2}>Employee</th><th className="text-center px-4 py-2 text-xs text-slate-300 border-l border-slate-700" colSpan={4}>{getMonthLabel(selectedMonth1)}</th><th className="text-center px-4 py-2 text-xs text-slate-300 border-l border-slate-700" colSpan={4}>{getMonthLabel(selectedMonth2)}</th></tr><tr className="border-b border-slate-700"><th className="text-right px-3 py-2 text-xs text-slate-400 border-l border-slate-700">Hours</th><th className="text-right px-3 py-2 text-xs text-slate-400">Revenue</th><th className="text-right px-3 py-2 text-xs text-slate-400">Cost</th><th className="text-right px-3 py-2 text-xs text-slate-400">Margin</th><th className="text-right px-3 py-2 text-xs text-slate-400 border-l border-slate-700">Hours</th><th className="text-right px-3 py-2 text-xs text-slate-400">Revenue</th><th className="text-right px-3 py-2 text-xs text-slate-400">Cost</th><th className="text-right px-3 py-2 text-xs text-slate-400">Margin</th></tr></thead><tbody>{profitabilityData.map(r => { const m1 = getMarginColor(r.month1.margin), m2 = getMarginColor(r.month2.margin); return <tr key={r.id} className="border-b border-slate-700/50 hover:bg-slate-700/30"><td className="px-4 py-3"><p className="text-slate-100 font-medium">{r.name}</p><p className="text-xs text-slate-400">{r.role || '—'}</p></td><td className="px-3 py-3 text-right text-sm text-slate-300 border-l border-slate-700">{r.month1.hours.toFixed(1)}</td><td className="px-3 py-3 text-right text-sm text-emerald-400">{formatCurrency(r.month1.revenue)}</td><td className="px-3 py-3 text-right text-sm text-orange-400">{formatCurrency(r.month1.cost)}</td><td className="px-3 py-3 text-right"><span className={`px-2 py-1 rounded text-sm ${m1.bg} ${m1.text}`}>{m1.icon} {r.month1.margin.toFixed(0)}%</span></td><td className="px-3 py-3 text-right text-sm text-slate-300 border-l border-slate-700">{r.month2.hours.toFixed(1)}</td><td className="px-3 py-3 text-right text-sm text-emerald-400">{formatCurrency(r.month2.revenue)}</td><td className="px-3 py-3 text-right text-sm text-orange-400">{formatCurrency(r.month2.cost)}</td><td className="px-3 py-3 text-right"><span className={`px-2 py-1 rounded text-sm ${m2.bg} ${m2.text}`}>{m2.icon} {r.month2.margin.toFixed(0)}%</span></td></tr> })}<tr className="bg-slate-900/50 font-medium"><td className="px-4 py-3 text-slate-100">TOTAL</td><td className="px-3 py-3 text-right text-sm text-slate-100 border-l border-slate-700">{profitabilityData.reduce((s, r) => s + r.month1.hours, 0).toFixed(1)}</td><td className="px-3 py-3 text-right text-sm text-emerald-400">{formatCurrency(profitabilityData.reduce((s, r) => s + r.month1.revenue, 0))}</td><td className="px-3 py-3 text-right text-sm text-orange-400">{formatCurrency(profitabilityData.reduce((s, r) => s + r.month1.cost, 0))}</td><td className="px-3 py-3 text-right">{(() => { const tr = profitabilityData.reduce((s, r) => s + r.month1.revenue, 0), tc = profitabilityData.reduce((s, r) => s + r.month1.cost, 0), tm = tr > 0 ? ((tr - tc) / tr) * 100 : 0, st = getMarginColor(tm); return <span className={`px-2 py-1 rounded text-sm ${st.bg} ${st.text}`}>{st.icon} {tm.toFixed(0)}%</span> })()}</td><td className="px-3 py-3 text-right text-sm text-slate-100 border-l border-slate-700">{profitabilityData.reduce((s, r) => s + r.month2.hours, 0).toFixed(1)}</td><td className="px-3 py-3 text-right text-sm text-emerald-400">{formatCurrency(profitabilityData.reduce((s, r) => s + r.month2.revenue, 0))}</td><td className="px-3 py-3 text-right text-sm text-orange-400">{formatCurrency(profitabilityData.reduce((s, r) => s + r.month2.cost, 0))}</td><td className="px-3 py-3 text-right">{(() => { const tr = profitabilityData.reduce((s, r) => s + r.month2.revenue, 0), tc = profitabilityData.reduce((s, r) => s + r.month2.cost, 0), tm = tr > 0 ? ((tr - tc) / tr) * 100 : 0, st = getMarginColor(tm); return <span className={`px-2 py-1 rounded text-sm ${st.bg} ${st.text}`}>{st.icon} {tm.toFixed(0)}%</span> })()}</td></tr></tbody></table></div></div>}
 
-        {/* Table */}
-        <div className="overflow-x-auto rounded-lg border border-slate-700">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-900/50">
-                <th className="px-4 py-3 text-left font-medium text-slate-400 w-8"></th>
-                <th className="px-4 py-3 text-left font-medium text-slate-400">Name</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-400">Role</th>
-                <th className="px-4 py-3 text-center font-medium text-slate-400">Projects</th>
-                <th className="px-4 py-3 text-center font-medium text-slate-400">Status</th>
-                <th className="px-4 py-3 text-right font-medium text-slate-400">Hours (MTD)</th>
-                <th className="px-4 py-3 text-right font-medium text-slate-400">Cost</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-400">Client Allocation</th>
-                <th className="px-4 py-3 text-center font-medium text-slate-400">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredMembers.length > 0 ? (
-                filteredMembers.map((member) => {
-                  const statusStyle = getStatusStyle(member.status)
-                  const memberAssignments = getMemberAssignments(member.id)
-                  const hours = getMemberHours(member.id)
-                  const monthlyCost = getMemberMonthlyCost(member)
-                  const allocation = getMemberAllocation(member.id)
-                  const isExpanded = expandedMember === member.id
+      {showMemberModal && <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"><div className="flex justify-between mb-4"><h3 className="text-lg font-semibold text-slate-100">{editingMember ? 'Edit Member' : 'Add Member'}</h3><button onClick={() => { setShowMemberModal(false); setEditingMember(null); resetForm() }} className="p-1 rounded hover:bg-slate-700"><X size={20} className="text-slate-400" /></button></div><div className="space-y-4"><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs text-slate-400 mb-1">Name *</label><input type="text" value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100" /></div><div><label className="block text-xs text-slate-400 mb-1">Email *</label><input type="email" value={formData.email} onChange={e => setFormData(p => ({ ...p, email: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100" /></div></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs text-slate-400 mb-1">Role</label><input type="text" value={formData.role} onChange={e => setFormData(p => ({ ...p, role: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100" /></div><div><label className="block text-xs text-slate-400 mb-1">Status</label><select value={formData.status} onChange={e => setFormData(p => ({ ...p, status: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100">{STATUS_OPTIONS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}</select></div></div><div className="border-t border-slate-700 pt-4"><h4 className="text-sm font-medium text-slate-300 mb-3">Cost</h4><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs text-slate-400 mb-1">Type</label><select value={formData.cost_type} onChange={e => setFormData(p => ({ ...p, cost_type: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100">{COST_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select></div><div><label className="block text-xs text-slate-400 mb-1">Amount ({formData.cost_type === 'T&M' ? '/hr' : '/mo'})</label><input type="number" value={formData.cost_amount} onChange={e => setFormData(p => ({ ...p, cost_amount: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100" /></div></div></div><div className="flex justify-end gap-3 pt-4"><button onClick={() => { setShowMemberModal(false); setEditingMember(null); resetForm() }} className="px-4 py-2 bg-slate-700 rounded-lg text-sm font-medium">Cancel</button><button onClick={saveMember} disabled={!formData.name || !formData.email} className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 rounded-lg text-sm font-medium">{editingMember ? 'Save' : 'Add'}</button></div></div></div></div>}
 
-                  return (
-                    <React.Fragment key={member.id}>
-                      <tr className={`border-t border-slate-700 hover:bg-slate-700/30 ${isExpanded ? 'bg-slate-700/20' : ''}`}>
-                        <td className="px-4 py-3">
-                          <button
-                            onClick={() => setExpandedMember(isExpanded ? null : member.id)}
-                            className="p-1 rounded hover:bg-slate-600"
-                          >
-                            {isExpanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
-                          </button>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="font-medium text-slate-100">{member.name}</span>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            {member.cost_amount > 0 
-                              ? `${formatCurrency(member.cost_amount)}${member.cost_type === 'hourly' ? '/hr' : member.cost_type === 'annual' ? '/yr' : '/mo'}`
-                              : 'No cost set'}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3 text-slate-300">{member.role || '—'}</td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => openAssignments(member)}
-                            className="text-blue-400 hover:text-blue-300 text-xs"
-                          >
-                            {memberAssignments.length} projects
-                          </button>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
-                            {STATUS_OPTIONS.find(s => s.id === member.status)?.label}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right text-blue-500 font-medium">{hours.toFixed(1)}</td>
-                        <td className="px-4 py-3 text-right text-amber-500 font-medium">{formatCurrency(monthlyCost)}</td>
-                        <td className="px-4 py-3">
-                          {allocation.length > 0 ? (
-                            <div className="flex items-center gap-1">
-                              <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden flex">
-                                {allocation.map((a, i) => (
-                                  <div
-                                    key={a.client_id}
-                                    className={`h-full ${ALLOCATION_COLORS[i % ALLOCATION_COLORS.length]}`}
-                                    style={{ width: `${a.percentage}%` }}
-                                    title={`${a.client_name}: ${a.percentage.toFixed(0)}%`}
-                                  />
-                                ))}
-                              </div>
-                              <span className="text-xs text-slate-400 w-12 text-right">{allocation.length} clients</span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-500 text-xs">No hours</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => openEditMember(member)}
-                              className="p-1.5 rounded bg-slate-700 text-slate-400 hover:bg-slate-600"
-                              title="Edit"
-                            >
-                              <Edit2 size={14} />
-                            </button>
-                            <button
-                              onClick={() => setShowBankingModal(member)}
-                              className="p-1.5 rounded bg-slate-700 text-slate-400 hover:bg-slate-600"
-                              title="Banking"
-                            >
-                              {member.bank_name ? <Eye size={14} /> : <EyeOff size={14} />}
-                            </button>
-                            {member.status === 'active' && (
-                              <button
-                                onClick={() => archiveMember(member.id)}
-                                className="p-1.5 rounded bg-slate-700 text-slate-400 hover:bg-rose-600"
-                                title="Archive"
-                              >
-                                <X size={14} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                      {/* Expanded Row - Allocation Details */}
-                      {isExpanded && (
-                        <tr className="bg-slate-800/50">
-                          <td colSpan={9} className="px-4 py-3">
-                            <div className="grid grid-cols-2 gap-4">
-                              {/* Contact Info */}
-                              <div className="space-y-2">
-                                <h4 className="text-xs font-medium text-slate-400 uppercase">Contact</h4>
-                                <div className="flex flex-col gap-1">
-                                  <a href={`mailto:${member.email}`} className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-2">
-                                    <Mail size={14} /> {member.email}
-                                  </a>
-                                  {member.phone && (
-                                    <span className="text-slate-300 text-sm flex items-center gap-2">
-                                      <Phone size={14} /> {member.phone}
-                                    </span>
-                                  )}
-                                  {member.start_date && (
-                                    <span className="text-slate-400 text-sm flex items-center gap-2">
-                                      <Calendar size={14} /> Since {member.start_date}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              {/* Client Allocation Breakdown */}
-                              <div className="space-y-2">
-                                <h4 className="text-xs font-medium text-slate-400 uppercase">Client Allocation (MTD)</h4>
-                                {allocation.length > 0 ? (
-                                  <div className="space-y-1.5">
-                                    {allocation.map((a, i) => (
-                                      <div key={a.client_id} className="flex items-center gap-2">
-                                        <div className={`w-2 h-2 rounded-full ${ALLOCATION_COLORS[i % ALLOCATION_COLORS.length]}`} />
-                                        <span className="text-slate-200 text-sm flex-1">{a.client_name}</span>
-                                        <span className="text-slate-400 text-xs">{a.hours.toFixed(1)} hrs</span>
-                                        <span className="text-slate-300 text-sm font-medium w-14 text-right">{a.percentage.toFixed(0)}%</span>
-                                        <span className="text-amber-500 text-sm font-medium w-20 text-right">{formatCurrency(a.cost)}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <p className="text-slate-500 text-sm">No time entries this month</p>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  )
-                })
-              ) : (
-                <tr><td colSpan={9} className="px-4 py-12 text-center text-slate-400">No team members found</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </CollapsibleSection>
+      {showScheduleModal && <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"><div className="flex justify-between mb-4"><h3 className="text-lg font-semibold text-slate-100">{editingSchedule ? 'Edit Schedule' : 'Add Schedule'}</h3><button onClick={() => { setShowScheduleModal(false); setEditingSchedule(null); resetScheduleForm() }} className="p-1 rounded hover:bg-slate-700"><X size={20} className="text-slate-400" /></button></div><div className="space-y-4"><div><label className="block text-xs text-slate-400 mb-1">Schedule Name *</label><input type="text" value={scheduleForm.schedule_name} onChange={e => setScheduleForm(p => ({ ...p, schedule_name: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100" placeholder="e.g., Google - Design Scope" /></div><div><label className="block text-xs text-slate-400 mb-1">Team Member *</label><select value={scheduleForm.team_member_id} onChange={e => setScheduleForm(p => ({ ...p, team_member_id: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100"><option value="">Select...</option>{teamMembers.filter(m => m.status === 'active').map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs text-slate-400 mb-1">Client</label><select value={scheduleForm.client_id} onChange={e => setScheduleForm(p => ({ ...p, client_id: e.target.value, project_id: '' }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100"><option value="">All</option>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div><div><label className="block text-xs text-slate-400 mb-1">Project</label><select value={scheduleForm.project_id} onChange={e => setScheduleForm(p => ({ ...p, project_id: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100"><option value="">All</option>{projects.filter(p => !scheduleForm.client_id || p.client_id === scheduleForm.client_id).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div></div><div className="border-t border-slate-700 pt-4"><h4 className="text-sm font-medium text-slate-300 mb-3">Cost</h4><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs text-slate-400 mb-1">Type</label><select value={scheduleForm.cost_type} onChange={e => setScheduleForm(p => ({ ...p, cost_type: e.target.value as any }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100">{COST_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select></div><div><label className="block text-xs text-slate-400 mb-1">Amount ({scheduleForm.cost_type === 'T&M' ? '/hr' : '/mo'})</label><input type="number" value={scheduleForm.cost_amount} onChange={e => setScheduleForm(p => ({ ...p, cost_amount: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100" /></div></div></div><div className="border-t border-slate-700 pt-4"><h4 className="text-sm font-medium text-slate-300 mb-3">Allocation</h4><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs text-slate-400 mb-1">Method</label><select value={scheduleForm.allocation_method} onChange={e => setScheduleForm(p => ({ ...p, allocation_method: e.target.value as any }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100">{ALLOCATION_METHODS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}</select></div>{scheduleForm.allocation_method !== 'auto' && <div><label className="block text-xs text-slate-400 mb-1">Value ({scheduleForm.allocation_method === 'fixed_percent' ? '%' : '$'})</label><input type="number" value={scheduleForm.allocation_value} onChange={e => setScheduleForm(p => ({ ...p, allocation_value: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100" /></div>}</div></div><div className="border-t border-slate-700 pt-4"><h4 className="text-sm font-medium text-slate-300 mb-3">Period</h4><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs text-slate-400 mb-1">Start</label><input type="date" value={scheduleForm.effective_start} onChange={e => setScheduleForm(p => ({ ...p, effective_start: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100" /></div><div><label className="block text-xs text-slate-400 mb-1">End (blank = ongoing)</label><input type="date" value={scheduleForm.effective_end} onChange={e => setScheduleForm(p => ({ ...p, effective_end: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100" /></div></div></div><div className="flex justify-end gap-3 pt-4"><button onClick={() => { setShowScheduleModal(false); setEditingSchedule(null); resetScheduleForm() }} className="px-4 py-2 bg-slate-700 rounded-lg text-sm font-medium">Cancel</button><button onClick={saveSchedule} disabled={!scheduleForm.team_member_id || !scheduleForm.schedule_name} className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 rounded-lg text-sm font-medium">{editingSchedule ? 'Save' : 'Add'}</button></div></div></div></div>}
 
-      {/* Member Modal */}
-      {showMemberModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-slate-100 mb-4">
-              {editingMember ? 'Edit Team Member' : 'Add Team Member'}
-            </h3>
-            
-            <div className="space-y-6">
-              {/* Basic Info */}
-              <div>
-                <h4 className="text-sm font-medium text-slate-300 mb-3">Basic Information</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Name *</label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
-                      placeholder="Full name"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Email *</label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
-                      placeholder="email@example.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Phone</label>
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
-                      placeholder="(555) 123-4567"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Role/Title</label>
-                    <input
-                      type="text"
-                      value={formData.role}
-                      onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
-                      placeholder="Project Manager"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Start Date</label>
-                    <input
-                      type="date"
-                      value={formData.start_date}
-                      onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Status</label>
-                    <select
-                      value={formData.status}
-                      onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
-                    >
-                      {STATUS_OPTIONS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                    </select>
-                  </div>
-                </div>
-              </div>
+      {showGroupModal && <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto"><div className="flex justify-between mb-4"><h3 className="text-lg font-semibold text-slate-100">{editingGroup ? 'Edit Group' : 'Add Group'}</h3><button onClick={() => { setShowGroupModal(false); setEditingGroup(null); resetGroupForm() }} className="p-1 rounded hover:bg-slate-700"><X size={20} className="text-slate-400" /></button></div><div className="space-y-4"><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs text-slate-400 mb-1">Group Name *</label><input type="text" value={groupForm.name} onChange={e => setGroupForm(p => ({ ...p, name: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100" /></div><div><label className="block text-xs text-slate-400 mb-1">Prime Contractor</label><input type="text" value={groupForm.prime_contractor_name} onChange={e => setGroupForm(p => ({ ...p, prime_contractor_name: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100" placeholder="e.g., Maria LLC" /></div></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs text-slate-400 mb-1">Client</label><select value={groupForm.client_id} onChange={e => setGroupForm(p => ({ ...p, client_id: e.target.value, project_id: '' }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100"><option value="">All</option>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div><div><label className="block text-xs text-slate-400 mb-1">Project</label><select value={groupForm.project_id} onChange={e => setGroupForm(p => ({ ...p, project_id: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100"><option value="">All</option>{projects.filter(p => !groupForm.client_id || p.client_id === groupForm.client_id).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div></div><div className="border-t border-slate-700 pt-4"><h4 className="text-sm font-medium text-slate-300 mb-3">Total Cost</h4><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs text-slate-400 mb-1">Type</label><select value={groupForm.cost_type} onChange={e => setGroupForm(p => ({ ...p, cost_type: e.target.value as any }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100">{COST_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select></div><div><label className="block text-xs text-slate-400 mb-1">Amount (/mo)</label><input type="number" value={groupForm.cost_amount} onChange={e => setGroupForm(p => ({ ...p, cost_amount: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100" /></div></div></div><div className="border-t border-slate-700 pt-4"><div className="flex justify-between mb-3"><h4 className="text-sm font-medium text-slate-300">Members</h4><button onClick={() => setGroupForm(p => ({ ...p, members: [...p.members, { team_member_id: '', proposed_hours: '160' }] }))} className="flex items-center gap-1 px-2 py-1 text-xs bg-slate-700 rounded"><Plus size={14} /> Add</button></div>{groupForm.members.length === 0 ? <p className="text-slate-500 text-sm text-center py-4">No members</p> : <div className="space-y-2">{groupForm.members.map((m, i) => { const th = groupForm.members.reduce((s, x) => s + (parseFloat(x.proposed_hours) || 0), 0), mh = parseFloat(m.proposed_hours) || 0, pct = th > 0 ? (mh / th) * 100 : 0, mc = (parseFloat(groupForm.cost_amount) || 0) * pct / 100; return <div key={i} className="flex items-center gap-3 p-3 bg-slate-900/50 rounded-lg"><select value={m.team_member_id} onChange={e => { const nm = [...groupForm.members]; nm[i].team_member_id = e.target.value; setGroupForm(p => ({ ...p, members: nm })) }} className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100"><option value="">Select...</option>{teamMembers.filter(x => x.status === 'active').map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select><input type="number" value={m.proposed_hours} onChange={e => { const nm = [...groupForm.members]; nm[i].proposed_hours = e.target.value; setGroupForm(p => ({ ...p, members: nm })) }} className="w-24 px-2 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 text-right" /><span className="text-sm text-slate-400 w-16 text-right">{pct.toFixed(0)}%</span><span className="text-sm text-orange-400 w-24 text-right">{formatCurrency(mc)}</span><button onClick={() => setGroupForm(p => ({ ...p, members: p.members.filter((_, j) => j !== i) }))} className="p-1 rounded hover:bg-slate-700"><Trash2 size={14} className="text-rose-400" /></button></div> })}<div className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg font-medium"><span className="flex-1 text-sm text-slate-300">TOTAL</span><span className="w-24 text-sm text-slate-100 text-right">{groupForm.members.reduce((s, m) => s + (parseFloat(m.proposed_hours) || 0), 0)} hrs</span><span className="text-sm text-slate-100 w-16 text-right">100%</span><span className="text-sm text-orange-400 w-24 text-right">{formatCurrency(parseFloat(groupForm.cost_amount) || 0)}</span><span className="w-6" /></div></div>}</div><div className="border-t border-slate-700 pt-4"><h4 className="text-sm font-medium text-slate-300 mb-3">Period</h4><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs text-slate-400 mb-1">Start</label><input type="date" value={groupForm.effective_start} onChange={e => setGroupForm(p => ({ ...p, effective_start: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100" /></div><div><label className="block text-xs text-slate-400 mb-1">End (blank = ongoing)</label><input type="date" value={groupForm.effective_end} onChange={e => setGroupForm(p => ({ ...p, effective_end: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100" /></div></div></div><div className="flex justify-end gap-3 pt-4"><button onClick={() => { setShowGroupModal(false); setEditingGroup(null); resetGroupForm() }} className="px-4 py-2 bg-slate-700 rounded-lg text-sm font-medium">Cancel</button><button onClick={saveResourceGroup} disabled={!groupForm.name} className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 rounded-lg text-sm font-medium">{editingGroup ? 'Save' : 'Add'}</button></div></div></div></div>}
 
-              {/* Services */}
-              <div>
-                <h4 className="text-sm font-medium text-slate-300 mb-3">Services</h4>
-                <div className="flex flex-wrap gap-2">
-                  {SERVICES.map(service => (
-                    <button
-                      key={service}
-                      onClick={() => toggleService(service)}
-                      className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                        formData.services.includes(service)
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                    >
-                      {service}
-                    </button>
-                  ))}
-                </div>
-              </div>
+      {showAssignmentsModal && <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"><div className="flex justify-between mb-4"><h3 className="text-lg font-semibold text-slate-100">Assignments — {showAssignmentsModal.name}</h3><button onClick={() => setShowAssignmentsModal(null)} className="p-1 rounded hover:bg-slate-700"><X size={20} className="text-slate-400" /></button></div><div className="space-y-2 mb-6">{getMemberAssignments(showAssignmentsModal.id).length > 0 ? getMemberAssignments(showAssignmentsModal.id).map(a => <div key={a.id} className="flex justify-between items-center p-3 bg-slate-900/50 rounded-lg"><div><p className="text-slate-100 font-medium">{a.project_name}</p><p className="text-xs text-slate-400">{a.client_name}</p></div><div className="flex items-center gap-3"><div className="text-right"><span className={`text-xs px-2 py-0.5 rounded ${a.payment_type === 'lump_sum' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'}`}>{a.payment_type === 'lump_sum' ? 'Lump Sum' : 'T&M'}</span><p className="text-sm text-slate-300 mt-1">{formatCurrency(a.rate)}{a.payment_type === 'tm' ? '/hr' : '/mo'}</p></div><button onClick={() => removeAssignment(a.id)} className="p-1.5 rounded bg-rose-500/20 text-rose-500"><Trash2 size={14} /></button></div></div>) : <p className="text-slate-400 text-center py-4">No assignments</p>}</div><div className="border-t border-slate-700 pt-4"><h4 className="text-sm font-medium text-slate-300 mb-3">Add Assignment</h4><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs text-slate-400 mb-1">Project</label><select value={assignmentForm.project_id} onChange={e => setAssignmentForm(p => ({ ...p, project_id: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100"><option value="">Select...</option>{projects.map(p => <option key={p.id} value={p.id}>{p.client} - {p.name}</option>)}</select></div><div><label className="block text-xs text-slate-400 mb-1">Service</label><select value={assignmentForm.service} onChange={e => setAssignmentForm(p => ({ ...p, service: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100"><option value="">Select...</option>{SERVICES.map(s => <option key={s} value={s}>{s}</option>)}</select></div><div><label className="block text-xs text-slate-400 mb-1">Payment Type</label><select value={assignmentForm.payment_type} onChange={e => setAssignmentForm(p => ({ ...p, payment_type: e.target.value as any }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100">{PAYMENT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select></div><div><label className="block text-xs text-slate-400 mb-1">Rate ({assignmentForm.payment_type === 'lump_sum' ? '/mo' : '/hr'})</label><input type="number" value={assignmentForm.rate} onChange={e => setAssignmentForm(p => ({ ...p, rate: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100" /></div></div><button onClick={addAssignment} disabled={!assignmentForm.project_id} className="mt-3 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 rounded-lg text-sm font-medium">Add</button></div></div></div>}
 
-              {/* Cost Information */}
-              <div>
-                <h4 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
-                  <DollarSign size={16} className="text-amber-500" />
-                  Cost to Company
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Cost Type</label>
-                    <select
-                      value={formData.cost_type}
-                      onChange={(e) => setFormData(prev => ({ ...prev, cost_type: e.target.value as 'hourly' | 'monthly' | 'annual' }))}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
-                    >
-                      {COST_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">
-                      Amount ({formData.cost_type === 'hourly' ? 'per hour' : formData.cost_type === 'annual' ? 'per year' : 'per month'})
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
-                      <input
-                        type="number"
-                        value={formData.cost_amount}
-                        onChange={(e) => setFormData(prev => ({ ...prev, cost_amount: e.target.value }))}
-                        className="w-full pl-7 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
-                        placeholder="0"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <p className="text-xs text-slate-500 mt-2">
-                  This is what you pay this team member. Cost will be allocated to clients based on time entries.
-                </p>
-              </div>
-
-              {/* Banking Info */}
-              <div>
-                <h4 className="text-sm font-medium text-slate-300 mb-3">Banking Information</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Bank Name</label>
-                    <input
-                      type="text"
-                      value={formData.bank_name}
-                      onChange={(e) => setFormData(prev => ({ ...prev, bank_name: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
-                      placeholder="Bank of America"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Account Type</label>
-                    <select
-                      value={formData.account_type}
-                      onChange={(e) => setFormData(prev => ({ ...prev, account_type: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
-                    >
-                      <option value="">Select...</option>
-                      {ACCOUNT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Routing Number</label>
-                    <input
-                      type="text"
-                      value={formData.routing_number}
-                      onChange={(e) => setFormData(prev => ({ ...prev, routing_number: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
-                      placeholder="123456789"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Account Number</label>
-                    <input
-                      type="text"
-                      value={formData.account_number}
-                      onChange={(e) => setFormData(prev => ({ ...prev, account_number: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
-                      placeholder="1234567890"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-sm text-slate-400 mb-1">Payment Method</label>
-                    <select
-                      value={formData.payment_method}
-                      onChange={(e) => setFormData(prev => ({ ...prev, payment_method: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"
-                    >
-                      <option value="">Select...</option>
-                      {PAYMENT_METHODS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setShowMemberModal(false)}
-                className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveMember}
-                className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-medium transition-colors"
-              >
-                {editingMember ? 'Save Changes' : 'Add Member'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Assignments Modal */}
-      {showAssignmentsModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-slate-100">
-                Project Assignments — {showAssignmentsModal.name}
-              </h3>
-              <button onClick={() => setShowAssignmentsModal(null)} className="p-1 rounded hover:bg-slate-700">
-                <X size={20} className="text-slate-400" />
-              </button>
-            </div>
-
-            {/* Current Assignments */}
-            <div className="space-y-2 mb-6">
-              {getMemberAssignments(showAssignmentsModal.id).length > 0 ? (
-                getMemberAssignments(showAssignmentsModal.id).map(assignment => (
-                  <div key={assignment.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-900/50">
-                    <div>
-                      <p className="text-slate-100 font-medium">{assignment.project_name}</p>
-                      <p className="text-xs text-slate-400">{assignment.client_name}</p>
-                      {assignment.service && (
-                        <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded bg-slate-700 text-slate-300">
-                          {assignment.service}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <span className={`text-xs px-2 py-0.5 rounded ${assignment.payment_type === 'lump_sum' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                          {assignment.payment_type === 'lump_sum' ? 'Lump Sum' : 'T&M'}
-                        </span>
-                        <p className="text-slate-300 text-sm mt-1">
-                          {formatCurrency(assignment.rate)}{assignment.payment_type === 'tm' ? '/hr' : '/mo'}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => removeAssignment(assignment.id)}
-                        className="p-1.5 rounded bg-rose-500/20 text-rose-500 hover:bg-rose-500/30"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-slate-400 text-center py-4">No project assignments</p>
-              )}
-            </div>
-
-            {/* Add Assignment */}
-            <div className="border-t border-slate-700 pt-4">
-              <h4 className="text-sm font-medium text-slate-300 mb-3">Add Assignment</h4>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Project</label>
-                  <select
-                    value={assignmentForm.project_id}
-                    onChange={(e) => setAssignmentForm(prev => ({ ...prev, project_id: e.target.value }))}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100"
-                  >
-                    <option value="">Select project...</option>
-                    {projects.map(p => (
-                      <option key={p.id} value={p.id}>{p.client ? `${p.client} - ` : ''}{p.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Service</label>
-                  <select
-                    value={assignmentForm.service}
-                    onChange={(e) => setAssignmentForm(prev => ({ ...prev, service: e.target.value }))}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100"
-                  >
-                    <option value="">Select service...</option>
-                    {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Payment Type</label>
-                  <select
-                    value={assignmentForm.payment_type}
-                    onChange={(e) => setAssignmentForm(prev => ({ ...prev, payment_type: e.target.value as 'lump_sum' | 'tm' }))}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100"
-                  >
-                    {PAYMENT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">
-                    Rate ({assignmentForm.payment_type === 'lump_sum' ? '/month' : '/hour'})
-                  </label>
-                  <input
-                    type="number"
-                    value={assignmentForm.rate}
-                    onChange={(e) => setAssignmentForm(prev => ({ ...prev, rate: e.target.value }))}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100"
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-              <button
-                onClick={addAssignment}
-                disabled={!assignmentForm.project_id}
-                className="mt-3 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
-              >
-                Add Assignment
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Banking Modal */}
-      {showBankingModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-slate-100">
-                Banking Info — {showBankingModal.name}
-              </h3>
-              <button onClick={() => setShowBankingModal(null)} className="p-1 rounded hover:bg-slate-700">
-                <X size={20} className="text-slate-400" />
-              </button>
-            </div>
-
-            {showBankingModal.bank_name ? (
-              <div className="space-y-3">
-                <div className="flex justify-between py-2 border-b border-slate-700">
-                  <span className="text-slate-400">Bank</span>
-                  <span className="text-slate-100">{showBankingModal.bank_name}</span>
-                </div>
-                <div className="flex justify-between py-2 border-b border-slate-700">
-                  <span className="text-slate-400">Account Type</span>
-                  <span className="text-slate-100">
-                    {ACCOUNT_TYPES.find(t => t.id === showBankingModal.account_type)?.label || '—'}
-                  </span>
-                </div>
-                <div className="flex justify-between py-2 border-b border-slate-700">
-                  <span className="text-slate-400">Routing #</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-100 font-mono">
-                      {visibleBanking[showBankingModal.id + '_routing'] 
-                        ? showBankingModal.routing_number 
-                        : maskNumber(showBankingModal.routing_number)}
-                    </span>
-                    <button
-                      onClick={() => setVisibleBanking(prev => ({ 
-                        ...prev, 
-                        [showBankingModal.id + '_routing']: !prev[showBankingModal.id + '_routing'] 
-                      }))}
-                      className="p-1 rounded hover:bg-slate-700"
-                    >
-                      {visibleBanking[showBankingModal.id + '_routing'] ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
-                  </div>
-                </div>
-                <div className="flex justify-between py-2 border-b border-slate-700">
-                  <span className="text-slate-400">Account #</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-100 font-mono">
-                      {visibleBanking[showBankingModal.id + '_account'] 
-                        ? showBankingModal.account_number 
-                        : maskNumber(showBankingModal.account_number)}
-                    </span>
-                    <button
-                      onClick={() => setVisibleBanking(prev => ({ 
-                        ...prev, 
-                        [showBankingModal.id + '_account']: !prev[showBankingModal.id + '_account'] 
-                      }))}
-                      className="p-1 rounded hover:bg-slate-700"
-                    >
-                      {visibleBanking[showBankingModal.id + '_account'] ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
-                  </div>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-slate-400">Payment Method</span>
-                  <span className="text-slate-100">
-                    {PAYMENT_METHODS.find(m => m.id === showBankingModal.payment_method)?.label || '—'}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <p className="text-slate-400 text-center py-8">No banking information on file</p>
-            )}
-
-            <button
-              onClick={() => {
-                setShowBankingModal(null)
-                openEditMember(showBankingModal)
-              }}
-              className="w-full mt-4 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors"
-            >
-              Edit Banking Info
-            </button>
-          </div>
-        </div>
-      )}
+      {showBankingModal && <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md"><div className="flex justify-between mb-4"><h3 className="text-lg font-semibold text-slate-100">Banking — {showBankingModal.name}</h3><button onClick={() => setShowBankingModal(null)} className="p-1 rounded hover:bg-slate-700"><X size={20} className="text-slate-400" /></button></div>{showBankingModal.bank_name ? <div className="space-y-3"><div className="flex justify-between py-2 border-b border-slate-700"><span className="text-slate-400">Bank</span><span className="text-slate-100">{showBankingModal.bank_name}</span></div><div className="flex justify-between py-2 border-b border-slate-700"><span className="text-slate-400">Account Type</span><span className="text-slate-100">{ACCOUNT_TYPES.find(t => t.id === showBankingModal.account_type)?.label || '—'}</span></div><div className="flex justify-between py-2 border-b border-slate-700"><span className="text-slate-400">Routing #</span><div className="flex items-center gap-2"><span className="text-slate-100 font-mono">{visibleBanking[showBankingModal.id + '_r'] ? showBankingModal.routing_number : maskNumber(showBankingModal.routing_number)}</span><button onClick={() => setVisibleBanking(p => ({ ...p, [showBankingModal.id + '_r']: !p[showBankingModal.id + '_r'] }))} className="p-1 rounded hover:bg-slate-700">{visibleBanking[showBankingModal.id + '_r'] ? <EyeOff size={14} /> : <Eye size={14} />}</button></div></div><div className="flex justify-between py-2 border-b border-slate-700"><span className="text-slate-400">Account #</span><div className="flex items-center gap-2"><span className="text-slate-100 font-mono">{visibleBanking[showBankingModal.id + '_a'] ? showBankingModal.account_number : maskNumber(showBankingModal.account_number)}</span><button onClick={() => setVisibleBanking(p => ({ ...p, [showBankingModal.id + '_a']: !p[showBankingModal.id + '_a'] }))} className="p-1 rounded hover:bg-slate-700">{visibleBanking[showBankingModal.id + '_a'] ? <EyeOff size={14} /> : <Eye size={14} />}</button></div></div><div className="flex justify-between py-2"><span className="text-slate-400">Payment Method</span><span className="text-slate-100">{PAYMENT_METHODS.find(m => m.id === showBankingModal.payment_method)?.label || '—'}</span></div></div> : <p className="text-slate-400 text-center py-8">No banking info on file</p>}<button onClick={() => { setShowBankingModal(null); openEditMember(showBankingModal) }} className="w-full mt-4 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium">Edit Banking Info</button></div></div>}
     </div>
   )
 }
