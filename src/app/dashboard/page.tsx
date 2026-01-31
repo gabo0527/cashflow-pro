@@ -10,7 +10,7 @@ import {
 import Link from 'next/link'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart as RePieChart, Pie, Cell, Area, AreaChart, ReferenceLine
+  Area, AreaChart, ReferenceLine
 } from 'recharts'
 import { createClient } from '@supabase/supabase-js'
 import { getCurrentUser } from '@/lib/supabase'
@@ -704,33 +704,29 @@ export default function DashboardPage() {
             </div>
           </Section>
 
-          {/* AR Aging */}
+          {/* AR Aging - No chart, clean list display */}
           <Section title="AR Aging">
-            <div className="h-24 relative overflow-hidden">
-              {arAgingData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <RePieChart>
-                    <Pie data={arAgingData} cx="50%" cy="50%" innerRadius={25} outerRadius={40} paddingAngle={2} dataKey="value">
-                      {arAgingData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                    </Pie>
-                    <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} />
-                  </RePieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-400 text-xs">No outstanding AR</div>
-              )}
-            </div>
-            <div className="space-y-1.5 mt-2">
-              {arAgingData.map((item, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="text-xs text-gray-500">{item.name}</span>
+            {arAgingData.length > 0 ? (
+              <div className="space-y-3">
+                {arAgingData.map((item, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                      <span className="text-sm text-gray-600">{item.name}</span>
+                    </div>
+                    <span className="text-sm font-semibold text-gray-900">{formatCurrency(item.value)}</span>
                   </div>
-                  <span className="text-xs font-medium text-gray-700">{formatCurrency(item.value)}</span>
+                ))}
+                <div className="pt-3 mt-1 border-t border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-500">Total AR</span>
+                    <span className="text-sm font-bold text-gray-900">{formatCurrency(metrics.totalAR)}</span>
+                  </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-20 text-gray-400 text-sm">No outstanding AR</div>
+            )}
           </Section>
         </div>
       </div>
