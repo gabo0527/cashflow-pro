@@ -2,8 +2,7 @@
 
 // ============================================================
 // EXPENSE MANAGEMENT - Leadership/Admin Component
-// Add as a tab inside Time Tracking page or as a standalone page
-// Only visible to users with role === 'admin' in team_members
+// Glassmorphism Dark Theme — matches Time Tracking page
 // ============================================================
 
 import React, { useState, useEffect, useMemo } from 'react'
@@ -14,6 +13,17 @@ import {
   ThumbsUp, ThumbsDown, Eye, Plus, CreditCard, Building2,
   Wallet, Landmark, AlertCircle, Loader2, Upload
 } from 'lucide-react'
+
+// ============ GLASSMORPHISM THEME ============
+const THEME = {
+  glass: 'bg-slate-900/70 backdrop-blur-xl',
+  glassBorder: 'border-white/[0.08]',
+  glassHover: 'hover:bg-white/[0.05] hover:border-white/[0.12]',
+  textPrimary: 'text-white',
+  textSecondary: 'text-slate-300',
+  textMuted: 'text-slate-400',
+  textDim: 'text-slate-500',
+}
 
 // ============ TYPES ============
 interface ExpenseClaimRow {
@@ -39,34 +49,33 @@ interface ExpenseClaimRow {
 
 // ============ CONSTANTS ============
 const EXPENSE_CATEGORIES: Record<string, { label: string; icon: any; color: string; bg: string }> = {
-  travel: { label: 'Travel', icon: Plane, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-  lodging: { label: 'Lodging', icon: Hotel, color: 'text-indigo-400', bg: 'bg-indigo-500/10' },
-  transportation: { label: 'Transport', icon: Car, color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
-  meal: { label: 'Meal', icon: Coffee, color: 'text-amber-400', bg: 'bg-amber-500/10' },
-  other: { label: 'Other', icon: MoreHorizontal, color: 'text-slate-400', bg: 'bg-slate-500/10' },
+  travel: { label: 'Travel', icon: Plane, color: 'text-blue-400', bg: 'bg-blue-500/15' },
+  lodging: { label: 'Lodging', icon: Hotel, color: 'text-indigo-400', bg: 'bg-indigo-500/15' },
+  transportation: { label: 'Transport', icon: Car, color: 'text-cyan-400', bg: 'bg-cyan-500/15' },
+  meal: { label: 'Meal', icon: Coffee, color: 'text-amber-400', bg: 'bg-amber-500/15' },
+  other: { label: 'Other', icon: MoreHorizontal, color: 'text-slate-400', bg: 'bg-slate-500/15' },
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; dot: string }> = {
-  draft: { label: 'Draft', color: 'text-slate-500', bg: 'bg-slate-100', dot: 'bg-slate-400' },
-  submitted: { label: 'Pending', color: 'text-amber-600', bg: 'bg-amber-50', dot: 'bg-amber-400' },
-  pending: { label: 'Pending', color: 'text-amber-600', bg: 'bg-amber-50', dot: 'bg-amber-400' },
-  approved: { label: 'Approved', color: 'text-emerald-600', bg: 'bg-emerald-50', dot: 'bg-emerald-400' },
-  rejected: { label: 'Rejected', color: 'text-red-600', bg: 'bg-red-50', dot: 'bg-red-400' },
-  reimbursed: { label: 'Reimbursed', color: 'text-blue-600', bg: 'bg-blue-50', dot: 'bg-blue-400' },
+  draft: { label: 'Draft', color: 'text-slate-400', bg: 'bg-slate-500/20', dot: 'bg-slate-400' },
+  submitted: { label: 'Pending', color: 'text-amber-400', bg: 'bg-amber-500/20', dot: 'bg-amber-400' },
+  pending: { label: 'Pending', color: 'text-amber-400', bg: 'bg-amber-500/20', dot: 'bg-amber-400' },
+  approved: { label: 'Approved', color: 'text-emerald-400', bg: 'bg-emerald-500/20', dot: 'bg-emerald-400' },
+  rejected: { label: 'Rejected', color: 'text-red-400', bg: 'bg-red-500/20', dot: 'bg-red-400' },
+  reimbursed: { label: 'Reimbursed', color: 'text-blue-400', bg: 'bg-blue-500/20', dot: 'bg-blue-400' },
 }
 
 const PAYMENT_METHODS: Record<string, { label: string; icon: any; color: string }> = {
-  main_bank: { label: 'Main Bank', icon: Landmark, color: 'text-blue-500' },
-  debit_card: { label: 'Debit Card', icon: CreditCard, color: 'text-purple-500' },
-  corporate_card: { label: 'Corporate Card', icon: Building2, color: 'text-emerald-500' },
-  personal_card: { label: 'Personal Card', icon: Wallet, color: 'text-orange-500' },
+  main_bank: { label: 'Main Bank', icon: Landmark, color: 'text-blue-400' },
+  debit_card: { label: 'Debit Card', icon: CreditCard, color: 'text-purple-400' },
+  corporate_card: { label: 'Corporate Card', icon: Building2, color: 'text-emerald-400' },
+  personal_card: { label: 'Personal Card', icon: Wallet, color: 'text-orange-400' },
 }
 
 type StatusFilter = 'all' | 'submitted' | 'approved' | 'rejected' | 'reimbursed'
 type SourceFilter = 'all' | 'employee' | 'admin'
 
 // ============ COMPONENT ============
-// Props: pass supabase client and company_id from parent
 export default function ExpenseManagement({ 
   supabase, 
   companyId,
@@ -188,40 +197,40 @@ export default function ExpenseManagement({
 
   // ============ RENDER ============
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'Pending Review', value: stats.pendingCount, amount: stats.pendingAmount, color: 'text-amber-500', bg: 'bg-amber-500/10', icon: Clock },
-          { label: 'Approved', value: null, amount: stats.approvedAmount, color: 'text-emerald-500', bg: 'bg-emerald-500/10', icon: Check },
-          { label: 'Needs Reimbursement', value: null, amount: stats.reimbursementAmount, color: 'text-orange-500', bg: 'bg-orange-500/10', icon: Wallet },
-          { label: 'Total Claims', value: claims.length, amount: claims.reduce((s, c) => s + c.amount, 0), color: 'text-blue-500', bg: 'bg-blue-500/10', icon: Receipt },
+          { label: 'Pending Review', amount: stats.pendingAmount, sub: `${stats.pendingCount} claims`, color: 'text-amber-400', icon: Clock },
+          { label: 'Approved', amount: stats.approvedAmount, sub: null, color: 'text-emerald-400', icon: Check },
+          { label: 'Needs Reimbursement', amount: stats.reimbursementAmount, sub: null, color: 'text-orange-400', icon: Wallet },
+          { label: 'Total Claims', amount: claims.reduce((s, c) => s + c.amount, 0), sub: `${claims.length} claims`, color: 'text-blue-400', icon: Receipt },
         ].map((stat, i) => (
-          <div key={i} className="bg-white/60 backdrop-blur-sm rounded-xl border border-slate-200/60 p-4">
-            <div className="flex items-center gap-3 mb-2">
-              <div className={`w-9 h-9 rounded-lg ${stat.bg} flex items-center justify-center`}>
-                <stat.icon size={18} className={stat.color} />
-              </div>
-              <span className="text-sm text-slate-500">{stat.label}</span>
+          <div key={i} className={`p-4 rounded-xl ${THEME.glass} border ${THEME.glassBorder}`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-xs font-medium ${THEME.textMuted} uppercase tracking-wide`}>{stat.label}</span>
+              <stat.icon size={16} className={THEME.textDim} />
             </div>
-            <p className="text-2xl font-bold text-slate-900">${stat.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-            {stat.value !== null && <p className="text-sm text-slate-400">{stat.value} claims</p>}
+            <p className={`text-2xl font-bold ${stat.color}`}>
+              ${stat.amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            </p>
+            {stat.sub && <p className={`text-xs mt-1 ${THEME.textDim}`}>{stat.sub}</p>}
           </div>
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="bg-white/60 backdrop-blur-sm rounded-xl border border-slate-200/60 p-4">
+      {/* Filters Bar */}
+      <div className={`p-4 rounded-xl border ${THEME.glass} ${THEME.glassBorder}`}>
         <div className="flex flex-col md:flex-row gap-3">
           {/* Search */}
           <div className="flex-1 relative">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${THEME.textDim}`} />
             <input
               type="text"
               placeholder="Search by vendor, employee, project..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+              className={`w-full pl-10 pr-4 py-2.5 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30`}
             />
           </div>
 
@@ -229,7 +238,7 @@ export default function ExpenseManagement({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-            className="px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+            className={`px-4 py-2.5 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30`}
           >
             <option value="all">All Statuses</option>
             <option value="submitted">Pending</option>
@@ -242,14 +251,14 @@ export default function ExpenseManagement({
           <select
             value={sourceFilter}
             onChange={(e) => setSourceFilter(e.target.value as SourceFilter)}
-            className="px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+            className={`px-4 py-2.5 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30`}
           >
             <option value="all">All Sources</option>
             <option value="employee">Employee Claims</option>
             <option value="admin">Leadership / Internal</option>
           </select>
 
-          {/* Add Internal Expense */}
+          {/* Add Expense */}
           <button
             onClick={() => setShowAddModal(true)}
             className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
@@ -259,36 +268,36 @@ export default function ExpenseManagement({
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white/60 backdrop-blur-sm rounded-xl border border-slate-200/60 overflow-hidden">
+      {/* Claims Table */}
+      <div className={`rounded-xl border ${THEME.glass} ${THEME.glassBorder} overflow-hidden`}>
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 text-emerald-500 animate-spin" />
           </div>
         ) : filteredClaims.length === 0 ? (
           <div className="text-center py-16">
-            <Receipt className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500">No expense claims found</p>
+            <Receipt className={`h-12 w-12 ${THEME.textDim} mx-auto mb-3`} />
+            <p className={THEME.textMuted}>No expense claims found</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-slate-50/80">
-                  <th className="text-left px-4 py-3 font-medium text-slate-500">Status</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-500">Date</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-500">Employee</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-500">Category</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-500">Description</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-500">Project</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-500">Payment</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-500">Billable</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-500">Receipt</th>
-                  <th className="text-right px-4 py-3 font-medium text-slate-500">Amount</th>
-                  <th className="text-center px-4 py-3 font-medium text-slate-500">Actions</th>
+                <tr className="bg-white/[0.02]">
+                  <th className={`text-left px-4 py-3 font-medium ${THEME.textMuted}`}>Status</th>
+                  <th className={`text-left px-4 py-3 font-medium ${THEME.textMuted}`}>Date</th>
+                  <th className={`text-left px-4 py-3 font-medium ${THEME.textMuted}`}>Employee</th>
+                  <th className={`text-left px-4 py-3 font-medium ${THEME.textMuted}`}>Category</th>
+                  <th className={`text-left px-4 py-3 font-medium ${THEME.textMuted}`}>Description</th>
+                  <th className={`text-left px-4 py-3 font-medium ${THEME.textMuted}`}>Project</th>
+                  <th className={`text-left px-4 py-3 font-medium ${THEME.textMuted}`}>Payment</th>
+                  <th className={`text-left px-4 py-3 font-medium ${THEME.textMuted}`}>Billable</th>
+                  <th className={`text-left px-4 py-3 font-medium ${THEME.textMuted}`}>Receipt</th>
+                  <th className={`text-right px-4 py-3 font-medium ${THEME.textMuted}`}>Amount</th>
+                  <th className={`text-center px-4 py-3 font-medium ${THEME.textMuted}`}>Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className={`divide-y divide-white/[0.05]`}>
                 {filteredClaims.map(claim => {
                   const cat = EXPENSE_CATEGORIES[claim.category] || EXPENSE_CATEGORIES.other
                   const status = STATUS_CONFIG[claim.status] || STATUS_CONFIG.pending
@@ -297,7 +306,7 @@ export default function ExpenseManagement({
                   const PayIcon = payment.icon
 
                   return (
-                    <tr key={claim.id} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={claim.id} className="hover:bg-white/[0.03] transition-colors">
                       {/* Status */}
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${status.bg} ${status.color}`}>
@@ -307,16 +316,16 @@ export default function ExpenseManagement({
                       </td>
 
                       {/* Date */}
-                      <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                      <td className={`px-4 py-3 ${THEME.textSecondary} whitespace-nowrap`}>
                         {new Date(claim.expense_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </td>
 
                       {/* Employee */}
                       <td className="px-4 py-3">
                         <div>
-                          <p className="font-medium text-slate-900">{claim.team_member_name}</p>
+                          <p className={`font-medium ${THEME.textPrimary}`}>{claim.team_member_name}</p>
                           {claim.submitted_by_role === 'admin' && (
-                            <span className="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded font-medium">ADMIN</span>
+                            <span className="text-[10px] px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded font-medium">ADMIN</span>
                           )}
                         </div>
                       </td>
@@ -325,17 +334,17 @@ export default function ExpenseManagement({
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <CatIcon size={14} className={cat.color} />
-                          <span className="text-slate-700">{cat.label}</span>
+                          <span className={THEME.textSecondary}>{cat.label}</span>
                         </div>
                       </td>
 
                       {/* Description */}
                       <td className="px-4 py-3">
-                        <p className="text-slate-700 truncate max-w-[200px]">{claim.vendor || claim.description || '—'}</p>
+                        <p className={`${THEME.textSecondary} truncate max-w-[200px]`}>{claim.vendor || claim.description || '—'}</p>
                       </td>
 
                       {/* Project */}
-                      <td className="px-4 py-3 text-slate-600 truncate max-w-[150px]">
+                      <td className={`px-4 py-3 ${THEME.textMuted} truncate max-w-[150px]`}>
                         {claim.project_name || '—'}
                       </td>
 
@@ -343,16 +352,16 @@ export default function ExpenseManagement({
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
                           <PayIcon size={14} className={payment.color} />
-                          <span className="text-xs text-slate-600">{payment.label}</span>
+                          <span className={`text-xs ${THEME.textMuted}`}>{payment.label}</span>
                         </div>
                       </td>
 
                       {/* Billable */}
                       <td className="px-4 py-3 text-center">
                         {claim.billable ? (
-                          <Check size={16} className="text-emerald-500 mx-auto" />
+                          <Check size={16} className="text-emerald-400 mx-auto" />
                         ) : (
-                          <X size={16} className="text-slate-300 mx-auto" />
+                          <X size={16} className="text-slate-600 mx-auto" />
                         )}
                       </td>
 
@@ -361,7 +370,7 @@ export default function ExpenseManagement({
                         {claim.receipt_url || claim.attachment_filename ? (
                           <button 
                             onClick={() => setSelectedClaim(claim)}
-                            className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors mx-auto"
+                            className="p-1.5 hover:bg-white/[0.08] rounded-lg transition-colors mx-auto"
                           >
                             {claim.attachment_type?.includes('pdf') ? (
                               <FileText size={16} className="text-red-400" />
@@ -370,13 +379,13 @@ export default function ExpenseManagement({
                             )}
                           </button>
                         ) : (
-                          <span className="text-xs text-slate-400">—</span>
+                          <span className={`text-xs ${THEME.textDim}`}>—</span>
                         )}
                       </td>
 
                       {/* Amount */}
                       <td className="px-4 py-3 text-right">
-                        <span className="font-semibold text-slate-900">${claim.amount.toFixed(2)}</span>
+                        <span className="font-semibold text-emerald-400">${claim.amount.toFixed(2)}</span>
                       </td>
 
                       {/* Actions */}
@@ -386,7 +395,7 @@ export default function ExpenseManagement({
                             <button
                               onClick={() => updateStatus(claim.id, 'approved')}
                               disabled={processing === claim.id}
-                              className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
+                              className="p-1.5 text-emerald-400 hover:bg-emerald-500/20 rounded-lg transition-colors"
                               title="Approve"
                             >
                               {processing === claim.id ? <Loader2 size={16} className="animate-spin" /> : <ThumbsUp size={16} />}
@@ -394,7 +403,7 @@ export default function ExpenseManagement({
                             <button
                               onClick={() => updateStatus(claim.id, 'rejected')}
                               disabled={processing === claim.id}
-                              className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-colors"
+                              className="p-1.5 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
                               title="Reject"
                             >
                               <ThumbsDown size={16} />
@@ -405,7 +414,7 @@ export default function ExpenseManagement({
                           <button
                             onClick={() => updateStatus(claim.id, 'reimbursed')}
                             disabled={processing === claim.id}
-                            className="text-xs px-2 py-1 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="text-xs px-2 py-1 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors"
                           >
                             Mark Paid
                           </button>
@@ -422,22 +431,22 @@ export default function ExpenseManagement({
 
       {/* Receipt Preview Modal */}
       {selectedClaim && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedClaim(null)}>
-          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-4 border-b border-slate-200">
-              <h3 className="font-semibold text-slate-900">Receipt - {selectedClaim.vendor || 'Expense'}</h3>
-              <button onClick={() => setSelectedClaim(null)} className="p-2 hover:bg-slate-100 rounded-lg">
-                <X size={18} className="text-slate-500" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedClaim(null)}>
+          <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-2xl max-w-lg w-full max-h-[80vh] overflow-auto shadow-2xl`} onClick={(e) => e.stopPropagation()}>
+            <div className={`flex items-center justify-between p-4 border-b ${THEME.glassBorder}`}>
+              <h3 className={`font-semibold ${THEME.textPrimary}`}>Receipt - {selectedClaim.vendor || 'Expense'}</h3>
+              <button onClick={() => setSelectedClaim(null)} className="p-2 hover:bg-white/[0.08] rounded-lg">
+                <X size={18} className={THEME.textMuted} />
               </button>
             </div>
             <div className="p-4">
               {selectedClaim.receipt_url && (
                 selectedClaim.attachment_type?.includes('pdf') ? (
-                  <div className="flex items-center gap-3 p-6 bg-slate-50 rounded-xl">
+                  <div className="flex items-center gap-3 p-6 bg-white/[0.03] rounded-xl">
                     <FileText size={32} className="text-red-400" />
                     <div>
-                      <p className="font-medium text-slate-900">{selectedClaim.attachment_filename || 'Receipt.pdf'}</p>
-                      <p className="text-sm text-slate-500">PDF Document</p>
+                      <p className={`font-medium ${THEME.textPrimary}`}>{selectedClaim.attachment_filename || 'Receipt.pdf'}</p>
+                      <p className={`text-sm ${THEME.textMuted}`}>PDF Document</p>
                     </div>
                   </div>
                 ) : (
@@ -445,12 +454,12 @@ export default function ExpenseManagement({
                 )
               )}
               <div className="mt-4 space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-slate-500">Amount</span><span className="font-semibold">${selectedClaim.amount.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Date</span><span>{new Date(selectedClaim.expense_date).toLocaleDateString()}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Employee</span><span>{selectedClaim.team_member_name}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Category</span><span>{EXPENSE_CATEGORIES[selectedClaim.category]?.label || selectedClaim.category}</span></div>
-                {selectedClaim.project_name && <div className="flex justify-between"><span className="text-slate-500">Project</span><span>{selectedClaim.project_name}</span></div>}
-                {selectedClaim.description && <div className="flex justify-between"><span className="text-slate-500">Notes</span><span>{selectedClaim.description}</span></div>}
+                <div className="flex justify-between"><span className={THEME.textMuted}>Amount</span><span className="font-semibold text-emerald-400">${selectedClaim.amount.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span className={THEME.textMuted}>Date</span><span className={THEME.textSecondary}>{new Date(selectedClaim.expense_date).toLocaleDateString()}</span></div>
+                <div className="flex justify-between"><span className={THEME.textMuted}>Employee</span><span className={THEME.textSecondary}>{selectedClaim.team_member_name}</span></div>
+                <div className="flex justify-between"><span className={THEME.textMuted}>Category</span><span className={THEME.textSecondary}>{EXPENSE_CATEGORIES[selectedClaim.category]?.label || selectedClaim.category}</span></div>
+                {selectedClaim.project_name && <div className="flex justify-between"><span className={THEME.textMuted}>Project</span><span className={THEME.textSecondary}>{selectedClaim.project_name}</span></div>}
+                {selectedClaim.description && <div className="flex justify-between"><span className={THEME.textMuted}>Notes</span><span className={THEME.textSecondary}>{selectedClaim.description}</span></div>}
               </div>
             </div>
           </div>
