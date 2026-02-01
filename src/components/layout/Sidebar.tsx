@@ -18,7 +18,8 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  LogOut
+  LogOut,
+  ClipboardList
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -42,10 +43,11 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={20} />, adminOnly: true },
   { label: 'Cash Flow', href: '/cash-flow', icon: <Wallet size={20} />, adminOnly: true },
   { label: 'Invoices & AR', href: '/invoices', icon: <FileText size={20} />, adminOnly: true },
+  { label: 'Expenses', href: '/expenses', icon: <Receipt size={20} />, adminOnly: true },
   { label: 'Projects', href: '/projects', icon: <FolderKanban size={20} />, adminOnly: true },
   { label: 'Clients', href: '/clients', icon: <Users size={20} />, adminOnly: true },
   { label: 'Time Tracking', href: '/time-tracking', icon: <Clock size={20} />, section: 'Operations', adminOnly: true },
-  { label: 'Expense Mgmt', href: '/expenses', icon: <Receipt size={20} />, adminOnly: true },
+  { label: 'Expense Mgmt', href: '/expense-management', icon: <ClipboardList size={20} />, adminOnly: true },
   { label: 'Team', href: '/team', icon: <UserCog size={20} />, adminOnly: true },
   { label: 'Reports', href: '/reports', icon: <BarChart3 size={20} />, section: 'Analysis', adminOnly: true },
   { label: 'Forecast', href: '/forecast', icon: <Calculator size={20} />, adminOnly: true },
