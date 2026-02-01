@@ -156,10 +156,23 @@ export default function ExpenseManagement({ supabase, companyId, currentUserId }
     setProcessing(claimId)
     try {
       const upd: any = { status: newStatus }
-      if (newStatus === 'approved') { upd.approved_by = currentUserId; upd.approved_at = new Date().toISOString() }
-      const { error } = await supabase.from('expense_claims').update(upd).eq('id', claimId)
-      if (!error) setClaims(prev => prev.map(c => c.id === claimId ? { ...c, status: newStatus } : c))
-    } catch (err) { console.error(err) }
+      if (newStatus === 'approved') {
+        upd.approved_at = new Date().toISOString()
+        if (currentUserId) upd.approved_by = currentUserId
+      }
+      if (newStatus === 'reimbursed') {
+        upd.reimbursed_at = new Date().toISOString()
+      }
+      console.log('Updating claim:', claimId, 'to:', newStatus, 'data:', upd)
+      const { data, error } = await supabase.from('expense_claims').update(upd).eq('id', claimId).select()
+      if (error) {
+        console.error('Update error:', error)
+        alert(`Failed to update: ${error.message}`)
+      } else {
+        console.log('Updated:', data)
+        setClaims(prev => prev.map(c => c.id === claimId ? { ...c, status: newStatus } : c))
+      }
+    } catch (err) { console.error('Catch error:', err) }
     finally { setProcessing(null) }
   }
 
