@@ -27,6 +27,7 @@ interface SidebarProps {
   onToggle: () => void
   companyName?: string
   onSignOut: () => void
+  userRole?: 'owner' | 'admin' | 'member' | 'viewer' | string
 }
 
 interface NavItem {
@@ -34,26 +35,42 @@ interface NavItem {
   href: string
   icon: React.ReactNode
   section?: string
+  adminOnly?: boolean
 }
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={20} /> },
-  { label: 'Cash Flow', href: '/cash-flow', icon: <Wallet size={20} /> },
-  { label: 'Invoices & AR', href: '/invoices', icon: <FileText size={20} /> },
-  { label: 'Expenses', href: '/expenses', icon: <Receipt size={20} /> },
-  { label: 'Projects', href: '/projects', icon: <FolderKanban size={20} /> },
-  { label: 'Clients', href: '/clients', icon: <Users size={20} /> },
-  { label: 'Time Tracking', href: '/time-tracking', icon: <Clock size={20} />, section: 'Operations' },
-  { label: 'Team', href: '/team', icon: <UserCog size={20} /> },
-  { label: 'Reports', href: '/reports', icon: <BarChart3 size={20} />, section: 'Analysis' },
-  { label: 'Forecast', href: '/forecast', icon: <Calculator size={20} /> },
-  { label: 'Sage', href: '/ai-assistant', icon: <MessageSquare size={20} />, section: 'Intelligence' },
-  { label: 'Settings', href: '/settings', icon: <Settings size={20} />, section: 'System' },
+  { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={20} />, adminOnly: true },
+  { label: 'Cash Flow', href: '/cash-flow', icon: <Wallet size={20} />, adminOnly: true },
+  { label: 'Invoices & AR', href: '/invoices', icon: <FileText size={20} />, adminOnly: true },
+  { label: 'Expenses', href: '/expenses', icon: <Receipt size={20} />, adminOnly: true },
+  { label: 'Projects', href: '/projects', icon: <FolderKanban size={20} />, adminOnly: true },
+  { label: 'Clients', href: '/clients', icon: <Users size={20} />, adminOnly: true },
+  { label: 'Time Tracking', href: '/time-tracking', icon: <Clock size={20} />, section: 'Operations', adminOnly: true },
+  { label: 'Team', href: '/team', icon: <UserCog size={20} />, adminOnly: true },
+  { label: 'Reports', href: '/reports', icon: <BarChart3 size={20} />, section: 'Analysis', adminOnly: true },
+  { label: 'Forecast', href: '/forecast', icon: <Calculator size={20} />, adminOnly: true },
+  { label: 'Sage', href: '/ai-assistant', icon: <MessageSquare size={20} />, section: 'Intelligence', adminOnly: true },
+  { label: 'Settings', href: '/settings', icon: <Settings size={20} />, section: 'System', adminOnly: true },
+  // Employee-only items
+  { label: 'My Timesheet', href: '/timesheet', icon: <Clock size={20} /> },
 ]
 
-export default function Sidebar({ collapsed, onToggle, companyName, onSignOut }: SidebarProps) {
+export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, userRole = 'member' }: SidebarProps) {
   const pathname = usePathname()
   
+  const isLeadership = userRole === 'owner' || userRole === 'admin'
+  
+  // Filter nav items based on role
+  const visibleItems = navItems.filter(item => {
+    if (isLeadership) {
+      // Admins see all admin items, but not "My Timesheet" (they use Time Tracking)
+      return item.adminOnly === true
+    } else {
+      // Employees only see non-admin items (My Timesheet)
+      return !item.adminOnly
+    }
+  })
+
   let currentSection = ''
 
   return (
@@ -118,7 +135,7 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut }:
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 px-2">
         <ul className="space-y-1">
-          {navItems.map((item) => {
+          {visibleItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             const showSection = item.section && item.section !== currentSection
             
