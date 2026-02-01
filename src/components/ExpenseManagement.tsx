@@ -148,7 +148,8 @@ export default function ExpenseManagement({ supabase, companyId, currentUserId }
     const pending = claims.filter(c => c.status === 'submitted')
     const approved = claims.filter(c => c.status === 'approved')
     const needsReimb = claims.filter(c => c.status === 'approved' && c.payment_method === 'personal_card')
-    return { pendingCount: pending.length, pendingAmount: pending.reduce((s, c) => s + c.amount, 0), approvedAmount: approved.reduce((s, c) => s + c.amount, 0), reimbursementAmount: needsReimb.reduce((s, c) => s + c.amount, 0) }
+    const validClaims = claims.filter(c => c.status === 'approved' || c.status === 'reimbursed')
+    return { pendingCount: pending.length, pendingAmount: pending.reduce((s, c) => s + c.amount, 0), approvedAmount: approved.reduce((s, c) => s + c.amount, 0), reimbursementAmount: needsReimb.reduce((s, c) => s + c.amount, 0), validCount: validClaims.length, validAmount: validClaims.reduce((s, c) => s + c.amount, 0) }
   }, [claims])
 
   const groupedData = useMemo(() => {
@@ -248,7 +249,7 @@ export default function ExpenseManagement({ supabase, companyId, currentUserId }
           { label: 'Pending Review', amount: stats.pendingAmount, sub: `${stats.pendingCount} claims`, color: 'text-amber-400', icon: Clock },
           { label: 'Approved', amount: stats.approvedAmount, sub: null, color: 'text-emerald-400', icon: Check },
           { label: 'Needs Reimbursement', amount: stats.reimbursementAmount, sub: null, color: 'text-orange-400', icon: Wallet },
-          { label: 'Total Claims', amount: claims.reduce((s, c) => s + c.amount, 0), sub: `${claims.length} claims`, color: 'text-blue-400', icon: Receipt },
+          { label: 'Total Approved', amount: stats.validAmount, sub: `${stats.validCount} claims`, color: 'text-blue-400', icon: Receipt },
         ].map((stat, i) => (
           <div key={i} className={`p-4 rounded-xl ${THEME.glass} border ${THEME.glassBorder}`}>
             <div className="flex items-center justify-between mb-2">
