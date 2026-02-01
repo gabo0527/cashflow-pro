@@ -574,8 +574,18 @@ export default function ProjectsPage() {
     loadData()
   }, [])
 
+  // Enriched project type
+  type EnrichedProject = Project & {
+    healthScore: number
+    margin: number
+    burnRate: number
+    effectiveRate: number
+    riskLevel: 'low' | 'medium' | 'high'
+    changeOrders?: EnrichedProject[]
+  }
+
   // Enhanced project calculations
-  const enrichedProjects = useMemo(() => {
+  const enrichedProjects = useMemo((): EnrichedProject[] => {
     return projects.map(p => ({
       ...p,
       healthScore: calculateHealthScore(p),
@@ -587,7 +597,7 @@ export default function ProjectsPage() {
   }, [projects])
 
   // Filter projects
-  const filteredProjects = useMemo(() => {
+  const filteredProjects = useMemo((): EnrichedProject[] => {
     return enrichedProjects.filter(p => {
       if (searchQuery) {
         const query = searchQuery.toLowerCase()
@@ -600,8 +610,8 @@ export default function ProjectsPage() {
   }, [enrichedProjects, searchQuery, selectedStatus, selectedRisk])
 
   // Group by client (THE EDGE - Client-first view)
-  const projectsByClient = useMemo(() => {
-    const grouped = new Map<string, typeof filteredProjects>()
+  const projectsByClient = useMemo((): [string, EnrichedProject[]][] => {
+    const grouped = new Map<string, EnrichedProject[]>()
     
     // Get parent projects (not change orders)
     const parentProjects = filteredProjects.filter(p => !p.is_change_order)
@@ -613,7 +623,8 @@ export default function ProjectsPage() {
       
       // Attach change orders to parent
       const cos = changeOrders.filter(co => co.parent_id === p.id)
-      existing.push({ ...p, changeOrders: cos })
+      const projectWithCOs: EnrichedProject = { ...p, changeOrders: cos }
+      existing.push(projectWithCOs)
       grouped.set(clientName, existing)
     })
     
@@ -1096,7 +1107,7 @@ export default function ProjectsPage() {
                           onAddCO={openAddCO}
                         />
                         {/* Change Orders */}
-                        {project.changeOrders?.map((co: any) => (
+                        {project.changeOrders?.map((co) => (
                           <ProjectRow 
                             key={co.id}
                             project={co} 
