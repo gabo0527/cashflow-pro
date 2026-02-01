@@ -19,12 +19,22 @@ const supabase = createClient(
 
 // ============ DESIGN SYSTEM ============
 const COLORS = {
-  primary: '#3b82f6',
+  primary: '#10b981', // Changed to emerald
   success: '#10b981',
   warning: '#f59e0b',
   danger: '#ef4444',
   purple: '#8b5cf6',
   cyan: '#06b6d4',
+}
+
+// ============ GLASSMORPHISM THEME ============
+const THEME = {
+  glass: 'bg-slate-900/70 backdrop-blur-xl',
+  glassBorder: 'border-white/[0.08]',
+  glassHover: 'hover:bg-white/[0.05]',
+  textPrimary: 'text-white',
+  textSecondary: 'text-slate-300',
+  textMuted: 'text-slate-400',
 }
 
 // ============ UTILITY FUNCTIONS ============
@@ -211,7 +221,7 @@ function DateRangePicker({
           onChange(e.target.value)
           setShowCustom(e.target.value === 'custom')
         }}
-        className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        className="bg-slate-900/70 backdrop-blur-xl border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-slate-200 focus:ring-2 focus:ring-emerald-500/30 focus:border-transparent"
       >
         {presets.map(p => (
           <option key={p.id} value={p.id}>{p.label}</option>
@@ -224,14 +234,14 @@ function DateRangePicker({
             type="date"
             value={customStart || ''}
             onChange={(e) => onCustomChange(e.target.value, customEnd || '')}
-            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:ring-2 focus:ring-blue-500"
+            className="bg-slate-900/70 backdrop-blur-xl border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-slate-200 focus:ring-2 focus:ring-emerald-500/30"
           />
           <span className="text-slate-400">to</span>
           <input
             type="date"
             value={customEnd || ''}
             onChange={(e) => onCustomChange(customStart || '', e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:ring-2 focus:ring-blue-500"
+            className="bg-slate-900/70 backdrop-blur-xl border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-slate-200 focus:ring-2 focus:ring-emerald-500/30"
           />
         </>
       )}
@@ -252,7 +262,7 @@ function ReportCard({
   return (
     <button
       onClick={onClick}
-      className="w-full text-left p-4 rounded-xl border border-slate-700 bg-slate-800/50 hover:bg-slate-800 hover:border-slate-600 transition-all group"
+      className="w-full text-left p-4 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl hover:bg-white/[0.08] hover:border-white/[0.12] transition-all group"
     >
       <div className="flex items-start gap-3">
         <div 
@@ -262,7 +272,7 @@ function ReportCard({
           <Icon size={20} style={{ color: report.color }} />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-slate-100 group-hover:text-white">{report.name}</h3>
+          <h3 className="font-medium text-white group-hover:text-white">{report.name}</h3>
           <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{report.description}</p>
         </div>
         <ChevronRight size={18} className="text-slate-600 group-hover:text-slate-400 mt-1" />
@@ -288,12 +298,12 @@ function SectionHeader({
   return (
     <button
       onClick={onToggle}
-      className="w-full flex items-center justify-between py-3 px-4 rounded-lg bg-slate-800/30 hover:bg-slate-800/50 transition-colors"
+      className="w-full flex items-center justify-between py-3 px-4 rounded-lg bg-white/[0.03] hover:bg-slate-900/70 backdrop-blur-xl transition-colors"
     >
       <div className="flex items-center gap-3">
         <Icon size={18} className="text-slate-400" />
         <span className="font-medium text-slate-200">{title}</span>
-        <span className="text-xs text-slate-500 bg-slate-700 px-2 py-0.5 rounded-full">{count}</span>
+        <span className="text-xs text-slate-500 bg-white/[0.05] px-2 py-0.5 rounded-full">{count}</span>
       </div>
       {expanded ? (
         <ChevronUp size={18} className="text-slate-400" />
@@ -360,11 +370,11 @@ function ARAgingReport({
       {/* Summary Cards */}
       <div className="grid grid-cols-5 gap-4">
         {Object.entries(agingData).map(([key, bucket]) => (
-          <div key={key} className="p-4 rounded-xl border border-slate-700 bg-slate-800/50">
+          <div key={key} className="p-4 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl">
             <p className="text-xs font-medium text-slate-400">{bucket.label}</p>
-            <p className="text-xl font-bold text-slate-100 mt-1">{formatCurrency(bucket.amount)}</p>
+            <p className="text-xl font-bold text-white mt-1">{formatCurrency(bucket.amount)}</p>
             <p className="text-xs text-slate-500 mt-1">{bucket.count} invoices</p>
-            <div className="mt-2 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+            <div className="mt-2 h-1.5 bg-white/[0.05] rounded-full overflow-hidden">
               <div 
                 className="h-full rounded-full"
                 style={{ 
@@ -381,14 +391,14 @@ function ARAgingReport({
       </div>
 
       {/* Detail Table */}
-      <div className="rounded-xl border border-slate-700 overflow-hidden">
-        <div className="bg-slate-800/50 px-4 py-3 border-b border-slate-700">
+      <div className="rounded-xl border border-white/[0.08] overflow-hidden">
+        <div className="bg-slate-900/70 backdrop-blur-xl px-4 py-3 border-b border-white/[0.08]">
           <h3 className="font-medium text-slate-200">Aging Detail by Client</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-800/30">
+              <tr className="bg-white/[0.03]">
                 <th className="text-left px-4 py-3 font-medium text-slate-400">Client</th>
                 <th className="text-right px-4 py-3 font-medium text-slate-400">Current</th>
                 <th className="text-right px-4 py-3 font-medium text-slate-400">1-30</th>
@@ -425,27 +435,27 @@ function ARAgingReport({
                 return Object.values(byClient)
                   .sort((a, b) => b.total - a.total)
                   .map((row, i) => (
-                    <tr key={i} className="border-t border-slate-700/50 hover:bg-slate-800/30">
+                    <tr key={i} className="border-t border-white/[0.08]/50 hover:bg-white/[0.03]">
                       <td className="px-4 py-3 font-medium text-slate-200">{row.name}</td>
                       <td className="px-4 py-3 text-right text-slate-300">{row.current > 0 ? formatCurrency(row.current) : '—'}</td>
                       <td className="px-4 py-3 text-right text-slate-300">{row.days30 > 0 ? formatCurrency(row.days30) : '—'}</td>
                       <td className="px-4 py-3 text-right text-slate-300">{row.days60 > 0 ? formatCurrency(row.days60) : '—'}</td>
                       <td className="px-4 py-3 text-right text-slate-300">{row.days90 > 0 ? formatCurrency(row.days90) : '—'}</td>
                       <td className="px-4 py-3 text-right text-rose-400">{row.over90 > 0 ? formatCurrency(row.over90) : '—'}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-100">{formatCurrency(row.total)}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-white">{formatCurrency(row.total)}</td>
                     </tr>
                   ))
               })()}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-slate-600 bg-slate-800/50">
-                <td className="px-4 py-3 font-semibold text-slate-100">Total</td>
-                <td className="px-4 py-3 text-right font-semibold text-slate-100">{formatCurrency(agingData.current.amount)}</td>
-                <td className="px-4 py-3 text-right font-semibold text-slate-100">{formatCurrency(agingData.days30.amount)}</td>
-                <td className="px-4 py-3 text-right font-semibold text-slate-100">{formatCurrency(agingData.days60.amount)}</td>
-                <td className="px-4 py-3 text-right font-semibold text-slate-100">{formatCurrency(agingData.days90.amount)}</td>
+              <tr className="border-t-2 border-white/[0.12] bg-slate-900/70 backdrop-blur-xl">
+                <td className="px-4 py-3 font-semibold text-white">Total</td>
+                <td className="px-4 py-3 text-right font-semibold text-white">{formatCurrency(agingData.current.amount)}</td>
+                <td className="px-4 py-3 text-right font-semibold text-white">{formatCurrency(agingData.days30.amount)}</td>
+                <td className="px-4 py-3 text-right font-semibold text-white">{formatCurrency(agingData.days60.amount)}</td>
+                <td className="px-4 py-3 text-right font-semibold text-white">{formatCurrency(agingData.days90.amount)}</td>
                 <td className="px-4 py-3 text-right font-semibold text-rose-400">{formatCurrency(agingData.over90.amount)}</td>
-                <td className="px-4 py-3 text-right font-bold text-slate-100">{formatCurrency(totalAR)}</td>
+                <td className="px-4 py-3 text-right font-bold text-white">{formatCurrency(totalAR)}</td>
               </tr>
             </tfoot>
           </table>
@@ -518,22 +528,22 @@ function CategorySpendingReport({
   return (
     <div className="space-y-6">
       {/* Summary */}
-      <div className="p-4 rounded-xl border border-slate-700 bg-slate-800/50">
+      <div className="p-4 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-slate-400">Total Spending</p>
-            <p className="text-3xl font-bold text-slate-100">{formatCurrency(totalSpending)}</p>
+            <p className="text-3xl font-bold text-white">{formatCurrency(totalSpending)}</p>
           </div>
           <div className="text-right">
             <p className="text-sm text-slate-400">Categories</p>
-            <p className="text-3xl font-bold text-slate-100">{categoryData.length}</p>
+            <p className="text-3xl font-bold text-white">{categoryData.length}</p>
           </div>
         </div>
       </div>
 
       {/* Category Breakdown */}
-      <div className="rounded-xl border border-slate-700 overflow-hidden">
-        <div className="bg-slate-800/50 px-4 py-3 border-b border-slate-700">
+      <div className="rounded-xl border border-white/[0.08] overflow-hidden">
+        <div className="bg-slate-900/70 backdrop-blur-xl px-4 py-3 border-b border-white/[0.08]">
           <h3 className="font-medium text-slate-200">Spending by Category</h3>
         </div>
         <div className="divide-y divide-slate-700/50">
@@ -541,7 +551,7 @@ function CategorySpendingReport({
             <div key={cat.name}>
               <button
                 onClick={() => setExpandedCategory(expandedCategory === cat.name ? null : cat.name)}
-                className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-800/30 transition-colors"
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/[0.03] transition-colors"
               >
                 <div className="flex items-center gap-3">
                   {expandedCategory === cat.name ? (
@@ -553,7 +563,7 @@ function CategorySpendingReport({
                   <span className="text-xs text-slate-500">{cat.count} transactions</span>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="w-32 h-2 bg-slate-700 rounded-full overflow-hidden">
+                  <div className="w-32 h-2 bg-white/[0.05] rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-blue-500 rounded-full"
                       style={{ width: `${(cat.amount / totalSpending) * 100}%` }}
@@ -562,7 +572,7 @@ function CategorySpendingReport({
                   <span className="text-sm text-slate-400 w-12 text-right">
                     {((cat.amount / totalSpending) * 100).toFixed(0)}%
                   </span>
-                  <span className="font-semibold text-slate-100 w-24 text-right">
+                  <span className="font-semibold text-white w-24 text-right">
                     {formatCurrency(cat.amount)}
                   </span>
                 </div>
@@ -686,22 +696,22 @@ function UtilizationReport({
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl border border-slate-700 bg-slate-800/50">
+        <div className="p-4 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl">
           <p className="text-xs font-medium text-slate-400">Billable Utilization</p>
           <p className="text-2xl font-bold text-emerald-400 mt-1">{formatPercent(totals.avgBillableUtilization)}</p>
           <p className="text-xs text-slate-500 mt-1">{formatNumber(totals.billableHours)} billable hours</p>
         </div>
-        <div className="p-4 rounded-xl border border-slate-700 bg-slate-800/50">
+        <div className="p-4 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl">
           <p className="text-xs font-medium text-slate-400">Total Utilization</p>
           <p className="text-2xl font-bold text-blue-400 mt-1">{formatPercent(totals.avgUtilization)}</p>
           <p className="text-xs text-slate-500 mt-1">{formatNumber(totals.totalHours)} total hours</p>
         </div>
-        <div className="p-4 rounded-xl border border-slate-700 bg-slate-800/50">
+        <div className="p-4 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl">
           <p className="text-xs font-medium text-slate-400">Billable Value</p>
-          <p className="text-2xl font-bold text-slate-100 mt-1">{formatCurrency(totals.billableAmount)}</p>
+          <p className="text-2xl font-bold text-white mt-1">{formatCurrency(totals.billableAmount)}</p>
           <p className="text-xs text-slate-500 mt-1">At current rates</p>
         </div>
-        <div className="p-4 rounded-xl border border-slate-700 bg-slate-800/50">
+        <div className="p-4 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl">
           <p className="text-xs font-medium text-slate-400">Non-Billable Hours</p>
           <p className="text-2xl font-bold text-amber-400 mt-1">{formatNumber(totals.nonBillableHours)}</p>
           <p className="text-xs text-slate-500 mt-1">{formatPercent(totals.totalHours > 0 ? (totals.nonBillableHours / totals.totalHours) * 100 : 0)} of total</p>
@@ -709,13 +719,13 @@ function UtilizationReport({
       </div>
 
       {/* Detail Table */}
-      <div className="rounded-xl border border-slate-700 overflow-hidden">
-        <div className="bg-slate-800/50 px-4 py-3 border-b border-slate-700">
+      <div className="rounded-xl border border-white/[0.08] overflow-hidden">
+        <div className="bg-slate-900/70 backdrop-blur-xl px-4 py-3 border-b border-white/[0.08]">
           <h3 className="font-medium text-slate-200">Utilization by Team Member</h3>
         </div>
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-slate-800/30">
+            <tr className="bg-white/[0.03]">
               <th className="text-left px-4 py-3 font-medium text-slate-400">Team Member</th>
               <th className="text-right px-4 py-3 font-medium text-slate-400">Billable Hrs</th>
               <th className="text-right px-4 py-3 font-medium text-slate-400">Non-Billable</th>
@@ -727,7 +737,7 @@ function UtilizationReport({
           </thead>
           <tbody>
             {utilizationData.members.map((member, i) => (
-              <tr key={i} className="border-t border-slate-700/50 hover:bg-slate-800/30">
+              <tr key={i} className="border-t border-white/[0.08]/50 hover:bg-white/[0.03]">
                 <td className="px-4 py-3 font-medium text-slate-200">{member.name}</td>
                 <td className="px-4 py-3 text-right text-emerald-400">{formatNumber(member.billableHours)}</td>
                 <td className="px-4 py-3 text-right text-amber-400">{formatNumber(member.nonBillableHours)}</td>
@@ -735,7 +745,7 @@ function UtilizationReport({
                 <td className="px-4 py-3 text-right text-slate-500">{formatNumber(utilizationData.availableHoursPerPerson)}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-center gap-2">
-                    <div className="w-20 h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="w-20 h-2 bg-white/[0.05] rounded-full overflow-hidden">
                       <div 
                         className="h-full rounded-full"
                         style={{ 
@@ -753,19 +763,19 @@ function UtilizationReport({
                     </span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-right font-medium text-slate-100">{formatCurrency(member.billableAmount)}</td>
+                <td className="px-4 py-3 text-right font-medium text-white">{formatCurrency(member.billableAmount)}</td>
               </tr>
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t-2 border-slate-600 bg-slate-800/50">
-              <td className="px-4 py-3 font-semibold text-slate-100">Total / Average</td>
+            <tr className="border-t-2 border-white/[0.12] bg-slate-900/70 backdrop-blur-xl">
+              <td className="px-4 py-3 font-semibold text-white">Total / Average</td>
               <td className="px-4 py-3 text-right font-semibold text-emerald-400">{formatNumber(totals.billableHours)}</td>
               <td className="px-4 py-3 text-right font-semibold text-amber-400">{formatNumber(totals.nonBillableHours)}</td>
-              <td className="px-4 py-3 text-right font-semibold text-slate-100">{formatNumber(totals.totalHours)}</td>
+              <td className="px-4 py-3 text-right font-semibold text-white">{formatNumber(totals.totalHours)}</td>
               <td className="px-4 py-3 text-right text-slate-500">—</td>
               <td className="px-4 py-3 text-center font-semibold text-emerald-400">{formatPercent(totals.avgBillableUtilization)}</td>
-              <td className="px-4 py-3 text-right font-bold text-slate-100">{formatCurrency(totals.billableAmount)}</td>
+              <td className="px-4 py-3 text-right font-bold text-white">{formatCurrency(totals.billableAmount)}</td>
             </tr>
           </tfoot>
         </table>
@@ -864,19 +874,19 @@ function ClientProfitabilityReport({
     <div className="space-y-6">
       {/* Summary */}
       <div className="grid grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl border border-slate-700 bg-slate-800/50">
+        <div className="p-4 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl">
           <p className="text-xs font-medium text-slate-400">Total Revenue</p>
           <p className="text-2xl font-bold text-emerald-400 mt-1">{formatCurrency(totals.revenue)}</p>
         </div>
-        <div className="p-4 rounded-xl border border-slate-700 bg-slate-800/50">
+        <div className="p-4 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl">
           <p className="text-xs font-medium text-slate-400">Total Labor Cost</p>
           <p className="text-2xl font-bold text-rose-400 mt-1">{formatCurrency(totals.laborCost)}</p>
         </div>
-        <div className="p-4 rounded-xl border border-slate-700 bg-slate-800/50">
+        <div className="p-4 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl">
           <p className="text-xs font-medium text-slate-400">Gross Profit</p>
-          <p className="text-2xl font-bold text-slate-100 mt-1">{formatCurrency(totals.grossProfit)}</p>
+          <p className="text-2xl font-bold text-white mt-1">{formatCurrency(totals.grossProfit)}</p>
         </div>
-        <div className="p-4 rounded-xl border border-slate-700 bg-slate-800/50">
+        <div className="p-4 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl">
           <p className="text-xs font-medium text-slate-400">Avg Margin</p>
           <p className="text-2xl font-bold mt-1" style={{ 
             color: totals.margin >= 40 ? COLORS.success : totals.margin >= 20 ? COLORS.warning : COLORS.danger 
@@ -887,13 +897,13 @@ function ClientProfitabilityReport({
       </div>
 
       {/* Detail Table */}
-      <div className="rounded-xl border border-slate-700 overflow-hidden">
-        <div className="bg-slate-800/50 px-4 py-3 border-b border-slate-700">
+      <div className="rounded-xl border border-white/[0.08] overflow-hidden">
+        <div className="bg-slate-900/70 backdrop-blur-xl px-4 py-3 border-b border-white/[0.08]">
           <h3 className="font-medium text-slate-200">Client Profitability Detail</h3>
         </div>
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-slate-800/30">
+            <tr className="bg-white/[0.03]">
               <th className="text-left px-4 py-3 font-medium text-slate-400">Client</th>
               <th className="text-right px-4 py-3 font-medium text-slate-400">Revenue</th>
               <th className="text-right px-4 py-3 font-medium text-slate-400">Labor Cost</th>
@@ -905,11 +915,11 @@ function ClientProfitabilityReport({
           </thead>
           <tbody>
             {profitabilityData.map((client, i) => (
-              <tr key={i} className="border-t border-slate-700/50 hover:bg-slate-800/30">
+              <tr key={i} className="border-t border-white/[0.08]/50 hover:bg-white/[0.03]">
                 <td className="px-4 py-3 font-medium text-slate-200">{client.name}</td>
                 <td className="px-4 py-3 text-right text-emerald-400">{formatCurrency(client.revenue)}</td>
                 <td className="px-4 py-3 text-right text-rose-400">{formatCurrency(client.laborCost)}</td>
-                <td className="px-4 py-3 text-right font-medium text-slate-100">{formatCurrency(client.grossProfit)}</td>
+                <td className="px-4 py-3 text-right font-medium text-white">{formatCurrency(client.grossProfit)}</td>
                 <td className="px-4 py-3 text-center">
                   <span className="px-2 py-0.5 rounded text-xs font-medium" style={{
                     backgroundColor: client.margin >= 40 ? `${COLORS.success}20` : 
@@ -1034,8 +1044,8 @@ function PnLReport({
       </div>
 
       {/* P&L Statement */}
-      <div className="rounded-xl border border-slate-700 overflow-hidden">
-        <div className="bg-slate-800/50 px-4 py-3 border-b border-slate-700">
+      <div className="rounded-xl border border-white/[0.08] overflow-hidden">
+        <div className="bg-slate-900/70 backdrop-blur-xl px-4 py-3 border-b border-white/[0.08]">
           <h3 className="font-medium text-slate-200">
             Profit & Loss Statement ({basis === 'cash' ? 'Cash Basis' : 'Accrual Basis'})
           </h3>
@@ -1049,8 +1059,8 @@ function PnLReport({
               <tr 
                 key={i} 
                 className={`
-                  ${row.border ? 'border-t-2 border-slate-600' : 'border-t border-slate-700/50'}
-                  ${row.highlight ? 'bg-slate-800/50' : ''}
+                  ${row.border ? 'border-t-2 border-white/[0.12]' : 'border-t border-white/[0.08]/50'}
+                  ${row.highlight ? 'bg-slate-900/70 backdrop-blur-xl' : ''}
                 `}
               >
                 <td 
@@ -1059,7 +1069,7 @@ function PnLReport({
                 >
                   {row.label}
                 </td>
-                <td className={`px-4 py-3 text-right ${row.bold ? 'font-semibold' : ''} ${row.color || 'text-slate-100'}`}>
+                <td className={`px-4 py-3 text-right ${row.bold ? 'font-semibold' : ''} ${row.color || 'text-white'}`}>
                   {row.isPercent 
                     ? formatPercent(row.value)
                     : formatCurrency(row.value)
@@ -1181,7 +1191,7 @@ export default function ReportsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -1191,7 +1201,7 @@ export default function ReportsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Reports</h1>
+          <h1 className="text-2xl font-bold text-white">Reports</h1>
           <p className="text-sm text-slate-400 mt-1">Financial analysis and insights</p>
         </div>
         
@@ -1200,8 +1210,8 @@ export default function ReportsPage() {
             onClick={() => setActiveView('library')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeView === 'library' 
-                ? 'bg-blue-500 text-white' 
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                ? 'bg-emerald-500 text-white' 
+                : 'bg-white/[0.05] border border-white/[0.08] text-slate-300 hover:bg-white/[0.08]'
             }`}
           >
             <Layers size={16} className="inline mr-2" />
@@ -1211,8 +1221,8 @@ export default function ReportsPage() {
             onClick={() => setActiveView('builder')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeView === 'builder' 
-                ? 'bg-blue-500 text-white' 
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                ? 'bg-emerald-500 text-white' 
+                : 'bg-white/[0.05] border border-white/[0.08] text-slate-300 hover:bg-white/[0.08]'
             }`}
           >
             <LayoutGrid size={16} className="inline mr-2" />
@@ -1222,7 +1232,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Filters Bar */}
-      <div className="flex flex-wrap items-center gap-4 p-4 rounded-xl border border-slate-700 bg-slate-800/50">
+      <div className="flex flex-wrap items-center gap-4 p-4 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl">
         <div className="flex items-center gap-2">
           <Calendar size={18} className="text-slate-400" />
           <DateRangePicker
@@ -1238,14 +1248,14 @@ export default function ReportsPage() {
         </div>
         
         {activeView === 'report' && selectedReport?.id.startsWith('pnl') && (
-          <div className="flex items-center gap-2 ml-4 pl-4 border-l border-slate-700">
+          <div className="flex items-center gap-2 ml-4 pl-4 border-l border-white/[0.08]">
             <span className="text-sm text-slate-400">Basis:</span>
             <button
               onClick={() => setPnlBasis('cash')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 pnlBasis === 'cash' 
-                  ? 'bg-blue-500 text-white' 
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  ? 'bg-emerald-500 text-white' 
+                  : 'bg-white/[0.05] text-slate-300 hover:bg-white/[0.1]'
               }`}
             >
               Cash
@@ -1254,8 +1264,8 @@ export default function ReportsPage() {
               onClick={() => setPnlBasis('accrual')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 pnlBasis === 'accrual' 
-                  ? 'bg-blue-500 text-white' 
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  ? 'bg-emerald-500 text-white' 
+                  : 'bg-white/[0.05] text-slate-300 hover:bg-white/[0.1]'
               }`}
             >
               Accrual
@@ -1269,7 +1279,7 @@ export default function ReportsPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={handleExportPDF}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-200 text-sm font-medium transition-colors"
             >
               <Download size={16} />
               Export PDF
@@ -1289,7 +1299,7 @@ export default function ReportsPage() {
               placeholder="Search reports..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-900/70 backdrop-blur-xl border border-white/[0.08] text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-emerald-500/30 focus:border-transparent"
             />
           </div>
 
@@ -1300,7 +1310,7 @@ export default function ReportsPage() {
               if (catReports.length === 0) return null
               
               return (
-                <div key={cat.id} className="rounded-xl border border-slate-700 overflow-hidden">
+                <div key={cat.id} className="rounded-xl border border-white/[0.08] overflow-hidden">
                   <SectionHeader
                     title={cat.name}
                     icon={cat.icon}
@@ -1310,7 +1320,7 @@ export default function ReportsPage() {
                   />
                   
                   {expandedCategories.includes(cat.id) && (
-                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 bg-slate-800/20">
+                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 bg-white/[0.02]">
                       {catReports.map(report => (
                         <ReportCard 
                           key={report.id} 
@@ -1350,7 +1360,7 @@ export default function ReportsPage() {
               <selectedReport.icon size={24} style={{ color: selectedReport.color }} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-100">{selectedReport.name}</h2>
+              <h2 className="text-xl font-bold text-white">{selectedReport.name}</h2>
               <p className="text-sm text-slate-400">{selectedReport.description}</p>
             </div>
           </div>
@@ -1401,7 +1411,7 @@ export default function ReportsPage() {
       )}
 
       {activeView === 'builder' && (
-        <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-8">
+        <div className="rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl p-8">
           <div className="text-center">
             <LayoutGrid size={48} className="mx-auto mb-4 text-slate-600" />
             <h3 className="text-lg font-semibold text-slate-200">Custom Report Builder</h3>
