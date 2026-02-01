@@ -9,15 +9,7 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', proces
 interface Company { id: string; name: string; legal_name?: string; ein?: string; address?: string; city?: string; state?: string; zip?: string; country?: string; industry?: string; fiscal_year_start?: string; currency?: string; timezone?: string; logo_url?: string; created_at: string }
 interface TeamMember { id: string; name: string; email: string; role: string | null; permission_role: 'owner'|'admin'|'member'|'viewer'|'employee'; status: 'active'|'inactive'|'invited' }
 
-// ====== SINGLE SOURCE OF TRUTH FOR PERMISSIONS ======
-// Import this in your Sidebar to gate navigation items
-export const PERMISSION_MATRIX: Record<string, { label: string; description: string; color: string; access: string[] }> = {
-  owner:    { label: 'Owner',    description: 'Full access, can delete company',    color: 'text-purple-400',  access: ['dashboard','cash_flow','invoices','expenses','time_tracking','team','projects','clients','reports','forecast','sage','settings'] },
-  admin:    { label: 'Admin',    description: 'Full access except billing & delete', color: 'text-emerald-400', access: ['dashboard','cash_flow','invoices','expenses','time_tracking','team','projects','clients','reports','forecast','sage','settings'] },
-  member:   { label: 'Member',   description: 'Can edit data, view reports',         color: 'text-blue-400',    access: ['dashboard','invoices','expenses','time_tracking','projects','reports'] },
-  viewer:   { label: 'Viewer',   description: 'Read-only access to dashboards',      color: 'text-slate-400',   access: ['dashboard','reports'] },
-  employee: { label: 'Employee', description: 'Timesheet & expenses only',           color: 'text-amber-400',   access: ['timesheet','expenses_submit'] },
-}
+import { PERMISSION_MATRIX } from '@/lib/permissions'
 
 const ALL_FEATURES = [
   { id: 'dashboard', label: 'Dashboard' }, { id: 'cash_flow', label: 'Cash Flow' }, { id: 'invoices', label: 'Invoices' },
