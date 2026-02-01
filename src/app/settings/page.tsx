@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Building2, Users, Shield, Link2, CreditCard, Database, Bell, ChevronRight, Check, X, Trash2, Edit2, Eye, EyeOff, RefreshCw, Copy, ExternalLink, Key, Lock, Mail, Smartphone, FileText, Download, UserPlus, CheckCircle2, Info, Loader2, Save, Plus } from 'lucide-react'
+import { Building2, Users, Shield, Link2, CreditCard, Database, Bell, ChevronRight, Check, X, Trash2, Edit2, Eye, EyeOff, RefreshCw, Copy, ExternalLink, Key, Lock, Mail, Smartphone, FileText, Download, UserPlus, CheckCircle2, Info, Loader2, Save, Plus, Scale } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
@@ -9,7 +9,15 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', proces
 interface Company { id: string; name: string; legal_name?: string; ein?: string; address?: string; city?: string; state?: string; zip?: string; country?: string; industry?: string; fiscal_year_start?: string; currency?: string; timezone?: string; logo_url?: string; created_at: string }
 interface TeamMember { id: string; name: string; email: string; role: string | null; permission_role: 'owner'|'admin'|'member'|'viewer'|'employee'; status: 'active'|'inactive'|'invited' }
 
-import { PERMISSION_MATRIX } from '@/lib/permissions'
+// ====== SINGLE SOURCE OF TRUTH FOR PERMISSIONS ======
+// Import this in your Sidebar to gate navigation items
+export const PERMISSION_MATRIX: Record<string, { label: string; description: string; color: string; access: string[] }> = {
+  owner:    { label: 'Owner',    description: 'Full access, can delete company',    color: 'text-purple-400',  access: ['dashboard','cash_flow','invoices','expenses','time_tracking','team','projects','clients','reports','forecast','sage','settings'] },
+  admin:    { label: 'Admin',    description: 'Full access except billing & delete', color: 'text-emerald-400', access: ['dashboard','cash_flow','invoices','expenses','time_tracking','team','projects','clients','reports','forecast','sage','settings'] },
+  member:   { label: 'Member',   description: 'Can edit data, view reports',         color: 'text-blue-400',    access: ['dashboard','invoices','expenses','time_tracking','projects','reports'] },
+  viewer:   { label: 'Viewer',   description: 'Read-only access to dashboards',      color: 'text-slate-400',   access: ['dashboard','reports'] },
+  employee: { label: 'Employee', description: 'Timesheet & expenses only',           color: 'text-amber-400',   access: ['timesheet','expenses_submit'] },
+}
 
 const ALL_FEATURES = [
   { id: 'dashboard', label: 'Dashboard' }, { id: 'cash_flow', label: 'Cash Flow' }, { id: 'invoices', label: 'Invoices' },
@@ -23,6 +31,7 @@ const SETTINGS_SECTIONS = [
   { id: 'security', label: 'Security', icon: Shield }, { id: 'integrations', label: 'Integrations', icon: Link2 },
   { id: 'billing', label: 'Billing & Plan', icon: CreditCard }, { id: 'data', label: 'Data & Privacy', icon: Database },
   { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'legal', label: 'Legal', icon: Scale },
 ]
 const INDUSTRIES = ['Consulting','Technology','Construction','Healthcare','Legal','Marketing','Financial Services','Real Estate','Manufacturing','Other']
 const TIMEZONES = [{ value: 'America/New_York', label: 'Eastern (ET)' },{ value: 'America/Chicago', label: 'Central (CT)' },{ value: 'America/Denver', label: 'Mountain (MT)' },{ value: 'America/Los_Angeles', label: 'Pacific (PT)' },{ value: 'America/Puerto_Rico', label: 'Atlantic (AT)' },{ value: 'Europe/Madrid', label: 'CET' },{ value: 'Europe/London', label: 'GMT' }]
@@ -200,6 +209,34 @@ function NotificationsSection({ companyId }: { companyId: string }) {
   </div>)
 }
 
+// ====== LEGAL ======
+function LegalSection() {
+  const docs = [
+    { title: 'Terms of Service', desc: 'Usage terms, liability, and service conditions', href: '/terms', updated: 'February 1, 2026' },
+    { title: 'Privacy Policy', desc: 'How we collect, use, and protect your data', href: '/privacy', updated: 'February 1, 2026' },
+  ]
+  return (<div className="space-y-6">
+    <SectionCard><SectionHeader title="Legal Documents" description="Review our terms and policies" /><div className="divide-y divide-white/[0.08]">
+      {docs.map(d => <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between px-6 py-4 hover:bg-white/[0.02] transition-colors group">
+        <div className="flex items-center gap-4"><div className="w-10 h-10 rounded-lg bg-slate-800/50 flex items-center justify-center"><FileText size={18} className="text-slate-400 group-hover:text-emerald-400 transition-colors" /></div><div><p className="text-white font-medium">{d.title}</p><p className="text-sm text-slate-400">{d.desc}</p></div></div>
+        <div className="flex items-center gap-3"><span className="text-xs text-slate-500">Updated {d.updated}</span><ExternalLink size={16} className="text-slate-500 group-hover:text-emerald-400 transition-colors" /></div>
+      </a>)}
+    </div></SectionCard>
+    <SectionCard><SectionHeader title="Contact" description="Reach our legal and privacy teams" /><div className="p-6 space-y-4">
+      <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg"><div className="flex items-center gap-3"><Mail size={18} className="text-slate-400" /><div><p className="text-white font-medium">Legal Inquiries</p><p className="text-sm text-slate-400">Terms, compliance, and general legal questions</p></div></div><a href="mailto:legal@vantagefp.co" className="text-emerald-400 text-sm font-medium hover:underline">legal@vantagefp.co</a></div>
+      <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg"><div className="flex items-center gap-3"><Shield size={18} className="text-slate-400" /><div><p className="text-white font-medium">Privacy & Data Requests</p><p className="text-sm text-slate-400">Data access, deletion, and privacy concerns</p></div></div><a href="mailto:privacy@vantagefp.co" className="text-emerald-400 text-sm font-medium hover:underline">privacy@vantagefp.co</a></div>
+    </div></SectionCard>
+    <SectionCard><SectionHeader title="Data Processing" description="Infrastructure and compliance" /><div className="p-6 space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="p-4 bg-slate-800/50 rounded-lg text-center"><p className="text-emerald-400 font-semibold text-lg">TLS 1.2+</p><p className="text-xs text-slate-400 mt-1">Encryption in Transit</p></div>
+        <div className="p-4 bg-slate-800/50 rounded-lg text-center"><p className="text-emerald-400 font-semibold text-lg">AES-256</p><p className="text-xs text-slate-400 mt-1">Encryption at Rest</p></div>
+        <div className="p-4 bg-slate-800/50 rounded-lg text-center"><p className="text-emerald-400 font-semibold text-lg">RLS</p><p className="text-xs text-slate-400 mt-1">Row-Level Isolation</p></div>
+      </div>
+      <div className="p-4 bg-slate-800/50 rounded-lg"><p className="text-sm text-slate-300 leading-relaxed">Your financial data is stored on Supabase (PostgreSQL) with Row Level Security ensuring complete data isolation between organizations. Application hosted on Vercel. Authentication handled via Google OAuth 2.0 — we never store passwords. All connections are HTTPS-only.</p></div>
+    </div></SectionCard>
+  </div>)
+}
+
 // ====== MAIN ======
 export default function SettingsPage() {
   const [section, setSection] = useState('company'); const [company, setCompany] = useState<Company|null>(null); const [companyId, setCompanyId] = useState<string|null>(null); const [loading, setLoading] = useState(true)
@@ -221,6 +258,7 @@ export default function SettingsPage() {
     case 'billing': return <BillingSection />
     case 'data': return <DataPrivacySection />
     case 'notifications': return companyId ? <NotificationsSection companyId={companyId} /> : null
+    case 'legal': return <LegalSection />
     default: return null
   }}
 
