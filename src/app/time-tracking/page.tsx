@@ -560,7 +560,7 @@ export default function TimeTrackingPage() {
           <p className={`text-sm mt-1 ${THEME.textMuted}`}>{getFilterTitle()}</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={exportToExcel} className={`flex items-center gap-2 px-4 py-2 ${THEME.glass} border ${THEME.glassBorder} hover:bg-white/[0.08] rounded-lg text-sm font-medium transition-colors`}><Download size={18} />Export</button>
+          <button onClick={exportToExcel} className={`flex items-center gap-2 px-4 py-2 ${THEME.glass} border ${THEME.glassBorder} hover:bg-white/[0.08] rounded-lg text-sm font-medium text-white transition-colors`}><Download size={18} />Export</button>
           <button onClick={() => setShowEntryModal(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm font-medium transition-colors"><Plus size={18} />Add Entry</button>
         </div>
       </div>
@@ -569,7 +569,7 @@ export default function TimeTrackingPage() {
       <div className={`p-4 rounded-xl border ${THEME.glass} ${THEME.glassBorder}`}>
         <div className="flex flex-wrap items-center gap-4">
           <div className="relative">
-            <button onClick={() => setShowDatePicker(!showDatePicker)} className={`flex items-center gap-2 px-4 py-2 bg-white/[0.05] border ${THEME.glassBorder} hover:bg-white/[0.08] rounded-lg text-sm font-medium transition-colors`}>
+            <button onClick={() => setShowDatePicker(!showDatePicker)} className={`flex items-center gap-2 px-4 py-2 bg-white/[0.05] border ${THEME.glassBorder} hover:bg-white/[0.08] rounded-lg text-sm font-medium text-white transition-colors`}>
               <Calendar size={16} />{DATE_PRESETS.find(p => p.id === datePreset)?.label}<ChevronDown size={16} />
             </button>
             {showDatePicker && (
@@ -590,7 +590,7 @@ export default function TimeTrackingPage() {
               </div>
             )}
           </div>
-          <span className={`text-sm ${THEME.textMuted}`}>{formatDate(dateRange.start)} — {formatDate(dateRange.end)}</span>
+          <span className={`text-sm ${THEME.textSecondary}`}>{formatDate(dateRange.start)} — {formatDate(dateRange.end)}</span>
           <div className="h-6 w-px bg-white/[0.08]" />
           <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className={`px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30`}>
             <option value="all">All Clients</option>
