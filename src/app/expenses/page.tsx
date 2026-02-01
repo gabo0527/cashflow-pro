@@ -1,40 +1,77 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { 
   Receipt, DollarSign, TrendingUp, TrendingDown, Users, Building2,
   Plus, ChevronDown, ChevronUp, Filter, Download, Search, RefreshCw,
   MoreHorizontal, Edit2, Check, X, Trash2, Calendar, Briefcase,
   CreditCard, FileText, PieChart, BarChart3, AlertCircle, CheckCircle2,
-  Settings, PlusCircle
+  Settings, PlusCircle, ChevronRight, Wrench, Package, UserCheck, Monitor
 } from 'lucide-react'
-import Link from 'next/link'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart as RePieChart, Pie, Cell, LineChart, Line, AreaChart, Area
+  PieChart as RePieChart, Pie, Cell
 } from 'recharts'
 import { createClient } from '@supabase/supabase-js'
 import { getCurrentUser } from '@/lib/supabase'
 
-// Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
-// ============ DESIGN SYSTEM ============
+// ============ GLASSMORPHISM THEME ============
+const THEME = {
+  glass: 'bg-slate-900/70 backdrop-blur-xl',
+  glassBorder: 'border-white/[0.08]',
+  glassHover: 'hover:bg-white/[0.05] hover:border-white/[0.12]',
+  textPrimary: 'text-white',
+  textSecondary: 'text-slate-300',
+  textMuted: 'text-slate-400',
+  textDim: 'text-slate-500',
+}
+
 const COLORS = {
   emerald: '#10b981',
-  emeraldLight: '#34d399',
-  blue: '#3b82f6',
-  blueLight: '#60a5fa',
   rose: '#f43f5e',
-  roseLight: '#fb7185',
   amber: '#f59e0b',
-  amberLight: '#fbbf24',
+  blue: '#3b82f6',
   purple: '#8b5cf6',
   cyan: '#06b6d4',
   orange: '#f97316',
+}
+
+// ============ EXPENSE CATEGORY SYSTEM ============
+// Main categories with their subcategories
+const EXPENSE_CATEGORIES = {
+  directCosts: {
+    label: 'Direct Costs',
+    description: 'Project-specific costs that affect Gross Margin',
+    color: 'rose',
+    subcategories: [
+      { id: 'labor', name: 'Labor', icon: Users, requiresTeamMember: true },
+      { id: 'materials', name: 'Materials', icon: Package, requiresTeamMember: false },
+      { id: 'equipment', name: 'Equipment Rental', icon: Wrench, requiresTeamMember: false },
+      { id: 'subcontractor', name: 'Subcontractor', icon: UserCheck, requiresTeamMember: true },
+      { id: 'projectExpense', name: 'Project Expense', icon: Briefcase, requiresTeamMember: false },
+    ]
+  },
+  overhead: {
+    label: 'Overhead',
+    description: 'Operating expenses that affect Net Profit',
+    color: 'amber',
+    subcategories: [
+      { id: 'software', name: 'Software & Subscriptions', icon: Monitor, requiresTeamMember: false },
+      { id: 'rent', name: 'Rent & Utilities', icon: Building2, requiresTeamMember: false },
+      { id: 'insurance', name: 'Insurance', icon: FileText, requiresTeamMember: false },
+      { id: 'marketing', name: 'Marketing', icon: TrendingUp, requiresTeamMember: false },
+      { id: 'professional', name: 'Professional Services', icon: Briefcase, requiresTeamMember: false },
+      { id: 'travel', name: 'Travel & Entertainment', icon: CreditCard, requiresTeamMember: false },
+      { id: 'office', name: 'Office & Supplies', icon: Package, requiresTeamMember: false },
+      { id: 'payroll', name: 'Payroll & Benefits', icon: Users, requiresTeamMember: true },
+      { id: 'other', name: 'Other', icon: MoreHorizontal, requiresTeamMember: false },
+    ]
+  }
 }
 
 // ============ UTILITY FUNCTIONS ============
@@ -49,29 +86,28 @@ const formatDateShort = (dateStr: string): string => {
 
 // ============ COMPONENTS ============
 
-// Metric Card
+// Glass Metric Card
 function MetricCard({ label, value, subtitle, icon: Icon, color = 'emerald' }: { 
   label: string; value: string; subtitle?: string; icon: any; color?: string
 }) {
-  const colorMap: { [key: string]: { bg: string; border: string; text: string; icon: string } } = {
-    emerald: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400', icon: 'text-emerald-500' },
-    blue: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-400', icon: 'text-blue-500' },
-    rose: { bg: 'bg-rose-500/10', border: 'border-rose-500/20', text: 'text-rose-400', icon: 'text-rose-500' },
-    amber: { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-400', icon: 'text-amber-500' },
-    slate: { bg: 'bg-slate-500/10', border: 'border-slate-500/20', text: 'text-slate-300', icon: 'text-slate-400' },
+  const colorMap: { [key: string]: string } = {
+    emerald: 'text-emerald-400',
+    rose: 'text-rose-400',
+    amber: 'text-amber-400',
+    blue: 'text-blue-400',
+    slate: 'text-slate-300',
   }
-  const c = colorMap[color] || colorMap.emerald
 
   return (
-    <div className={`${c.bg} ${c.border} border rounded-xl p-5`}>
+    <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-5 ${THEME.glassHover} transition-all`}>
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm font-medium text-slate-400">{label}</p>
-          <p className={`text-2xl font-bold ${c.text} mt-1`}>{value}</p>
-          {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
+          <p className={`text-sm font-medium ${THEME.textMuted}`}>{label}</p>
+          <p className={`text-2xl font-semibold ${colorMap[color]} mt-1`}>{value}</p>
+          {subtitle && <p className={`text-xs ${THEME.textDim} mt-1`}>{subtitle}</p>}
         </div>
-        <div className={`${c.bg} p-2.5 rounded-lg`}>
-          <Icon size={20} className={c.icon} />
+        <div className="p-2.5 rounded-lg bg-white/[0.05]">
+          <Icon size={20} className={THEME.textMuted} strokeWidth={1.5} />
         </div>
       </div>
     </div>
@@ -80,53 +116,34 @@ function MetricCard({ label, value, subtitle, icon: Icon, color = 'emerald' }: {
 
 // Category Badge
 function CategoryBadge({ category }: { category: string }) {
-  const configs: { [key: string]: { bg: string; text: string; border: string; label: string } } = {
-    directCosts: { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/30', label: 'Direct Costs' },
-    overhead: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30', label: 'Overhead' },
-  }
-  const config = configs[category] || configs.overhead
+  const isDirectCost = category === 'directCosts'
   return (
-    <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${config.bg} ${config.text} border ${config.border}`}>
-      {config.label}
+    <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
+      isDirectCost ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30' : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+    }`}>
+      {isDirectCost ? 'Direct Cost' : 'Overhead'}
     </span>
   )
 }
 
 // Status Badge
 function StatusBadge({ status }: { status: string }) {
-  const configs: { [key: string]: { bg: string; text: string; border: string; label: string } } = {
-    paid: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', label: 'Paid' },
-    pending: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30', label: 'Pending' },
-  }
-  const config = configs[status] || configs.paid
+  const isPaid = status === 'paid'
   return (
-    <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${config.bg} ${config.text} border ${config.border}`}>
-      {config.label}
+    <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
+      isPaid ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+    }`}>
+      {isPaid ? 'Paid' : 'Pending'}
     </span>
   )
 }
 
-// Expense Bar
-function ExpenseBar({ label, amount, total, color }: { label: string; amount: number; total: number; color: string }) {
-  const percent = total > 0 ? (amount / total) * 100 : 0
-  return (
-    <div className="flex items-center gap-4 py-2">
-      <div className="w-40 shrink-0"><p className="text-sm text-slate-300">{label}</p></div>
-      <div className="flex-1 h-4 bg-slate-700/30 rounded-full overflow-hidden">
-        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${percent}%`, backgroundColor: color }} />
-      </div>
-      <div className="w-24 text-right shrink-0"><p className="text-sm font-semibold text-slate-200">{formatCurrency(amount)}</p></div>
-      <div className="w-12 text-right shrink-0"><p className="text-xs text-slate-400">{percent.toFixed(0)}%</p></div>
-    </div>
-  )
-}
-
-// Custom Tooltip
+// Glass Tooltip
 const CustomTooltip = ({ active, payload, label, formatter }: any) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 shadow-xl">
-      <p className="text-xs text-slate-400 mb-1">{label}</p>
+    <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-lg px-3 py-2 shadow-xl`}>
+      <p className={`text-xs ${THEME.textDim} mb-1`}>{label}</p>
       {payload.map((entry: any, index: number) => (
         <p key={index} className="text-sm font-medium" style={{ color: entry.color }}>
           {entry.name}: {formatter ? formatter(entry.value) : entry.value}
@@ -136,8 +153,41 @@ const CustomTooltip = ({ active, payload, label, formatter }: any) => {
   )
 }
 
-// Editable Select
-function EditableSelect({ value, options, onChange, placeholder = 'Select...' }: { 
+// Expense Bar
+function ExpenseBar({ label, amount, total, color }: { label: string; amount: number; total: number; color: string }) {
+  const percent = total > 0 ? (amount / total) * 100 : 0
+  return (
+    <div className="flex items-center gap-4 py-2">
+      <div className="w-36 shrink-0"><p className={`text-sm ${THEME.textSecondary} truncate`}>{label}</p></div>
+      <div className="flex-1 h-2 bg-white/[0.08] rounded-full overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${percent}%`, backgroundColor: color }} />
+      </div>
+      <div className="w-24 text-right shrink-0"><p className={`text-sm font-semibold ${THEME.textPrimary}`}>{formatCurrency(amount)}</p></div>
+      <div className="w-12 text-right shrink-0"><p className={`text-xs ${THEME.textMuted}`}>{percent.toFixed(0)}%</p></div>
+    </div>
+  )
+}
+
+// Glass Select
+function GlassSelect({ value, onChange, options, placeholder, className = '' }: {
+  value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; placeholder?: string; className?: string
+}) {
+  return (
+    <select 
+      value={value} 
+      onChange={(e) => onChange(e.target.value)}
+      className={`bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 ${className}`}
+    >
+      {placeholder && <option value="" className="bg-slate-900">{placeholder}</option>}
+      {options.map(opt => (
+        <option key={opt.value} value={opt.value} className="bg-slate-900">{opt.label}</option>
+      ))}
+    </select>
+  )
+}
+
+// Inline Editable Select
+function EditableSelect({ value, options, onChange, placeholder = 'Assign' }: { 
   value: string; options: { id: string; name: string }[]; onChange: (value: string) => void; placeholder?: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -147,23 +197,23 @@ function EditableSelect({ value, options, onChange, placeholder = 'Select...' }:
   
   return (
     <div className="relative">
-      <button onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-1 text-sm text-slate-300 hover:text-slate-100 transition-colors group">
-        <span className={selectedOption ? '' : 'text-slate-500 italic'}>{selectedOption?.name || placeholder}</span>
-        <Edit2 size={12} className="text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <button onClick={() => setIsOpen(!isOpen)} className={`flex items-center gap-1 text-sm ${THEME.textSecondary} hover:text-white transition-colors group`}>
+        <span className={selectedOption ? '' : `${THEME.textDim} italic`}>{selectedOption?.name || placeholder}</span>
+        <Edit2 size={12} className={`${THEME.textDim} opacity-0 group-hover:opacity-100 transition-opacity`} />
       </button>
       {isOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-          <div className="absolute top-full left-0 mt-1 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
-            <div className="p-2 border-b border-slate-700">
-              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..." 
-                className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500" autoFocus />
+          <div className={`absolute top-full left-0 mt-1 w-56 ${THEME.glass} border ${THEME.glassBorder} rounded-lg shadow-xl z-20 overflow-hidden`}>
+            <div className="p-2 border-b border-white/[0.08]">
+              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..."
+                className="w-full bg-white/[0.05] border border-white/[0.1] rounded px-2 py-1.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30" autoFocus />
             </div>
             <div className="max-h-48 overflow-y-auto">
-              <button onClick={() => { onChange(''); setIsOpen(false); setSearch(''); }} className="w-full px-3 py-2 text-left text-sm text-slate-500 hover:bg-slate-700/50 transition-colors">— None —</button>
+              <button onClick={() => { onChange(''); setIsOpen(false); setSearch(''); }} className={`w-full px-3 py-2 text-left text-sm ${THEME.textDim} hover:bg-white/[0.05] transition-colors`}>— None —</button>
               {filteredOptions.map(opt => (
                 <button key={opt.id} onClick={() => { onChange(opt.id); setIsOpen(false); setSearch(''); }}
-                  className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-700/50 transition-colors ${opt.id === value ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-300'}`}>{opt.name}</button>
+                  className={`w-full px-3 py-2 text-left text-sm hover:bg-white/[0.05] transition-colors ${opt.id === value ? 'text-emerald-400 bg-emerald-500/10' : THEME.textSecondary}`}>{opt.name}</button>
               ))}
             </div>
           </div>
@@ -173,335 +223,235 @@ function EditableSelect({ value, options, onChange, placeholder = 'Select...' }:
   )
 }
 
-// Action Menu (3 dots dropdown)
-function ActionMenu({ expense, subcategories, onEdit, onToggleStatus, onChangeSubcategory, onDelete }: { 
-  expense: any; subcategories: { directCosts: string[]; overhead: string[] }
-  onEdit: () => void; onToggleStatus: () => void; onChangeSubcategory: (sub: string) => void; onDelete: () => void
-}) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [showTypes, setShowTypes] = useState(false)
-  const currentSubcategories = subcategories[expense.category as keyof typeof subcategories] || []
-
-  return (
-    <div className="relative">
-      <button onClick={() => setIsOpen(!isOpen)} className="p-1 hover:bg-slate-700 rounded transition-colors" title="More actions">
-        <MoreHorizontal size={16} className="text-slate-500 hover:text-slate-300" />
-      </button>
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => { setIsOpen(false); setShowTypes(false); }} />
-          <div className="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 overflow-hidden">
-            <button onClick={() => { onEdit(); setIsOpen(false); }} className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700/50 flex items-center gap-2 transition-colors">
-              <Edit2 size={14} /> Edit Expense
-            </button>
-            <div className="relative">
-              <button onClick={() => setShowTypes(!showTypes)} className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700/50 flex items-center justify-between transition-colors">
-                <span className="flex items-center gap-2"><FileText size={14} /> Change Type</span>
-                <ChevronDown size={14} className={`transition-transform ${showTypes ? 'rotate-180' : ''}`} />
-              </button>
-              {showTypes && (
-                <div className="border-t border-slate-700 bg-slate-800/50 max-h-40 overflow-y-auto">
-                  {currentSubcategories.map(sub => (
-                    <button key={sub} onClick={() => { onChangeSubcategory(sub); setIsOpen(false); setShowTypes(false); }}
-                      className={`w-full px-4 py-1.5 text-left text-xs hover:bg-slate-700/50 transition-colors ${expense.subcategory === sub ? 'text-emerald-400' : 'text-slate-400'}`}>{sub}</button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <button onClick={() => { onToggleStatus(); setIsOpen(false); }} className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700/50 flex items-center gap-2 transition-colors">
-              {expense.status === 'paid' ? <><AlertCircle size={14} className="text-amber-400" /> Mark as Pending</> : <><CheckCircle2 size={14} className="text-emerald-400" /> Mark as Paid</>}
-            </button>
-            <div className="border-t border-slate-700 my-1" />
-            <button onClick={() => { onDelete(); setIsOpen(false); }} className="w-full px-3 py-2 text-left text-sm text-rose-400 hover:bg-rose-500/10 flex items-center gap-2 transition-colors">
-              <Trash2 size={14} /> Delete
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
 // Expense Row
-function ExpenseRow({ expense, contractors, projects, subcategories, onUpdate, onEdit, onDelete, isSelected, onSelect }: { 
-  expense: any; contractors: any[]; projects: any[]; subcategories: { directCosts: string[]; overhead: string[] }
-  onUpdate: (id: string, updates: any) => void; onEdit: (expense: any) => void; onDelete: (id: string) => void
+function ExpenseRow({ expense, teamMembers, projects, clients, onUpdate, onDelete, isSelected, onSelect }: { 
+  expense: any; teamMembers: any[]; projects: any[]; clients: any[]
+  onUpdate: (id: string, updates: any) => void; onDelete: (id: string) => void
   isSelected: boolean; onSelect: (id: string) => void
 }) {
+  const subcatConfig = [...EXPENSE_CATEGORIES.directCosts.subcategories, ...EXPENSE_CATEGORIES.overhead.subcategories]
+    .find(s => s.id === expense.subcategory)
+  const showTeamMember = subcatConfig?.requiresTeamMember
+  const project = projects.find(p => p.id === expense.project_id)
+  const client = project ? clients.find(c => c.id === project.client_id) : null
+  
   return (
-    <div className={`flex items-center gap-3 py-3 px-4 hover:bg-slate-800/30 transition-colors border-b border-slate-700/30 ${isSelected ? 'bg-emerald-500/5' : ''}`}>
+    <div className={`flex items-center gap-3 py-3 px-4 hover:bg-white/[0.03] transition-colors border-b border-white/[0.05] ${isSelected ? 'bg-emerald-500/10' : ''}`}>
       <div className="w-8 shrink-0">
-        <input type="checkbox" checked={isSelected} onChange={() => onSelect(expense.id)} className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0" />
+        <input type="checkbox" checked={isSelected} onChange={() => onSelect(expense.id)} className="w-4 h-4 rounded border-white/20 bg-white/5 text-emerald-500 focus:ring-emerald-500/30" />
       </div>
-      <div className="w-24 shrink-0"><p className="text-sm text-slate-400">{formatDateShort(expense.date)}</p></div>
-      <div className="flex-1 min-w-0"><p className="text-sm text-slate-200 truncate">{expense.description}</p></div>
-      <div className="w-28 shrink-0"><CategoryBadge category={expense.category} /></div>
-      <div className="w-36 shrink-0"><p className="text-xs text-slate-400">{expense.subcategory}</p></div>
+      <div className="w-20 shrink-0"><p className={`text-sm ${THEME.textMuted}`}>{formatDateShort(expense.date)}</p></div>
+      <div className="flex-1 min-w-0"><p className={`text-sm ${THEME.textPrimary} truncate`}>{expense.description}</p></div>
+      <div className="w-24 shrink-0"><CategoryBadge category={expense.category} /></div>
+      <div className="w-32 shrink-0"><p className={`text-xs ${THEME.textMuted}`}>{subcatConfig?.name || expense.subcategory}</p></div>
+      <div className="w-28 shrink-0">
+        {showTeamMember ? (
+          <EditableSelect value={expense.team_member_id || ''} options={teamMembers} onChange={(value) => onUpdate(expense.id, { team_member_id: value || null })} placeholder="Assign" />
+        ) : <span className={`text-xs ${THEME.textDim}`}>—</span>}
+      </div>
       <div className="w-32 shrink-0">
-        {expense.category === 'directCosts' ? (
-          <EditableSelect value={expense.contractor_id || ''} options={contractors} onChange={(value) => onUpdate(expense.id, { contractor_id: value })} placeholder="Assign" />
-        ) : <span className="text-xs text-slate-500">—</span>}
+        <EditableSelect value={expense.project_id || ''} options={projects} onChange={(value) => onUpdate(expense.id, { project_id: value || null })} placeholder="Assign" />
       </div>
-      <div className="w-36 shrink-0">
-        {expense.category === 'directCosts' ? (
-          <EditableSelect value={expense.project_id || ''} options={projects} onChange={(value) => onUpdate(expense.id, { project_id: value })} placeholder="Assign" />
-        ) : <span className="text-xs text-slate-500">—</span>}
+      <div className="w-24 shrink-0">
+        {client ? <p className={`text-xs ${THEME.textMuted} truncate`}>{client.name}</p> : <span className={`text-xs ${THEME.textDim}`}>—</span>}
       </div>
       <div className="w-24 text-right shrink-0"><p className="text-sm font-semibold text-rose-400">{formatCurrency(expense.amount)}</p></div>
       <div className="w-20 shrink-0"><StatusBadge status={expense.status} /></div>
-      <div className="w-16 shrink-0 flex items-center justify-end gap-1">
-        <button onClick={() => onDelete(expense.id)} className="p-1 hover:bg-slate-700 rounded transition-colors" title="Delete">
-          <Trash2 size={14} className="text-slate-500 hover:text-rose-400" />
+      <div className="w-12 shrink-0 flex items-center justify-end">
+        <button onClick={() => onDelete(expense.id)} className="p-1 hover:bg-white/[0.05] rounded transition-colors" title="Delete">
+          <Trash2 size={14} className={`${THEME.textDim} hover:text-rose-400`} />
         </button>
-        <ActionMenu expense={expense} subcategories={subcategories} onEdit={() => onEdit(expense)} 
-          onToggleStatus={() => onUpdate(expense.id, { status: expense.status === 'paid' ? 'pending' : 'paid' })}
-          onChangeSubcategory={(sub) => onUpdate(expense.id, { subcategory: sub })} onDelete={() => onDelete(expense.id)} />
       </div>
     </div>
   )
 }
 
-// Edit Expense Modal
-function EditExpenseModal({ isOpen, expense, onClose, contractors, projects, subcategories, onSave }: { 
-  isOpen: boolean; expense: any; onClose: () => void; contractors: any[]; projects: any[]
-  subcategories: { directCosts: string[]; overhead: string[] }; onSave: (id: string, updates: any) => void
+// Collapsible Section
+function CollapsibleSection({ title, subtitle, badge, children, defaultExpanded = true, noPadding = false }: { 
+  title: string; subtitle?: string; badge?: string | number; children: React.ReactNode; defaultExpanded?: boolean; noPadding?: boolean 
+}) {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded)
+  
+  return (
+    <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
+      <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder} cursor-pointer hover:bg-white/[0.03] transition-colors`}
+        onClick={() => setIsExpanded(!isExpanded)}>
+        <div className="flex items-center gap-3">
+          <div className={THEME.textMuted}>{isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}</div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>{title}</h3>
+              {badge !== undefined && <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-white/[0.08] text-slate-300">{badge}</span>}
+            </div>
+            {subtitle && <p className={`text-xs ${THEME.textDim} mt-0.5`}>{subtitle}</p>}
+          </div>
+        </div>
+      </div>
+      {isExpanded && <div className={noPadding ? '' : 'p-6'}>{children}</div>}
+    </div>
+  )
+}
+
+// Add Expense Modal
+function AddExpenseModal({ isOpen, onClose, teamMembers, projects, onSave }: { 
+  isOpen: boolean; onClose: () => void; teamMembers: any[]; projects: any[]; onSave: (expense: any) => void
 }) {
   const [category, setCategory] = useState<'directCosts' | 'overhead'>('directCosts')
-  const [subcategory, setSubcategory] = useState('')
+  const [subcategory, setSubcategory] = useState('labor')
   const [amount, setAmount] = useState('')
-  const [date, setDate] = useState('')
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [description, setDescription] = useState('')
-  const [contractorId, setContractorId] = useState('')
+  const [teamMemberId, setTeamMemberId] = useState('')
   const [projectId, setProjectId] = useState('')
   const [status, setStatus] = useState<'paid' | 'pending'>('paid')
 
   useEffect(() => {
-    if (expense) {
-      setCategory(expense.category || 'directCosts')
-      setSubcategory(expense.subcategory || '')
-      setAmount(expense.amount?.toString() || '')
-      setDate(expense.date || '')
-      setDescription(expense.description || '')
-      setContractorId(expense.contractor_id || '')
-      setProjectId(expense.project_id || '')
-      setStatus(expense.status || 'paid')
-    }
-  }, [expense])
-
-  if (!isOpen || !expense) return null
-
-  const handleSave = () => {
-    onSave(expense.id, { category, subcategory, amount: parseFloat(amount) || 0, date, description,
-      contractor_id: category === 'directCosts' ? contractorId : null,
-      project_id: category === 'directCosts' ? projectId : null, status })
-    onClose()
-  }
-
-  const currentSubcategories = subcategories[category]
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg mx-4 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
-          <h3 className="text-lg font-semibold text-slate-100">Edit Expense</h3>
-          <button onClick={onClose} className="p-1 hover:bg-slate-700 rounded-lg transition-colors"><X size={20} className="text-slate-400" /></button>
-        </div>
-        <div className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-400 mb-2">Category</label>
-            <div className="flex gap-2">
-              <button onClick={() => setCategory('directCosts')} className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${category === 'directCosts' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-slate-700/50 text-slate-400 border border-transparent'}`}>Direct Costs</button>
-              <button onClick={() => setCategory('overhead')} className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${category === 'overhead' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-slate-700/50 text-slate-400 border border-transparent'}`}>Overhead</button>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-400 mb-1.5">Type</label>
-            <select value={subcategory} onChange={(e) => setSubcategory(e.target.value)} className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
-              {currentSubcategories.map(sub => <option key={sub} value={sub}>{sub}</option>)}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1.5">Amount</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
-                <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="w-full bg-slate-700/50 border border-slate-600 rounded-lg pl-7 pr-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1.5">Date</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500" />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-400 mb-1.5">Description</label>
-            <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500" />
-          </div>
-          {category === 'directCosts' && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1.5">Contractor</label>
-                <select value={contractorId} onChange={(e) => setContractorId(e.target.value)} className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
-                  <option value="">Select contractor...</option>
-                  {contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1.5">Project</label>
-                <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
-                  <option value="">Select project...</option>
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-            </div>
-          )}
-          <div>
-            <label className="block text-sm font-medium text-slate-400 mb-2">Status</label>
-            <div className="flex gap-2">
-              <button onClick={() => setStatus('paid')} className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${status === 'paid' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-700/50 text-slate-400 border border-transparent'}`}><CheckCircle2 size={14} className="inline mr-1.5" />Paid</button>
-              <button onClick={() => setStatus('pending')} className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${status === 'pending' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-slate-700/50 text-slate-400 border border-transparent'}`}><AlertCircle size={14} className="inline mr-1.5" />Pending</button>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-700 bg-slate-800/50">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">Cancel</button>
-          <button onClick={handleSave} disabled={!amount || !description} className="px-4 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Save Changes</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Add Expense Modal with Editable Categories
-function AddExpenseModal({ isOpen, onClose, contractors, projects, subcategories, onAddSubcategory, onDeleteSubcategory, onSave }: { 
-  isOpen: boolean; onClose: () => void; contractors: any[]; projects: any[]
-  subcategories: { directCosts: string[]; overhead: string[] }
-  onAddSubcategory: (category: 'directCosts' | 'overhead', name: string) => void
-  onDeleteSubcategory: (category: 'directCosts' | 'overhead', name: string) => void
-  onSave: (expense: any) => void
-}) {
-  const [category, setCategory] = useState<'directCosts' | 'overhead'>('directCosts')
-  const [subcategory, setSubcategory] = useState('')
-  const [amount, setAmount] = useState('')
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
-  const [description, setDescription] = useState('')
-  const [contractorId, setContractorId] = useState('')
-  const [projectId, setProjectId] = useState('')
-  const [status, setStatus] = useState<'paid' | 'pending'>('paid')
-  const [showManageTypes, setShowManageTypes] = useState(false)
-  const [newTypeName, setNewTypeName] = useState('')
-
-  useEffect(() => { setSubcategory(subcategories[category][0] || '') }, [category, subcategories])
+    // Reset subcategory when category changes
+    const defaultSub = category === 'directCosts' ? 'labor' : 'software'
+    setSubcategory(defaultSub)
+    setTeamMemberId('')
+  }, [category])
 
   if (!isOpen) return null
 
+  const currentCategory = EXPENSE_CATEGORIES[category]
+  const currentSubcat = currentCategory.subcategories.find(s => s.id === subcategory)
+  const showTeamMember = currentSubcat?.requiresTeamMember
+
   const handleSave = () => {
-    onSave({ category, subcategory, amount: parseFloat(amount) || 0, date, description,
-      contractor_id: category === 'directCosts' ? contractorId : null,
-      project_id: category === 'directCosts' ? projectId : null, status })
-    setAmount(''); setDescription(''); setContractorId(''); setProjectId('')
+    onSave({
+      category,
+      subcategory,
+      amount: parseFloat(amount) || 0,
+      date,
+      description,
+      team_member_id: showTeamMember ? teamMemberId || null : null,
+      project_id: projectId || null,
+      status
+    })
+    // Reset form
+    setAmount(''); setDescription(''); setTeamMemberId(''); setProjectId('')
     onClose()
   }
 
-  const handleAddType = () => {
-    if (newTypeName.trim()) { onAddSubcategory(category, newTypeName.trim()); setNewTypeName('') }
-  }
-
-  const currentSubcategories = subcategories[category]
-
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg mx-4 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
-          <h3 className="text-lg font-semibold text-slate-100">Add Expense</h3>
-          <button onClick={onClose} className="p-1 hover:bg-slate-700 rounded-lg transition-colors"><X size={20} className="text-slate-400" /></button>
+      <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-2xl w-full max-w-lg mx-4 overflow-hidden`}>
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder}`}>
+          <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>Add Expense</h3>
+          <button onClick={onClose} className="p-1 hover:bg-white/[0.05] rounded-lg transition-colors"><X size={20} className={THEME.textMuted} /></button>
         </div>
-        <div className="p-6 space-y-4">
+        
+        <div className="p-6 space-y-5">
+          {/* Category Selection */}
           <div>
-            <label className="block text-sm font-medium text-slate-400 mb-2">Category</label>
+            <label className={`block text-sm font-medium ${THEME.textMuted} mb-2`}>Category</label>
             <div className="flex gap-2">
-              <button onClick={() => setCategory('directCosts')} className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${category === 'directCosts' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-slate-700/50 text-slate-400 border border-transparent'}`}>Direct Costs</button>
-              <button onClick={() => setCategory('overhead')} className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${category === 'overhead' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-slate-700/50 text-slate-400 border border-transparent'}`}>Overhead</button>
+              <button onClick={() => setCategory('directCosts')} 
+                className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${
+                  category === 'directCosts' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-white/[0.05] text-slate-400 border border-transparent'
+                }`}>Direct Costs</button>
+              <button onClick={() => setCategory('overhead')} 
+                className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${
+                  category === 'overhead' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-white/[0.05] text-slate-400 border border-transparent'
+                }`}>Overhead</button>
             </div>
-            <p className="text-xs text-slate-500 mt-1.5">{category === 'directCosts' ? 'Project-specific costs that affect Gross Margin' : 'Operating expenses that affect Net Profit'}</p>
+            <p className={`text-xs ${THEME.textDim} mt-1.5`}>{currentCategory.description}</p>
           </div>
+
+          {/* Subcategory Selection */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-sm font-medium text-slate-400">Type</label>
-              <button onClick={() => setShowManageTypes(!showManageTypes)} className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors">
-                <Settings size={12} /> {showManageTypes ? 'Done' : 'Manage Types'}
-              </button>
+            <label className={`block text-sm font-medium ${THEME.textMuted} mb-2`}>Type</label>
+            <div className="grid grid-cols-3 gap-2">
+              {currentCategory.subcategories.map(sub => {
+                const IconComp = sub.icon
+                return (
+                  <button key={sub.id} onClick={() => { setSubcategory(sub.id); setTeamMemberId(''); }}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                      subcategory === sub.id 
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                        : 'bg-white/[0.05] text-slate-400 border border-transparent hover:bg-white/[0.08]'
+                    }`}>
+                    <IconComp size={14} />
+                    <span className="truncate">{sub.name}</span>
+                  </button>
+                )
+              })}
             </div>
-            {!showManageTypes ? (
-              <select value={subcategory} onChange={(e) => setSubcategory(e.target.value)} className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
-                {currentSubcategories.map(sub => <option key={sub} value={sub}>{sub}</option>)}
-              </select>
-            ) : (
-              <div className="bg-slate-700/30 border border-slate-600 rounded-lg p-3 space-y-2">
-                <div className="flex gap-2">
-                  <input type="text" value={newTypeName} onChange={(e) => setNewTypeName(e.target.value)} placeholder="New type name..."
-                    className="flex-1 bg-slate-700/50 border border-slate-600 rounded px-2.5 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddType()} />
-                  <button onClick={handleAddType} disabled={!newTypeName.trim()} className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded text-sm font-medium hover:bg-emerald-500/30 disabled:opacity-50 transition-colors"><PlusCircle size={16} /></button>
-                </div>
-                <div className="space-y-1 max-h-40 overflow-y-auto">
-                  {currentSubcategories.map(sub => (
-                    <div key={sub} className="flex items-center justify-between py-1.5 px-2 bg-slate-700/30 rounded">
-                      <span className="text-sm text-slate-300">{sub}</span>
-                      <button onClick={() => onDeleteSubcategory(category, sub)} className="p-1 text-slate-500 hover:text-rose-400 transition-colors" title="Delete type"><Trash2 size={12} /></button>
-                    </div>
-                  ))}
-                </div>
-                {currentSubcategories.length === 0 && <p className="text-xs text-slate-500 text-center py-2">No types yet. Add one above.</p>}
-              </div>
-            )}
           </div>
+
+          {/* Amount & Date */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1.5">Amount</label>
+              <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Amount</label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
-                <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="w-full bg-slate-700/50 border border-slate-600 rounded-lg pl-7 pr-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500" />
+                <span className={`absolute left-3 top-1/2 -translate-y-1/2 ${THEME.textDim}`}>$</span>
+                <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00"
+                  className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg pl-7 pr-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1.5">Date</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500" />
+              <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Date</label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
             </div>
           </div>
+
+          {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-slate-400 mb-1.5">Description</label>
-            <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g., Travis Swank - January Invoice" className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500" />
+            <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Description</label>
+            <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} 
+              placeholder="e.g., January software subscription"
+              className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
           </div>
-          {category === 'directCosts' && (
-            <div className="grid grid-cols-2 gap-4">
+
+          {/* Team Member (conditional) + Project (always) */}
+          <div className="grid grid-cols-2 gap-4">
+            {showTeamMember && (
               <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1.5">Contractor</label>
-                <select value={contractorId} onChange={(e) => setContractorId(e.target.value)} className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
-                  <option value="">Select contractor...</option>
-                  {contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>
+                  {subcategory === 'labor' || subcategory === 'payroll' ? 'Employee/Contractor' : 'Subcontractor'}
+                </label>
+                <select value={teamMemberId} onChange={(e) => setTeamMemberId(e.target.value)}
+                  className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30">
+                  <option value="" className="bg-slate-900">Select...</option>
+                  {teamMembers.map(tm => <option key={tm.id} value={tm.id} className="bg-slate-900">{tm.name}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1.5">Project</label>
-                <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
-                  <option value="">Select project...</option>
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
+            )}
+            <div className={showTeamMember ? '' : 'col-span-2'}>
+              <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Project (optional)</label>
+              <select value={projectId} onChange={(e) => setProjectId(e.target.value)}
+                className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30">
+                <option value="" className="bg-slate-900">No project</option>
+                {projects.map(p => <option key={p.id} value={p.id} className="bg-slate-900">{p.name}</option>)}
+              </select>
+              <p className={`text-xs ${THEME.textDim} mt-1`}>Links expense to project → client</p>
             </div>
-          )}
+          </div>
+
+          {/* Status */}
           <div>
-            <label className="block text-sm font-medium text-slate-400 mb-2">Status</label>
+            <label className={`block text-sm font-medium ${THEME.textMuted} mb-2`}>Status</label>
             <div className="flex gap-2">
-              <button onClick={() => setStatus('paid')} className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${status === 'paid' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-700/50 text-slate-400 border border-transparent'}`}><CheckCircle2 size={14} className="inline mr-1.5" />Paid</button>
-              <button onClick={() => setStatus('pending')} className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${status === 'pending' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-slate-700/50 text-slate-400 border border-transparent'}`}><AlertCircle size={14} className="inline mr-1.5" />Pending</button>
+              <button onClick={() => setStatus('paid')} 
+                className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                  status === 'paid' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-white/[0.05] text-slate-400 border border-transparent'
+                }`}><CheckCircle2 size={14} className="inline mr-1.5" />Paid</button>
+              <button onClick={() => setStatus('pending')} 
+                className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                  status === 'pending' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-white/[0.05] text-slate-400 border border-transparent'
+                }`}><AlertCircle size={14} className="inline mr-1.5" />Pending</button>
             </div>
           </div>
         </div>
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-700 bg-slate-800/50">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">Cancel</button>
-          <button onClick={handleSave} disabled={!amount || !description || !subcategory} className="px-4 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Add Expense</button>
+
+        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
+          <button onClick={onClose} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white transition-colors`}>Cancel</button>
+          <button onClick={handleSave} disabled={!amount || !description}
+            className="px-4 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+            Add Expense
+          </button>
         </div>
       </div>
     </div>
@@ -518,19 +468,12 @@ export default function ExpensesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedExpenses, setSelectedExpenses] = useState<string[]>([])
   const [showAddModal, setShowAddModal] = useState(false)
-  const [editingExpense, setEditingExpense] = useState<any>(null)
   const [sortField, setSortField] = useState<string>('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
-  // Editable subcategories (could be stored in company settings later)
-  const [subcategories, setSubcategories] = useState({
-    directCosts: ['Contractor Labor', 'Materials', 'Subcontractors', 'Project Expenses'],
-    overhead: ['Payroll', 'Software & Subscriptions', 'Rent & Utilities', 'Insurance', 'Professional Services', 'Travel & Entertainment', 'Office & Supplies', 'Marketing', 'Other']
-  })
-
-  // Real data from Supabase
-  const [contractors, setContractors] = useState<any[]>([])
+  const [teamMembers, setTeamMembers] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
+  const [clients, setClients] = useState<any[]>([])
   const [expenses, setExpenses] = useState<any[]>([])
 
   const months = [
@@ -541,83 +484,39 @@ export default function ExpensesPage() {
     { value: 9, label: 'October' }, { value: 10, label: 'November' }, { value: 11, label: 'December' }
   ]
 
-  // Load data from Supabase
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Get current user and company
         const result = await getCurrentUser()
         const user = result?.user
-        if (!user) {
-          console.error('No user found')
-          setLoading(false)
-          return
-        }
+        if (!user) { setLoading(false); return }
 
-        // Get company_id from profiles
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single()
-
-        if (!profile?.company_id) {
-          console.error('No company found for user')
-          setLoading(false)
-          return
-        }
+        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
+        if (!profile?.company_id) { setLoading(false); return }
 
         setCompanyId(profile.company_id)
 
-        // Load expenses
-        const { data: expensesData, error: expensesError } = await supabase
-          .from('expenses')
-          .select('*')
-          .eq('company_id', profile.company_id)
-          .order('date', { ascending: false })
+        const [expRes, teamRes, projRes, clientRes] = await Promise.all([
+          supabase.from('expenses').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
+          supabase.from('team_members').select('id, name').eq('company_id', profile.company_id).order('name'),
+          supabase.from('projects').select('id, name, client_id').eq('company_id', profile.company_id).order('name'),
+          supabase.from('clients').select('id, name').eq('company_id', profile.company_id).order('name')
+        ])
 
-        if (expensesError) {
-          console.error('Error loading expenses:', expensesError)
-        } else {
-          setExpenses(expensesData || [])
-        }
-
-        // Load team members (contractors)
-        const { data: teamData, error: teamError } = await supabase
-          .from('team_members')
-          .select('id, name')
-          .eq('company_id', profile.company_id)
-          .order('name')
-
-        if (teamError) {
-          console.error('Error loading team:', teamError)
-        } else {
-          setContractors(teamData || [])
-        }
-
-        // Load projects
-        const { data: projectsData, error: projectsError } = await supabase
-          .from('projects')
-          .select('id, name, client_id')
-          .eq('company_id', profile.company_id)
-          .order('name')
-
-        if (projectsError) {
-          console.error('Error loading projects:', projectsError)
-        } else {
-          setProjects(projectsData || [])
-        }
-
-        setLoading(false)
+        setExpenses(expRes.data || [])
+        setTeamMembers(teamRes.data || [])
+        setProjects(projRes.data || [])
+        setClients(clientRes.data || [])
       } catch (error) {
         console.error('Error loading data:', error)
+      } finally {
         setLoading(false)
       }
     }
-
     loadData()
   }, [])
 
+  // Metrics
   const expenseMetrics = useMemo(() => {
     const filtered = expenses.filter(exp => {
       const expDate = new Date(exp.date)
@@ -625,27 +524,39 @@ export default function ExpensesPage() {
       if (selectedMonth !== 'all' && expDate.getMonth() !== selectedMonth) return false
       return true
     })
+
     const totalExpenses = filtered.reduce((sum, exp) => sum + exp.amount, 0)
     const directCosts = filtered.filter(exp => exp.category === 'directCosts').reduce((sum, exp) => sum + exp.amount, 0)
     const overhead = filtered.filter(exp => exp.category === 'overhead').reduce((sum, exp) => sum + exp.amount, 0)
     const pendingAmount = filtered.filter(exp => exp.status === 'pending').reduce((sum, exp) => sum + exp.amount, 0)
     const pendingCount = filtered.filter(exp => exp.status === 'pending').length
+
+    // By subcategory
     const bySubcategory: { [key: string]: { category: string; amount: number } } = {}
     filtered.forEach(exp => {
-      if (!bySubcategory[exp.subcategory]) bySubcategory[exp.subcategory] = { category: exp.category, amount: 0 }
-      bySubcategory[exp.subcategory].amount += exp.amount
+      const subcat = [...EXPENSE_CATEGORIES.directCosts.subcategories, ...EXPENSE_CATEGORIES.overhead.subcategories]
+        .find(s => s.id === exp.subcategory)
+      const name = subcat?.name || exp.subcategory
+      if (!bySubcategory[name]) bySubcategory[name] = { category: exp.category, amount: 0 }
+      bySubcategory[name].amount += exp.amount
     })
-    const byContractor: { [key: string]: number } = {}
-    filtered.filter(exp => exp.category === 'directCosts' && exp.contractor_id).forEach(exp => {
-      const contractor = contractors.find(c => c.id === exp.contractor_id)
-      const name = contractor?.name || 'Unknown'
-      byContractor[name] = (byContractor[name] || 0) + exp.amount
-    })
-    return { totalExpenses, directCosts, overhead, pendingAmount, pendingCount,
-      bySubcategory: Object.entries(bySubcategory).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.amount - a.amount),
-      byContractor: Object.entries(byContractor).map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount) }
-  }, [expenses, selectedYear, selectedMonth, contractors])
 
+    // By project
+    const byProject: { [key: string]: number } = {}
+    filtered.filter(exp => exp.project_id).forEach(exp => {
+      const project = projects.find(p => p.id === exp.project_id)
+      const name = project?.name || 'Unknown'
+      byProject[name] = (byProject[name] || 0) + exp.amount
+    })
+
+    return {
+      totalExpenses, directCosts, overhead, pendingAmount, pendingCount,
+      bySubcategory: Object.entries(bySubcategory).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.amount - a.amount),
+      byProject: Object.entries(byProject).map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount)
+    }
+  }, [expenses, selectedYear, selectedMonth, projects])
+
+  // Filtered expenses
   const filteredExpenses = useMemo(() => {
     let filtered = [...expenses]
     filtered = filtered.filter(exp => new Date(exp.date).getFullYear() === selectedYear)
@@ -653,126 +564,103 @@ export default function ExpensesPage() {
     if (filterCategory !== 'all') filtered = filtered.filter(exp => exp.category === filterCategory)
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
-      filtered = filtered.filter(exp => exp.description.toLowerCase().includes(q) || exp.subcategory.toLowerCase().includes(q) || contractors.find(c => c.id === exp.contractor_id)?.name.toLowerCase().includes(q))
+      filtered = filtered.filter(exp => 
+        exp.description?.toLowerCase().includes(q) || 
+        exp.subcategory?.toLowerCase().includes(q) ||
+        teamMembers.find(tm => tm.id === exp.team_member_id)?.name?.toLowerCase().includes(q)
+      )
     }
     filtered.sort((a, b) => {
       let aVal: any = a[sortField as keyof typeof a]
       let bVal: any = b[sortField as keyof typeof b]
       if (sortField === 'date') { aVal = new Date(aVal as string).getTime(); bVal = new Date(bVal as string).getTime() }
-      if (sortDir === 'asc') return aVal > bVal ? 1 : -1
-      return aVal < bVal ? 1 : -1
+      return sortDir === 'asc' ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1)
     })
     return filtered
-  }, [expenses, selectedYear, selectedMonth, filterCategory, searchQuery, sortField, sortDir, contractors])
+  }, [expenses, selectedYear, selectedMonth, filterCategory, searchQuery, sortField, sortDir, teamMembers])
 
+  // Monthly trend
   const monthlyTrend = useMemo(() => {
     const data: { month: string; directCosts: number; overhead: number }[] = []
     for (let m = 0; m < 12; m++) {
       const monthExpenses = expenses.filter(exp => { const d = new Date(exp.date); return d.getFullYear() === selectedYear && d.getMonth() === m })
-      data.push({ month: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m],
+      data.push({
+        month: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m],
         directCosts: monthExpenses.filter(e => e.category === 'directCosts').reduce((s, e) => s + e.amount, 0),
-        overhead: monthExpenses.filter(e => e.category === 'overhead').reduce((s, e) => s + e.amount, 0) })
+        overhead: monthExpenses.filter(e => e.category === 'overhead').reduce((s, e) => s + e.amount, 0)
+      })
     }
     return data
   }, [expenses, selectedYear])
 
+  // Handlers
   const handleAddExpense = async (expense: any) => {
     if (!companyId) return
-    
-    const newExpense = {
-      company_id: companyId,
-      date: expense.date,
-      description: expense.description,
-      amount: expense.amount,
-      category: expense.category,
-      subcategory: expense.subcategory,
-      contractor_id: expense.contractor_id || null,
-      project_id: expense.project_id || null,
-      status: expense.status || 'paid'
-    }
-
-    const { data, error } = await supabase
-      .from('expenses')
-      .insert(newExpense)
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Error adding expense:', error)
-      alert('Failed to add expense')
-      return
-    }
-
-    // Add to local state
+    const newExpense = { company_id: companyId, ...expense }
+    const { data, error } = await supabase.from('expenses').insert(newExpense).select().single()
+    if (error) { console.error('Error adding expense:', error); alert('Failed to add expense'); return }
     setExpenses(prev => [data, ...prev])
   }
 
   const handleUpdateExpense = async (id: string, updates: any) => {
-    const { error } = await supabase
-      .from('expenses')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
-
-    if (error) {
-      console.error('Error updating expense:', error)
-      alert('Failed to update expense')
-      return
-    }
-
-    // Update local state
+    const { error } = await supabase.from('expenses').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) { console.error('Error updating expense:', error); alert('Failed to update expense'); return }
     setExpenses(prev => prev.map(exp => exp.id === id ? { ...exp, ...updates } : exp))
   }
 
   const handleDeleteExpense = async (id: string) => {
     if (!confirm('Delete this expense?')) return
-
-    const { error } = await supabase
-      .from('expenses')
-      .delete()
-      .eq('id', id)
-
-    if (error) {
-      console.error('Error deleting expense:', error)
-      alert('Failed to delete expense')
-      return
-    }
-
-    // Remove from local state
+    const { error } = await supabase.from('expenses').delete().eq('id', id)
+    if (error) { console.error('Error deleting expense:', error); alert('Failed to delete expense'); return }
     setExpenses(prev => prev.filter(exp => exp.id !== id))
+    setSelectedExpenses(prev => prev.filter(i => i !== id))
   }
-  const handleSelectExpense = (id: string) => { setSelectedExpenses(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]) }
-  const handleSelectAll = () => { setSelectedExpenses(prev => prev.length === filteredExpenses.length ? [] : filteredExpenses.map(exp => exp.id)) }
+
+  const handleSelectExpense = (id: string) => setSelectedExpenses(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
+  const handleSelectAll = () => setSelectedExpenses(prev => prev.length === filteredExpenses.length ? [] : filteredExpenses.map(exp => exp.id))
   const handleSort = (field: string) => { if (sortField === field) setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); else { setSortField(field); setSortDir('desc') } }
-  const handleAddSubcategory = (category: 'directCosts' | 'overhead', name: string) => { setSubcategories(prev => ({ ...prev, [category]: [...prev[category], name] })) }
-  const handleDeleteSubcategory = (category: 'directCosts' | 'overhead', name: string) => {
-    if (subcategories[category].length <= 1) { alert('You must have at least one type in each category.'); return }
-    const inUse = expenses.some(exp => exp.subcategory === name)
-    if (inUse && !confirm(`"${name}" is used by existing expenses. Delete anyway?`)) return
-    setSubcategories(prev => ({ ...prev, [category]: prev[category].filter(sub => sub !== name) }))
-  }
 
   if (loading) return (
     <div className="flex items-center justify-center h-[60vh]">
-      <div className="text-center"><RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" /><p className="text-slate-400 text-sm">Loading expenses...</p></div>
+      <div className="text-center"><RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" /><p className={`text-sm ${THEME.textMuted}`}>Loading expenses...</p></div>
     </div>
   )
 
+  const pieColors = ['#10B981', '#f43f5e', '#f59e0b', '#3b82f6', '#8b5cf6', '#06b6d4']
+
   return (
-    <div className="space-y-6 pb-8">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div><h1 className="text-2xl font-bold text-slate-100">Expenses</h1><p className="text-sm text-slate-400 mt-1">Direct costs & overhead tracking</p></div>
+        <div>
+          <h1 className={`text-xl font-semibold ${THEME.textPrimary}`}>Expenses</h1>
+          <p className={`text-sm ${THEME.textMuted} mt-1`}>Direct costs & overhead tracking</p>
+        </div>
         <div className="flex items-center gap-2">
-          <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
-            {[2026, 2025, 2024, 2023].map(year => <option key={year} value={year}>{year}</option>)}
-          </select>
-          <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
-            {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-          <button className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 hover:border-slate-600 transition-colors"><Download size={16} />Export</button>
-          <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors"><Plus size={16} />Add Expense</button>
+          <div className="relative">
+            <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="appearance-none bg-white/[0.05] border border-white/[0.1] rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer">
+              {[2026, 2025, 2024, 2023].map(year => <option key={year} value={year} className="bg-slate-900">{year}</option>)}
+            </select>
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+          </div>
+          <div className="relative">
+            <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+              className="appearance-none bg-white/[0.05] border border-white/[0.1] rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer">
+              {months.map(m => <option key={m.value} value={m.value} className="bg-slate-900">{m.label}</option>)}
+            </select>
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+          </div>
+          <button className="flex items-center gap-2 px-4 py-2 border border-white/[0.1] rounded-lg text-sm font-medium text-slate-300 hover:bg-white/[0.05] transition-colors">
+            <Download size={14} />Export
+          </button>
+          <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors">
+            <Plus size={14} />Add Expense
+          </button>
         </div>
       </div>
 
+      {/* Metrics */}
       <div className="grid grid-cols-4 gap-4">
         <MetricCard label="Total Expenses" value={formatCurrency(expenseMetrics.totalExpenses)} subtitle={`${selectedMonth === 'all' ? 'YTD' : months.find(m => m.value === selectedMonth)?.label} ${selectedYear}`} icon={Receipt} color="slate" />
         <MetricCard label="Direct Costs" value={formatCurrency(expenseMetrics.directCosts)} subtitle="Affects Gross Margin" icon={Users} color="rose" />
@@ -780,14 +668,21 @@ export default function ExpensesPage() {
         <MetricCard label="Pending" value={formatCurrency(expenseMetrics.pendingAmount)} subtitle={`${expenseMetrics.pendingCount} unpaid bills`} icon={AlertCircle} color={expenseMetrics.pendingCount > 0 ? 'amber' : 'emerald'} />
       </div>
 
-      <div className="grid grid-cols-12 gap-4">
+      {/* Charts */}
+      <div className="grid grid-cols-12 gap-6">
+        {/* Monthly Trend */}
         <div className="col-span-12 lg:col-span-8">
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-4"><div><h2 className="text-lg font-semibold text-slate-100">Monthly Expenses</h2><p className="text-sm text-slate-500 mt-0.5">{selectedYear} breakdown</p></div></div>
+          <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-6`}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className={`text-sm font-semibold ${THEME.textPrimary}`}>Monthly Expenses</h2>
+                <p className={`text-xs ${THEME.textDim} mt-0.5`}>{selectedYear} breakdown</p>
+              </div>
+            </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthlyTrend} barGap={0}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                   <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
                   <Tooltip content={<CustomTooltip formatter={(v: number) => formatCurrency(v)} />} />
@@ -798,27 +693,39 @@ export default function ExpensesPage() {
             </div>
           </div>
         </div>
+
+        {/* By Category */}
         <div className="col-span-12 lg:col-span-4">
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 h-full">
-            <h2 className="text-lg font-semibold text-slate-100 mb-4">By Category</h2>
+          <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-6 h-full`}>
+            <h2 className={`text-sm font-semibold ${THEME.textPrimary} mb-4`}>By Category</h2>
             <div className="space-y-1">
               {expenseMetrics.bySubcategory.slice(0, 6).map((item, i) => (
-                <ExpenseBar key={i} label={item.name} amount={item.amount} total={expenseMetrics.totalExpenses} color={item.category === 'directCosts' ? COLORS.rose : COLORS.amber} />
+                <ExpenseBar key={i} label={item.name} amount={item.amount} total={expenseMetrics.totalExpenses} 
+                  color={item.category === 'directCosts' ? COLORS.rose : COLORS.amber} />
               ))}
+              {expenseMetrics.bySubcategory.length === 0 && (
+                <p className={`text-sm ${THEME.textMuted} text-center py-8`}>No expenses yet</p>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {expenseMetrics.byContractor.length > 0 && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-          <h2 className="text-lg font-semibold text-slate-100 mb-4">Contractor Costs</h2>
+      {/* By Project (if any) */}
+      {expenseMetrics.byProject.length > 0 && (
+        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-6`}>
+          <h2 className={`text-sm font-semibold ${THEME.textPrimary} mb-4`}>Expenses by Project</h2>
           <div className="grid grid-cols-4 gap-4">
-            {expenseMetrics.byContractor.map((contractor, i) => (
-              <div key={i} className="bg-slate-700/30 rounded-lg p-4">
+            {expenseMetrics.byProject.slice(0, 8).map((proj, i) => (
+              <div key={i} className="bg-white/[0.03] rounded-lg p-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-rose-500/20 flex items-center justify-center"><Users size={18} className="text-rose-400" /></div>
-                  <div><p className="text-sm font-medium text-slate-200">{contractor.name}</p><p className="text-lg font-bold text-rose-400">{formatCurrency(contractor.amount)}</p></div>
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                    <Briefcase size={18} className="text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className={`text-sm font-medium ${THEME.textSecondary} truncate`}>{proj.name}</p>
+                    <p className="text-lg font-bold text-emerald-400">{formatCurrency(proj.amount)}</p>
+                  </div>
                 </div>
               </div>
             ))}
@@ -826,61 +733,86 @@ export default function ExpensesPage() {
         </div>
       )}
 
-      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-5 py-4 border-b border-slate-700/50">
-          <div className="flex items-center gap-3"><h2 className="text-lg font-semibold text-slate-100">All Expenses</h2><span className="px-2 py-0.5 bg-slate-700 rounded text-xs font-medium text-slate-300">{filteredExpenses.length}</span></div>
+      {/* Expense Table */}
+      <CollapsibleSection 
+        title="All Expenses" 
+        subtitle={`${filteredExpenses.filter(e => e.category === 'directCosts').length} direct • ${filteredExpenses.filter(e => e.category === 'overhead').length} overhead`}
+        badge={filteredExpenses.length}
+        defaultExpanded={true}
+        noPadding
+      >
+        {/* Filters */}
+        <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b ${THEME.glassBorder}`}>
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" /><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search expenses..." className="bg-slate-700/50 border border-slate-600 rounded-lg pl-9 pr-3 py-1.5 text-sm text-slate-200 w-48 focus:outline-none focus:border-emerald-500" /></div>
-            <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
-              <option value="all">All Categories</option><option value="directCosts">Direct Costs</option><option value="overhead">Overhead</option>
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search expenses..."
+                className="bg-white/[0.05] border border-white/[0.1] rounded-lg pl-9 pr-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 w-48 focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
+            </div>
+            <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}
+              className="bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30">
+              <option value="all" className="bg-slate-900">All Categories</option>
+              <option value="directCosts" className="bg-slate-900">Direct Costs</option>
+              <option value="overhead" className="bg-slate-900">Overhead</option>
             </select>
           </div>
         </div>
 
+        {/* Bulk Actions */}
         {selectedExpenses.length > 0 && (
-          <div className="flex items-center gap-4 px-5 py-3 bg-emerald-500/10 border-b border-emerald-500/20">
-            <span className="text-sm text-emerald-400">{selectedExpenses.length} selected</span>
-            <button className="text-sm text-slate-300 hover:text-white transition-colors">Mark as Paid</button>
-            <button className="text-sm text-slate-300 hover:text-white transition-colors">Delete</button>
-            <button className="text-sm text-slate-300 hover:text-white transition-colors">Export</button>
+          <div className="flex items-center gap-4 px-6 py-3 bg-emerald-500/10 border-b border-emerald-500/20">
+            <span className="text-sm font-medium text-emerald-400">{selectedExpenses.length} selected</span>
+            <button className={`text-sm ${THEME.textSecondary} hover:text-white transition-colors`}>Mark as Paid</button>
+            <button className={`text-sm ${THEME.textSecondary} hover:text-white transition-colors`}>Delete</button>
+            <button className={`text-sm ${THEME.textSecondary} hover:text-white transition-colors`}>Export</button>
           </div>
         )}
-        
-        <div className="flex items-center gap-3 py-2 px-4 bg-slate-800/80 border-b border-slate-700/50 text-xs font-medium text-slate-500 uppercase tracking-wider">
-          <div className="w-8 shrink-0"><input type="checkbox" checked={selectedExpenses.length === filteredExpenses.length && filteredExpenses.length > 0} onChange={handleSelectAll} className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-emerald-500" /></div>
-          <button onClick={() => handleSort('date')} className="w-24 shrink-0 flex items-center gap-1 hover:text-slate-300 transition-colors">Date {sortField === 'date' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}</button>
+
+        {/* Column Headers */}
+        <div className={`flex items-center gap-3 py-2.5 px-4 bg-white/[0.03] border-b ${THEME.glassBorder} text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>
+          <div className="w-8 shrink-0">
+            <input type="checkbox" checked={selectedExpenses.length === filteredExpenses.length && filteredExpenses.length > 0} onChange={handleSelectAll} className="w-4 h-4 rounded border-white/20 bg-white/5 text-emerald-500 focus:ring-emerald-500/30" />
+          </div>
+          <button onClick={() => handleSort('date')} className="w-20 shrink-0 flex items-center gap-1 hover:text-white transition-colors">
+            Date {sortField === 'date' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+          </button>
           <div className="flex-1">Description</div>
-          <div className="w-28 shrink-0">Category</div>
-          <div className="w-36 shrink-0">Type</div>
-          <div className="w-32 shrink-0">Contractor</div>
-          <div className="w-36 shrink-0">Project</div>
-          <button onClick={() => handleSort('amount')} className="w-24 text-right shrink-0 flex items-center justify-end gap-1 hover:text-slate-300 transition-colors">Amount {sortField === 'amount' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}</button>
+          <div className="w-24 shrink-0">Category</div>
+          <div className="w-32 shrink-0">Type</div>
+          <div className="w-28 shrink-0">Person</div>
+          <div className="w-32 shrink-0">Project</div>
+          <div className="w-24 shrink-0">Client</div>
+          <button onClick={() => handleSort('amount')} className="w-24 text-right shrink-0 flex items-center justify-end gap-1 hover:text-white transition-colors">
+            Amount {sortField === 'amount' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+          </button>
           <div className="w-20 shrink-0">Status</div>
-          <div className="w-16 shrink-0"></div>
+          <div className="w-12 shrink-0"></div>
         </div>
 
+        {/* Expense List */}
         <div className="max-h-[500px] overflow-y-auto">
           {filteredExpenses.length > 0 ? filteredExpenses.map(expense => (
-            <ExpenseRow key={expense.id} expense={expense} contractors={contractors} projects={projects} subcategories={subcategories}
-              onUpdate={handleUpdateExpense} onEdit={(exp) => setEditingExpense(exp)} onDelete={handleDeleteExpense}
+            <ExpenseRow key={expense.id} expense={expense} teamMembers={teamMembers} projects={projects} clients={clients}
+              onUpdate={handleUpdateExpense} onDelete={handleDeleteExpense}
               isSelected={selectedExpenses.includes(expense.id)} onSelect={handleSelectExpense} />
-          )) : <div className="flex items-center justify-center py-12 text-slate-500">No expenses found</div>}
+          )) : (
+            <div className={`flex items-center justify-center py-12 ${THEME.textMuted}`}>No expenses found</div>
+          )}
         </div>
 
-        <div className="flex items-center justify-between px-5 py-3 bg-slate-800/80 border-t border-slate-700/50">
-          <p className="text-sm text-slate-400">Showing {filteredExpenses.length} expenses</p>
+        {/* Footer */}
+        <div className={`flex items-center justify-between px-6 py-3 bg-white/[0.03] border-t ${THEME.glassBorder}`}>
+          <p className={`text-sm ${THEME.textMuted}`}>Showing {filteredExpenses.length} expenses</p>
           <div className="flex items-center gap-6 text-sm">
-            <div><span className="text-slate-500">Direct Costs: </span><span className="font-semibold text-rose-400">{formatCurrency(filteredExpenses.filter(e => e.category === 'directCosts').reduce((s, e) => s + e.amount, 0))}</span></div>
-            <div><span className="text-slate-500">Overhead: </span><span className="font-semibold text-amber-400">{formatCurrency(filteredExpenses.filter(e => e.category === 'overhead').reduce((s, e) => s + e.amount, 0))}</span></div>
-            <div><span className="text-slate-500">Total: </span><span className="font-semibold text-slate-200">{formatCurrency(filteredExpenses.reduce((s, e) => s + e.amount, 0))}</span></div>
+            <div><span className={THEME.textMuted}>Direct: </span><span className="font-semibold text-rose-400">{formatCurrency(filteredExpenses.filter(e => e.category === 'directCosts').reduce((s, e) => s + e.amount, 0))}</span></div>
+            <div><span className={THEME.textMuted}>Overhead: </span><span className="font-semibold text-amber-400">{formatCurrency(filteredExpenses.filter(e => e.category === 'overhead').reduce((s, e) => s + e.amount, 0))}</span></div>
+            <div><span className={THEME.textMuted}>Total: </span><span className={`font-semibold ${THEME.textPrimary}`}>{formatCurrency(filteredExpenses.reduce((s, e) => s + e.amount, 0))}</span></div>
           </div>
         </div>
-      </div>
+      </CollapsibleSection>
 
-      <AddExpenseModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} contractors={contractors} projects={projects}
-        subcategories={subcategories} onAddSubcategory={handleAddSubcategory} onDeleteSubcategory={handleDeleteSubcategory} onSave={handleAddExpense} />
-      <EditExpenseModal isOpen={!!editingExpense} expense={editingExpense} onClose={() => setEditingExpense(null)} contractors={contractors}
-        projects={projects} subcategories={subcategories} onSave={handleUpdateExpense} />
+      {/* Add Modal */}
+      <AddExpenseModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} teamMembers={teamMembers} projects={projects} onSave={handleAddExpense} />
     </div>
   )
 }
