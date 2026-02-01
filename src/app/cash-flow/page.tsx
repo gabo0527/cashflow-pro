@@ -19,16 +19,21 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
-// ============ THEME ============
+// ============ GLASSMORPHISM THEME ============
 const THEME = {
-  cardShadow: '0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05)',
-  cardShadowHover: '0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05)',
+  glass: 'bg-slate-900/70 backdrop-blur-xl',
+  glassBorder: 'border-white/[0.08]',
+  glassHover: 'hover:bg-white/[0.05] hover:border-white/[0.12]',
+  textPrimary: 'text-white',
+  textSecondary: 'text-slate-300',
+  textMuted: 'text-slate-400',
+  textDim: 'text-slate-500',
   chart: {
     primary: '#10B981',
-    secondary: '#6B7280',
+    secondary: '#64748b',
     negative: '#EF4444',
-    grid: '#F3F4F6',
-    axis: '#9CA3AF',
+    grid: 'rgba(255,255,255,0.06)',
+    axis: '#64748b',
   }
 }
 
@@ -50,7 +55,7 @@ const formatDate = (dateStr: string): string => {
 
 // ============ COMPONENTS ============
 
-// Premium KPI Card
+// Glass KPI Card
 function MetricCard({ 
   label, 
   value, 
@@ -59,7 +64,7 @@ function MetricCard({
   trendLabel,
   icon: Icon,
   href,
-  valueColor = 'text-gray-900'
+  valueColor = 'text-white'
 }: { 
   label: string
   value: string
@@ -71,33 +76,30 @@ function MetricCard({
   valueColor?: string
 }) {
   const content = (
-    <div 
-      className="bg-white border border-gray-200 rounded-xl p-6 transition-all duration-200 hover:shadow-md hover:border-gray-300 group"
-      style={{ boxShadow: THEME.cardShadow }}
-    >
+    <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-6 transition-all duration-200 ${THEME.glassHover} group`}>
       <div className="flex items-start justify-between">
         <div className="space-y-1.5">
-          <p className="text-sm font-medium text-gray-500">{label}</p>
+          <p className={`text-sm font-medium ${THEME.textMuted}`}>{label}</p>
           <p className={`text-2xl font-semibold tracking-tight ${valueColor}`}>{value}</p>
           {subValue && (
-            <p className="text-xs text-gray-400 mt-1">{subValue}</p>
+            <p className={`text-xs mt-1 ${THEME.textDim}`}>{subValue}</p>
           )}
           {trend !== undefined && (
             <div className="flex items-center gap-1.5 pt-1">
               {trend >= 0 ? (
-                <ArrowUpRight size={14} className="text-emerald-500" />
+                <ArrowUpRight size={14} className="text-emerald-400" />
               ) : (
-                <ArrowDownRight size={14} className="text-red-500" />
+                <ArrowDownRight size={14} className="text-rose-400" />
               )}
-              <span className={`text-xs font-medium ${trend >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              <span className={`text-xs font-medium ${trend >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                 {Math.abs(trend).toFixed(1)}%
               </span>
-              {trendLabel && <span className="text-xs text-gray-400">{trendLabel}</span>}
+              {trendLabel && <span className={`text-xs ${THEME.textDim}`}>{trendLabel}</span>}
             </div>
           )}
         </div>
-        <div className="p-2.5 rounded-lg bg-gray-50 group-hover:bg-gray-100 transition-colors">
-          <Icon size={20} className="text-gray-400" strokeWidth={1.5} />
+        <div className="p-2.5 rounded-lg bg-white/[0.05] group-hover:bg-white/[0.08] transition-colors">
+          <Icon size={20} className={THEME.textMuted} strokeWidth={1.5} />
         </div>
       </div>
     </div>
@@ -107,7 +109,7 @@ function MetricCard({
   return content
 }
 
-// Section Card
+// Glass Section Card
 function Section({ 
   title, 
   subtitle, 
@@ -130,35 +132,32 @@ function Section({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
 
   return (
-    <div 
-      className="rounded-xl bg-white border border-gray-200 overflow-hidden"
-      style={{ boxShadow: THEME.cardShadow }}
-    >
+    <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
       <div 
-        className={`flex items-center justify-between px-6 py-4 border-b border-gray-100 ${collapsible ? 'cursor-pointer hover:bg-gray-50 transition-colors' : ''}`}
+        className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder} ${collapsible ? 'cursor-pointer hover:bg-white/[0.03] transition-colors' : ''}`}
         onClick={collapsible ? () => setIsExpanded(!isExpanded) : undefined}
       >
         <div className="flex items-center gap-3">
           {collapsible && (
-            <div className="text-gray-400">
+            <div className={THEME.textMuted}>
               {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
             </div>
           )}
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+              <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>{title}</h3>
               {badge !== undefined && (
-                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600">{badge}</span>
+                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-white/[0.08] text-slate-300">{badge}</span>
               )}
             </div>
-            {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+            {subtitle && <p className={`text-xs mt-0.5 ${THEME.textDim}`}>{subtitle}</p>}
           </div>
         </div>
         {action && !collapsible && (
           action.onClick ? (
             <button 
               onClick={action.onClick}
-              className="text-xs font-medium text-gray-500 hover:text-gray-700 flex items-center gap-0.5 transition-colors"
+              className={`text-xs font-medium ${THEME.textMuted} hover:text-white flex items-center gap-0.5 transition-colors`}
             >
               {action.label}
               <ChevronRight size={14} />
@@ -166,7 +165,7 @@ function Section({
           ) : (
             <Link 
               href={action.href || '#'} 
-              className="text-xs font-medium text-gray-500 hover:text-gray-700 flex items-center gap-0.5 transition-colors"
+              className={`text-xs font-medium ${THEME.textMuted} hover:text-white flex items-center gap-0.5 transition-colors`}
             >
               {action.label}
               <ChevronRight size={14} />
@@ -183,7 +182,7 @@ function Section({
   )
 }
 
-// P&L Row
+// Glass P&L Row
 function PLRow({ 
   label, 
   value, 
@@ -200,27 +199,27 @@ function PLRow({
   bold?: boolean
 }) {
   const colorMap = {
-    positive: 'text-emerald-600',
-    negative: 'text-red-500',
-    neutral: 'text-gray-900',
-    muted: 'text-gray-500'
+    positive: 'text-emerald-400',
+    negative: 'text-rose-400',
+    neutral: 'text-white',
+    muted: 'text-slate-400'
   }
   const barColorMap = {
     positive: '#10B981',
     negative: '#EF4444',
-    neutral: '#6B7280',
-    muted: '#E5E7EB'
+    neutral: '#64748b',
+    muted: 'rgba(255,255,255,0.1)'
   }
   
   return (
     <div className={`flex items-center justify-between py-3.5 ${indent ? 'pl-6' : ''}`}>
       <div className="flex items-center gap-4 flex-1 min-w-0">
-        <span className={`text-sm ${bold ? 'font-semibold text-gray-900' : indent ? 'text-gray-500' : 'font-medium text-gray-700'}`}>
+        <span className={`text-sm ${bold ? `font-semibold ${THEME.textPrimary}` : indent ? THEME.textMuted : `font-medium ${THEME.textSecondary}`}`}>
           {label}
         </span>
         {percentage !== undefined && (
           <div className="flex-1 max-w-40 hidden sm:block">
-            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-1.5 bg-white/[0.08] rounded-full overflow-hidden">
               <div 
                 className="h-full rounded-full transition-all duration-500"
                 style={{ 
@@ -237,19 +236,19 @@ function PLRow({
           {formatCurrency(value)}
         </span>
         {percentage !== undefined && (
-          <span className="text-xs text-gray-400 w-12 text-right tabular-nums">{percentage.toFixed(1)}%</span>
+          <span className={`text-xs w-12 text-right tabular-nums ${THEME.textDim}`}>{percentage.toFixed(1)}%</span>
         )}
       </div>
     </div>
   )
 }
 
-// Chart Tooltip
+// Glass Chart Tooltip
 const ChartTooltip = ({ active, payload, label, formatter }: any) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-lg">
-      <p className="text-xs text-gray-500 mb-1">{label}</p>
+    <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-lg px-3 py-2 shadow-xl`}>
+      <p className={`text-xs ${THEME.textDim} mb-1`}>{label}</p>
       {payload.map((entry: any, i: number) => (
         <p key={i} className="text-sm font-medium" style={{ color: entry.color }}>
           {entry.name}: {formatter ? formatter(entry.value) : entry.value}
@@ -433,8 +432,8 @@ export default function CashFlowPage() {
       projectRevenue[name] = (projectRevenue[name] || 0) + (parseFloat(inv.amount) || parseFloat(inv.total_amount) || 0)
     })
 
-    // Monochrome colors with emerald as primary
-    const colors = ['#10B981', '#6B7280', '#9CA3AF', '#D1D5DB', '#E5E7EB']
+    // Glass theme colors
+    const colors = ['#10B981', '#64748b', '#94a3b8', '#cbd5e1', '#475569']
     
     return Object.entries(projectRevenue)
       .map(([name, value], i) => ({ name, value, color: colors[i % colors.length] }))
@@ -456,19 +455,19 @@ export default function CashFlowPage() {
       <div className="flex items-center justify-center h-[60vh]">
         <div className="flex flex-col items-center gap-3">
           <RefreshCw size={24} className="text-emerald-500 animate-spin" />
-          <p className="text-sm text-gray-500">Loading cash flow...</p>
+          <p className={`text-sm ${THEME.textMuted}`}>Loading cash flow...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 pb-8">
-      {/* Header - with proper spacing */}
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Cash Flow</h1>
-          <p className="text-sm text-gray-500 mt-1">Real-time cash position & profitability</p>
+          <h1 className={`text-xl font-semibold ${THEME.textPrimary}`}>Cash Flow</h1>
+          <p className={`text-sm mt-1 ${THEME.textMuted}`}>Real-time cash position & profitability</p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -477,13 +476,13 @@ export default function CashFlowPage() {
             <select 
               value={selectedYear} 
               onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="appearance-none bg-white border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer"
+              className="appearance-none bg-white/[0.05] border border-white/[0.1] rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 cursor-pointer"
             >
               {years.map(year => (
-                <option key={year} value={year}>{year}</option>
+                <option key={year} value={year} className="bg-slate-900">{year}</option>
               ))}
             </select>
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
           </div>
           
           {/* Month selector */}
@@ -491,23 +490,23 @@ export default function CashFlowPage() {
             <select 
               value={selectedMonth} 
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className="appearance-none bg-white border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer"
+              className="appearance-none bg-white/[0.05] border border-white/[0.1] rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 cursor-pointer"
             >
               {months.map(month => (
-                <option key={month} value={month}>{month}</option>
+                <option key={month} value={month} className="bg-slate-900">{month}</option>
               ))}
             </select>
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
           </div>
 
           {/* Sync button */}
-          <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors">
+          <button className="flex items-center gap-2 px-4 py-2 border border-white/[0.1] rounded-lg text-sm font-medium text-slate-300 hover:bg-white/[0.05] hover:border-white/[0.15] transition-colors">
             <RefreshCw size={14} />
             Sync QBO
           </button>
 
           {/* Add Entry */}
-          <button className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors shadow-sm">
+          <button className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20">
             <Plus size={14} />
             Add Entry
           </button>
@@ -521,14 +520,14 @@ export default function CashFlowPage() {
           value={formatCurrency(metrics.cashOnHand)}
           subValue="Bank accounts"
           icon={Wallet}
-          valueColor="text-emerald-600"
+          valueColor="text-emerald-400"
         />
         <MetricCard
           label="Credit Card Debt"
           value={formatCurrency(metrics.creditCardDebt)}
           subValue="Outstanding balance"
           icon={CreditCard}
-          valueColor="text-red-500"
+          valueColor="text-rose-400"
         />
         <MetricCard
           label="Net Position"
@@ -537,14 +536,14 @@ export default function CashFlowPage() {
           trend={metrics.revenueChange}
           trendLabel="vs last month"
           icon={DollarSign}
-          valueColor={metrics.netPosition >= 0 ? 'text-emerald-600' : 'text-red-500'}
+          valueColor={metrics.netPosition >= 0 ? 'text-emerald-400' : 'text-rose-400'}
         />
         <MetricCard
           label="Gross Margin"
           value={`${metrics.grossMargin.toFixed(1)}%`}
           subValue={formatCurrency(metrics.grossProfit)}
           icon={Percent}
-          valueColor={metrics.grossMargin >= 30 ? 'text-emerald-600' : metrics.grossMargin >= 15 ? 'text-amber-500' : 'text-red-500'}
+          valueColor={metrics.grossMargin >= 30 ? 'text-emerald-400' : metrics.grossMargin >= 15 ? 'text-amber-400' : 'text-rose-400'}
         />
       </div>
 
@@ -553,13 +552,13 @@ export default function CashFlowPage() {
         {/* Profit & Loss */}
         <div className="col-span-12 lg:col-span-8">
           <Section title="Profit & Loss" subtitle={`${selectedMonth} ${selectedYear}`}>
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-white/[0.05]">
               <PLRow label="Revenue" value={metrics.revenue} percentage={100} type="positive" bold />
               <PLRow label="Contractor Labor" value={metrics.directCosts} percentage={metrics.revenue > 0 ? (metrics.directCosts / metrics.revenue) * 100 : 0} type="negative" indent />
-              <div className="h-px bg-gray-200 my-1" />
+              <div className="h-px bg-white/[0.1] my-1" />
               <PLRow label="Gross Profit" value={metrics.grossProfit} percentage={metrics.grossMargin} type={metrics.grossProfit >= 0 ? 'positive' : 'negative'} bold />
               <PLRow label="Overhead" value={metrics.overhead} percentage={metrics.revenue > 0 ? (metrics.overhead / metrics.revenue) * 100 : 0} type="muted" indent />
-              <div className="h-px bg-gray-200 my-1" />
+              <div className="h-px bg-white/[0.1] my-1" />
               <PLRow label="Net Profit" value={metrics.netProfit} percentage={metrics.netMargin} type={metrics.netProfit >= 0 ? 'positive' : 'negative'} bold />
             </div>
           </Section>
@@ -595,15 +594,15 @@ export default function CashFlowPage() {
                     <div key={i} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: project.color }} />
-                        <span className="text-gray-600 truncate">{project.name}</span>
+                        <span className={`${THEME.textSecondary} truncate`}>{project.name}</span>
                       </div>
-                      <span className="font-semibold text-gray-900 tabular-nums shrink-0 ml-3">{formatCurrency(project.value)}</span>
+                      <span className={`font-semibold ${THEME.textPrimary} tabular-nums shrink-0 ml-3`}>{formatCurrency(project.value)}</span>
                     </div>
                   ))}
                 </div>
               </>
             ) : (
-              <div className="flex items-center justify-center h-44 text-gray-400 text-sm">
+              <div className={`flex items-center justify-center h-44 ${THEME.textMuted} text-sm`}>
                 No project revenue this period
               </div>
             )}
@@ -619,14 +618,14 @@ export default function CashFlowPage() {
               .sort(([,a], [,b]) => b - a)
               .slice(0, 5)
               .map(([category, amount], i) => {
-                const colors = ['#EF4444', '#F59E0B', '#10B981', '#6B7280', '#9CA3AF']
+                const colors = ['#EF4444', '#F59E0B', '#10B981', '#64748b', '#94a3b8']
                 return (
-                  <div key={i} className="bg-gray-50 border border-gray-100 rounded-lg p-4">
+                  <div key={i} className="bg-white/[0.03] border border-white/[0.08] rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-2 h-2 rounded-full" style={{ backgroundColor: colors[i] }} />
-                      <span className="text-xs text-gray-500 truncate">{category}</span>
+                      <span className={`text-xs ${THEME.textMuted} truncate`}>{category}</span>
                     </div>
-                    <span className="text-lg font-semibold text-gray-900">{formatCurrency(amount)}</span>
+                    <span className={`text-lg font-semibold ${THEME.textPrimary}`}>{formatCurrency(amount)}</span>
                   </div>
                 )
               })}
@@ -645,23 +644,23 @@ export default function CashFlowPage() {
       >
         <div>
           {/* Header */}
-          <div className="flex items-center px-6 py-3 bg-gray-50 border-b border-gray-200">
-            <div className="flex-1 text-xs font-medium text-gray-500 uppercase tracking-wider">Description</div>
-            <div className="w-24 text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:block">Date</div>
-            <div className="w-32 text-xs font-medium text-gray-500 uppercase tracking-wider text-right">Amount</div>
+          <div className={`flex items-center px-6 py-3 bg-white/[0.03] border-b ${THEME.glassBorder}`}>
+            <div className={`flex-1 text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Description</div>
+            <div className={`w-24 text-xs font-medium ${THEME.textDim} uppercase tracking-wider hidden sm:block`}>Date</div>
+            <div className={`w-32 text-xs font-medium ${THEME.textDim} uppercase tracking-wider text-right`}>Amount</div>
           </div>
           
           {/* Rows */}
           {displayTransactions.length > 0 ? (
             <>
               {displayTransactions.map((tx, i) => (
-                <div key={i} className="flex items-center px-6 py-3.5 bg-white border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                <div key={i} className="flex items-center px-6 py-3.5 border-b border-white/[0.05] hover:bg-white/[0.03] transition-colors">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-800 truncate">{tx.description || tx.name || 'Transaction'}</p>
-                    <p className="text-xs text-gray-400 sm:hidden">{formatDate(tx.date)}</p>
+                    <p className={`text-sm ${THEME.textSecondary} truncate`}>{tx.description || tx.name || 'Transaction'}</p>
+                    <p className={`text-xs ${THEME.textDim} sm:hidden`}>{formatDate(tx.date)}</p>
                   </div>
-                  <div className="w-24 text-sm text-gray-500 hidden sm:block">{formatDate(tx.date)}</div>
-                  <div className={`w-32 text-sm font-semibold text-right tabular-nums ${(parseFloat(tx.amount) || 0) < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                  <div className={`w-24 text-sm ${THEME.textMuted} hidden sm:block`}>{formatDate(tx.date)}</div>
+                  <div className={`w-32 text-sm font-semibold text-right tabular-nums ${(parseFloat(tx.amount) || 0) < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
                     {formatCurrency(parseFloat(tx.amount) || 0)}
                   </div>
                 </div>
@@ -671,7 +670,7 @@ export default function CashFlowPage() {
               {filteredTransactions.length > 5 && (
                 <button 
                   onClick={() => setShowAllTransactions(!showAllTransactions)}
-                  className="w-full px-6 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1"
+                  className={`w-full px-6 py-3 text-sm font-medium ${THEME.textMuted} hover:text-white hover:bg-white/[0.03] transition-colors flex items-center justify-center gap-1`}
                 >
                   {showAllTransactions ? (
                     <>Show Less <ChevronUp size={14} /></>
@@ -682,7 +681,7 @@ export default function CashFlowPage() {
               )}
             </>
           ) : (
-            <div className="flex items-center justify-center py-12 text-gray-400 text-sm">
+            <div className={`flex items-center justify-center py-12 ${THEME.textMuted} text-sm`}>
               No transactions this period
             </div>
           )}
