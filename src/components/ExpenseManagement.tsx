@@ -158,7 +158,6 @@ export default function ExpenseManagement({ supabase, companyId, currentUserId }
       const upd: any = { status: newStatus }
       if (newStatus === 'approved') {
         upd.approved_at = new Date().toISOString()
-        if (currentUserId) upd.approved_by = currentUserId
       }
       if (newStatus === 'reimbursed') {
         upd.reimbursed_at = new Date().toISOString()
