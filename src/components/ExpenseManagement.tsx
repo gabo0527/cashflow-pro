@@ -101,39 +101,67 @@ export default function ExpenseManagement({
   const loadClaims = async () => {
     setLoading(true)
     try {
+      // Simple query - avoid nested joins that can fail silently
       const { data, error } = await supabase
         .from('expense_claims')
         .select(`
           id, expense_date, vendor, amount, category, description, billable,
           status, payment_method, receipt_url, attachment_filename, attachment_type,
-          submitted_by_role, submitted_at, project_id, team_member_id,
-          team_members(name, email),
-          projects(name, clients(name))
+          submitted_by_role, submitted_at, project_id, team_member_id
         `)
         .eq('company_id', companyId)
         .order('expense_date', { ascending: false })
 
+      if (error) { console.error('Query error:', error); setLoading(false); return }
+
+      // Load team members and projects separately for lookups
+      const { data: teamData } = await supabase
+        .from('team_members')
+        .select('id, name, email')
+        .eq('company_id', companyId)
+      
+      const { data: projectData } = await supabase
+        .from('projects')
+        .select('id, name, client_id')
+        .eq('company_id', companyId)
+
+      const { data: clientData } = await supabase
+        .from('clients')
+        .select('id, name')
+        .eq('company_id', companyId)
+
+      const teamMap: Record<string, any> = {}
+      ;(teamData || []).forEach((t: any) => { teamMap[t.id] = t })
+      const projectMap: Record<string, any> = {}
+      ;(projectData || []).forEach((p: any) => { projectMap[p.id] = p })
+      const clientMap: Record<string, any> = {}
+      ;(clientData || []).forEach((c: any) => { clientMap[c.id] = c })
+
       if (data) {
-        setClaims(data.map((d: any) => ({
-          id: d.id,
-          expense_date: d.expense_date,
-          vendor: d.vendor,
-          amount: d.amount,
-          category: d.category,
-          description: d.description,
-          billable: d.billable || false,
-          status: d.status,
-          payment_method: d.payment_method || 'personal_card',
-          receipt_url: d.receipt_url,
-          attachment_filename: d.attachment_filename,
-          attachment_type: d.attachment_type,
-          submitted_by_role: d.submitted_by_role || 'employee',
-          submitted_at: d.submitted_at,
-          team_member_name: d.team_members?.name || 'Unknown',
-          team_member_email: d.team_members?.email || '',
-          project_name: d.projects?.name || null,
-          client_name: d.projects?.clients?.name || null,
-        })))
+        setClaims(data.map((d: any) => {
+          const project = d.project_id ? projectMap[d.project_id] : null
+          const client = project?.client_id ? clientMap[project.client_id] : null
+          return {
+            id: d.id,
+            expense_date: d.expense_date,
+            vendor: d.vendor,
+            amount: d.amount,
+            category: d.category,
+            description: d.description,
+            billable: d.billable || false,
+            status: d.status,
+            payment_method: d.payment_method || 'personal_card',
+            receipt_url: d.receipt_url,
+            attachment_filename: d.attachment_filename,
+            attachment_type: d.attachment_type,
+            submitted_by_role: d.submitted_by_role || 'employee',
+            submitted_at: d.submitted_at,
+            team_member_name: teamMap[d.team_member_id]?.name || 'Unknown',
+            team_member_email: teamMap[d.team_member_id]?.email || '',
+            project_name: project?.name || null,
+            client_name: client?.name || null,
+          }
+        }))
       }
     } catch (err) {
       console.error('Error loading claims:', err)
