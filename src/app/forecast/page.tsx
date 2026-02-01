@@ -23,7 +23,7 @@ const supabase = createClient(
 
 // ============ DESIGN SYSTEM ============
 const COLORS = {
-  primary: '#3b82f6',
+  primary: '#10b981', // Emerald
   success: '#10b981',
   warning: '#f59e0b',
   danger: '#ef4444',
@@ -31,6 +31,26 @@ const COLORS = {
   cyan: '#06b6d4',
   pink: '#ec4899',
   orange: '#f97316',
+}
+
+// ============ GLASSMORPHISM THEME ============
+const THEME = {
+  glass: 'bg-slate-900/70 backdrop-blur-xl',
+  glassBorder: 'border-white/[0.08]',
+  glassHover: 'hover:bg-white/[0.05]',
+  textPrimary: 'text-white',
+  textSecondary: 'text-slate-300',
+  textMuted: 'text-slate-400',
+}
+
+// Category tags for CEO visibility
+const CATEGORY_TAGS: Record<string, { label: string; color: string; bg: string }> = {
+  revenue: { label: 'Revenue', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
+  labor: { label: 'Direct Cost', color: 'text-blue-400', bg: 'bg-blue-500/20' },
+  opex: { label: 'Operating Exp', color: 'text-amber-400', bg: 'bg-amber-500/20' },
+  overhead: { label: 'Overhead', color: 'text-purple-400', bg: 'bg-purple-500/20' },
+  collections: { label: 'AR/Collections', color: 'text-cyan-400', bg: 'bg-cyan-500/20' },
+  cash: { label: 'Cash', color: 'text-blue-400', bg: 'bg-blue-500/20' },
 }
 
 const CHART_COLORS = [COLORS.primary, COLORS.success, COLORS.purple, COLORS.cyan, COLORS.warning, COLORS.pink]
@@ -75,6 +95,18 @@ interface PlannedItem {
   startMonth: number // 0-indexed from current month
   recurring: boolean
   category?: string
+  source?: string // Where this comes from (client name, expense type, etc.)
+  tag?: string // Category tag for CEO visibility
+}
+
+// Source breakdown for transparency
+interface SourceItem {
+  id: string
+  name: string
+  amount: number
+  percentage: number
+  tag: string
+  subItems?: { name: string; amount: number }[]
 }
 
 interface ForecastPeriod {
@@ -177,7 +209,7 @@ function EditableInput({
           onBlur={handleSave}
           onKeyDown={handleKeyDown}
           autoFocus
-          className={`bg-slate-700 border border-blue-500 rounded px-2 py-1 text-slate-100 text-sm w-24 focus:outline-none ${className}`}
+          className={`bg-white/[0.05] border border-emerald-500 rounded px-2 py-1 text-white text-sm w-24 focus:outline-none ${className}`}
         />
         {type === 'percent' && <span className="text-slate-500">%</span>}
       </div>
@@ -190,34 +222,105 @@ function EditableInput({
         setTempValue(value.toString())
         setEditing(true)
       }}
-      className={`text-slate-100 font-semibold hover:text-blue-400 hover:underline cursor-pointer ${className}`}
+      className={`text-white font-semibold hover:text-emerald-400 hover:underline cursor-pointer ${className}`}
     >
       {formatDisplay()}
     </button>
   )
 }
 
-// Assumption Card
+// Source Breakdown Component - Shows WHERE inputs come from
+function SourceBreakdown({ 
+  sources, 
+  title,
+  expanded,
+  onToggle
+}: { 
+  sources: SourceItem[]
+  title: string
+  expanded: boolean
+  onToggle: () => void
+}) {
+  if (sources.length === 0) return null
+
+  return (
+    <div className="mt-2">
+      <button 
+        onClick={onToggle}
+        className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+      >
+        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        <span>View breakdown ({sources.length} sources)</span>
+      </button>
+      
+      {expanded && (
+        <div className="mt-2 ml-4 space-y-1.5 border-l-2 border-white/[0.08] pl-3">
+          {sources.map((source, i) => (
+            <div key={source.id || i} className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <span className={`px-1.5 py-0.5 rounded text-[10px] ${CATEGORY_TAGS[source.tag]?.bg || 'bg-slate-700'} ${CATEGORY_TAGS[source.tag]?.color || 'text-slate-400'}`}>
+                  {CATEGORY_TAGS[source.tag]?.label || source.tag}
+                </span>
+                <span className="text-slate-400">{source.name}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-slate-500">{source.percentage.toFixed(1)}%</span>
+                <span className="text-slate-300 font-medium">{formatCurrency(source.amount)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Enhanced Assumption Card with Source Attribution
 function AssumptionCard({ 
   assumption, 
-  onUpdate 
+  onUpdate,
+  sources = [],
+  showSources = false
 }: { 
   assumption: Assumption
   onUpdate: (id: string, value: number) => void
+  sources?: SourceItem[]
+  showSources?: boolean
 }) {
+  const [expanded, setExpanded] = useState(false)
+  const tag = CATEGORY_TAGS[assumption.category]
+  
   return (
-    <div className="flex items-center justify-between py-3 border-b border-slate-700/50 last:border-0">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-200">{assumption.name}</p>
-        {assumption.description && (
-          <p className="text-xs text-slate-500 mt-0.5">{assumption.description}</p>
-        )}
+    <div className="py-3 border-b border-white/[0.05] last:border-0">
+      <div className="flex items-center justify-between">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-slate-200">{assumption.name}</p>
+            {tag && (
+              <span className={`px-1.5 py-0.5 rounded text-[10px] ${tag.bg} ${tag.color}`}>
+                {tag.label}
+              </span>
+            )}
+          </div>
+          {assumption.description && (
+            <p className="text-xs text-slate-500 mt-0.5">{assumption.description}</p>
+          )}
+        </div>
+        <EditableInput
+          value={assumption.value}
+          onChange={(value) => onUpdate(assumption.id, value)}
+          type={assumption.type}
+        />
       </div>
-      <EditableInput
-        value={assumption.value}
-        onChange={(value) => onUpdate(assumption.id, value)}
-        type={assumption.type}
-      />
+      
+      {showSources && sources.length > 0 && (
+        <SourceBreakdown 
+          sources={sources} 
+          title={assumption.name}
+          expanded={expanded}
+          onToggle={() => setExpanded(!expanded)}
+        />
+      )}
     </div>
   )
 }
@@ -239,13 +342,13 @@ function PlannedItemRow({
   })
 
   return (
-    <div className="flex items-center gap-3 py-2 border-b border-slate-700/50">
+    <div className="flex items-center gap-3 py-2 border-b border-white/[0.08]/50">
       <div className="flex-1">
         <input
           type="text"
           value={item.name}
           onChange={(e) => onUpdate({ ...item, name: e.target.value })}
-          className="bg-transparent border-b border-transparent hover:border-slate-600 focus:border-blue-500 text-slate-200 text-sm w-full focus:outline-none"
+          className="bg-transparent border-b border-transparent hover:border-white/[0.08] focus:border-emerald-500 text-slate-200 text-sm w-full focus:outline-none"
           placeholder="Item name"
         />
       </div>
@@ -259,7 +362,7 @@ function PlannedItemRow({
       <select
         value={item.startMonth}
         onChange={(e) => onUpdate({ ...item, startMonth: parseInt(e.target.value) })}
-        className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm text-slate-200 w-28"
+        className="bg-white/[0.05] border border-white/[0.08] rounded px-2 py-1 text-sm text-slate-200 w-28"
       >
         {monthLabels.map((label, i) => (
           <option key={i} value={i}>{label}</option>
@@ -270,7 +373,7 @@ function PlannedItemRow({
           type="checkbox"
           checked={item.recurring}
           onChange={(e) => onUpdate({ ...item, recurring: e.target.checked })}
-          className="rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500"
+          className="rounded border-white/[0.08] bg-white/[0.05] text-blue-500 focus:ring-blue-500"
         />
         Recurring
       </label>
@@ -298,10 +401,10 @@ function Section({
   const [expanded, setExpanded] = useState(defaultExpanded)
 
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
+    <div className="rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-700/30 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.05] transition-colors"
       >
         <div className="flex items-center gap-3">
           <Icon size={18} className="text-slate-400" />
@@ -313,7 +416,7 @@ function Section({
         </div>
       </button>
       {expanded && (
-        <div className="px-4 pb-4 border-t border-slate-700/50">
+        <div className="px-4 pb-4 border-t border-white/[0.05]">
           {children}
         </div>
       )}
@@ -344,7 +447,7 @@ function KPICard({
   }
 
   return (
-    <div className="p-4 rounded-xl border border-slate-700 bg-slate-800/50">
+    <div className="p-4 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl">
       <p className="text-xs font-medium text-slate-400">{title}</p>
       <p className={`text-2xl font-bold mt-1 ${colorClasses[color]}`}>{value}</p>
       {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
@@ -376,6 +479,12 @@ export default function AssumptionsPage() {
 
   // Historical data (would come from DB)
   const [historicalData, setHistoricalData] = useState<any>({})
+  
+  // SOURCE DATA for CEO visibility
+  const [revenueByClient, setRevenueByClient] = useState<SourceItem[]>([])
+  const [expensesByCategory, setExpensesByCategory] = useState<SourceItem[]>([])
+  const [laborByMember, setLaborByMember] = useState<SourceItem[]>([])
+  const [overheadBreakdown, setOverheadBreakdown] = useState<SourceItem[]>([])
 
   useEffect(() => {
     const loadData = async () => {
@@ -406,18 +515,96 @@ export default function AssumptionsPage() {
             setPlannedRevenue(savedAssumptions.data.plannedRevenue || [])
           }
 
-          // Load historical transactions for baseline
-          const { data: transactions } = await supabase
-            .from('transactions')
-            .select('*')
-            .eq('company_id', profile.company_id)
+          // Load ALL source data for CEO visibility
+          const [txRes, invRes, clientsRes, teamRes] = await Promise.all([
+            supabase.from('transactions').select('*').eq('company_id', profile.company_id),
+            supabase.from('invoices').select('*, clients(name)').eq('company_id', profile.company_id),
+            supabase.from('clients').select('*').eq('company_id', profile.company_id),
+            supabase.from('team_members').select('*').eq('company_id', profile.company_id).eq('status', 'active')
+          ])
           
-          if (transactions) {
-            // Calculate historical averages
-            const revenue = transactions.filter(t => t.category === 'revenue').reduce((sum, t) => sum + (t.amount || 0), 0)
-            const expenses = transactions.filter(t => ['opex', 'overhead', 'cogs'].includes(t.category)).reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
-            setHistoricalData({ revenue, expenses, transactionCount: transactions.length })
-          }
+          const transactions = txRes.data || []
+          const invoices = invRes.data || []
+          const clients = clientsRes.data || []
+          const teamMembers = teamRes.data || []
+
+          // Calculate historical averages
+          const revenue = transactions.filter(t => t.category === 'revenue').reduce((sum, t) => sum + (t.amount || 0), 0)
+          const expenses = transactions.filter(t => ['opex', 'overhead', 'cogs'].includes(t.category)).reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
+          setHistoricalData({ revenue, expenses, transactionCount: transactions.length })
+
+          // BUILD SOURCE BREAKDOWNS FOR CEO
+          
+          // 1. Revenue by Client (from invoices)
+          const clientRevenue: Record<string, number> = {}
+          invoices.forEach(inv => {
+            const clientName = (inv.clients as any)?.name || 'Unknown Client'
+            clientRevenue[clientName] = (clientRevenue[clientName] || 0) + (inv.amount || 0)
+          })
+          const totalClientRevenue = Object.values(clientRevenue).reduce((a, b) => a + b, 0)
+          const revSources: SourceItem[] = Object.entries(clientRevenue)
+            .sort((a, b) => b[1] - a[1])
+            .map(([name, amount]) => ({
+              id: name,
+              name,
+              amount,
+              percentage: totalClientRevenue > 0 ? (amount / totalClientRevenue) * 100 : 0,
+              tag: 'revenue'
+            }))
+          setRevenueByClient(revSources)
+
+          // 2. Expenses by Category
+          const expenseCategories: Record<string, number> = {}
+          transactions.filter(t => t.amount < 0 || ['opex', 'overhead', 'cogs'].includes(t.category))
+            .forEach(t => {
+              const cat = t.category || 'Uncategorized'
+              expenseCategories[cat] = (expenseCategories[cat] || 0) + Math.abs(t.amount || 0)
+            })
+          const totalExpenses = Object.values(expenseCategories).reduce((a, b) => a + b, 0)
+          const expSources: SourceItem[] = Object.entries(expenseCategories)
+            .sort((a, b) => b[1] - a[1])
+            .map(([name, amount]) => ({
+              id: name,
+              name: name.charAt(0).toUpperCase() + name.slice(1).replace(/_/g, ' '),
+              amount,
+              percentage: totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0,
+              tag: name === 'overhead' ? 'overhead' : 'opex'
+            }))
+          setExpensesByCategory(expSources)
+
+          // 3. Labor by Team Member
+          const totalLabor = teamMembers.reduce((sum, m) => sum + (m.cost_amount || 0), 0)
+          const laborSources: SourceItem[] = teamMembers
+            .filter(m => m.cost_amount > 0)
+            .sort((a, b) => (b.cost_amount || 0) - (a.cost_amount || 0))
+            .map(m => ({
+              id: m.id,
+              name: m.name,
+              amount: m.cost_amount || 0,
+              percentage: totalLabor > 0 ? ((m.cost_amount || 0) / totalLabor) * 100 : 0,
+              tag: 'labor'
+            }))
+          setLaborByMember(laborSources)
+
+          // 4. Overhead breakdown (filter overhead transactions)
+          const overheadTx = transactions.filter(t => t.category === 'overhead' || t.category === 'g_and_a')
+          const ohByDesc: Record<string, number> = {}
+          overheadTx.forEach(t => {
+            const desc = t.description || t.vendor || 'Other Overhead'
+            ohByDesc[desc] = (ohByDesc[desc] || 0) + Math.abs(t.amount || 0)
+          })
+          const totalOH = Object.values(ohByDesc).reduce((a, b) => a + b, 0)
+          const ohSources: SourceItem[] = Object.entries(ohByDesc)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10) // Top 10
+            .map(([name, amount]) => ({
+              id: name,
+              name,
+              amount,
+              percentage: totalOH > 0 ? (amount / totalOH) * 100 : 0,
+              tag: 'overhead'
+            }))
+          setOverheadBreakdown(ohSources)
         }
       } catch (error) {
         console.error('Error loading assumptions:', error)
@@ -648,7 +835,7 @@ export default function AssumptionsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Forecast</h1>
+          <h1 className="text-2xl font-bold text-white">Forecast</h1>
           <p className="text-sm text-slate-400 mt-1">Build cash flow models and financial projections</p>
         </div>
         
@@ -660,7 +847,7 @@ export default function AssumptionsPage() {
             <Save size={16} />
             Save
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium transition-colors">
+          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.05] hover:bg-white/[0.08] text-slate-200 text-sm font-medium transition-colors">
             <Download size={16} />
             Export
           </button>
@@ -668,19 +855,19 @@ export default function AssumptionsPage() {
       </div>
 
       {/* Controls Bar */}
-      <div className="flex flex-wrap items-center gap-4 p-4 rounded-xl border border-slate-700 bg-slate-800/50">
+      <div className="flex flex-wrap items-center gap-4 p-4 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl">
         {/* Forecast Horizon */}
         <div className="flex items-center gap-2">
           <Calendar size={18} className="text-slate-400" />
           <span className="text-sm text-slate-400">Horizon:</span>
-          <div className="flex bg-slate-700 rounded-lg p-1">
+          <div className="flex bg-white/[0.05] rounded-lg p-1">
             {([3, 6, 12, 18, 24] as const).map((h) => (
               <button
                 key={h}
                 onClick={() => setForecastHorizon(h)}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                   forecastHorizon === h 
-                    ? 'bg-blue-500 text-white' 
+                    ? 'bg-emerald-500 text-white' 
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -691,10 +878,10 @@ export default function AssumptionsPage() {
         </div>
 
         {/* Scenario */}
-        <div className="flex items-center gap-2 pl-4 border-l border-slate-700">
+        <div className="flex items-center gap-2 pl-4 border-l border-white/[0.08]">
           <Layers size={18} className="text-slate-400" />
           <span className="text-sm text-slate-400">Scenario:</span>
-          <div className="flex bg-slate-700 rounded-lg p-1">
+          <div className="flex bg-white/[0.05] rounded-lg p-1">
             {(['worst', 'base', 'best'] as const).map((s) => (
               <button
                 key={s}
@@ -703,7 +890,7 @@ export default function AssumptionsPage() {
                   scenario === s 
                     ? s === 'best' ? 'bg-emerald-500 text-white' :
                       s === 'worst' ? 'bg-rose-500 text-white' :
-                      'bg-blue-500 text-white'
+                      'bg-emerald-500 text-white'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -714,13 +901,13 @@ export default function AssumptionsPage() {
         </div>
 
         {/* View Level */}
-        <div className="flex items-center gap-2 pl-4 border-l border-slate-700">
+        <div className="flex items-center gap-2 pl-4 border-l border-white/[0.08]">
           <Target size={18} className="text-slate-400" />
           <span className="text-sm text-slate-400">Level:</span>
           <select
             value={viewLevel}
             onChange={(e) => setViewLevel(e.target.value as any)}
-            className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200"
+            className="bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-1.5 text-sm text-slate-200"
           >
             <option value="company">Company</option>
             <option value="client">By Client</option>
@@ -730,7 +917,7 @@ export default function AssumptionsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-700 pb-2">
+      <div className="flex gap-2 border-b border-white/[0.08] pb-2">
         {([
           { id: 'inputs', label: 'Inputs' },
           { id: 'projections', label: 'Projections' },
@@ -741,7 +928,7 @@ export default function AssumptionsPage() {
             onClick={() => setActiveTab(tab.id)}
             className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
               activeTab === tab.id
-                ? 'bg-slate-700 text-slate-100 border-b-2 border-blue-500'
+                ? 'bg-white/[0.05] text-white border-b-2 border-emerald-500'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -757,8 +944,22 @@ export default function AssumptionsPage() {
           <Section title="Revenue" icon={TrendingUp}>
             <div className="pt-3">
               {assumptions.filter(a => a.category === 'revenue').map(a => (
-                <AssumptionCard key={a.id} assumption={a} onUpdate={updateAssumption} />
+                <AssumptionCard 
+                  key={a.id} 
+                  assumption={a} 
+                  onUpdate={updateAssumption}
+                  sources={a.id === 'base_revenue' ? revenueByClient : []}
+                  showSources={a.id === 'base_revenue' && revenueByClient.length > 0}
+                />
               ))}
+              {revenueByClient.length > 0 && (
+                <div className="mt-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                  <p className="text-xs text-emerald-400 flex items-center gap-2">
+                    <CheckCircle2 size={14} />
+                    Revenue sourced from {revenueByClient.length} clients • Click "View breakdown" above to see details
+                  </p>
+                </div>
+              )}
             </div>
           </Section>
 
@@ -766,8 +967,22 @@ export default function AssumptionsPage() {
           <Section title="Labor & Team" icon={Users}>
             <div className="pt-3">
               {assumptions.filter(a => a.category === 'labor').map(a => (
-                <AssumptionCard key={a.id} assumption={a} onUpdate={updateAssumption} />
+                <AssumptionCard 
+                  key={a.id} 
+                  assumption={a} 
+                  onUpdate={updateAssumption}
+                  sources={a.id === 'current_labor' ? laborByMember : []}
+                  showSources={a.id === 'current_labor' && laborByMember.length > 0}
+                />
               ))}
+              {laborByMember.length > 0 && (
+                <div className="mt-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                  <p className="text-xs text-blue-400 flex items-center gap-2">
+                    <Users size={14} />
+                    {laborByMember.length} active team members • Tagged as Direct Cost
+                  </p>
+                </div>
+              )}
             </div>
           </Section>
 
@@ -775,8 +990,22 @@ export default function AssumptionsPage() {
           <Section title="Operating Expenses" icon={TrendingDown}>
             <div className="pt-3">
               {assumptions.filter(a => a.category === 'opex').map(a => (
-                <AssumptionCard key={a.id} assumption={a} onUpdate={updateAssumption} />
+                <AssumptionCard 
+                  key={a.id} 
+                  assumption={a} 
+                  onUpdate={updateAssumption}
+                  sources={a.id === 'fixed_opex' ? expensesByCategory.filter(e => e.tag === 'opex') : []}
+                  showSources={a.id === 'fixed_opex' && expensesByCategory.length > 0}
+                />
               ))}
+              {expensesByCategory.filter(e => e.tag === 'opex').length > 0 && (
+                <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <p className="text-xs text-amber-400 flex items-center gap-2">
+                    <AlertTriangle size={14} />
+                    {expensesByCategory.filter(e => e.tag === 'opex').length} expense categories • Tagged as Operating Expenses
+                  </p>
+                </div>
+              )}
             </div>
           </Section>
 
@@ -784,8 +1013,22 @@ export default function AssumptionsPage() {
           <Section title="Overhead / G&A" icon={Building2}>
             <div className="pt-3">
               {assumptions.filter(a => a.category === 'overhead').map(a => (
-                <AssumptionCard key={a.id} assumption={a} onUpdate={updateAssumption} />
+                <AssumptionCard 
+                  key={a.id} 
+                  assumption={a} 
+                  onUpdate={updateAssumption}
+                  sources={overheadBreakdown}
+                  showSources={overheadBreakdown.length > 0}
+                />
               ))}
+              {overheadBreakdown.length > 0 && (
+                <div className="mt-4 p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                  <p className="text-xs text-purple-400 flex items-center gap-2">
+                    <Building2 size={14} />
+                    {overheadBreakdown.length} overhead items • Tagged as G&A/Overhead
+                  </p>
+                </div>
+              )}
             </div>
           </Section>
 
@@ -812,7 +1055,7 @@ export default function AssumptionsPage() {
             title="Planned Hires" 
             icon={Users}
             action={
-              <button onClick={addPlannedHire} className="p-1 text-blue-400 hover:text-blue-300">
+              <button onClick={addPlannedHire} className="p-1 text-emerald-400 hover:text-emerald-300">
                 <Plus size={18} />
               </button>
             }
@@ -838,7 +1081,7 @@ export default function AssumptionsPage() {
             title="Planned Revenue (New Clients/Projects)" 
             icon={TrendingUp}
             action={
-              <button onClick={addPlannedRevenue} className="p-1 text-blue-400 hover:text-blue-300">
+              <button onClick={addPlannedRevenue} className="p-1 text-emerald-400 hover:text-emerald-300">
                 <Plus size={18} />
               </button>
             }
@@ -864,7 +1107,7 @@ export default function AssumptionsPage() {
             title="Planned One-Time & Recurring Expenses" 
             icon={TrendingDown}
             action={
-              <button onClick={addPlannedExpense} className="p-1 text-blue-400 hover:text-blue-300">
+              <button onClick={addPlannedExpense} className="p-1 text-emerald-400 hover:text-emerald-300">
                 <Plus size={18} />
               </button>
             }
@@ -930,7 +1173,7 @@ export default function AssumptionsPage() {
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* P&L Trend Chart */}
-            <div className="lg:col-span-2 p-6 rounded-xl border border-slate-700 bg-slate-800/50">
+            <div className="lg:col-span-2 p-6 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl">
               <h3 className="font-medium text-slate-200 mb-4">Revenue & Net Income Forecast</h3>
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
@@ -963,7 +1206,7 @@ export default function AssumptionsPage() {
             </div>
 
             {/* Expense Breakdown */}
-            <div className="p-6 rounded-xl border border-slate-700 bg-slate-800/50">
+            <div className="p-6 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl">
               <h3 className="font-medium text-slate-200 mb-4">Expense Breakdown</h3>
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
@@ -1003,7 +1246,7 @@ export default function AssumptionsPage() {
           </div>
 
           {/* Cash Flow Chart */}
-          <div className="p-6 rounded-xl border border-slate-700 bg-slate-800/50">
+          <div className="p-6 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl">
             <h3 className="font-medium text-slate-200 mb-4">Cash Position Forecast</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
@@ -1051,15 +1294,15 @@ export default function AssumptionsPage() {
           </div>
 
           {/* Detailed Forecast Table */}
-          <div className="rounded-xl border border-slate-700 overflow-hidden">
-            <div className="bg-slate-800/50 px-4 py-3 border-b border-slate-700">
+          <div className="rounded-xl border border-white/[0.08] overflow-hidden">
+            <div className="bg-slate-900/70 backdrop-blur-xl px-4 py-3 border-b border-white/[0.08]">
               <h3 className="font-medium text-slate-200">Projected P&L Detail</h3>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-slate-800/30">
-                    <th className="text-left px-4 py-3 font-medium text-slate-400 sticky left-0 bg-slate-800/30">Month</th>
+                  <tr className="bg-white/[0.03]">
+                    <th className="text-left px-4 py-3 font-medium text-slate-400 sticky left-0 bg-white/[0.03]">Month</th>
                     <th className="text-right px-4 py-3 font-medium text-slate-400">Revenue</th>
                     <th className="text-right px-4 py-3 font-medium text-slate-400">COGS</th>
                     <th className="text-right px-4 py-3 font-medium text-slate-400">Gross Profit</th>
@@ -1071,7 +1314,7 @@ export default function AssumptionsPage() {
                 </thead>
                 <tbody>
                   {forecastData.map((row, i) => (
-                    <tr key={i} className="border-t border-slate-700/50 hover:bg-slate-800/30">
+                    <tr key={i} className="border-t border-white/[0.08]/50 hover:bg-white/[0.03]">
                       <td className="px-4 py-3 font-medium text-slate-200 sticky left-0 bg-slate-900/50">{row.month}</td>
                       <td className="px-4 py-3 text-right text-emerald-400">{formatCurrency(row.revenue)}</td>
                       <td className="px-4 py-3 text-right text-rose-400">{formatCurrency(row.cogs)}</td>
@@ -1103,7 +1346,7 @@ export default function AssumptionsPage() {
 
       {activeTab === 'scenarios' && (
         <div className="space-y-6">
-          <div className="p-6 rounded-xl border border-slate-700 bg-slate-800/50">
+          <div className="p-6 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl">
             <h3 className="font-medium text-slate-200 mb-4">Scenario Comparison</h3>
             <p className="text-sm text-slate-400 mb-6">
               Compare Base, Best, and Worst case scenarios side-by-side. Use these to stress-test your forecast and prepare for different outcomes.
@@ -1126,7 +1369,7 @@ export default function AssumptionsPage() {
                     className={`p-4 rounded-xl border ${
                       s === 'best' ? 'border-emerald-500/30 bg-emerald-500/5' :
                       s === 'worst' ? 'border-rose-500/30 bg-rose-500/5' :
-                      'border-blue-500/30 bg-blue-500/5'
+                      'border-emerald-500/30 bg-blue-500/5'
                     }`}
                   >
                     <h4 className={`font-semibold capitalize mb-4 ${
@@ -1145,7 +1388,7 @@ export default function AssumptionsPage() {
                         <span className="text-slate-400">Expenses</span>
                         <span className="text-slate-200">{formatCurrency(projectedExp)}</span>
                       </div>
-                      <div className="flex justify-between pt-2 border-t border-slate-700">
+                      <div className="flex justify-between pt-2 border-t border-white/[0.08]">
                         <span className="text-slate-400">Net</span>
                         <span className={projectedRev - projectedExp >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
                           {formatCurrency(projectedRev - projectedExp)}
@@ -1164,7 +1407,7 @@ export default function AssumptionsPage() {
           </div>
 
           {/* What-If Analysis */}
-          <div className="p-6 rounded-xl border border-slate-700 bg-slate-800/50">
+          <div className="p-6 rounded-xl border border-white/[0.08] bg-slate-900/70 backdrop-blur-xl">
             <h3 className="font-medium text-slate-200 mb-4">What-If Analysis</h3>
             <p className="text-sm text-slate-400 mb-4">
               Quickly test the impact of adding new revenue or expenses to your projections.
@@ -1178,7 +1421,7 @@ export default function AssumptionsPage() {
                   <input
                     type="number"
                     placeholder="10000"
-                    className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 w-32"
+                    className="bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-2 text-slate-200 w-32"
                   />
                   <span className="text-slate-500">/month</span>
                 </div>
@@ -1194,7 +1437,7 @@ export default function AssumptionsPage() {
                   <input
                     type="number"
                     placeholder="6000"
-                    className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 w-32"
+                    className="bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-2 text-slate-200 w-32"
                   />
                   <span className="text-slate-500">/month</span>
                 </div>
