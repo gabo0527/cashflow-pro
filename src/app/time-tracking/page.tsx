@@ -78,6 +78,17 @@ const VIEW_TABS: { id: ViewTab; label: string; icon: React.ReactNode }[] = [
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
 
+// ============ GLASSMORPHISM THEME ============
+const THEME = {
+  glass: 'bg-slate-900/70 backdrop-blur-xl',
+  glassBorder: 'border-white/[0.08]',
+  glassHover: 'hover:bg-white/[0.05] hover:border-white/[0.12]',
+  textPrimary: 'text-white',
+  textSecondary: 'text-slate-300',
+  textMuted: 'text-slate-400',
+  textDim: 'text-slate-500',
+}
+
 const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -210,7 +221,7 @@ function KPICard({ title, value, format = 'number', trend, trendLabel, icon, col
   title: string; value: number; format?: 'number' | 'currency' | 'percent' | 'hours'
   trend?: number; trendLabel?: string; icon?: React.ReactNode; color?: 'blue' | 'emerald' | 'amber' | 'purple' | 'rose'
 }) {
-  const colorClasses = { blue: 'text-blue-500', emerald: 'text-emerald-500', amber: 'text-amber-500', purple: 'text-purple-500', rose: 'text-rose-500' }
+  const colorClasses = { blue: 'text-blue-400', emerald: 'text-emerald-400', amber: 'text-amber-400', purple: 'text-purple-400', rose: 'text-rose-400' }
   const formatValue = () => {
     switch (format) {
       case 'currency': return formatCurrency(value)
@@ -220,17 +231,17 @@ function KPICard({ title, value, format = 'number', trend, trendLabel, icon, col
     }
   }
   return (
-    <div className="p-4 rounded-xl bg-slate-800 border border-slate-700">
+    <div className={`p-4 rounded-xl ${THEME.glass} border ${THEME.glassBorder}`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">{title}</span>
-        {icon && <span className="text-slate-500">{icon}</span>}
+        <span className={`text-xs font-medium ${THEME.textMuted} uppercase tracking-wide`}>{title}</span>
+        {icon && <span className={THEME.textDim}>{icon}</span>}
       </div>
       <p className={`text-2xl font-bold ${colorClasses[color]}`}>{formatValue()}</p>
       {trend !== undefined && (
         <div className="flex items-center gap-1 mt-1">
-          {trend >= 0 ? <TrendingUp size={14} className="text-emerald-500" /> : <TrendingDown size={14} className="text-rose-500" />}
-          <span className={`text-xs font-medium ${trend >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{trend >= 0 ? '+' : ''}{trend.toFixed(1)}%</span>
-          {trendLabel && <span className="text-xs text-slate-500">{trendLabel}</span>}
+          {trend >= 0 ? <TrendingUp size={14} className="text-emerald-400" /> : <TrendingDown size={14} className="text-rose-400" />}
+          <span className={`text-xs font-medium ${trend >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{trend >= 0 ? '+' : ''}{trend.toFixed(1)}%</span>
+          {trendLabel && <span className={`text-xs ${THEME.textDim}`}>{trendLabel}</span>}
         </div>
       )}
     </div>
@@ -243,18 +254,18 @@ function CollapsibleSection({ title, children, defaultExpanded = true, badge, ba
   badgeColor?: 'slate' | 'blue' | 'emerald' | 'amber'; rightContent?: React.ReactNode; icon?: React.ReactNode
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
-  const badgeColors = { slate: 'bg-slate-700 text-slate-300', blue: 'bg-blue-500/20 text-blue-400', emerald: 'bg-emerald-500/20 text-emerald-400', amber: 'bg-amber-500/20 text-amber-400' }
+  const badgeColors = { slate: 'bg-white/[0.08] text-slate-300', blue: 'bg-blue-500/20 text-blue-400', emerald: 'bg-emerald-500/20 text-emerald-400', amber: 'bg-amber-500/20 text-amber-400' }
   return (
-    <div className="rounded-xl border bg-slate-800 border-slate-700 overflow-hidden">
-      <button onClick={() => setIsExpanded(!isExpanded)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-700/50 transition-colors">
+    <div className={`rounded-xl border ${THEME.glass} ${THEME.glassBorder} overflow-hidden`}>
+      <button onClick={() => setIsExpanded(!isExpanded)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.03] transition-colors">
         <div className="flex items-center gap-2">
-          {icon && <span className="text-slate-400">{icon}</span>}
-          <h3 className="text-sm font-medium text-slate-100">{title}</h3>
+          {icon && <span className={THEME.textMuted}>{icon}</span>}
+          <h3 className={`text-sm font-medium ${THEME.textPrimary}`}>{title}</h3>
           {badge !== undefined && <span className={`px-2 py-0.5 text-xs rounded-full ${badgeColors[badgeColor]}`}>{badge}</span>}
         </div>
         <div className="flex items-center gap-3">
           {rightContent}
-          {isExpanded ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
+          {isExpanded ? <ChevronUp size={18} className={THEME.textMuted} /> : <ChevronDown size={18} className={THEME.textMuted} />}
         </div>
       </button>
       {isExpanded && <div className="px-4 pb-4 pt-1">{children}</div>}
@@ -278,11 +289,11 @@ function EditableCell({ value, onSave }: { value: number; onSave: (newValue: num
   if (isEditing) {
     return (
       <input type="number" value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={handleSave} onKeyDown={handleKeyDown}
-        className="w-16 px-1 py-0.5 text-right bg-slate-900 border border-blue-500 rounded text-sm text-slate-100 focus:outline-none" autoFocus step="0.5" />
+        className="w-16 px-1 py-0.5 text-right bg-slate-900/50 border border-emerald-500/50 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30" autoFocus step="0.5" />
     )
   }
   return (
-    <button onClick={() => { setEditValue(value.toString()); setIsEditing(true) }} className="px-1 py-0.5 rounded hover:bg-slate-600 text-slate-300 transition-colors" title="Click to edit">
+    <button onClick={() => { setEditValue(value.toString()); setIsEditing(true) }} className="px-1 py-0.5 rounded hover:bg-white/[0.08] text-slate-300 transition-colors" title="Click to edit">
       {value.toFixed(1)}
     </button>
   )
@@ -538,63 +549,63 @@ export default function TimeTrackingPage() {
     return 'All Clients'
   }
 
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>
 
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-100">Time Analytics</h1>
-          <p className="text-sm mt-1 text-slate-400">{getFilterTitle()}</p>
+          <h1 className={`text-2xl font-semibold ${THEME.textPrimary}`}>Time Analytics</h1>
+          <p className={`text-sm mt-1 ${THEME.textMuted}`}>{getFilterTitle()}</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={exportToExcel} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors"><Download size={18} />Export</button>
-          <button onClick={() => setShowEntryModal(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-medium transition-colors"><Plus size={18} />Add Entry</button>
+          <button onClick={exportToExcel} className={`flex items-center gap-2 px-4 py-2 ${THEME.glass} border ${THEME.glassBorder} hover:bg-white/[0.08] rounded-lg text-sm font-medium transition-colors`}><Download size={18} />Export</button>
+          <button onClick={() => setShowEntryModal(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm font-medium transition-colors"><Plus size={18} />Add Entry</button>
         </div>
       </div>
 
       {/* Date Range & Filters */}
-      <div className="p-4 rounded-xl border bg-slate-800 border-slate-700">
+      <div className={`p-4 rounded-xl border ${THEME.glass} ${THEME.glassBorder}`}>
         <div className="flex flex-wrap items-center gap-4">
           <div className="relative">
-            <button onClick={() => setShowDatePicker(!showDatePicker)} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors">
+            <button onClick={() => setShowDatePicker(!showDatePicker)} className={`flex items-center gap-2 px-4 py-2 bg-white/[0.05] border ${THEME.glassBorder} hover:bg-white/[0.08] rounded-lg text-sm font-medium transition-colors`}>
               <Calendar size={16} />{DATE_PRESETS.find(p => p.id === datePreset)?.label}<ChevronDown size={16} />
             </button>
             {showDatePicker && (
-              <div className="absolute top-full left-0 mt-2 w-64 p-3 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50">
+              <div className={`absolute top-full left-0 mt-2 w-64 p-3 ${THEME.glass} border ${THEME.glassBorder} rounded-lg shadow-xl z-50`}>
                 <div className="space-y-1">
                   {DATE_PRESETS.map(preset => (
                     <button key={preset.id} onClick={() => { setDatePreset(preset.id); if (preset.id !== 'custom') setShowDatePicker(false) }}
-                      className={`w-full text-left px-3 py-2 rounded text-sm ${datePreset === preset.id ? 'bg-blue-500 text-white' : 'text-slate-300 hover:bg-slate-700'}`}>{preset.label}</button>
+                      className={`w-full text-left px-3 py-2 rounded text-sm ${datePreset === preset.id ? 'bg-emerald-500 text-white' : 'text-slate-300 hover:bg-white/[0.08]'}`}>{preset.label}</button>
                   ))}
                 </div>
                 {datePreset === 'custom' && (
-                  <div className="mt-3 pt-3 border-t border-slate-700 space-y-2">
-                    <div><label className="text-xs text-slate-400">Start</label><input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className="w-full mt-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-sm text-slate-100" /></div>
-                    <div><label className="text-xs text-slate-400">End</label><input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className="w-full mt-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-sm text-slate-100" /></div>
-                    <button onClick={() => setShowDatePicker(false)} className="w-full mt-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded text-sm font-medium">Apply</button>
+                  <div className={`mt-3 pt-3 border-t ${THEME.glassBorder} space-y-2`}>
+                    <div><label className={`text-xs ${THEME.textMuted}`}>Start</label><input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className={`w-full mt-1 px-2 py-1 bg-white/[0.05] border ${THEME.glassBorder} rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30`} /></div>
+                    <div><label className={`text-xs ${THEME.textMuted}`}>End</label><input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className={`w-full mt-1 px-2 py-1 bg-white/[0.05] border ${THEME.glassBorder} rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30`} /></div>
+                    <button onClick={() => setShowDatePicker(false)} className="w-full mt-2 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 rounded text-sm font-medium">Apply</button>
                   </div>
                 )}
               </div>
             )}
           </div>
-          <span className="text-slate-400 text-sm">{formatDate(dateRange.start)} — {formatDate(dateRange.end)}</span>
-          <div className="h-6 w-px bg-slate-700" />
-          <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-slate-100">
+          <span className={`text-sm ${THEME.textMuted}`}>{formatDate(dateRange.start)} — {formatDate(dateRange.end)}</span>
+          <div className="h-6 w-px bg-white/[0.08]" />
+          <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className={`px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30`}>
             <option value="all">All Clients</option>
             {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)} className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-slate-100">
+          <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)} className={`px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30`}>
             <option value="all">All Employees</option>
             {teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
-          <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-slate-100">
+          <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className={`px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30`}>
             <option value="all">All Projects</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
           {(selectedClient !== 'all' || selectedEmployee !== 'all' || selectedProject !== 'all') && (
-            <button onClick={() => { setSelectedClient('all'); setSelectedEmployee('all'); setSelectedProject('all') }} className="flex items-center gap-1 px-3 py-2 text-sm text-slate-400 hover:text-slate-200"><X size={14} />Clear</button>
+            <button onClick={() => { setSelectedClient('all'); setSelectedEmployee('all'); setSelectedProject('all') }} className={`flex items-center gap-1 px-3 py-2 text-sm ${THEME.textMuted} hover:text-white`}><X size={14} />Clear</button>
           )}
         </div>
       </div>
@@ -609,9 +620,9 @@ export default function TimeTrackingPage() {
       </div>
 
       {/* View Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-700 pb-2">
+      <div className={`flex items-center gap-2 border-b ${THEME.glassBorder} pb-2`}>
         {VIEW_TABS.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-blue-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-emerald-500 text-white' : `${THEME.glass} border ${THEME.glassBorder} text-slate-300 hover:bg-white/[0.08]`}`}>
             {tab.icon}{tab.label}
           </button>
         ))}
@@ -628,7 +639,7 @@ export default function TimeTrackingPage() {
                     <Pie data={revenueByClientData} cx="35%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value">
                       {revenueByClientData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
                     </Pie>
-                    <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} />
+                    <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', backdropFilter: 'blur(12px)' }} />
                     <Legend layout="vertical" align="right" verticalAlign="middle" formatter={(value, entry: any) => {
                       const item = revenueByClientData.find(d => d.name === value)
                       const total = revenueByClientData.reduce((sum, d) => sum + d.value, 0)
@@ -637,7 +648,7 @@ export default function TimeTrackingPage() {
                     }} />
                   </RechartsPie>
                 </ResponsiveContainer>
-              ) : <div className="flex items-center justify-center h-full text-slate-400">No data</div>}
+              ) : <div className="flex items-center justify-center h-full text-slate-500">No data</div>}
             </div>
           </CollapsibleSection>
           <CollapsibleSection title="Weekly Trend" icon={<Activity size={16} />}>
@@ -645,17 +656,17 @@ export default function TimeTrackingPage() {
               {weeklyTrendData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={weeklyTrendData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                     <XAxis dataKey="week" tick={{ fill: '#94a3b8', fontSize: 11 }} />
                     <YAxis yAxisId="hours" orientation="left" tick={{ fill: '#94a3b8', fontSize: 11 }} />
                     <YAxis yAxisId="revenue" orientation="right" tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} formatter={(value: number, name: string) => [name === 'revenue' ? formatCurrency(value) : `${value.toFixed(1)} hrs`, name === 'revenue' ? 'Revenue' : 'Hours']} />
+                    <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', backdropFilter: 'blur(12px)' }} formatter={(value: number, name: string) => [name === 'revenue' ? formatCurrency(value) : `${value.toFixed(1)} hrs`, name === 'revenue' ? 'Revenue' : 'Hours']} />
                     <Area yAxisId="hours" type="monotone" dataKey="hours" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} name="Hours" />
                     <Area yAxisId="revenue" type="monotone" dataKey="revenue" stroke="#10b981" fill="#10b981" fillOpacity={0.2} name="Revenue" />
                     <Legend />
                   </AreaChart>
                 </ResponsiveContainer>
-              ) : <div className="flex items-center justify-center h-full text-slate-400">No data</div>}
+              ) : <div className="flex items-center justify-center h-full text-slate-500">No data</div>}
             </div>
           </CollapsibleSection>
           <CollapsibleSection title="Hours by Employee" icon={<Users size={16} />}>
@@ -663,14 +674,14 @@ export default function TimeTrackingPage() {
               {dataByEmployee.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={dataByEmployee.slice(0, 8)} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                     <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
                     <YAxis type="category" dataKey="name" width={100} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} formatter={(value: number) => [`${value.toFixed(1)} hrs`, 'Hours']} />
+                    <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', backdropFilter: 'blur(12px)' }} formatter={(value: number) => [`${value.toFixed(1)} hrs`, 'Hours']} />
                     <Bar dataKey="totalHours" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              ) : <div className="flex items-center justify-center h-full text-slate-400">No data</div>}
+              ) : <div className="flex items-center justify-center h-full text-slate-500">No data</div>}
             </div>
           </CollapsibleSection>
           <CollapsibleSection title="Hours by Project" icon={<Briefcase size={16} />}>
@@ -678,14 +689,14 @@ export default function TimeTrackingPage() {
               {filteredEntries.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={Object.values(filteredEntries.reduce((acc, e) => { if (!acc[e.project_id]) acc[e.project_id] = { name: e.project_name.substring(0, 15), hours: 0 }; acc[e.project_id].hours += e.hours; return acc }, {} as Record<string, { name: string; hours: number }>)).sort((a, b) => b.hours - a.hours).slice(0, 8)} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                     <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
                     <YAxis type="category" dataKey="name" width={100} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} formatter={(value: number) => [`${value.toFixed(1)} hrs`, 'Hours']} />
+                    <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', backdropFilter: 'blur(12px)' }} formatter={(value: number) => [`${value.toFixed(1)} hrs`, 'Hours']} />
                     <Bar dataKey="hours" fill="#f59e0b" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              ) : <div className="flex items-center justify-center h-full text-slate-400">No data</div>}
+              ) : <div className="flex items-center justify-center h-full text-slate-500">No data</div>}
             </div>
           </CollapsibleSection>
         </div>
@@ -700,7 +711,7 @@ export default function TimeTrackingPage() {
                 <div className="flex items-center gap-3">
                   {expandedClients.has(client.id) ? <ChevronDown size={18} className="text-slate-400" /> : <ChevronRight size={18} className="text-slate-400" />}
                   <Building2 size={18} style={{ color: CHART_COLORS[clientIndex % CHART_COLORS.length] }} />
-                  <h3 className="text-base font-semibold text-slate-100">{client.name}</h3>
+                  <h3 className="text-base font-semibold text-white">{client.name}</h3>
                 </div>
                 <div className="flex items-center gap-6">
                   <span className="text-sm text-blue-400">{client.totalHours.toFixed(1)} hrs</span>
@@ -745,7 +756,7 @@ export default function TimeTrackingPage() {
                                   <td className="px-2 py-2 text-right text-emerald-400 font-medium">{formatCurrency(member.totalRevenue)}</td>
                                 </tr>
                               ))}
-                              <tr className="bg-slate-900/30 font-medium">
+                              <tr className="bg-white/[0.02] font-medium">
                                 <td className="px-2 py-2 text-slate-300">SITE TOTAL</td>
                                 <td className="px-2 py-2"></td>
                                 {weekColumns.map(week => { const weekTotal = Object.values(project.members).reduce((sum, m) => sum + (m.weekHours[week.end] || 0), 0); return <td key={week.end} className="px-2 py-2 text-right text-slate-300">{weekTotal.toFixed(1)}</td> })}
@@ -761,10 +772,10 @@ export default function TimeTrackingPage() {
                 </div>
               )}
             </div>
-          )) : <div className="text-center py-12 text-slate-400">No time entries for this period</div>}
+          )) : <div className={`text-center py-12 ${THEME.textMuted}`}>No time entries for this period</div>}
           {dataByClient.length > 0 && (
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-between">
-              <span className="text-lg font-semibold text-slate-100">GRAND TOTAL</span>
+            <div className={`p-4 rounded-xl ${THEME.glass} border ${THEME.glassBorder} flex items-center justify-between`}>
+              <span className={`text-lg font-semibold ${THEME.textPrimary}`}>GRAND TOTAL</span>
               <div className="flex items-center gap-8">
                 <span className="text-lg font-semibold text-blue-400">{kpis.totalHours.toFixed(1)} hrs</span>
                 <span className="text-lg font-semibold text-emerald-400">{formatCurrency(kpis.totalRevenue)}</span>
@@ -784,7 +795,7 @@ export default function TimeTrackingPage() {
                   <h4 className="text-xs font-medium text-slate-400 uppercase mb-2">By Client</h4>
                   <div className="space-y-2">
                     {Object.entries(employee.clients).sort((a, b) => b[1].hours - a[1].hours).map(([clientId, data], i) => (
-                      <div key={clientId} className="flex items-center justify-between p-2 rounded bg-slate-900/50">
+                      <div key={clientId} className="flex items-center justify-between p-2 rounded bg-white/[0.03]">
                         <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} /><span className="text-sm text-slate-200">{data.name}</span></div>
                         <div className="flex items-center gap-4 text-sm"><span className="text-blue-400">{data.hours.toFixed(1)} hrs</span><span className="text-emerald-400">{formatCurrency(data.revenue)}</span></div>
                       </div>
@@ -810,32 +821,32 @@ export default function TimeTrackingPage() {
       {/* Detailed View */}
       {activeTab === 'detailed' && (
         <CollapsibleSection title="Time Entries" badge={filteredEntries.length} icon={<Calendar size={16} />}>
-          <div className="overflow-x-auto rounded-lg border border-slate-700">
+          <div className={`overflow-x-auto rounded-lg border ${THEME.glassBorder}`}>
             <table className="w-full text-sm">
-              <thead><tr className="bg-slate-900/50">
-                <th className="px-4 py-3 text-left font-medium text-slate-400">Date</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-400">Employee</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-400">Client</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-400">Project</th>
-                <th className="px-4 py-3 text-right font-medium text-slate-400">Hours</th>
-                <th className="px-4 py-3 text-right font-medium text-slate-400">Rate</th>
-                <th className="px-4 py-3 text-right font-medium text-slate-400">Amount</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-400">Notes</th>
-                <th className="px-4 py-3 text-center font-medium text-slate-400">Actions</th>
+              <thead><tr className="bg-white/[0.02]">
+                <th className={`px-4 py-3 text-left font-medium ${THEME.textMuted}`}>Date</th>
+                <th className={`px-4 py-3 text-left font-medium ${THEME.textMuted}`}>Employee</th>
+                <th className={`px-4 py-3 text-left font-medium ${THEME.textMuted}`}>Client</th>
+                <th className={`px-4 py-3 text-left font-medium ${THEME.textMuted}`}>Project</th>
+                <th className={`px-4 py-3 text-right font-medium ${THEME.textMuted}`}>Hours</th>
+                <th className={`px-4 py-3 text-right font-medium ${THEME.textMuted}`}>Rate</th>
+                <th className={`px-4 py-3 text-right font-medium ${THEME.textMuted}`}>Amount</th>
+                <th className={`px-4 py-3 text-left font-medium ${THEME.textMuted}`}>Notes</th>
+                <th className={`px-4 py-3 text-center font-medium ${THEME.textMuted}`}>Actions</th>
               </tr></thead>
               <tbody>
                 {filteredEntries.length > 0 ? filteredEntries.slice(0, 100).map((entry) => (
-                  <tr key={entry.id} className="border-t border-slate-700 hover:bg-slate-700/30">
-                    <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{formatDate(entry.date)}</td>
-                    <td className="px-4 py-3 text-slate-100">{entry.team_member_name}</td>
-                    <td className="px-4 py-3 text-slate-400">{entry.client_name || '—'}</td>
-                    <td className="px-4 py-3 text-slate-100">{entry.project_name}</td>
+                  <tr key={entry.id} className={`border-t ${THEME.glassBorder} hover:bg-white/[0.03]`}>
+                    <td className={`px-4 py-3 ${THEME.textSecondary} whitespace-nowrap`}>{formatDate(entry.date)}</td>
+                    <td className={`px-4 py-3 ${THEME.textPrimary}`}>{entry.team_member_name}</td>
+                    <td className={`px-4 py-3 ${THEME.textMuted}`}>{entry.client_name || '—'}</td>
+                    <td className={`px-4 py-3 ${THEME.textPrimary}`}>{entry.project_name}</td>
                     <td className="px-4 py-3 text-right">
                       <EditableCell value={entry.hours} onSave={(newValue) => updateEntryHours([{ id: entry.id, hours: entry.hours }], newValue)} />
                     </td>
-                    <td className="px-4 py-3 text-right text-slate-400">{formatCurrency(entry.bill_rate)}</td>
-                    <td className="px-4 py-3 text-right text-emerald-500 font-medium">{formatCurrency(entry.hours * entry.bill_rate)}</td>
-                    <td className="px-4 py-3 text-slate-400 text-xs max-w-[150px] truncate">{entry.notes || '—'}</td>
+                    <td className={`px-4 py-3 text-right ${THEME.textMuted}`}>{formatCurrency(entry.bill_rate)}</td>
+                    <td className="px-4 py-3 text-right text-emerald-400 font-medium">{formatCurrency(entry.hours * entry.bill_rate)}</td>
+                    <td className={`px-4 py-3 ${THEME.textMuted} text-xs max-w-[150px] truncate`}>{entry.notes || '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
                         <button onClick={() => deleteEntry(entry.id)} className="p-1.5 rounded bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-colors" title="Delete">
@@ -844,7 +855,7 @@ export default function TimeTrackingPage() {
                       </div>
                     </td>
                   </tr>
-                )) : <tr><td colSpan={9} className="px-4 py-12 text-center text-slate-400">No time entries found</td></tr>}
+                )) : <tr><td colSpan={9} className={`px-4 py-12 text-center ${THEME.textMuted}`}>No time entries found</td></tr>}
               </tbody>
             </table>
           </div>
@@ -854,19 +865,19 @@ export default function TimeTrackingPage() {
 
       {/* Entry Modal */}
       {showEntryModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-slate-100 mb-4">Add Time Entry</h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-6 w-full max-w-md shadow-2xl`}>
+            <h3 className={`text-lg font-semibold ${THEME.textPrimary} mb-4`}>Add Time Entry</h3>
             <div className="space-y-4">
-              <div><label className="block text-sm text-slate-400 mb-1">Date *</label><input type="date" value={formData.date} onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100" /></div>
-              <div><label className="block text-sm text-slate-400 mb-1">Employee *</label><select value={formData.team_member_id} onChange={(e) => setFormData(prev => ({ ...prev, team_member_id: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"><option value="">Select...</option>{teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-              <div><label className="block text-sm text-slate-400 mb-1">Project *</label><select value={formData.project_id} onChange={(e) => setFormData(prev => ({ ...prev, project_id: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"><option value="">Select...</option>{projects.map(p => <option key={p.id} value={p.id}>{p.client ? `${p.client} - ` : ''}{p.name}</option>)}</select></div>
-              <div><label className="block text-sm text-slate-400 mb-1">Hours *</label><input type="number" value={formData.hours} onChange={(e) => setFormData(prev => ({ ...prev, hours: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100" placeholder="8" step="0.5" /></div>
-              <div><label className="block text-sm text-slate-400 mb-1">Notes</label><textarea value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 resize-none" rows={2} placeholder="Description..." /></div>
+              <div><label className={`block text-sm ${THEME.textMuted} mb-1`}>Date *</label><input type="date" value={formData.date} onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))} className={`w-full px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30`} /></div>
+              <div><label className={`block text-sm ${THEME.textMuted} mb-1`}>Employee *</label><select value={formData.team_member_id} onChange={(e) => setFormData(prev => ({ ...prev, team_member_id: e.target.value }))} className={`w-full px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30`}><option value="">Select...</option>{teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+              <div><label className={`block text-sm ${THEME.textMuted} mb-1`}>Project *</label><select value={formData.project_id} onChange={(e) => setFormData(prev => ({ ...prev, project_id: e.target.value }))} className={`w-full px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30`}><option value="">Select...</option>{projects.map(p => <option key={p.id} value={p.id}>{p.client ? `${p.client} - ` : ''}{p.name}</option>)}</select></div>
+              <div><label className={`block text-sm ${THEME.textMuted} mb-1`}>Hours *</label><input type="number" value={formData.hours} onChange={(e) => setFormData(prev => ({ ...prev, hours: e.target.value }))} className={`w-full px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30`} placeholder="8" step="0.5" /></div>
+              <div><label className={`block text-sm ${THEME.textMuted} mb-1`}>Notes</label><textarea value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} className={`w-full px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/30`} rows={2} placeholder="Description..." /></div>
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowEntryModal(false)} className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium">Cancel</button>
-              <button onClick={saveNewEntry} className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-medium">Add Entry</button>
+              <button onClick={() => setShowEntryModal(false)} className={`flex-1 px-4 py-2 bg-white/[0.05] hover:bg-white/[0.08] border ${THEME.glassBorder} rounded-lg text-sm font-medium`}>Cancel</button>
+              <button onClick={saveNewEntry} className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm font-medium">Add Entry</button>
             </div>
           </div>
         </div>
