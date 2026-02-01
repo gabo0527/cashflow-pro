@@ -23,7 +23,7 @@ interface ExpenseClaimRow {
   id: string; expense_date: string; vendor: string | null; amount: number; category: string
   description: string | null; billable: boolean; status: string; payment_method: string
   receipt_url: string | null; attachment_filename: string | null; attachment_type: string | null
-  submitted_by_role: string; submitted_at: string | null; team_member_id: string
+  submitted_by_role: string; submitted_at: string | null; reimbursed_at: string | null; team_member_id: string
   team_member_name: string; team_member_email: string; project_id: string | null
   project_name: string | null; client_id: string | null; client_name: string | null
 }
@@ -55,7 +55,9 @@ const PAYMENT_METHODS: Record<string, { label: string; icon: any; color: string 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
 
 const formatCurrency = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
+const formatAmount = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)
 const formatDate = (d: string) => { if (!d) return '—'; const [y, m, day] = d.split('-').map(Number); return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }
+const formatDateShort = (d: string | null) => { if (!d) return null; try { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) } catch { return null } }
 
 type StatusFilter = 'all' | 'submitted' | 'approved' | 'rejected' | 'reimbursed'
 
@@ -79,7 +81,7 @@ export default function ExpenseManagement({ supabase, companyId, currentUserId }
     setLoading(true)
     try {
       const { data, error } = await supabase.from('expense_claims')
-        .select('id, expense_date, vendor, amount, category, description, billable, status, payment_method, receipt_url, attachment_filename, attachment_type, submitted_by_role, submitted_at, project_id, team_member_id')
+        .select('id, expense_date, vendor, amount, category, description, billable, status, payment_method, receipt_url, attachment_filename, attachment_type, submitted_by_role, submitted_at, reimbursed_at, project_id, team_member_id')
         .eq('company_id', companyId).order('expense_date', { ascending: false })
       if (error) { console.error('Query error:', error); setLoading(false); return }
 
@@ -104,7 +106,7 @@ export default function ExpenseManagement({ supabase, companyId, currentUserId }
             status: d.status, payment_method: d.payment_method || 'personal_card',
             receipt_url: d.receipt_url, attachment_filename: d.attachment_filename,
             attachment_type: d.attachment_type, submitted_by_role: d.submitted_by_role || 'employee',
-            submitted_at: d.submitted_at, team_member_id: d.team_member_id,
+            submitted_at: d.submitted_at, reimbursed_at: d.reimbursed_at || null, team_member_id: d.team_member_id,
             team_member_name: teamMap[d.team_member_id]?.name || 'Unknown',
             team_member_email: teamMap[d.team_member_id]?.email || '',
             project_id: d.project_id, project_name: project?.name || null,
@@ -324,6 +326,7 @@ export default function ExpenseManagement({ supabase, companyId, currentUserId }
                                     <th className={`px-3 py-2 text-center font-medium ${THEME.textDim} w-14`}>Bill</th>
                                     <th className={`px-3 py-2 text-center font-medium ${THEME.textDim} w-12`}>Rcpt</th>
                                     <th className={`px-3 py-2 text-right font-medium ${THEME.textDim} w-24`}>Amount</th>
+                                    <th className={`px-3 py-2 text-center font-medium ${THEME.textDim} w-28`}>Reimbursed</th>
                                     <th className={`px-3 py-2 text-center font-medium ${THEME.textDim} w-32`}>Actions</th>
                                   </tr></thead>
                                   <tbody className="divide-y divide-white/[0.04]">
@@ -343,7 +346,28 @@ export default function ExpenseManagement({ supabase, companyId, currentUserId }
                                           <td className="px-3 py-2">{isEditing ? <select value={editData.payment_method || ''} onChange={(e) => setEditData(p => ({ ...p, payment_method: e.target.value }))} className={`${selectClass} w-28`}>{Object.entries(PAYMENT_METHODS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select> : <div className="flex items-center gap-1"><PayIcon size={13} className={pay.color} /><span className={`text-xs ${THEME.textMuted}`}>{pay.label}</span></div>}</td>
                                           <td className="px-3 py-2 text-center">{isEditing ? <button onClick={() => setEditData(p => ({ ...p, billable: !p.billable }))} className={`p-1 rounded ${editData.billable ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/[0.05] text-slate-600'}`}><Check size={14} /></button> : (claim.billable ? <Check size={14} className="text-emerald-400 mx-auto" /> : <X size={14} className="text-slate-600 mx-auto" />)}</td>
                                           <td className="px-3 py-2 text-center">{claim.receipt_url || claim.attachment_filename ? <button onClick={() => setSelectedClaim(claim)} className="p-1 hover:bg-white/[0.08] rounded">{claim.attachment_type?.includes('pdf') ? <FileText size={14} className="text-red-400" /> : <ImageIcon size={14} className="text-blue-400" />}</button> : <span className={`text-xs ${THEME.textDim}`}>—</span>}</td>
-                                          <td className="px-3 py-2 text-right">{isEditing ? <input type="number" value={editData.amount ?? ''} onChange={(e) => setEditData(p => ({ ...p, amount: parseFloat(e.target.value) || 0 }))} className={`${inputClass} w-24 text-right`} step="0.01" /> : <span className="font-semibold text-emerald-400">${claim.amount.toFixed(2)}</span>}</td>
+                                          <td className="px-3 py-2 text-right">{isEditing ? <input type="number" value={editData.amount ?? ''} onChange={(e) => setEditData(p => ({ ...p, amount: parseFloat(e.target.value) || 0 }))} className={`${inputClass} w-24 text-right`} step="0.01" /> : <span className="font-semibold text-emerald-400">{formatAmount(claim.amount)}</span>}</td>
+                                          {/* Reimbursed */}
+                                          <td className="px-3 py-2 text-center">
+                                            {claim.status === 'reimbursed' ? (
+                                              <div className="flex flex-col items-center">
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/20 text-emerald-400">
+                                                  <Check size={10} /> Paid
+                                                </span>
+                                                {claim.reimbursed_at && <span className={`text-[10px] mt-0.5 ${THEME.textDim}`}>{formatDateShort(claim.reimbursed_at)}</span>}
+                                              </div>
+                                            ) : claim.status === 'approved' ? (
+                                              <button
+                                                onClick={() => updateStatus(claim.id, 'reimbursed')}
+                                                disabled={processing === claim.id}
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 transition-colors"
+                                              >
+                                                {processing === claim.id ? <Loader2 size={10} className="animate-spin" /> : <Clock size={10} />} Unpaid
+                                              </button>
+                                            ) : (
+                                              <span className={`text-[11px] ${THEME.textDim}`}>—</span>
+                                            )}
+                                          </td>
                                           <td className="px-3 py-2">
                                             <div className="flex items-center justify-center gap-1">
                                               {isEditing ? (<>
@@ -355,7 +379,7 @@ export default function ExpenseManagement({ supabase, companyId, currentUserId }
                                                   <button onClick={() => updateStatus(claim.id, 'approved')} disabled={processing === claim.id} className="p-1.5 text-emerald-400 hover:bg-emerald-500/20 rounded" title="Approve">{processing === claim.id ? <Loader2 size={14} className="animate-spin" /> : <ThumbsUp size={14} />}</button>
                                                   <button onClick={() => updateStatus(claim.id, 'rejected')} disabled={processing === claim.id} className="p-1.5 text-red-400 hover:bg-red-500/20 rounded" title="Reject"><ThumbsDown size={14} /></button>
                                                 </>)}
-                                                {claim.status === 'approved' && claim.payment_method === 'personal_card' && <button onClick={() => updateStatus(claim.id, 'reimbursed')} disabled={processing === claim.id} className="text-[11px] px-1.5 py-0.5 text-blue-400 hover:bg-blue-500/20 rounded">Paid</button>}
+                                                {claim.status === 'approved' && claim.payment_method === 'personal_card' && null}
                                                 <button onClick={() => deleteClaim(claim.id)} className="p-1.5 text-rose-400 hover:bg-rose-500/20 rounded" title="Delete"><Trash2 size={14} /></button>
                                               </>)}
                                             </div>
@@ -401,7 +425,7 @@ export default function ExpenseManagement({ supabase, companyId, currentUserId }
                 <div className="flex items-center gap-3 p-6 bg-white/[0.03] rounded-xl"><FileText size={32} className="text-red-400" /><div><p className={`font-medium ${THEME.textPrimary}`}>{selectedClaim.attachment_filename || 'Receipt.pdf'}</p><p className={`text-sm ${THEME.textMuted}`}>PDF Document</p></div></div>
               ) : <img src={selectedClaim.receipt_url} alt="Receipt" className="w-full rounded-xl" />)}
               <div className="mt-4 space-y-2 text-sm">
-                <div className="flex justify-between"><span className={THEME.textMuted}>Amount</span><span className="font-semibold text-emerald-400">${selectedClaim.amount.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span className={THEME.textMuted}>Amount</span><span className="font-semibold text-emerald-400">{formatAmount(selectedClaim.amount)}</span></div>
                 <div className="flex justify-between"><span className={THEME.textMuted}>Date</span><span className={THEME.textSecondary}>{formatDate(selectedClaim.expense_date)}</span></div>
                 <div className="flex justify-between"><span className={THEME.textMuted}>Employee</span><span className={THEME.textSecondary}>{selectedClaim.team_member_name}</span></div>
                 <div className="flex justify-between"><span className={THEME.textMuted}>Category</span><span className={THEME.textSecondary}>{EXPENSE_CATEGORIES[selectedClaim.category]?.label || selectedClaim.category}</span></div>
