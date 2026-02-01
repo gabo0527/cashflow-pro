@@ -433,11 +433,11 @@ function TableRenderer({ table }: { table: TableData }) {
   if (!table || !table.headers || !table.rows) return null
 
   return (
-    <div className="my-4 p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 overflow-x-auto">
+    <div className="my-4 p-4 bg-slate-900/70 backdrop-blur-xl rounded-xl border border-white/[0.08] overflow-x-auto">
       <h4 className="text-sm font-medium text-slate-200 mb-4">{table.title}</h4>
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-700">
+          <tr className="border-b border-white/[0.08]">
             {table.headers.map((header, i) => (
               <th key={i} className="text-left py-2 px-3 text-slate-300 font-medium">{header}</th>
             ))}
@@ -445,7 +445,7 @@ function TableRenderer({ table }: { table: TableData }) {
         </thead>
         <tbody>
           {table.rows.map((row, rowIndex) => (
-            <tr key={rowIndex} className="border-b border-slate-700/50 hover:bg-slate-800/50">
+            <tr key={rowIndex} className="border-b border-white/[0.08] hover:bg-white/[0.05]">
               {row.map((cell, cellIndex) => (
                 <td key={cellIndex} className="py-2 px-3 text-slate-200">{cell}</td>
               ))}
@@ -462,32 +462,32 @@ function ChartRenderer({ chart }: { chart: ChartData }) {
   if (!chart || !chart.data || chart.data.length === 0) return null
 
   return (
-    <div className="my-4 p-4 bg-slate-900/50 rounded-xl border border-slate-700/50">
+    <div className="my-4 p-4 bg-slate-900/70 backdrop-blur-xl rounded-xl border border-white/[0.08]">
       <h4 className="text-sm font-medium text-slate-200 mb-4">{chart.title}</h4>
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           {chart.type === 'bar' ? (
             <BarChart data={chart.data}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
               <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} />
               <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} />
-              <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} />
-              <Bar dataKey="value" fill="#34D399" radius={[4, 4, 0, 0]} />
+              <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px' }} />
+              <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} />
             </BarChart>
           ) : chart.type === 'line' ? (
             <LineChart data={chart.data}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
               <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} />
               <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} />
-              <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} />
-              <Line type="monotone" dataKey="value" stroke="#34D399" strokeWidth={2} dot={{ fill: '#34D399' }} />
+              <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px' }} />
+              <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981' }} />
             </LineChart>
           ) : (
             <RechartsPie>
               <Pie data={chart.data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                 {chart.data.map((_, index) => <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
               </Pie>
-              <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} />
+              <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px' }} />
               <Legend />
             </RechartsPie>
           )}
@@ -561,11 +561,11 @@ function ChatMessage({ message }: { message: Message }) {
         {isUser ? <User size={18} className="text-white" /> : <SageLogo size={24} />}
       </div>
       <div className={`flex-1 ${isUser ? 'text-right' : ''}`}>
-        <div className={`inline-block rounded-2xl px-5 py-3 max-w-[85%] ${isUser ? 'bg-blue-500 text-white rounded-tr-md' : 'bg-slate-800/90 text-slate-100 rounded-tl-md border border-slate-700/50'}`}>
+        <div className={`inline-block rounded-2xl px-5 py-3 max-w-[85%] ${isUser ? 'bg-blue-500 text-white rounded-tr-md' : 'bg-slate-900/80 backdrop-blur-xl text-slate-100 rounded-tl-md border border-white/[0.08]'}`}>
           {message.attachments && message.attachments.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
               {message.attachments.map(att => (
-                <div key={att.id} className="flex items-center gap-2 px-3 py-1.5 bg-slate-700/50 rounded-lg text-xs">
+                <div key={att.id} className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.05]/50 rounded-lg text-xs">
                   {att.type.startsWith('image/') ? <ImageIcon size={14} /> : <FileText size={14} />}
                   <span className="truncate max-w-[150px]">{att.name}</span>
                   <span className="text-slate-400">{formatFileSize(att.size)}</span>
@@ -586,7 +586,7 @@ function ChatMessage({ message }: { message: Message }) {
 function QuickActionButton({ action, onClick }: { action: typeof QUICK_ACTIONS[0], onClick: () => void }) {
   const Icon = action.icon
   return (
-    <button onClick={onClick} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:bg-slate-700/60 hover:border-slate-600 transition-all text-sm text-slate-300 text-left">
+    <button onClick={onClick} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] hover:bg-white/[0.05]/60 hover:border-white/[0.08] transition-all text-sm text-slate-300 text-left">
       <Icon size={18} className="text-emerald-400 flex-shrink-0" />
       <span>{action.label}</span>
     </button>
@@ -598,11 +598,11 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, onRename 
   const [editTitle, setEditTitle] = useState(conversation.title)
 
   return (
-    <div className={`group relative flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all ${isActive ? 'bg-slate-700/80' : 'hover:bg-slate-800/60'}`} onClick={() => !isEditing && onClick()}>
+    <div className={`group relative flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all ${isActive ? 'bg-white/[0.1]' : 'hover:bg-white/[0.05]'}`} onClick={() => !isEditing && onClick()}>
       <MessageSquare size={16} className="text-slate-400 flex-shrink-0" />
       {isEditing ? (
         <div className="flex-1 flex items-center gap-1">
-          <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="flex-1 bg-slate-700 text-sm text-slate-100 px-2 py-1 rounded border border-slate-600 focus:outline-none focus:border-emerald-500" autoFocus onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') { onRename(editTitle); setIsEditing(false) } if (e.key === 'Escape') setIsEditing(false) }} />
+          <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="flex-1 bg-white/[0.05] text-sm text-slate-100 px-2 py-1 rounded border border-white/[0.08] focus:outline-none focus:border-emerald-500" autoFocus onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') { onRename(editTitle); setIsEditing(false) } if (e.key === 'Escape') setIsEditing(false) }} />
           <button onClick={(e) => { e.stopPropagation(); onRename(editTitle); setIsEditing(false) }} className="p-1 text-emerald-400"><Check size={14} /></button>
           <button onClick={(e) => { e.stopPropagation(); setIsEditing(false) }} className="p-1 text-slate-400"><X size={14} /></button>
         </div>
@@ -758,12 +758,12 @@ export default function SageAssistantPage() {
   return (
     <div className="flex h-[calc(100vh-80px)]">
       {/* Collapsible Sidebar */}
-      <div className={`${sidebarOpen ? 'w-72' : 'w-0'} border-r border-slate-700/50 bg-slate-900/50 flex flex-col transition-all duration-300 overflow-hidden`}>
-        <div className="p-4 border-b border-slate-700/50 flex items-center gap-2">
+      <div className={`${sidebarOpen ? 'w-72' : 'w-0'} border-r border-white/[0.08] bg-slate-900/70 backdrop-blur-xl flex flex-col transition-all duration-300 overflow-hidden`}>
+        <div className="p-4 border-b border-white/[0.08] flex items-center gap-2">
           <button onClick={startNewConversation} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-medium transition-colors">
             <Plus size={18} /> New Chat
           </button>
-          <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors" title="Collapse sidebar">
+          <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/[0.08] transition-colors" title="Collapse sidebar">
             <PanelLeftClose size={18} />
           </button>
         </div>
@@ -778,10 +778,10 @@ export default function SageAssistantPage() {
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col relative" onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }} onDragLeave={() => setIsDragging(false)} onDrop={handleDrop}>
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/50">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
           <div className="flex items-center gap-3">
             {!sidebarOpen && (
-              <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors" title="Open sidebar">
+              <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/[0.08] transition-colors" title="Open sidebar">
                 <PanelLeft size={18} />
               </button>
             )}
@@ -793,7 +793,7 @@ export default function SageAssistantPage() {
               <p className="text-xs text-slate-400">Financial Intelligence Partner</p>
             </div>
           </div>
-          <button onClick={startNewConversation} className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors" title="New conversation">
+          <button onClick={startNewConversation} className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/[0.08] transition-colors" title="New conversation">
             <Plus size={18} />
           </button>
         </div>
@@ -825,12 +825,12 @@ export default function SageAssistantPage() {
 
               <div className="w-full max-w-2xl">
                 <div className="relative">
-                  <textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyPress} placeholder="Ask Sage about your finances..." rows={1} className="w-full bg-slate-800/80 border border-slate-600/50 rounded-2xl pl-5 pr-28 py-4 text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-base" style={{ minHeight: '64px', maxHeight: '200px' }} />
+                  <textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyPress} placeholder="Ask Sage about your finances..." rows={1} className="w-full bg-slate-900/70 backdrop-blur-xl border border-white/[0.08] rounded-2xl pl-5 pr-28 py-4 text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-base" style={{ minHeight: '64px', maxHeight: '200px' }} />
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
                     <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-slate-200 transition-colors" title="Attach file">
                       <Paperclip size={18} />
                     </button>
-                    <button onClick={() => sendMessage(input)} disabled={!input.trim() || loading} className="w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 disabled:cursor-not-allowed flex items-center justify-center transition-colors">
+                    <button onClick={() => sendMessage(input)} disabled={!input.trim() || loading} className="w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-white/[0.05] disabled:cursor-not-allowed flex items-center justify-center transition-colors">
                       {loading ? <RefreshCw size={18} className="text-white animate-spin" /> : <Send size={18} className="text-white" />}
                     </button>
                   </div>
@@ -844,7 +844,7 @@ export default function SageAssistantPage() {
               {loading && (
                 <div className="flex gap-4 max-w-4xl mx-auto">
                   <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 via-indigo-500 to-blue-500 flex items-center justify-center"><SageLogo size={24} /></div>
-                  <div className="bg-slate-800/90 rounded-2xl rounded-tl-md px-5 py-3 border border-slate-700/50">
+                  <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl rounded-tl-md px-5 py-3 border border-white/[0.08]">
                     <div className="flex items-center gap-2">
                       <div className="flex gap-1">
                         <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -863,11 +863,11 @@ export default function SageAssistantPage() {
 
         {/* Bottom Input */}
         {hasMessages && (
-          <div className="border-t border-slate-700/50 px-4 py-4 bg-slate-900/80">
+          <div className="border-t border-white/[0.08] px-4 py-4 bg-slate-900/80">
             {attachments.length > 0 && (
               <div className="max-w-4xl mx-auto mb-3 flex flex-wrap gap-2">
                 {attachments.map(att => (
-                  <div key={att.id} className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 rounded-lg text-sm">
+                  <div key={att.id} className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/70 backdrop-blur-xl rounded-lg text-sm">
                     {att.type.startsWith('image/') ? <ImageIcon size={14} className="text-slate-400" /> : <FileText size={14} className="text-slate-400" />}
                     <span className="text-slate-200 truncate max-w-[150px]">{att.name}</span>
                     <button onClick={() => removeAttachment(att.id)} className="text-slate-400 hover:text-red-400"><XCircle size={14} /></button>
@@ -876,12 +876,12 @@ export default function SageAssistantPage() {
               </div>
             )}
             <div className="max-w-4xl mx-auto relative">
-              <textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyPress} placeholder="Ask a follow-up question..." rows={1} className="w-full bg-slate-800/80 border border-slate-600/50 rounded-2xl pl-5 pr-28 py-4 text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/50" style={{ minHeight: '60px', maxHeight: '200px' }} />
+              <textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyPress} placeholder="Ask a follow-up question..." rows={1} className="w-full bg-slate-900/70 backdrop-blur-xl border border-white/[0.08] rounded-2xl pl-5 pr-28 py-4 text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/50" style={{ minHeight: '60px', maxHeight: '200px' }} />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
                 <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-slate-200 transition-colors" title="Attach file">
                   <Paperclip size={18} />
                 </button>
-                <button onClick={() => sendMessage(input)} disabled={(!input.trim() && attachments.length === 0) || loading} className="w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 disabled:cursor-not-allowed flex items-center justify-center transition-colors">
+                <button onClick={() => sendMessage(input)} disabled={(!input.trim() && attachments.length === 0) || loading} className="w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-white/[0.05] disabled:cursor-not-allowed flex items-center justify-center transition-colors">
                   {loading ? <RefreshCw size={18} className="text-white animate-spin" /> : <Send size={18} className="text-white" />}
                 </button>
               </div>
