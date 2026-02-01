@@ -4,10 +4,8 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { 
   Search, Filter, Download, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
   Clock, Plus, Edit2, X, Check, Trash2, Calendar, Users, DollarSign, BarChart3,
-  TrendingUp, TrendingDown, Target, PieChart, Activity, Building2, User, Briefcase,
-  Receipt
+  TrendingUp, TrendingDown, Target, PieChart, Activity, Building2, User, Briefcase
 } from 'lucide-react'
-import ExpenseManagement from '@/components/ExpenseManagement'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
   PieChart as RechartsPie, Pie, LineChart, Line, Legend, Area, AreaChart
@@ -311,12 +309,6 @@ export default function TimeTrackingPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [companyId, setCompanyId] = useState<string | null>(null)
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
-  const [userRole, setUserRole] = useState<string>('member')
-
-  // Page-level tabs: Time Analytics vs Expenses
-  type PageTab = 'time' | 'expenses'
-  const [pageTab, setPageTab] = useState<PageTab>('time')
 
   const [datePreset, setDatePreset] = useState<DatePreset>('mtd')
   const [customStartDate, setCustomStartDate] = useState('')
@@ -341,14 +333,9 @@ export default function TimeTrackingPage() {
       try {
         const { user } = await getCurrentUser()
         if (!user) return
-        setCurrentUserId(user.id)
         const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
         if (!profile?.company_id) { setLoading(false); return }
         setCompanyId(profile.company_id)
-
-        // Determine user role from team_members table
-        const { data: roleData } = await supabase.from('team_members').select('role').eq('company_id', profile.company_id).eq('email', user.email).single()
-        if (roleData?.role) setUserRole(roleData.role)
 
         const { data: teamData } = await supabase.from('team_members').select('*').eq('company_id', profile.company_id)
         const { data: projData } = await supabase.from('projects').select('*').eq('company_id', profile.company_id)
@@ -567,45 +554,9 @@ export default function TimeTrackingPage() {
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>
 
-  // Page-level tabs always visible — this route is admin-only via sidebar
-  const isLeadership = true
-
   return (
     <div className="space-y-4">
-      {/* Page-Level Tabs: Time Analytics | Expenses */}
-      {isLeadership && (
-        <div className={`flex items-center gap-1 p-1 rounded-xl ${THEME.glass} border ${THEME.glassBorder} w-fit`}>
-          <button
-            onClick={() => setPageTab('time')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              pageTab === 'time'
-                ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
-                : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
-            }`}
-          >
-            <Clock size={16} />
-            Time Analytics
-          </button>
-          <button
-            onClick={() => setPageTab('expenses')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              pageTab === 'expenses'
-                ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
-                : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
-            }`}
-          >
-            <Receipt size={16} />
-            Expenses
-          </button>
-        </div>
-      )}
-
-      {/* ===== EXPENSES TAB ===== */}
-      {pageTab === 'expenses' && isLeadership && companyId && currentUserId ? (
-        <ExpenseManagement supabase={supabase} companyId={companyId} currentUserId={currentUserId} />
-      ) : (
-      <>
-      {/* ===== TIME ANALYTICS TAB (existing content) ===== */}
+      {/* ===== TIME ANALYTICS ===== */}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -934,8 +885,6 @@ export default function TimeTrackingPage() {
             </div>
           </div>
         </div>
-      )}
-      </>
       )}
     </div>
   )
