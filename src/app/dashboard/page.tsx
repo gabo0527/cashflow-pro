@@ -20,39 +20,36 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
-// ============ PREMIUM DESIGN SYSTEM ============
-// Monochrome base + Emerald accent (Mercury/Stripe tier)
+// ============ GLASSMORPHISM DESIGN SYSTEM ============
 const THEME = {
-  // Surfaces
-  pageBg: '#F9FAFB',        // Warm gray
-  cardBg: '#FFFFFF',
-  cardBorder: '#E5E7EB',    // gray-200
-  cardShadow: '0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04)',
-  cardShadowHover: '0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.03)',
+  // Glass effects
+  glass: 'bg-slate-900/70 backdrop-blur-xl',
+  glassBorder: 'border-white/[0.08]',
+  glassHover: 'hover:bg-white/[0.05] hover:border-white/[0.12]',
   
   // Text
-  textPrimary: '#111827',   // gray-900
-  textSecondary: '#6B7280', // gray-500
-  textMuted: '#9CA3AF',     // gray-400
+  textPrimary: 'text-white',
+  textSecondary: 'text-slate-300',
+  textMuted: 'text-slate-400',
+  textDim: 'text-slate-500',
   
-  // Single accent color - Emerald
+  // Accent - Emerald
   accent: '#10B981',
-  accentLight: '#D1FAE5',   // emerald-100
-  accentDark: '#059669',
+  accentLight: '#34d399',
   
-  // Semantic (minimal)
+  // Semantic
   positive: '#10B981',
   negative: '#EF4444',
   warning: '#F59E0B',
   
-  // Chart palette (monochrome + accent)
+  // Chart palette
   chart: {
-    primary: '#10B981',     // Emerald - main data
-    secondary: '#6B7280',   // Gray - secondary data
-    tertiary: '#D1D5DB',    // Light gray - background data
+    primary: '#10B981',
+    secondary: '#64748b',
+    tertiary: '#475569',
     negative: '#EF4444',
-    grid: '#F3F4F6',
-    axis: '#9CA3AF',
+    grid: 'rgba(255,255,255,0.06)',
+    axis: '#64748b',
   }
 }
 
@@ -78,7 +75,7 @@ const formatDate = (dateStr: string): string => {
 
 // ============ COMPONENTS ============
 
-// Premium KPI Card - Monochrome icons, no colored backgrounds
+// Glass Metric Card
 function MetricCard({ 
   label, 
   value, 
@@ -97,34 +94,30 @@ function MetricCard({
   href?: string
 }) {
   const content = (
-    <div 
-      className="bg-white border border-gray-200 rounded-xl p-5 transition-all duration-200 hover:shadow-md hover:border-gray-300"
-      style={{ boxShadow: THEME.cardShadow }}
-    >
+    <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-5 transition-all duration-200 ${THEME.glassHover}`}>
       <div className="flex items-start justify-between">
         <div className="space-y-1">
-          <p className="text-sm font-medium text-gray-500">{label}</p>
-          <p className="text-2xl font-semibold text-gray-900 tracking-tight">{value}</p>
+          <p className={`text-sm font-medium ${THEME.textMuted}`}>{label}</p>
+          <p className={`text-2xl font-semibold tracking-tight ${THEME.textPrimary}`}>{value}</p>
           {subValue && (
-            <p className="text-xs text-gray-400">{subValue}</p>
+            <p className={`text-xs ${THEME.textDim}`}>{subValue}</p>
           )}
           {trend !== undefined && (
             <div className="flex items-center gap-1.5 pt-1">
               {trend >= 0 ? (
-                <ArrowUpRight size={14} className="text-emerald-500" />
+                <ArrowUpRight size={14} className="text-emerald-400" />
               ) : (
-                <ArrowDownRight size={14} className="text-red-500" />
+                <ArrowDownRight size={14} className="text-rose-400" />
               )}
-              <span className={`text-xs font-medium ${trend >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              <span className={`text-xs font-medium ${trend >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                 {Math.abs(trend).toFixed(1)}%
               </span>
-              {trendLabel && <span className="text-xs text-gray-400">{trendLabel}</span>}
+              {trendLabel && <span className={`text-xs ${THEME.textDim}`}>{trendLabel}</span>}
             </div>
           )}
         </div>
-        {/* Monochrome icon - no colored background */}
-        <div className="p-2">
-          <Icon size={20} className="text-gray-400" strokeWidth={1.5} />
+        <div className="p-2.5 rounded-lg bg-white/[0.05]">
+          <Icon size={20} className={THEME.textMuted} strokeWidth={1.5} />
         </div>
       </div>
     </div>
@@ -134,7 +127,7 @@ function MetricCard({
   return content
 }
 
-// Premium Section Card
+// Glass Section Card
 function Section({ 
   title, 
   subtitle, 
@@ -153,51 +146,37 @@ function Section({
   fillHeight?: boolean
 }) {
   return (
-    <div 
-      className={`rounded-xl flex flex-col ${fillHeight ? 'h-full' : ''}`}
-      style={{ 
-        backgroundColor: '#FFFFFF',
-        border: '1px solid #E5E7EB',
-        boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.04)',
-        overflow: 'hidden',
-      }}
-    >
-      <div 
-        className="flex items-center justify-between px-5 py-4"
-        style={{ borderBottom: '1px solid #F3F4F6', backgroundColor: '#FFFFFF' }}
-      >
+    <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden ${fillHeight ? 'h-full flex flex-col' : ''}`}>
+      <div className={`flex items-center justify-between px-5 py-4 border-b ${THEME.glassBorder}`}>
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>{title}</h3>
             {badge !== undefined && (
-              <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-gray-100 text-gray-600">
+              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-white/[0.08] text-slate-300">
                 {badge}
               </span>
             )}
           </div>
-          {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+          {subtitle && <p className={`text-xs mt-0.5 ${THEME.textDim}`}>{subtitle}</p>}
         </div>
         {action && (
           <Link 
             href={action.href} 
-            className="text-xs font-medium text-gray-500 hover:text-gray-700 flex items-center gap-0.5 transition-colors"
+            className={`text-xs font-medium ${THEME.textMuted} hover:text-white flex items-center gap-0.5 transition-colors`}
           >
             {action.label}
             <ChevronRight size={14} />
           </Link>
         )}
       </div>
-      <div 
-        className={`${fillHeight ? 'flex-1' : ''} ${noPadding ? '' : 'p-5'}`}
-        style={{ backgroundColor: '#FFFFFF' }}
-      >
+      <div className={`${fillHeight ? 'flex-1' : ''} ${noPadding ? '' : 'p-5'}`}>
         {children}
       </div>
     </div>
   )
 }
 
-// Health Score Ring - Refined
+// Health Score Ring - Glass style
 function HealthRing({ score, size = 100 }: { score: number; size?: number }) {
   const strokeWidth = 6
   const radius = (size - strokeWidth) / 2
@@ -218,7 +197,7 @@ function HealthRing({ score, size = 100 }: { score: number; size?: number }) {
           cy={size / 2} 
           r={radius} 
           fill="none" 
-          stroke="#F3F4F6" 
+          stroke="rgba(255,255,255,0.08)" 
           strokeWidth={strokeWidth} 
         />
         <circle 
@@ -235,19 +214,19 @@ function HealthRing({ score, size = 100 }: { score: number; size?: number }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold text-gray-900">{score}</span>
-        <span className="text-[10px] text-gray-400 font-medium">/ 100</span>
+        <span className={`text-2xl font-bold ${THEME.textPrimary}`}>{score}</span>
+        <span className={`text-[10px] font-medium ${THEME.textDim}`}>/ 100</span>
       </div>
     </div>
   )
 }
 
-// Progress Bar - Minimal
+// Progress Bar - Glass style
 function ProgressBar({ value, max = 100, color = THEME.accent }: { value: number; max?: number; color?: string }) {
   const percentage = Math.min((value / max) * 100, 100)
   
   return (
-    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+    <div className="w-full h-1.5 bg-white/[0.08] rounded-full overflow-hidden">
       <div 
         className="h-full rounded-full transition-all duration-500" 
         style={{ width: `${percentage}%`, backgroundColor: color }} 
@@ -256,15 +235,15 @@ function ProgressBar({ value, max = 100, color = THEME.accent }: { value: number
   )
 }
 
-// Team Member Row
+// Team Member Row - Glass style
 function TeamRow({ name, hours, target = 40 }: { name: string; hours: number; target?: number }) {
   const utilization = (hours / target) * 100
   const color = utilization >= 80 ? THEME.positive : utilization >= 50 ? THEME.warning : THEME.chart.secondary
   
   return (
-    <div className="flex items-center gap-4 py-3 border-b border-gray-50 last:border-0">
+    <div className="flex items-center gap-4 py-3 border-b border-white/[0.05] last:border-0">
       <div className="w-24 min-w-0">
-        <p className="text-sm font-medium text-gray-700 truncate">{name}</p>
+        <p className={`text-sm font-medium ${THEME.textSecondary} truncate`}>{name}</p>
       </div>
       <div className="flex-1">
         <ProgressBar value={utilization} color={color} />
@@ -276,7 +255,7 @@ function TeamRow({ name, hours, target = 40 }: { name: string; hours: number; ta
   )
 }
 
-// Alert Item - Clean
+// Alert Item - Glass style
 function AlertRow({ type, message, detail, action }: { 
   type: 'error' | 'warning' | 'success'
   message: string
@@ -284,21 +263,21 @@ function AlertRow({ type, message, detail, action }: {
   action?: { label: string; href: string }
 }) {
   const config = {
-    error: { icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-50' },
-    warning: { icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-50' },
-    success: { icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+    error: { icon: AlertCircle, color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20' },
+    warning: { icon: AlertTriangle, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+    success: { icon: CheckCircle2, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
   }
-  const { icon: Icon, color, bg } = config[type]
+  const { icon: Icon, color, bg, border } = config[type]
   
   return (
-    <div className={`flex items-start gap-3 p-3 rounded-lg ${bg}`}>
+    <div className={`flex items-start gap-3 p-3 rounded-lg ${bg} border ${border}`}>
       <Icon size={16} className={`${color} mt-0.5 flex-shrink-0`} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-800">{message}</p>
-        {detail && <p className="text-xs text-gray-500 mt-0.5">{detail}</p>}
+        <p className={`text-sm font-medium ${THEME.textPrimary}`}>{message}</p>
+        {detail && <p className={`text-xs mt-0.5 ${THEME.textMuted}`}>{detail}</p>}
       </div>
       {action && (
-        <Link href={action.href} className="text-xs font-medium text-gray-600 hover:text-gray-800">
+        <Link href={action.href} className={`text-xs font-medium ${THEME.textMuted} hover:text-white transition-colors`}>
           {action.label}
         </Link>
       )}
@@ -306,12 +285,12 @@ function AlertRow({ type, message, detail, action }: {
   )
 }
 
-// Custom Tooltip - Clean
+// Custom Tooltip - Glass style
 const ChartTooltip = ({ active, payload, label, formatter }: any) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-lg">
-      <p className="text-xs text-gray-500 mb-1">{label}</p>
+    <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-lg px-3 py-2 shadow-xl`}>
+      <p className={`text-xs ${THEME.textDim} mb-1`}>{label}</p>
       {payload.map((entry: any, i: number) => (
         <p key={i} className="text-sm font-medium" style={{ color: entry.color }}>
           {entry.name}: {formatter ? formatter(entry.value) : entry.value}
@@ -460,7 +439,7 @@ export default function DashboardPage() {
     }
   }, [filteredInvoices, filteredExpenses, filteredTimeEntries, invoices])
 
-  // Chart data - Revenue vs Expenses (monochrome palette)
+  // Chart data - Revenue vs Expenses
   const revenueExpenseData = useMemo(() => {
     const months: { [key: string]: { revenue: number; expenses: number } } = {}
     
@@ -483,7 +462,7 @@ export default function DashboardPage() {
     })).slice(-6)
   }, [filteredInvoices, filteredExpenses])
 
-  // AR Aging - Simplified palette
+  // AR Aging
   const arAgingData = useMemo(() => {
     const aging = { current: 0, overdue: 0 }
     const now = new Date()
@@ -577,46 +556,49 @@ export default function DashboardPage() {
   // Loading
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: THEME.pageBg }}>
+      <div className="flex items-center justify-center h-[60vh]">
         <div className="flex flex-col items-center gap-3">
-          <RefreshCw size={24} className="text-gray-400 animate-spin" />
-          <p className="text-sm text-gray-500">Loading...</p>
+          <RefreshCw size={24} className="text-emerald-500 animate-spin" />
+          <p className={`text-sm ${THEME.textMuted}`}>Loading dashboard...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen p-6 relative" style={{ backgroundColor: THEME.pageBg }}>
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Financial overview for {selectedYear}</p>
+          <h1 className={`text-xl font-semibold ${THEME.textPrimary}`}>Dashboard</h1>
+          <p className={`text-sm mt-0.5 ${THEME.textMuted}`}>Financial overview for {selectedYear}</p>
         </div>
         
         <div className="flex items-center gap-2">
           {/* Year selector */}
-          <select 
-            value={selectedYear} 
-            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-            className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200"
-          >
-            {availableYears.map(year => (
-              <option key={year} value={year}>{year}</option>
-            ))}
-          </select>
+          <div className="relative">
+            <select 
+              value={selectedYear} 
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              className="appearance-none bg-white/[0.05] border border-white/[0.1] rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 cursor-pointer"
+            >
+              {availableYears.map(year => (
+                <option key={year} value={year} className="bg-slate-900">{year}</option>
+              ))}
+            </select>
+            <ChevronRight size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 rotate-90 text-slate-500 pointer-events-none" />
+          </div>
           
-          {/* Period tabs - subtle styling */}
-          <div className="flex bg-white border border-gray-200 rounded-lg p-1">
+          {/* Period tabs */}
+          <div className="flex bg-white/[0.05] border border-white/[0.1] rounded-lg p-1">
             {(['week', 'month', 'quarter', 'ytd'] as const).map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
                   period === p 
-                    ? 'bg-gray-900 text-white' 
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    ? 'bg-emerald-500 text-white' 
+                    : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
                 }`}
               >
                 {p === 'ytd' ? 'YTD' : p.charAt(0).toUpperCase() + p.slice(1)}
@@ -627,7 +609,7 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           label="Revenue"
           value={formatCurrency(metrics.totalRevenue, true)}
@@ -661,7 +643,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Charts Row 1 */}
-      <div className="grid grid-cols-12 gap-4 mb-6">
+      <div className="grid grid-cols-12 gap-4">
         {/* Revenue vs Expenses */}
         <div className="col-span-12 lg:col-span-8">
           <Section title="Revenue vs Expenses" subtitle="Monthly comparison">
@@ -678,17 +660,17 @@ export default function DashboardPage() {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-full text-gray-400 text-sm">No data for selected period</div>
+                <div className={`flex items-center justify-center h-full ${THEME.textMuted} text-sm`}>No data for selected period</div>
               )}
             </div>
-            <div className="flex items-center gap-6 mt-3 pt-3 border-t border-gray-100">
+            <div className={`flex items-center gap-6 mt-3 pt-3 border-t ${THEME.glassBorder}`}>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded" style={{ backgroundColor: THEME.chart.primary }} />
-                <span className="text-xs text-gray-500">Revenue</span>
+                <span className={`text-xs ${THEME.textMuted}`}>Revenue</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded" style={{ backgroundColor: THEME.chart.secondary }} />
-                <span className="text-xs text-gray-500">Expenses</span>
+                <span className={`text-xs ${THEME.textMuted}`}>Expenses</span>
               </div>
             </div>
           </Section>
@@ -702,22 +684,22 @@ export default function DashboardPage() {
               <HealthRing score={metrics.healthScore} size={90} />
               <div className="flex-1 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Gross Margin</span>
-                  <span className="font-medium text-gray-900">{metrics.grossMargin.toFixed(1)}%</span>
+                  <span className={THEME.textMuted}>Gross Margin</span>
+                  <span className={`font-medium ${THEME.textPrimary}`}>{metrics.grossMargin.toFixed(1)}%</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Net Margin</span>
-                  <span className="font-medium text-gray-900">{metrics.netMargin.toFixed(1)}%</span>
+                  <span className={THEME.textMuted}>Net Margin</span>
+                  <span className={`font-medium ${THEME.textPrimary}`}>{metrics.netMargin.toFixed(1)}%</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Utilization</span>
-                  <span className="font-medium text-gray-900">{metrics.billableRate.toFixed(0)}%</span>
+                  <span className={THEME.textMuted}>Utilization</span>
+                  <span className={`font-medium ${THEME.textPrimary}`}>{metrics.billableRate.toFixed(0)}%</span>
                 </div>
               </div>
             </div>
           </Section>
 
-          {/* AR Aging - No chart, clean list display */}
+          {/* AR Aging */}
           <Section title="AR Aging">
             {arAgingData.length > 0 ? (
               <div className="space-y-3">
@@ -725,27 +707,27 @@ export default function DashboardPage() {
                   <div key={i} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                      <span className="text-sm text-gray-600">{item.name}</span>
+                      <span className={`text-sm ${THEME.textSecondary}`}>{item.name}</span>
                     </div>
-                    <span className="text-sm font-semibold text-gray-900">{formatCurrency(item.value)}</span>
+                    <span className={`text-sm font-semibold ${THEME.textPrimary}`}>{formatCurrency(item.value)}</span>
                   </div>
                 ))}
-                <div className="pt-3 mt-1 border-t border-gray-100">
+                <div className={`pt-3 mt-1 border-t ${THEME.glassBorder}`}>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-500">Total AR</span>
-                    <span className="text-sm font-bold text-gray-900">{formatCurrency(metrics.totalAR)}</span>
+                    <span className={`text-sm font-medium ${THEME.textMuted}`}>Total AR</span>
+                    <span className={`text-sm font-bold ${THEME.textPrimary}`}>{formatCurrency(metrics.totalAR)}</span>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-20 text-gray-400 text-sm">No outstanding AR</div>
+              <div className={`flex items-center justify-center h-20 ${THEME.textMuted} text-sm`}>No outstanding AR</div>
             )}
           </Section>
         </div>
       </div>
 
       {/* Charts Row 2 */}
-      <div className="grid grid-cols-12 gap-4 mb-6">
+      <div className="grid grid-cols-12 gap-4">
         {/* Team Utilization */}
         <div className="col-span-12 lg:col-span-6">
           <Section title="Team Utilization" subtitle="Hours logged this period" action={{ label: 'View Team', href: '/team' }}>
@@ -755,16 +737,16 @@ export default function DashboardPage() {
                   {teamUtilization.map((member, i) => (
                     <TeamRow key={i} name={member.name} hours={member.hours} />
                   ))}
-                  <div className="flex items-center justify-between pt-3 mt-2 border-t border-gray-100">
-                    <span className="text-xs text-gray-400">Team Average</span>
-                    <span className="text-sm font-medium text-gray-700">
+                  <div className={`flex items-center justify-between pt-3 mt-2 border-t ${THEME.glassBorder}`}>
+                    <span className={`text-xs ${THEME.textDim}`}>Team Average</span>
+                    <span className={`text-sm font-medium ${THEME.textSecondary}`}>
                       {(teamUtilization.reduce((sum, m) => sum + m.hours, 0) / teamUtilization.length).toFixed(0)}h
-                      <span className="text-gray-400 font-normal ml-1">/ 40h</span>
+                      <span className={`${THEME.textDim} font-normal ml-1`}>/ 40h</span>
                     </span>
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-full text-gray-400 text-sm">No time entries</div>
+                <div className={`flex items-center justify-center h-full ${THEME.textMuted} text-sm`}>No time entries</div>
               )}
             </div>
           </Section>
@@ -778,7 +760,7 @@ export default function DashboardPage() {
                 <AreaChart data={cashForecastData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                   <defs>
                     <linearGradient id="cashGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={THEME.chart.primary} stopOpacity={0.15}/>
+                      <stop offset="5%" stopColor={THEME.chart.primary} stopOpacity={0.3}/>
                       <stop offset="95%" stopColor={THEME.chart.primary} stopOpacity={0}/>
                     </linearGradient>
                   </defs>
@@ -791,14 +773,14 @@ export default function DashboardPage() {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-gray-100">
+            <div className={`flex items-center gap-4 mt-2 pt-2 border-t ${THEME.glassBorder}`}>
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: THEME.chart.primary }} />
-                <span className="text-xs text-gray-400">Projected</span>
+                <span className={`text-xs ${THEME.textDim}`}>Projected</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-3 border-t border-dashed" style={{ borderColor: THEME.warning }} />
-                <span className="text-xs text-gray-400">Threshold</span>
+                <span className={`text-xs ${THEME.textDim}`}>Threshold</span>
               </div>
             </div>
           </Section>
@@ -825,29 +807,29 @@ export default function DashboardPage() {
               {recentInvoices.length > 0 ? (
                 <div>
                   {/* Header */}
-                  <div className="flex items-center px-5 py-2 bg-gray-50 border-b border-gray-200">
-                    <div className="flex-1 text-xs font-medium text-gray-400 uppercase tracking-wider">Client</div>
-                    <div className="w-24 text-xs font-medium text-gray-400 uppercase tracking-wider">Invoice</div>
-                    <div className="w-24 text-xs font-medium text-gray-400 uppercase tracking-wider">Due</div>
-                    <div className="w-28 text-xs font-medium text-gray-400 uppercase tracking-wider text-right">Amount</div>
-                    <div className="w-24 text-xs font-medium text-gray-400 uppercase tracking-wider text-right">Status</div>
+                  <div className={`flex items-center px-5 py-2 bg-white/[0.03] border-b ${THEME.glassBorder}`}>
+                    <div className={`flex-1 text-xs font-medium uppercase tracking-wider ${THEME.textDim}`}>Client</div>
+                    <div className={`w-24 text-xs font-medium uppercase tracking-wider ${THEME.textDim}`}>Invoice</div>
+                    <div className={`w-24 text-xs font-medium uppercase tracking-wider ${THEME.textDim}`}>Due</div>
+                    <div className={`w-28 text-xs font-medium uppercase tracking-wider text-right ${THEME.textDim}`}>Amount</div>
+                    <div className={`w-24 text-xs font-medium uppercase tracking-wider text-right ${THEME.textDim}`}>Status</div>
                   </div>
                   {/* Rows */}
                   {recentInvoices.map((inv) => (
-                    <div key={inv.id} className="flex items-center px-5 py-3 bg-white border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                      <div className="flex-1 text-sm text-gray-800 font-medium truncate">{inv.client_name || '—'}</div>
-                      <div className="w-24 text-sm text-gray-500">{inv.invoice_number || inv.doc_number || 'Draft'}</div>
-                      <div className="w-24 text-sm text-gray-500">{formatDate(inv.due_date)}</div>
-                      <div className="w-28 text-sm text-gray-800 font-medium text-right tabular-nums">
+                    <div key={inv.id} className={`flex items-center px-5 py-3 border-b border-white/[0.05] hover:bg-white/[0.03] transition-colors`}>
+                      <div className={`flex-1 text-sm font-medium truncate ${THEME.textSecondary}`}>{inv.client_name || '—'}</div>
+                      <div className={`w-24 text-sm ${THEME.textMuted}`}>{inv.invoice_number || inv.doc_number || 'Draft'}</div>
+                      <div className={`w-24 text-sm ${THEME.textMuted}`}>{formatDate(inv.due_date)}</div>
+                      <div className={`w-28 text-sm font-medium text-right tabular-nums ${THEME.textPrimary}`}>
                         {formatCurrency(parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0)}
                       </div>
                       <div className="w-24 text-right">
                         {inv.daysOverdue > 0 ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-500/15 text-rose-400 border border-rose-500/20">
                             {inv.daysOverdue}d
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/[0.05] text-slate-400 border border-white/[0.1]">
                             Current
                           </span>
                         )}
@@ -856,7 +838,7 @@ export default function DashboardPage() {
                   ))}
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-full text-gray-400 text-sm py-12">No open invoices</div>
+                <div className={`flex items-center justify-center h-full ${THEME.textMuted} text-sm py-12`}>No open invoices</div>
               )}
             </div>
           </Section>
