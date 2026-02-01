@@ -27,7 +27,7 @@ interface SidebarProps {
   onToggle: () => void
   companyName?: string
   onSignOut: () => void
-  userRole?: 'owner' | 'admin' | 'member' | 'viewer' | string
+  userRole?: 'owner' | 'admin' | 'member' | 'viewer' | 'employee' | string
 }
 
 interface NavItem {
@@ -42,10 +42,10 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={20} />, adminOnly: true },
   { label: 'Cash Flow', href: '/cash-flow', icon: <Wallet size={20} />, adminOnly: true },
   { label: 'Invoices & AR', href: '/invoices', icon: <FileText size={20} />, adminOnly: true },
-  { label: 'Expenses', href: '/expenses', icon: <Receipt size={20} />, adminOnly: true },
   { label: 'Projects', href: '/projects', icon: <FolderKanban size={20} />, adminOnly: true },
   { label: 'Clients', href: '/clients', icon: <Users size={20} />, adminOnly: true },
   { label: 'Time Tracking', href: '/time-tracking', icon: <Clock size={20} />, section: 'Operations', adminOnly: true },
+  { label: 'Expense Mgmt', href: '/expenses', icon: <Receipt size={20} />, adminOnly: true },
   { label: 'Team', href: '/team', icon: <UserCog size={20} />, adminOnly: true },
   { label: 'Reports', href: '/reports', icon: <BarChart3 size={20} />, section: 'Analysis', adminOnly: true },
   { label: 'Forecast', href: '/forecast', icon: <Calculator size={20} />, adminOnly: true },
@@ -53,6 +53,7 @@ const navItems: NavItem[] = [
   { label: 'Settings', href: '/settings', icon: <Settings size={20} />, section: 'System', adminOnly: true },
   // Employee-only items
   { label: 'My Timesheet', href: '/timesheet', icon: <Clock size={20} /> },
+  { label: 'My Expenses', href: '/expense-report', icon: <Receipt size={20} /> },
 ]
 
 export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, userRole = 'owner' }: SidebarProps) {
@@ -63,10 +64,8 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
   // Filter nav items based on role
   const visibleItems = navItems.filter(item => {
     if (isLeadership) {
-      // Admins see all admin items, but not "My Timesheet" (they use Time Tracking)
       return item.adminOnly === true
     } else {
-      // Employees only see non-admin items (My Timesheet)
       return !item.adminOnly
     }
   })
