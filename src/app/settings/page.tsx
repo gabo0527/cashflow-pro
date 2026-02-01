@@ -11,7 +11,7 @@ interface TeamMember { id: string; name: string; email: string; role: string | n
 
 // ====== SINGLE SOURCE OF TRUTH FOR PERMISSIONS ======
 // Import this in your Sidebar to gate navigation items
-export const PERMISSION_MATRIX: Record<string, { label: string; description: string; color: string; access: string[] }> = {
+const PERMISSION_MATRIX: Record<string, { label: string; description: string; color: string; access: string[] }> = {
   owner:    { label: 'Owner',    description: 'Full access, can delete company',    color: 'text-purple-400',  access: ['dashboard','cash_flow','invoices','expenses','time_tracking','team','projects','clients','reports','forecast','sage','settings'] },
   admin:    { label: 'Admin',    description: 'Full access except billing & delete', color: 'text-emerald-400', access: ['dashboard','cash_flow','invoices','expenses','time_tracking','team','projects','clients','reports','forecast','sage','settings'] },
   member:   { label: 'Member',   description: 'Can edit data, view reports',         color: 'text-blue-400',    access: ['dashboard','invoices','expenses','time_tracking','projects','reports'] },
