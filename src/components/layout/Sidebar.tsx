@@ -55,7 +55,7 @@ const navItems: NavItem[] = [
   { label: 'My Timesheet', href: '/timesheet', icon: <Clock size={20} /> },
 ]
 
-export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, userRole = 'member' }: SidebarProps) {
+export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, userRole = 'owner' }: SidebarProps) {
   const pathname = usePathname()
   
   const isLeadership = userRole === 'owner' || userRole === 'admin'
