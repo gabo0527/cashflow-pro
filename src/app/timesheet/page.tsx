@@ -569,7 +569,7 @@ export default function TimesheetPage() {
         .limit(50)
 
       if (timeData) {
-        const projectIds = [...new Set(timeData.map((t: any) => t.project_id).filter(Boolean))]
+        const projectIds = Array.from(new Set(timeData.map((t: any) => t.project_id).filter(Boolean)))
         let projectMap: Record<string, { name: string; client: string }> = {}
         
         if (projectIds.length > 0) {
@@ -606,7 +606,7 @@ export default function TimesheetPage() {
         .limit(50)
 
       if (expData) {
-        const projectIds = [...new Set(expData.map((e: any) => e.project_id).filter(Boolean))]
+        const projectIds = Array.from(new Set(expData.map((e: any) => e.project_id).filter(Boolean)))
         let projectMap: Record<string, string> = {}
         if (projectIds.length > 0) {
           const { data: projects } = await supabase.from('projects').select('id, name').in('id', projectIds)
@@ -651,7 +651,7 @@ export default function TimesheetPage() {
       const projectIds = assignData.map((a: any) => a.project_id).filter(Boolean)
       const { data: projectsData } = await supabase.from('projects').select('id, name, client_id').in('id', projectIds)
 
-      const clientIds = [...new Set((projectsData || []).map((p: any) => p.client_id).filter(Boolean))]
+      const clientIds = Array.from(new Set((projectsData || []).map((p: any) => p.client_id).filter(Boolean)))
       let clientsMap: Record<string, string> = {}
       if (clientIds.length > 0) {
         const { data: clientsData } = await supabase.from('clients').select('id, name').in('id', clientIds)
