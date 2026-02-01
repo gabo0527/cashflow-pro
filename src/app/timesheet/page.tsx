@@ -341,7 +341,7 @@ function ExpenseForm({
 
   useEffect(() => {
     if (initialData) {
-      setForm(prev => ({ ...prev, ...initialData }))
+      setForm((prev: any) => ({ ...prev, ...initialData }))
     }
   }, [initialData])
 
