@@ -67,9 +67,13 @@ export default function AppShell({ children }: AppShellProps) {
         if (profile?.company_id) {
           setCompanyId(profile.company_id)
           
+          // Try company_settings first, then companies table
           const { data: settings } = await fetchCompanySettings(profile.company_id)
           if (settings?.company_name) {
             setCompanyName(settings.company_name)
+          } else {
+            const { data: co } = await supabase.from('companies').select('name').eq('id', profile.company_id).single()
+            if (co?.name) setCompanyName(co.name)
           }
         }
         
@@ -91,6 +95,15 @@ export default function AppShell({ children }: AppShellProps) {
     
     return () => subscription.unsubscribe()
   }, [router])
+
+  // Listen for company name updates from Settings page
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.name) setCompanyName(e.detail.name)
+    }
+    window.addEventListener('company-updated', handler)
+    return () => window.removeEventListener('company-updated', handler)
+  }, [])
 
   // Handle sign out
   const handleSignOut = async () => {
