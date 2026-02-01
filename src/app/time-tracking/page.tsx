@@ -100,13 +100,16 @@ const formatCurrency = (value: number): string => {
 
 const formatDate = (dateStr: string): string => {
   if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  // Parse as local date to avoid timezone shifts
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 const formatShortDate = (dateStr: string): string => {
   if (!dateStr) return '—'
-  const d = new Date(dateStr)
-  return `${d.getMonth() + 1}/${d.getDate()}`
+  const [year, month, day] = dateStr.split('-').map(Number)
+  return `${month}/${day}`
 }
 
 // Date utilities
@@ -566,7 +569,7 @@ export default function TimeTrackingPage() {
       </div>
 
       {/* Date Range & Filters */}
-      <div className={`p-4 rounded-xl border ${THEME.glass} ${THEME.glassBorder}`}>
+      <div className={`p-4 rounded-xl border ${THEME.glass} ${THEME.glassBorder} relative z-20`}>
         <div className="flex flex-wrap items-center gap-4">
           <div className="relative">
             <button onClick={() => setShowDatePicker(!showDatePicker)} className={`flex items-center gap-2 px-4 py-2 bg-white/[0.05] border ${THEME.glassBorder} hover:bg-white/[0.08] rounded-lg text-sm font-medium text-white transition-colors`}>
@@ -611,7 +614,7 @@ export default function TimeTrackingPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 relative z-10">
         <KPICard title="Total Hours" value={kpis.totalHours} format="hours" trend={kpis.hoursTrend} trendLabel="vs prior" icon={<Clock size={16} />} color="blue" />
         <KPICard title="Revenue" value={kpis.totalRevenue} format="currency" trend={kpis.revenueTrend} trendLabel="vs prior" icon={<DollarSign size={16} />} color="emerald" />
         <KPICard title="Utilization" value={kpis.utilization} format="percent" icon={<Target size={16} />} color="amber" />
@@ -620,7 +623,7 @@ export default function TimeTrackingPage() {
       </div>
 
       {/* View Tabs */}
-      <div className={`flex items-center gap-2 border-b ${THEME.glassBorder} pb-2`}>
+      <div className={`flex items-center gap-2 border-b ${THEME.glassBorder} pb-2 relative z-10`}>
         {VIEW_TABS.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-emerald-500 text-white' : `${THEME.glass} border ${THEME.glassBorder} text-slate-300 hover:bg-white/[0.08]`}`}>
             {tab.icon}{tab.label}
