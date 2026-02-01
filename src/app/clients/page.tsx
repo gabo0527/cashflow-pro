@@ -553,7 +553,7 @@ export default function ClientsPage() {
   const [quickFilter, setQuickFilter] = useState<'all' | 'at-risk' | 'top-tier' | 'needs-followup'>('all')
 
   // Profitability period state
-  const [profitabilityPeriod, setProfitabilityPeriod] = useState<'month' | 'ytd'>('month')
+  const [profitabilityPeriod, setProfitabilityPeriod] = useState<'month' | 'quarter' | 'ytd' | 'mom' | 'qoq' | 'yoy'>('month')
 
   // Modal & Detail state
   const [showClientModal, setShowClientModal] = useState(false)
@@ -809,76 +809,59 @@ export default function ClientsPage() {
       }))
   }, [enrichedClients])
 
-  // True Profitability Calculation (Overhead Allocation by Revenue Share)
-  const trueProfitability = useMemo(() => {
-    const now = new Date()
-    const currentYear = now.getFullYear()
-    const currentMonth = now.getMonth()
-    
+  // Helper: Get quarter from month (0-indexed)
+  const getQuarter = (month: number) => Math.floor(month / 3)
+  
+  // Helper: Calculate profitability for a specific period
+  const calculatePeriodProfitability = (
+    periodStart: Date,
+    periodEnd: Date,
+    label: string
+  ) => {
     // Filter invoices by period
     const periodInvoices = invoices.filter(inv => {
       if (!inv.invoice_date) return false
       const invDate = new Date(inv.invoice_date)
-      if (profitabilityPeriod === 'month') {
-        return invDate.getFullYear() === currentYear && invDate.getMonth() === currentMonth
-      } else {
-        return invDate.getFullYear() === currentYear
-      }
+      return invDate >= periodStart && invDate <= periodEnd
     })
     
     // Filter overhead (transactions without project assignment) by period
     const periodOverhead = transactions.filter(txn => {
       if (!txn.date) return false
       const txnDate = new Date(txn.date)
-      const isOverhead = !txn.project // No project = overhead
-      if (profitabilityPeriod === 'month') {
-        return isOverhead && txnDate.getFullYear() === currentYear && txnDate.getMonth() === currentMonth
-      } else {
-        return isOverhead && txnDate.getFullYear() === currentYear
-      }
+      const isOverhead = !txn.project
+      return isOverhead && txnDate >= periodStart && txnDate <= periodEnd
     })
     
-    // Filter direct project costs (transactions with project assignment) by period
+    // Filter direct project costs by period
     const periodDirectCosts = transactions.filter(txn => {
       if (!txn.date || !txn.project) return false
       const txnDate = new Date(txn.date)
-      if (profitabilityPeriod === 'month') {
-        return txnDate.getFullYear() === currentYear && txnDate.getMonth() === currentMonth
-      } else {
-        return txnDate.getFullYear() === currentYear
-      }
+      return txnDate >= periodStart && txnDate <= periodEnd
     })
     
     const totalOverhead = periodOverhead.reduce((sum, t) => sum + (t.amount || 0), 0)
     const totalPeriodRevenue = periodInvoices.reduce((sum, i) => sum + (i.amount || 0), 0)
+    const totalDirectCosts = periodDirectCosts.reduce((sum, t) => sum + (t.amount || 0), 0)
     
     // Calculate per-client profitability
     const clientProfitability = enrichedClients
       .filter(c => c.status === 'active')
       .map(client => {
-        // Client's revenue for the period
         const clientPeriodInvoices = periodInvoices.filter(i => 
           i.client?.toLowerCase() === client.name?.toLowerCase()
         )
         const clientRevenue = clientPeriodInvoices.reduce((sum, i) => sum + (i.amount || 0), 0)
-        
-        // Revenue share %
         const revenueShare = totalPeriodRevenue > 0 ? (clientRevenue / totalPeriodRevenue) * 100 : 0
-        
-        // Allocated overhead based on revenue share
         const allocatedOverhead = (revenueShare / 100) * totalOverhead
         
-        // Direct costs for this client's projects
         const clientProjects = projects.filter(p => p.client?.toLowerCase() === client.name?.toLowerCase())
         const clientProjectNames = clientProjects.map(p => p.name?.toLowerCase())
         const directCosts = periodDirectCosts
           .filter(t => clientProjectNames.includes(t.project?.toLowerCase() || ''))
           .reduce((sum, t) => sum + (t.amount || 0), 0)
         
-        // Net contribution = Revenue - Direct Costs - Allocated Overhead
         const netContribution = clientRevenue - directCosts - allocatedOverhead
-        
-        // Net margin %
         const netMargin = clientRevenue > 0 ? (netContribution / clientRevenue) * 100 : 0
         
         return {
@@ -893,19 +876,215 @@ export default function ClientsPage() {
           netMargin,
         }
       })
-      .filter(c => c.revenue > 0) // Only show clients with revenue in period
+      .filter(c => c.revenue > 0)
       .sort((a, b) => b.revenue - a.revenue)
     
     return {
-      period: profitabilityPeriod,
-      periodLabel: profitabilityPeriod === 'month' 
-        ? new Date(currentYear, currentMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-        : `YTD ${currentYear}`,
+      label,
+      startDate: periodStart,
+      endDate: periodEnd,
       totalRevenue: totalPeriodRevenue,
       totalOverhead,
-      totalDirectCosts: periodDirectCosts.reduce((sum, t) => sum + (t.amount || 0), 0),
+      totalDirectCosts,
       totalNetContribution: clientProfitability.reduce((sum, c) => sum + c.netContribution, 0),
+      netMargin: totalPeriodRevenue > 0 
+        ? ((totalPeriodRevenue - totalDirectCosts - totalOverhead) / totalPeriodRevenue) * 100 
+        : 0,
       clients: clientProfitability,
+    }
+  }
+
+  // True Profitability Calculation with Comparisons
+  const trueProfitability = useMemo(() => {
+    const now = new Date()
+    const currentYear = now.getFullYear()
+    const currentMonth = now.getMonth()
+    const currentQuarter = getQuarter(currentMonth)
+    
+    // Define period boundaries
+    const periods: Record<string, { current: { start: Date; end: Date; label: string }; prior?: { start: Date; end: Date; label: string } }> = {
+      month: {
+        current: {
+          start: new Date(currentYear, currentMonth, 1),
+          end: new Date(currentYear, currentMonth + 1, 0, 23, 59, 59),
+          label: new Date(currentYear, currentMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        }
+      },
+      quarter: {
+        current: {
+          start: new Date(currentYear, currentQuarter * 3, 1),
+          end: new Date(currentYear, (currentQuarter + 1) * 3, 0, 23, 59, 59),
+          label: `Q${currentQuarter + 1} ${currentYear}`
+        }
+      },
+      ytd: {
+        current: {
+          start: new Date(currentYear, 0, 1),
+          end: now,
+          label: `YTD ${currentYear}`
+        }
+      },
+      mom: {
+        current: {
+          start: new Date(currentYear, currentMonth, 1),
+          end: new Date(currentYear, currentMonth + 1, 0, 23, 59, 59),
+          label: new Date(currentYear, currentMonth).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+        },
+        prior: {
+          start: new Date(currentYear, currentMonth - 1, 1),
+          end: new Date(currentYear, currentMonth, 0, 23, 59, 59),
+          label: new Date(currentYear, currentMonth - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+        }
+      },
+      qoq: {
+        current: {
+          start: new Date(currentYear, currentQuarter * 3, 1),
+          end: new Date(currentYear, (currentQuarter + 1) * 3, 0, 23, 59, 59),
+          label: `Q${currentQuarter + 1} ${currentYear}`
+        },
+        prior: {
+          start: new Date(currentQuarter === 0 ? currentYear - 1 : currentYear, currentQuarter === 0 ? 9 : (currentQuarter - 1) * 3, 1),
+          end: new Date(currentQuarter === 0 ? currentYear - 1 : currentYear, currentQuarter === 0 ? 12 : currentQuarter * 3, 0, 23, 59, 59),
+          label: currentQuarter === 0 ? `Q4 ${currentYear - 1}` : `Q${currentQuarter} ${currentYear}`
+        }
+      },
+      yoy: {
+        current: {
+          start: new Date(currentYear, 0, 1),
+          end: now,
+          label: `${currentYear}`
+        },
+        prior: {
+          start: new Date(currentYear - 1, 0, 1),
+          end: new Date(currentYear - 1, currentMonth, now.getDate(), 23, 59, 59),
+          label: `${currentYear - 1}`
+        }
+      }
+    }
+    
+    const periodConfig = periods[profitabilityPeriod]
+    const currentPeriod = calculatePeriodProfitability(
+      periodConfig.current.start,
+      periodConfig.current.end,
+      periodConfig.current.label
+    )
+    
+    const priorPeriod = periodConfig.prior 
+      ? calculatePeriodProfitability(
+          periodConfig.prior.start,
+          periodConfig.prior.end,
+          periodConfig.prior.label
+        )
+      : null
+    
+    // Calculate deltas for comparison periods
+    const isComparison = ['mom', 'qoq', 'yoy'].includes(profitabilityPeriod)
+    
+    // Generate trend data (last 6 periods for MoM, last 4 for QoQ, last 3 for YoY)
+    let trendData: { label: string; revenue: number; netContribution: number; netMargin: number }[] = []
+    
+    if (profitabilityPeriod === 'mom') {
+      // Last 6 months
+      for (let i = 5; i >= 0; i--) {
+        const m = currentMonth - i
+        const y = m < 0 ? currentYear - 1 : currentYear
+        const adjustedM = m < 0 ? 12 + m : m
+        const start = new Date(y, adjustedM, 1)
+        const end = new Date(y, adjustedM + 1, 0, 23, 59, 59)
+        const data = calculatePeriodProfitability(start, end, new Date(y, adjustedM).toLocaleDateString('en-US', { month: 'short' }))
+        trendData.push({
+          label: data.label,
+          revenue: data.totalRevenue,
+          netContribution: data.totalNetContribution,
+          netMargin: data.netMargin,
+        })
+      }
+    } else if (profitabilityPeriod === 'qoq') {
+      // Last 4 quarters
+      for (let i = 3; i >= 0; i--) {
+        const q = currentQuarter - i
+        const y = q < 0 ? currentYear - 1 : currentYear
+        const adjustedQ = q < 0 ? 4 + q : q
+        const start = new Date(y, adjustedQ * 3, 1)
+        const end = new Date(y, (adjustedQ + 1) * 3, 0, 23, 59, 59)
+        const data = calculatePeriodProfitability(start, end, `Q${adjustedQ + 1}`)
+        trendData.push({
+          label: data.label,
+          revenue: data.totalRevenue,
+          netContribution: data.totalNetContribution,
+          netMargin: data.netMargin,
+        })
+      }
+    } else if (profitabilityPeriod === 'yoy') {
+      // Last 3 years YTD
+      for (let i = 2; i >= 0; i--) {
+        const y = currentYear - i
+        const start = new Date(y, 0, 1)
+        const end = i === 0 ? now : new Date(y, currentMonth, now.getDate(), 23, 59, 59)
+        const data = calculatePeriodProfitability(start, end, `${y}`)
+        trendData.push({
+          label: data.label,
+          revenue: data.totalRevenue,
+          netContribution: data.totalNetContribution,
+          netMargin: data.netMargin,
+        })
+      }
+    }
+    
+    // Merge client data with prior period for comparison
+    const clientsWithComparison = currentPeriod.clients.map(client => {
+      const priorClient = priorPeriod?.clients.find(c => c.id === client.id)
+      return {
+        ...client,
+        priorRevenue: priorClient?.revenue || 0,
+        priorNetContribution: priorClient?.netContribution || 0,
+        priorNetMargin: priorClient?.netMargin || 0,
+        revenueDelta: priorClient ? client.revenue - priorClient.revenue : 0,
+        revenueDeltaPct: priorClient && priorClient.revenue > 0 
+          ? ((client.revenue - priorClient.revenue) / priorClient.revenue) * 100 
+          : 0,
+        contributionDelta: priorClient ? client.netContribution - priorClient.netContribution : 0,
+        contributionDeltaPct: priorClient && priorClient.netContribution !== 0
+          ? ((client.netContribution - priorClient.netContribution) / Math.abs(priorClient.netContribution)) * 100
+          : 0,
+      }
+    })
+    
+    return {
+      period: profitabilityPeriod,
+      isComparison,
+      currentLabel: currentPeriod.label,
+      priorLabel: priorPeriod?.label || null,
+      
+      // Current period totals
+      totalRevenue: currentPeriod.totalRevenue,
+      totalOverhead: currentPeriod.totalOverhead,
+      totalDirectCosts: currentPeriod.totalDirectCosts,
+      totalNetContribution: currentPeriod.totalNetContribution,
+      netMargin: currentPeriod.netMargin,
+      
+      // Prior period totals (for comparison)
+      priorRevenue: priorPeriod?.totalRevenue || 0,
+      priorOverhead: priorPeriod?.totalOverhead || 0,
+      priorDirectCosts: priorPeriod?.totalDirectCosts || 0,
+      priorNetContribution: priorPeriod?.totalNetContribution || 0,
+      priorNetMargin: priorPeriod?.netMargin || 0,
+      
+      // Deltas
+      revenueDelta: priorPeriod ? currentPeriod.totalRevenue - priorPeriod.totalRevenue : 0,
+      revenueDeltaPct: priorPeriod && priorPeriod.totalRevenue > 0
+        ? ((currentPeriod.totalRevenue - priorPeriod.totalRevenue) / priorPeriod.totalRevenue) * 100
+        : 0,
+      contributionDelta: priorPeriod ? currentPeriod.totalNetContribution - priorPeriod.totalNetContribution : 0,
+      contributionDeltaPct: priorPeriod && priorPeriod.totalNetContribution !== 0
+        ? ((currentPeriod.totalNetContribution - priorPeriod.totalNetContribution) / Math.abs(priorPeriod.totalNetContribution)) * 100
+        : 0,
+      
+      // Trend data for charts
+      trendData,
+      
+      // Client data
+      clients: clientsWithComparison,
     }
   }, [enrichedClients, invoices, transactions, projects, profitabilityPeriod])
 
@@ -1123,65 +1302,155 @@ export default function ClientsPage() {
         </div>
       </CollapsibleSection>
 
-      {/* True Profitability - Overhead Allocation */}
+      {/* True Profitability - Overhead Allocation with Comparisons */}
       <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
         {/* Header with Period Toggle */}
-        <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder}`}>
+        <div className={`flex flex-col sm:flex-row sm:items-center justify-between px-6 py-4 border-b ${THEME.glassBorder} gap-3`}>
           <div className="flex items-center gap-3">
             <Calculator size={16} className={THEME.textMuted} />
             <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>True Profitability</h3>
             <span className={`px-2 py-0.5 text-xs font-medium rounded-full bg-purple-500/20 text-purple-400`}>
-              {trueProfitability.periodLabel}
+              {trueProfitability.currentLabel}
+              {trueProfitability.isComparison && trueProfitability.priorLabel && (
+                <span className="text-slate-500"> vs {trueProfitability.priorLabel}</span>
+              )}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className={`text-xs ${THEME.textMuted}`}>Period:</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-xs ${THEME.textMuted}`}>View:</span>
             <div className="flex bg-white/[0.05] rounded-lg p-0.5">
-              <button
-                onClick={() => setProfitabilityPeriod('month')}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                  profitabilityPeriod === 'month' 
-                    ? 'bg-emerald-500 text-white' 
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Month
-              </button>
-              <button
-                onClick={() => setProfitabilityPeriod('ytd')}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                  profitabilityPeriod === 'ytd' 
-                    ? 'bg-emerald-500 text-white' 
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                YTD
-              </button>
+              {[
+                { id: 'month', label: 'Month' },
+                { id: 'quarter', label: 'Quarter' },
+                { id: 'ytd', label: 'YTD' },
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => setProfitabilityPeriod(opt.id as any)}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                    profitabilityPeriod === opt.id 
+                      ? 'bg-emerald-500 text-white' 
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <div className="w-px h-5 bg-white/10 mx-1 hidden sm:block" />
+            <span className={`text-xs ${THEME.textMuted}`}>Compare:</span>
+            <div className="flex bg-white/[0.05] rounded-lg p-0.5">
+              {[
+                { id: 'mom', label: 'MoM' },
+                { id: 'qoq', label: 'QoQ' },
+                { id: 'yoy', label: 'YoY' },
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => setProfitabilityPeriod(opt.id as any)}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                    profitabilityPeriod === opt.id 
+                      ? 'bg-blue-500 text-white' 
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Summary Row */}
-        <div className={`grid grid-cols-4 gap-4 px-6 py-4 border-b ${THEME.glassBorder} bg-white/[0.02]`}>
+        {/* Summary Row with Comparison */}
+        <div className={`grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 px-6 py-4 border-b ${THEME.glassBorder} bg-white/[0.02]`}>
           <div>
             <p className={`text-xs ${THEME.textMuted}`}>Total Revenue</p>
             <p className={`text-lg font-semibold ${THEME.textPrimary}`}>{formatCurrency(trueProfitability.totalRevenue)}</p>
+            {trueProfitability.isComparison && (
+              <div className={`flex items-center gap-1 mt-0.5 text-xs ${trueProfitability.revenueDelta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {trueProfitability.revenueDelta >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                <span>{formatCurrency(Math.abs(trueProfitability.revenueDelta))}</span>
+                <span>({trueProfitability.revenueDeltaPct >= 0 ? '+' : ''}{trueProfitability.revenueDeltaPct.toFixed(1)}%)</span>
+              </div>
+            )}
           </div>
           <div>
             <p className={`text-xs ${THEME.textMuted}`}>Total Overhead</p>
             <p className={`text-lg font-semibold text-amber-400`}>{formatCurrency(trueProfitability.totalOverhead)}</p>
+            {trueProfitability.isComparison && trueProfitability.priorOverhead > 0 && (
+              <p className={`text-xs ${THEME.textDim} mt-0.5`}>Prior: {formatCurrency(trueProfitability.priorOverhead)}</p>
+            )}
           </div>
           <div>
             <p className={`text-xs ${THEME.textMuted}`}>Direct Costs</p>
             <p className={`text-lg font-semibold text-rose-400`}>{formatCurrency(trueProfitability.totalDirectCosts)}</p>
+            {trueProfitability.isComparison && trueProfitability.priorDirectCosts > 0 && (
+              <p className={`text-xs ${THEME.textDim} mt-0.5`}>Prior: {formatCurrency(trueProfitability.priorDirectCosts)}</p>
+            )}
           </div>
           <div>
             <p className={`text-xs ${THEME.textMuted}`}>Net Contribution</p>
             <p className={`text-lg font-semibold ${trueProfitability.totalNetContribution >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
               {formatCurrency(trueProfitability.totalNetContribution)}
             </p>
+            {trueProfitability.isComparison && (
+              <div className={`flex items-center gap-1 mt-0.5 text-xs ${trueProfitability.contributionDelta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {trueProfitability.contributionDelta >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                <span>{formatCurrency(Math.abs(trueProfitability.contributionDelta))}</span>
+                <span>({trueProfitability.contributionDeltaPct >= 0 ? '+' : ''}{trueProfitability.contributionDeltaPct.toFixed(1)}%)</span>
+              </div>
+            )}
+          </div>
+          <div>
+            <p className={`text-xs ${THEME.textMuted}`}>Net Margin</p>
+            <p className={`text-lg font-semibold ${trueProfitability.netMargin >= 20 ? 'text-emerald-400' : trueProfitability.netMargin >= 10 ? 'text-amber-400' : 'text-rose-400'}`}>
+              {formatPercent(trueProfitability.netMargin)}
+            </p>
+            {trueProfitability.isComparison && trueProfitability.priorNetMargin > 0 && (
+              <p className={`text-xs ${THEME.textDim} mt-0.5`}>Prior: {formatPercent(trueProfitability.priorNetMargin)}</p>
+            )}
           </div>
         </div>
+
+        {/* Trend Chart (only for comparison views) */}
+        {trueProfitability.isComparison && trueProfitability.trendData.length > 0 && (
+          <div className={`px-6 py-4 border-b ${THEME.glassBorder}`}>
+            <h4 className={`text-xs font-medium ${THEME.textMuted} uppercase tracking-wide mb-3`}>
+              {profitabilityPeriod === 'mom' ? 'Monthly Trend (6 months)' : profitabilityPeriod === 'qoq' ? 'Quarterly Trend' : 'Annual Trend'}
+            </h4>
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={trueProfitability.trendData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                  <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                  <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => formatCompactCurrency(v)} />
+                  <Tooltip 
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null
+                      return (
+                        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-lg px-3 py-2 shadow-xl`}>
+                          <p className={`text-xs font-medium ${THEME.textPrimary} mb-1`}>{label}</p>
+                          <p className="text-xs text-blue-400">Revenue: {formatCurrency(payload[0]?.payload?.revenue || 0)}</p>
+                          <p className="text-xs text-emerald-400">Net Contribution: {formatCurrency(payload[0]?.value as number || 0)}</p>
+                          <p className="text-xs text-purple-400">Net Margin: {formatPercent(payload[0]?.payload?.netMargin || 0)}</p>
+                        </div>
+                      )
+                    }}
+                  />
+                  <Bar dataKey="netContribution" name="Net Contribution" radius={[4, 4, 0, 0]}>
+                    {trueProfitability.trendData.map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={entry.netContribution >= 0 ? '#10b981' : '#ef4444'} 
+                        fillOpacity={index === trueProfitability.trendData.length - 1 ? 1 : 0.6}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
         {/* Profitability Table */}
         <div className="overflow-x-auto">
@@ -1199,6 +1468,9 @@ export default function ClientsPage() {
                 <th className={`px-4 py-3 text-right font-medium ${THEME.textMuted} text-xs uppercase tracking-wide`}>Direct Costs</th>
                 <th className={`px-4 py-3 text-right font-medium ${THEME.textMuted} text-xs uppercase tracking-wide`}>Allocated OH</th>
                 <th className={`px-4 py-3 text-right font-medium ${THEME.textMuted} text-xs uppercase tracking-wide`}>Net Contribution</th>
+                {trueProfitability.isComparison && (
+                  <th className={`px-4 py-3 text-right font-medium ${THEME.textMuted} text-xs uppercase tracking-wide`}>Δ Change</th>
+                )}
                 <th className={`px-4 py-3 text-right font-medium ${THEME.textMuted} text-xs uppercase tracking-wide`}>Net Margin</th>
               </tr>
             </thead>
@@ -1207,6 +1479,7 @@ export default function ClientsPage() {
                 trueProfitability.clients.map((client, idx) => {
                   const marginColor = client.netMargin >= 20 ? 'text-emerald-400' : client.netMargin >= 10 ? 'text-amber-400' : client.netMargin >= 0 ? 'text-slate-300' : 'text-rose-400'
                   const contributionColor = client.netContribution >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                  const deltaColor = client.contributionDelta >= 0 ? 'text-emerald-400' : 'text-rose-400'
                   
                   return (
                     <tr key={client.id} className={`border-b border-white/[0.05] hover:bg-white/[0.03] transition-colors`}>
@@ -1216,8 +1489,11 @@ export default function ClientsPage() {
                           <TierBadge tier={client.tier} />
                         </div>
                       </td>
-                      <td className={`px-4 py-3 text-right font-medium ${THEME.textPrimary}`}>
-                        {formatCurrency(client.revenue)}
+                      <td className="px-4 py-3 text-right">
+                        <p className={`font-medium ${THEME.textPrimary}`}>{formatCurrency(client.revenue)}</p>
+                        {trueProfitability.isComparison && client.priorRevenue > 0 && (
+                          <p className={`text-xs ${THEME.textDim}`}>Prior: {formatCurrency(client.priorRevenue)}</p>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -1237,6 +1513,17 @@ export default function ClientsPage() {
                       <td className={`px-4 py-3 text-right font-semibold ${contributionColor}`}>
                         {formatCurrency(client.netContribution)}
                       </td>
+                      {trueProfitability.isComparison && (
+                        <td className={`px-4 py-3 text-right ${deltaColor}`}>
+                          <div className="flex items-center justify-end gap-1">
+                            {client.contributionDelta >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                            <span className="font-medium">{formatCurrency(Math.abs(client.contributionDelta))}</span>
+                          </div>
+                          <p className={`text-xs ${deltaColor}`}>
+                            {client.contributionDeltaPct >= 0 ? '+' : ''}{client.contributionDeltaPct.toFixed(1)}%
+                          </p>
+                        </td>
+                      )}
                       <td className={`px-4 py-3 text-right font-bold ${marginColor}`}>
                         {formatPercent(client.netMargin)}
                       </td>
@@ -1245,8 +1532,8 @@ export default function ClientsPage() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={7} className={`px-4 py-12 text-center ${THEME.textMuted}`}>
-                    No revenue data for {trueProfitability.periodLabel}
+                  <td colSpan={trueProfitability.isComparison ? 8 : 7} className={`px-4 py-12 text-center ${THEME.textMuted}`}>
+                    No revenue data for {trueProfitability.currentLabel}
                   </td>
                 </tr>
               )}
@@ -1258,6 +1545,7 @@ export default function ClientsPage() {
         <div className={`px-6 py-3 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
           <p className={`text-xs ${THEME.textDim}`}>
             Overhead is allocated proportionally based on each client's revenue share. Net Contribution = Revenue − Direct Costs − Allocated Overhead.
+            {trueProfitability.isComparison && ' Δ Change shows period-over-period difference.'}
           </p>
         </div>
       </div>
