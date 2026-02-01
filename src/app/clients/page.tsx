@@ -7,13 +7,13 @@ import {
   Mail, Phone, AlertTriangle, TrendingUp, TrendingDown, Clock,
   Star, Target, Activity, AlertCircle, CheckCircle, Zap, RefreshCw,
   Calendar, Briefcase, ArrowUpRight, ArrowDownRight, Eye, Crown,
-  ExternalLink, PieChart as PieChartIcon
+  ExternalLink, PieChart as PieChartIcon, Calculator, Percent
 } from 'lucide-react'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   Cell, PieChart, Pie, Legend
 } from 'recharts'
-import { supabase, getCurrentUser, fetchClients, fetchProjects, fetchInvoices } from '@/lib/supabase'
+import { supabase, getCurrentUser, fetchClients, fetchProjects, fetchInvoices, fetchTransactions } from '@/lib/supabase'
 import Link from 'next/link'
 
 // ============ GLASSMORPHISM THEME ============
@@ -62,6 +62,19 @@ interface Invoice {
   due_date?: string
   paid_date?: string
   status?: string
+}
+
+interface Transaction {
+  id: string
+  description: string
+  amount: number
+  date: string
+  category?: string
+  subcategory?: string
+  payee?: string
+  project?: string
+  client?: string
+  type?: string
 }
 
 interface EnrichedClient extends Client {
@@ -529,6 +542,7 @@ export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
   const [companyId, setCompanyId] = useState<string | null>(null)
 
   // Filter state
@@ -537,6 +551,9 @@ export default function ClientsPage() {
   const [selectedTier, setSelectedTier] = useState<string>('all')
   const [showFilters, setShowFilters] = useState(false)
   const [quickFilter, setQuickFilter] = useState<'all' | 'at-risk' | 'top-tier' | 'needs-followup'>('all')
+
+  // Profitability period state
+  const [profitabilityPeriod, setProfitabilityPeriod] = useState<'month' | 'ytd'>('month')
 
   // Modal & Detail state
   const [showClientModal, setShowClientModal] = useState(false)
@@ -574,10 +591,11 @@ export default function ClientsPage() {
 
         setCompanyId(profile.company_id)
 
-        const [clientRes, projRes, invRes] = await Promise.all([
+        const [clientRes, projRes, invRes, txnRes] = await Promise.all([
           fetchClients(profile.company_id),
           fetchProjects(profile.company_id),
-          fetchInvoices(profile.company_id)
+          fetchInvoices(profile.company_id),
+          fetchTransactions(profile.company_id)
         ])
 
         setClients((clientRes.data || []).map((c: any) => ({
@@ -615,6 +633,23 @@ export default function ClientsPage() {
           paid_date: i.paid_date,
           status: i.status,
         })))
+
+        // Filter transactions for expenses only (negative amounts = expenses)
+        const expenseTransactions = (txnRes.data || [])
+          .filter((t: any) => t.amount < 0) // Expenses are negative in typical accounting
+          .map((t: any) => ({
+            id: t.id,
+            description: t.description || '',
+            amount: Math.abs(t.amount || 0), // Convert to positive for calculations
+            date: t.date || '',
+            category: t.category,
+            subcategory: t.subcategory,
+            payee: t.payee,
+            project: t.project,
+            client: t.client,
+            type: t.type,
+          }))
+        setTransactions(expenseTransactions)
       } catch (error) {
         console.error('Error loading data:', error)
       } finally {
@@ -773,6 +808,106 @@ export default function ClientsPage() {
         ar: c.outstandingAR,
       }))
   }, [enrichedClients])
+
+  // True Profitability Calculation (Overhead Allocation by Revenue Share)
+  const trueProfitability = useMemo(() => {
+    const now = new Date()
+    const currentYear = now.getFullYear()
+    const currentMonth = now.getMonth()
+    
+    // Filter invoices by period
+    const periodInvoices = invoices.filter(inv => {
+      if (!inv.invoice_date) return false
+      const invDate = new Date(inv.invoice_date)
+      if (profitabilityPeriod === 'month') {
+        return invDate.getFullYear() === currentYear && invDate.getMonth() === currentMonth
+      } else {
+        return invDate.getFullYear() === currentYear
+      }
+    })
+    
+    // Filter overhead (transactions without project assignment) by period
+    const periodOverhead = transactions.filter(txn => {
+      if (!txn.date) return false
+      const txnDate = new Date(txn.date)
+      const isOverhead = !txn.project // No project = overhead
+      if (profitabilityPeriod === 'month') {
+        return isOverhead && txnDate.getFullYear() === currentYear && txnDate.getMonth() === currentMonth
+      } else {
+        return isOverhead && txnDate.getFullYear() === currentYear
+      }
+    })
+    
+    // Filter direct project costs (transactions with project assignment) by period
+    const periodDirectCosts = transactions.filter(txn => {
+      if (!txn.date || !txn.project) return false
+      const txnDate = new Date(txn.date)
+      if (profitabilityPeriod === 'month') {
+        return txnDate.getFullYear() === currentYear && txnDate.getMonth() === currentMonth
+      } else {
+        return txnDate.getFullYear() === currentYear
+      }
+    })
+    
+    const totalOverhead = periodOverhead.reduce((sum, t) => sum + (t.amount || 0), 0)
+    const totalPeriodRevenue = periodInvoices.reduce((sum, i) => sum + (i.amount || 0), 0)
+    
+    // Calculate per-client profitability
+    const clientProfitability = enrichedClients
+      .filter(c => c.status === 'active')
+      .map(client => {
+        // Client's revenue for the period
+        const clientPeriodInvoices = periodInvoices.filter(i => 
+          i.client?.toLowerCase() === client.name?.toLowerCase()
+        )
+        const clientRevenue = clientPeriodInvoices.reduce((sum, i) => sum + (i.amount || 0), 0)
+        
+        // Revenue share %
+        const revenueShare = totalPeriodRevenue > 0 ? (clientRevenue / totalPeriodRevenue) * 100 : 0
+        
+        // Allocated overhead based on revenue share
+        const allocatedOverhead = (revenueShare / 100) * totalOverhead
+        
+        // Direct costs for this client's projects
+        const clientProjects = projects.filter(p => p.client?.toLowerCase() === client.name?.toLowerCase())
+        const clientProjectNames = clientProjects.map(p => p.name?.toLowerCase())
+        const directCosts = periodDirectCosts
+          .filter(t => clientProjectNames.includes(t.project?.toLowerCase() || ''))
+          .reduce((sum, t) => sum + (t.amount || 0), 0)
+        
+        // Net contribution = Revenue - Direct Costs - Allocated Overhead
+        const netContribution = clientRevenue - directCosts - allocatedOverhead
+        
+        // Net margin %
+        const netMargin = clientRevenue > 0 ? (netContribution / clientRevenue) * 100 : 0
+        
+        return {
+          id: client.id,
+          name: client.name,
+          tier: client.tier,
+          revenue: clientRevenue,
+          revenueShare,
+          directCosts,
+          allocatedOverhead,
+          netContribution,
+          netMargin,
+        }
+      })
+      .filter(c => c.revenue > 0) // Only show clients with revenue in period
+      .sort((a, b) => b.revenue - a.revenue)
+    
+    return {
+      period: profitabilityPeriod,
+      periodLabel: profitabilityPeriod === 'month' 
+        ? new Date(currentYear, currentMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        : `YTD ${currentYear}`,
+      totalRevenue: totalPeriodRevenue,
+      totalOverhead,
+      totalDirectCosts: periodDirectCosts.reduce((sum, t) => sum + (t.amount || 0), 0),
+      totalNetContribution: clientProfitability.reduce((sum, c) => sum + c.netContribution, 0),
+      clients: clientProfitability,
+    }
+  }, [enrichedClients, invoices, transactions, projects, profitabilityPeriod])
 
   // Handlers
   const openAddClient = () => {
@@ -987,6 +1122,145 @@ export default function ClientsPage() {
           )}
         </div>
       </CollapsibleSection>
+
+      {/* True Profitability - Overhead Allocation */}
+      <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
+        {/* Header with Period Toggle */}
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder}`}>
+          <div className="flex items-center gap-3">
+            <Calculator size={16} className={THEME.textMuted} />
+            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>True Profitability</h3>
+            <span className={`px-2 py-0.5 text-xs font-medium rounded-full bg-purple-500/20 text-purple-400`}>
+              {trueProfitability.periodLabel}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs ${THEME.textMuted}`}>Period:</span>
+            <div className="flex bg-white/[0.05] rounded-lg p-0.5">
+              <button
+                onClick={() => setProfitabilityPeriod('month')}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  profitabilityPeriod === 'month' 
+                    ? 'bg-emerald-500 text-white' 
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Month
+              </button>
+              <button
+                onClick={() => setProfitabilityPeriod('ytd')}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  profitabilityPeriod === 'ytd' 
+                    ? 'bg-emerald-500 text-white' 
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                YTD
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Summary Row */}
+        <div className={`grid grid-cols-4 gap-4 px-6 py-4 border-b ${THEME.glassBorder} bg-white/[0.02]`}>
+          <div>
+            <p className={`text-xs ${THEME.textMuted}`}>Total Revenue</p>
+            <p className={`text-lg font-semibold ${THEME.textPrimary}`}>{formatCurrency(trueProfitability.totalRevenue)}</p>
+          </div>
+          <div>
+            <p className={`text-xs ${THEME.textMuted}`}>Total Overhead</p>
+            <p className={`text-lg font-semibold text-amber-400`}>{formatCurrency(trueProfitability.totalOverhead)}</p>
+          </div>
+          <div>
+            <p className={`text-xs ${THEME.textMuted}`}>Direct Costs</p>
+            <p className={`text-lg font-semibold text-rose-400`}>{formatCurrency(trueProfitability.totalDirectCosts)}</p>
+          </div>
+          <div>
+            <p className={`text-xs ${THEME.textMuted}`}>Net Contribution</p>
+            <p className={`text-lg font-semibold ${trueProfitability.totalNetContribution >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {formatCurrency(trueProfitability.totalNetContribution)}
+            </p>
+          </div>
+        </div>
+
+        {/* Profitability Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className={`border-b ${THEME.glassBorder} bg-white/[0.02]`}>
+                <th className={`px-4 py-3 text-left font-medium ${THEME.textMuted} text-xs uppercase tracking-wide`}>Client</th>
+                <th className={`px-4 py-3 text-right font-medium ${THEME.textMuted} text-xs uppercase tracking-wide`}>Revenue</th>
+                <th className={`px-4 py-3 text-center font-medium ${THEME.textMuted} text-xs uppercase tracking-wide`}>
+                  <div className="flex items-center justify-center gap-1">
+                    <Percent size={12} />
+                    Share
+                  </div>
+                </th>
+                <th className={`px-4 py-3 text-right font-medium ${THEME.textMuted} text-xs uppercase tracking-wide`}>Direct Costs</th>
+                <th className={`px-4 py-3 text-right font-medium ${THEME.textMuted} text-xs uppercase tracking-wide`}>Allocated OH</th>
+                <th className={`px-4 py-3 text-right font-medium ${THEME.textMuted} text-xs uppercase tracking-wide`}>Net Contribution</th>
+                <th className={`px-4 py-3 text-right font-medium ${THEME.textMuted} text-xs uppercase tracking-wide`}>Net Margin</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trueProfitability.clients.length > 0 ? (
+                trueProfitability.clients.map((client, idx) => {
+                  const marginColor = client.netMargin >= 20 ? 'text-emerald-400' : client.netMargin >= 10 ? 'text-amber-400' : client.netMargin >= 0 ? 'text-slate-300' : 'text-rose-400'
+                  const contributionColor = client.netContribution >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                  
+                  return (
+                    <tr key={client.id} className={`border-b border-white/[0.05] hover:bg-white/[0.03] transition-colors`}>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className={`font-medium ${THEME.textPrimary}`}>{client.name}</span>
+                          <TierBadge tier={client.tier} />
+                        </div>
+                      </td>
+                      <td className={`px-4 py-3 text-right font-medium ${THEME.textPrimary}`}>
+                        {formatCurrency(client.revenue)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          client.revenueShare > 30 ? 'bg-rose-500/20 text-rose-400' :
+                          client.revenueShare > 20 ? 'bg-amber-500/20 text-amber-400' :
+                          'bg-blue-500/20 text-blue-400'
+                        }`}>
+                          {formatPercent(client.revenueShare)}
+                        </span>
+                      </td>
+                      <td className={`px-4 py-3 text-right ${THEME.textSecondary}`}>
+                        {formatCurrency(client.directCosts)}
+                      </td>
+                      <td className={`px-4 py-3 text-right text-amber-400`}>
+                        {formatCurrency(client.allocatedOverhead)}
+                      </td>
+                      <td className={`px-4 py-3 text-right font-semibold ${contributionColor}`}>
+                        {formatCurrency(client.netContribution)}
+                      </td>
+                      <td className={`px-4 py-3 text-right font-bold ${marginColor}`}>
+                        {formatPercent(client.netMargin)}
+                      </td>
+                    </tr>
+                  )
+                })
+              ) : (
+                <tr>
+                  <td colSpan={7} className={`px-4 py-12 text-center ${THEME.textMuted}`}>
+                    No revenue data for {trueProfitability.periodLabel}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer */}
+        <div className={`px-6 py-3 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
+          <p className={`text-xs ${THEME.textDim}`}>
+            Overhead is allocated proportionally based on each client's revenue share. Net Contribution = Revenue − Direct Costs − Allocated Overhead.
+          </p>
+        </div>
+      </div>
 
       {/* Clients Table */}
       <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
