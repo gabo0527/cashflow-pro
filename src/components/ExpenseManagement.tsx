@@ -66,6 +66,9 @@ export default function ExpenseManagement({ supabase, companyId, currentUserId }
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [monthFilter, setMonthFilter] = useState<string>(() => {
+    const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  })
   const [processing, setProcessing] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editData, setEditData] = useState<Partial<ExpenseClaimRow>>({})
@@ -123,12 +126,23 @@ export default function ExpenseManagement({ supabase, companyId, currentUserId }
 
   const filteredClaims = useMemo(() => claims.filter(c => {
     if (statusFilter !== 'all' && c.status !== statusFilter) return false
+    if (monthFilter && monthFilter !== 'all') {
+      const claimMonth = c.expense_date?.substring(0, 7)
+      if (claimMonth !== monthFilter) return false
+    }
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       return c.vendor?.toLowerCase().includes(q) || c.team_member_name.toLowerCase().includes(q) || c.project_name?.toLowerCase().includes(q) || c.client_name?.toLowerCase().includes(q) || c.description?.toLowerCase().includes(q)
     }
     return true
-  }), [claims, statusFilter, searchQuery])
+  }), [claims, statusFilter, searchQuery, monthFilter])
+
+  // Available months for the filter
+  const availableMonths = useMemo(() => {
+    const months = new Set<string>()
+    claims.forEach(c => { if (c.expense_date) months.add(c.expense_date.substring(0, 7)) })
+    return Array.from(months).sort().reverse()
+  }, [claims])
 
   const stats = useMemo(() => {
     const pending = claims.filter(c => c.status === 'submitted')
@@ -262,6 +276,15 @@ export default function ExpenseManagement({ supabase, companyId, currentUserId }
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
             <option value="reimbursed">Reimbursed</option>
+          </select>
+          <select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}
+            className={`px-4 py-2.5 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30`}>
+            <option value="all">All Months</option>
+            {availableMonths.map(m => {
+              const [y, mo] = m.split('-')
+              const label = new Date(parseInt(y), parseInt(mo) - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+              return <option key={m} value={m}>{label}</option>
+            })}
           </select>
           <button className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
             <Plus size={18} /> Add Expense
