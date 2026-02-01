@@ -189,6 +189,7 @@ export default function AppShell({ children }: AppShellProps) {
       <ChatPanel
         isOpen={chatOpen}
         onClose={() => setChatOpen(false)}
+        theme="dark"
         companyId={companyId}
       />
     </div>
