@@ -5,7 +5,7 @@ import {
   TrendingUp, TrendingDown, DollarSign, CreditCard, Wallet, Building2,
   ChevronRight, ChevronDown, ChevronUp, Plus, RefreshCw, ArrowUpRight, 
   ArrowDownRight, Percent, Receipt, PiggyBank, FileText, Users,
-  AlertCircle, Clock, ArrowRight
+  AlertCircle, Clock, ArrowRight, X
 } from 'lucide-react'
 import Link from 'next/link'
 import { 
@@ -273,10 +273,19 @@ export default function CashFlowPage() {
   const [clients, setClients] = useState<any[]>([])
   const [companySettings, setCompanySettings] = useState<any>(null)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('en-US', { month: 'long' }))
+  const [selectedMonth, setSelectedMonth] = useState('Full Year')
   const [showAllTransactions, setShowAllTransactions] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [newTransaction, setNewTransaction] = useState({
+    description: '',
+    amount: '',
+    date: new Date().toISOString().split('T')[0],
+    category: 'income',
+    type: 'deposit'
+  })
 
-  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+  const months = ['Full Year', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
   const years = [2026, 2025, 2024, 2023]
 
   // ============ DATA FETCHING ============
@@ -321,10 +330,18 @@ export default function CashFlowPage() {
 
   // ============ PERIOD FILTERING ============
   const periodRange = useMemo(() => {
-    const monthIndex = months.indexOf(selectedMonth)
-    const startDate = new Date(selectedYear, monthIndex, 1)
-    const endDate = new Date(selectedYear, monthIndex + 1, 0, 23, 59, 59)
-    return { startDate, endDate, monthIndex }
+    if (selectedMonth === 'Full Year') {
+      // Full year view
+      const startDate = new Date(selectedYear, 0, 1)
+      const endDate = new Date(selectedYear, 11, 31, 23, 59, 59)
+      return { startDate, endDate, monthIndex: -1, isFullYear: true }
+    } else {
+      // Single month view
+      const monthIndex = months.indexOf(selectedMonth) - 1 // -1 because "Full Year" is at index 0
+      const startDate = new Date(selectedYear, monthIndex, 1)
+      const endDate = new Date(selectedYear, monthIndex + 1, 0, 23, 59, 59)
+      return { startDate, endDate, monthIndex, isFullYear: false }
+    }
   }, [selectedYear, selectedMonth])
 
   const filteredInvoices = useMemo(() => invoices.filter(inv => {
@@ -440,12 +457,17 @@ export default function CashFlowPage() {
 
   // ============ CHART DATA ============
   
-  // Cash Flow Trend (6 months)
+  // Cash Flow Trend (6 months or full year)
   const cashFlowTrendData = useMemo(() => {
     const data: { month: string; inflows: number; outflows: number; net: number }[] = []
     
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(selectedYear, periodRange.monthIndex - i, 1)
+    // If full year, show all 12 months; otherwise show trailing 6 months
+    const monthCount = periodRange.isFullYear ? 12 : 6
+    const startMonth = periodRange.isFullYear ? 0 : periodRange.monthIndex - 5
+    
+    for (let i = 0; i < monthCount; i++) {
+      const monthIdx = periodRange.isFullYear ? i : startMonth + i
+      const d = new Date(selectedYear, monthIdx, 1)
       const monthStart = new Date(d.getFullYear(), d.getMonth(), 1)
       const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59)
       const monthName = d.toLocaleString('en-US', { month: 'short' })
@@ -471,12 +493,17 @@ export default function CashFlowPage() {
     return data
   }, [transactions, selectedYear, periodRange])
 
-  // Revenue vs Costs by Month
+  // Revenue vs Costs by Month (6 months or full year)
   const revenueVsCostsData = useMemo(() => {
     const data: { month: string; revenue: number; directCosts: number; overhead: number }[] = []
     
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(selectedYear, periodRange.monthIndex - i, 1)
+    // If full year, show all 12 months; otherwise show trailing 6 months
+    const monthCount = periodRange.isFullYear ? 12 : 6
+    const startMonth = periodRange.isFullYear ? 0 : periodRange.monthIndex - 5
+    
+    for (let i = 0; i < monthCount; i++) {
+      const monthIdx = periodRange.isFullYear ? i : startMonth + i
+      const d = new Date(selectedYear, monthIdx, 1)
       const monthStart = new Date(d.getFullYear(), d.getMonth(), 1)
       const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59)
       const monthName = d.toLocaleString('en-US', { month: 'short' })
@@ -581,6 +608,48 @@ export default function CashFlowPage() {
     return showAllTransactions ? sorted : sorted.slice(0, 8)
   }, [filteredTransactions, showAllTransactions])
 
+  // Handle adding new transaction
+  const handleAddTransaction = async () => {
+    if (!companyId || !newTransaction.description || !newTransaction.amount) return
+    
+    setSaving(true)
+    try {
+      const amount = newTransaction.type === 'withdrawal' 
+        ? -Math.abs(parseFloat(newTransaction.amount))
+        : Math.abs(parseFloat(newTransaction.amount))
+      
+      const { data, error } = await supabase.from('transactions').insert({
+        company_id: companyId,
+        description: newTransaction.description,
+        amount: amount,
+        date: newTransaction.date,
+        category: newTransaction.category,
+        type: newTransaction.type,
+        sync_source: 'manual'
+      }).select().single()
+      
+      if (error) throw error
+      
+      // Add to local state
+      setTransactions(prev => [data, ...prev])
+      
+      // Reset form and close modal
+      setNewTransaction({
+        description: '',
+        amount: '',
+        date: new Date().toISOString().split('T')[0],
+        category: 'income',
+        type: 'deposit'
+      })
+      setShowAddModal(false)
+    } catch (error) {
+      console.error('Error adding transaction:', error)
+      alert('Failed to add transaction. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // ============ LOADING ============
   if (loading) {
     return (
@@ -639,7 +708,10 @@ export default function CashFlowPage() {
           </button>
 
           {/* Add Entry */}
-          <button className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20">
+          <button 
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20"
+          >
             <Plus size={14} />
             Add Entry
           </button>
@@ -686,7 +758,7 @@ export default function CashFlowPage() {
       <div className="grid grid-cols-12 gap-4">
         {/* Cash Flow Trend */}
         <div className="col-span-12 lg:col-span-6">
-          <Section title="Cash Flow Trend" subtitle="Inflows vs Outflows (6 months)">
+          <Section title="Cash Flow Trend" subtitle={periodRange.isFullYear ? `${selectedYear} by month` : 'Inflows vs Outflows (6 months)'}>
             <div className="h-64">
               {cashFlowTrendData.some(d => d.inflows > 0 || d.outflows > 0) ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -725,7 +797,7 @@ export default function CashFlowPage() {
 
         {/* Revenue vs Costs */}
         <div className="col-span-12 lg:col-span-6">
-          <Section title="Revenue vs Costs" subtitle="Monthly comparison (6 months)">
+          <Section title="Revenue vs Costs" subtitle={periodRange.isFullYear ? `${selectedYear} by month` : 'Monthly comparison (6 months)'}>
             <div className="h-64">
               {revenueVsCostsData.some(d => d.revenue > 0 || d.directCosts > 0) ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -767,7 +839,7 @@ export default function CashFlowPage() {
       <div className="grid grid-cols-12 gap-4">
         {/* Profit & Loss */}
         <div className="col-span-12 lg:col-span-8">
-          <Section title="Profit & Loss" subtitle={`${selectedMonth} ${selectedYear}`}>
+          <Section title="Profit & Loss" subtitle={selectedMonth === 'Full Year' ? `${selectedYear}` : `${selectedMonth} ${selectedYear}`}>
             <div className="divide-y divide-white/[0.05]">
               <PLRow label="Revenue" value={metrics.revenue} percentage={100} type="positive" bold />
               <PLRow label="Direct Costs (Contractors)" value={metrics.directCosts} percentage={metrics.revenue > 0 ? (metrics.directCosts / metrics.revenue) * 100 : 0} type="negative" indent />
@@ -989,6 +1061,147 @@ export default function CashFlowPage() {
           )}
         </div>
       </Section>
+
+      {/* Add Transaction Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowAddModal(false)}
+          />
+          
+          {/* Modal */}
+          <div className={`relative w-full max-w-md ${THEME.glass} border ${THEME.glassBorder} rounded-2xl shadow-2xl`}>
+            {/* Header */}
+            <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder}`}>
+              <h2 className={`text-lg font-semibold ${THEME.textPrimary}`}>Add Transaction</h2>
+              <button 
+                onClick={() => setShowAddModal(false)}
+                className={`p-1 rounded-lg ${THEME.textMuted} hover:text-white hover:bg-white/[0.1] transition-colors`}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            {/* Form */}
+            <div className="p-6 space-y-4">
+              {/* Type Toggle */}
+              <div>
+                <label className={`block text-sm font-medium ${THEME.textMuted} mb-2`}>Type</label>
+                <div className="flex bg-white/[0.05] border border-white/[0.1] rounded-lg p-1">
+                  <button
+                    type="button"
+                    onClick={() => setNewTransaction(prev => ({ ...prev, type: 'deposit' }))}
+                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                      newTransaction.type === 'deposit' 
+                        ? 'bg-emerald-500 text-white' 
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Income / Deposit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewTransaction(prev => ({ ...prev, type: 'withdrawal' }))}
+                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                      newTransaction.type === 'withdrawal' 
+                        ? 'bg-rose-500 text-white' 
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Expense / Withdrawal
+                  </button>
+                </div>
+              </div>
+              
+              {/* Description */}
+              <div>
+                <label className={`block text-sm font-medium ${THEME.textMuted} mb-2`}>Description</label>
+                <input
+                  type="text"
+                  value={newTransaction.description}
+                  onChange={(e) => setNewTransaction(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="e.g., Client payment, Office supplies"
+                  className="w-full px-4 py-2.5 bg-white/[0.05] border border-white/[0.1] rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50"
+                />
+              </div>
+              
+              {/* Amount */}
+              <div>
+                <label className={`block text-sm font-medium ${THEME.textMuted} mb-2`}>Amount</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                  <input
+                    type="number"
+                    value={newTransaction.amount}
+                    onChange={(e) => setNewTransaction(prev => ({ ...prev, amount: e.target.value }))}
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                    className="w-full pl-8 pr-4 py-2.5 bg-white/[0.05] border border-white/[0.1] rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50"
+                  />
+                </div>
+              </div>
+              
+              {/* Date */}
+              <div>
+                <label className={`block text-sm font-medium ${THEME.textMuted} mb-2`}>Date</label>
+                <input
+                  type="date"
+                  value={newTransaction.date}
+                  onChange={(e) => setNewTransaction(prev => ({ ...prev, date: e.target.value }))}
+                  className="w-full px-4 py-2.5 bg-white/[0.05] border border-white/[0.1] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50"
+                />
+              </div>
+              
+              {/* Category */}
+              <div>
+                <label className={`block text-sm font-medium ${THEME.textMuted} mb-2`}>Category</label>
+                <select
+                  value={newTransaction.category}
+                  onChange={(e) => setNewTransaction(prev => ({ ...prev, category: e.target.value }))}
+                  className="w-full px-4 py-2.5 bg-white/[0.05] border border-white/[0.1] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 appearance-none cursor-pointer"
+                >
+                  <option value="income" className="bg-slate-900">Income</option>
+                  <option value="expense" className="bg-slate-900">Expense</option>
+                  <option value="payroll" className="bg-slate-900">Payroll</option>
+                  <option value="transfer" className="bg-slate-900">Transfer</option>
+                  <option value="refund" className="bg-slate-900">Refund</option>
+                  <option value="other" className="bg-slate-900">Other</option>
+                </select>
+              </div>
+            </div>
+            
+            {/* Footer */}
+            <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder}`}>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddTransaction}
+                disabled={saving || !newTransaction.description || !newTransaction.amount}
+                className="flex items-center gap-2 px-5 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Plus size={14} />
+                    Add Transaction
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
