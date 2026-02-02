@@ -22,27 +22,18 @@ const supabase = createClient(
 
 // ============ GLASSMORPHISM DESIGN SYSTEM ============
 const THEME = {
-  // Glass effects
   glass: 'bg-slate-900/70 backdrop-blur-xl',
   glassBorder: 'border-white/[0.08]',
   glassHover: 'hover:bg-white/[0.05] hover:border-white/[0.12]',
-  
-  // Text
   textPrimary: 'text-white',
   textSecondary: 'text-slate-300',
   textMuted: 'text-slate-400',
   textDim: 'text-slate-500',
-  
-  // Accent - Emerald
   accent: '#10B981',
   accentLight: '#34d399',
-  
-  // Semantic
   positive: '#10B981',
   negative: '#EF4444',
   warning: '#F59E0B',
-  
-  // Chart palette
   chart: {
     primary: '#10B981',
     secondary: '#64748b',
@@ -64,10 +55,6 @@ const formatCurrency = (value: number, compact = false): string => {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value)
 }
 
-const formatNumber = (value: number, decimals = 1): string => {
-  return new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: decimals }).format(value)
-}
-
 const formatDate = (dateStr: string): string => {
   if (!dateStr) return '—'
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -75,7 +62,6 @@ const formatDate = (dateStr: string): string => {
 
 // ============ COMPONENTS ============
 
-// Glass Metric Card
 function MetricCard({ 
   label, 
   value, 
@@ -127,7 +113,6 @@ function MetricCard({
   return content
 }
 
-// Glass Section Card
 function Section({ 
   title, 
   subtitle, 
@@ -176,7 +161,6 @@ function Section({
   )
 }
 
-// Health Score Ring - Glass style
 function HealthRing({ score, size = 100 }: { score: number; size?: number }) {
   const strokeWidth = 6
   const radius = (size - strokeWidth) / 2
@@ -221,7 +205,6 @@ function HealthRing({ score, size = 100 }: { score: number; size?: number }) {
   )
 }
 
-// Progress Bar - Glass style
 function ProgressBar({ value, max = 100, color = THEME.accent }: { value: number; max?: number; color?: string }) {
   const percentage = Math.min((value / max) * 100, 100)
   
@@ -235,7 +218,6 @@ function ProgressBar({ value, max = 100, color = THEME.accent }: { value: number
   )
 }
 
-// Team Member Row - Glass style
 function TeamRow({ name, hours, target = 40 }: { name: string; hours: number; target?: number }) {
   const utilization = (hours / target) * 100
   const color = utilization >= 80 ? THEME.positive : utilization >= 50 ? THEME.warning : THEME.chart.secondary
@@ -255,7 +237,6 @@ function TeamRow({ name, hours, target = 40 }: { name: string; hours: number; ta
   )
 }
 
-// Alert Item - Glass style
 function AlertRow({ type, message, detail, action }: { 
   type: 'error' | 'warning' | 'success'
   message: string
@@ -285,7 +266,6 @@ function AlertRow({ type, message, detail, action }: {
   )
 }
 
-// Custom Tooltip - Glass style
 const ChartTooltip = ({ active, payload, label, formatter }: any) => {
   if (!active || !payload?.length) return null
   return (
@@ -304,8 +284,8 @@ const ChartTooltip = ({ active, payload, label, formatter }: any) => {
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [companyId, setCompanyId] = useState<string | null>(null)
-  const [transactions, setTransactions] = useState<any[]>([])
   const [invoices, setInvoices] = useState<any[]>([])
+  const [bills, setBills] = useState<any[]>([])
   const [expenses, setExpenses] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
   const [timeEntries, setTimeEntries] = useState<any[]>([])
@@ -328,17 +308,18 @@ export default function DashboardPage() {
 
         setCompanyId(profile.company_id)
 
-        const [txRes, invRes, expRes, projRes, timeRes, teamRes] = await Promise.all([
-          supabase.from('transactions').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
+        // Fetch all data including bills for AP/direct costs
+        const [invRes, billsRes, expRes, projRes, timeRes, teamRes] = await Promise.all([
           supabase.from('invoices').select('*').eq('company_id', profile.company_id).order('invoice_date', { ascending: false }),
+          supabase.from('bills').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
           supabase.from('expenses').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
           supabase.from('projects').select('*').eq('company_id', profile.company_id),
           supabase.from('time_entries').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
           supabase.from('team_members').select('*').eq('company_id', profile.company_id),
         ])
 
-        setTransactions(txRes.data || [])
         setInvoices(invRes.data || [])
+        setBills(billsRes.data || [])
         setExpenses(expRes.data || [])
         setProjects(projRes.data || [])
         setTimeEntries(timeRes.data || [])
@@ -388,11 +369,16 @@ export default function DashboardPage() {
     return { startDate, endDate, weeksInPeriod }
   }, [period, selectedYear, currentYear])
 
-  // Filtered data
+  // Filtered data by period
   const filteredInvoices = useMemo(() => invoices.filter(inv => {
     const d = new Date(inv.invoice_date)
     return d >= periodRange.startDate && d <= periodRange.endDate
   }), [invoices, periodRange])
+
+  const filteredBills = useMemo(() => bills.filter(bill => {
+    const d = new Date(bill.date)
+    return d >= periodRange.startDate && d <= periodRange.endDate
+  }), [bills, periodRange])
 
   const filteredExpenses = useMemo(() => expenses.filter(exp => {
     const d = new Date(exp.date)
@@ -404,49 +390,88 @@ export default function DashboardPage() {
     return d >= periodRange.startDate && d <= periodRange.endDate
   }), [timeEntries, periodRange])
 
-  // Metrics
+  // ============ METRICS CALCULATION ============
+  // Profitability Model:
+  // - Revenue = invoices.amount (AR)
+  // - Direct Costs = bills.amount (AP - contractor costs)
+  // - Overhead = expenses.amount (bank transactions)
+  // - Gross Profit = Revenue - Direct Costs
+  // - Net Profit = Gross Profit - Overhead
+  
   const metrics = useMemo(() => {
-    const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || parseFloat(inv.total) || 0), 0)
-    const directCosts = filteredExpenses.filter(e => e.expense_type === 'direct_cost').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
-    const overhead = filteredExpenses.filter(e => e.expense_type === 'overhead').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
-    const totalExpenses = directCosts + overhead
+    // Revenue from invoices (using amount field)
+    const totalRevenue = filteredInvoices.reduce((sum, inv) => {
+      return sum + (parseFloat(inv.amount) || 0)
+    }, 0)
     
+    // Direct costs from bills (AP - contractor invoices)
+    const directCosts = filteredBills.reduce((sum, bill) => {
+      return sum + (parseFloat(bill.amount) || 0)
+    }, 0)
+    
+    // Overhead from expenses (bank transactions)
+    const overhead = filteredExpenses.reduce((sum, exp) => {
+      return sum + (parseFloat(exp.amount) || 0)
+    }, 0)
+    
+    const totalExpenses = directCosts + overhead
     const grossProfit = totalRevenue - directCosts
     const grossMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0
     const netProfit = grossProfit - overhead
     const netMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0
     
-    const openInvoices = invoices.filter(inv => (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0) > 0)
-    const totalAR = openInvoices.reduce((sum, inv) => sum + (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0), 0)
+    // AR calculations - use balance_due field
+    const openInvoices = invoices.filter(inv => {
+      const balance = parseFloat(inv.balance_due) || 0
+      return balance > 0
+    })
+    const totalAR = openInvoices.reduce((sum, inv) => sum + (parseFloat(inv.balance_due) || 0), 0)
     const overdueInvoices = openInvoices.filter(inv => new Date(inv.due_date) < new Date())
-    const overdueAR = overdueInvoices.reduce((sum, inv) => sum + (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0), 0)
+    const overdueAR = overdueInvoices.reduce((sum, inv) => sum + (parseFloat(inv.balance_due) || 0), 0)
     
+    // AP calculations - use balance field from bills
+    const openBills = bills.filter(bill => {
+      const balance = parseFloat(bill.balance) || (parseFloat(bill.amount) - (parseFloat(bill.paid_amount) || 0))
+      return balance > 0
+    })
+    const totalAP = openBills.reduce((sum, bill) => {
+      return sum + (parseFloat(bill.balance) || (parseFloat(bill.amount) - (parseFloat(bill.paid_amount) || 0)))
+    }, 0)
+    
+    // Time tracking
     const totalHours = filteredTimeEntries.reduce((sum, te) => sum + (parseFloat(te.hours) || 0), 0)
     const billableHours = filteredTimeEntries.filter(te => te.billable).reduce((sum, te) => sum + (parseFloat(te.hours) || 0), 0)
     const billableRate = totalHours > 0 ? (billableHours / totalHours) * 100 : 0
     
-    // Health score
+    // Health score calculation
     const arScore = totalAR > 0 ? Math.max(0, 100 - (overdueAR / totalAR) * 100) : 100
-    const marginScore = Math.min(100, grossMargin * 2)
+    const marginScore = Math.min(100, Math.max(0, grossMargin * 2))
     const utilizationScore = Math.min(100, billableRate)
     const healthScore = Math.round((arScore * 0.3) + (marginScore * 0.4) + (utilizationScore * 0.3))
     
     return {
       totalRevenue, directCosts, overhead, totalExpenses,
       grossProfit, grossMargin, netProfit, netMargin,
-      totalAR, overdueAR, openInvoicesCount: openInvoices.length,
+      totalAR, overdueAR, totalAP, openInvoicesCount: openInvoices.length,
       totalHours, billableHours, billableRate, healthScore
     }
-  }, [filteredInvoices, filteredExpenses, filteredTimeEntries, invoices])
+  }, [filteredInvoices, filteredBills, filteredExpenses, filteredTimeEntries, invoices, bills])
 
-  // Chart data - Revenue vs Expenses
+  // Chart data - Revenue vs Expenses by month
   const revenueExpenseData = useMemo(() => {
     const months: { [key: string]: { revenue: number; expenses: number } } = {}
     
     filteredInvoices.forEach(inv => {
       const month = new Date(inv.invoice_date).toLocaleString('en-US', { month: 'short' })
       if (!months[month]) months[month] = { revenue: 0, expenses: 0 }
-      months[month].revenue += parseFloat(inv.total_amount) || parseFloat(inv.total) || 0
+      months[month].revenue += parseFloat(inv.amount) || 0
+    })
+    
+    // Combine bills and expenses for total expenses
+    filteredBills.forEach(bill => {
+      const month = new Date(bill.date).toLocaleString('en-US', { month: 'short' })
+      if (!months[month]) months[month] = { revenue: 0, expenses: 0 }
+      months[month].expenses += parseFloat(bill.amount) || 0
     })
     
     filteredExpenses.forEach(exp => {
@@ -458,29 +483,34 @@ export default function DashboardPage() {
     const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     
     return Object.entries(months)
-      .map(([month, data]) => ({
-        month,
-        revenue: data.revenue,
-        expenses: data.expenses,
-      }))
+      .map(([month, data]) => ({ month, revenue: data.revenue, expenses: data.expenses }))
       .sort((a, b) => monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month))
       .slice(-6)
-  }, [filteredInvoices, filteredExpenses])
+  }, [filteredInvoices, filteredBills, filteredExpenses])
 
-  // AR Aging
+  // AR Aging breakdown
   const arAgingData = useMemo(() => {
-    const aging = { current: 0, overdue: 0 }
     const now = new Date()
+    const aging = { current: 0, days1to30: 0, days31to60: 0, days61to90: 0, days90plus: 0 }
     
-    invoices.filter(inv => (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0) > 0).forEach(inv => {
-      const balance = parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0
-      if (new Date(inv.due_date) >= now) aging.current += balance
-      else aging.overdue += balance
+    invoices.filter(inv => (parseFloat(inv.balance_due) || 0) > 0).forEach(inv => {
+      const balance = parseFloat(inv.balance_due) || 0
+      const dueDate = new Date(inv.due_date)
+      const daysOverdue = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+      
+      if (daysOverdue <= 0) aging.current += balance
+      else if (daysOverdue <= 30) aging.days1to30 += balance
+      else if (daysOverdue <= 60) aging.days31to60 += balance
+      else if (daysOverdue <= 90) aging.days61to90 += balance
+      else aging.days90plus += balance
     })
     
     return [
       { name: 'Current', value: aging.current, color: THEME.chart.primary },
-      { name: 'Overdue', value: aging.overdue, color: THEME.chart.negative },
+      { name: '1-30 Days', value: aging.days1to30, color: THEME.warning },
+      { name: '31-60 Days', value: aging.days31to60, color: '#F97316' },
+      { name: '61-90 Days', value: aging.days61to90, color: '#EF4444' },
+      { name: '90+ Days', value: aging.days90plus, color: '#DC2626' },
     ].filter(d => d.value > 0)
   }, [invoices])
 
@@ -535,6 +565,15 @@ export default function DashboardPage() {
       })
     }
     
+    if (metrics.totalAP > 50000) {
+      list.push({
+        type: 'warning',
+        message: `${formatCurrency(metrics.totalAP)} in AP`,
+        detail: 'Outstanding contractor bills',
+        action: { label: 'Review', href: '/invoices' }
+      })
+    }
+    
     if (list.length === 0) {
       list.push({
         type: 'success',
@@ -546,10 +585,10 @@ export default function DashboardPage() {
     return list
   }, [metrics])
 
-  // Recent invoices
+  // Recent open invoices - using correct field name 'client'
   const recentInvoices = useMemo(() => {
     return invoices
-      .filter(inv => (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0) > 0)
+      .filter(inv => (parseFloat(inv.balance_due) || 0) > 0)
       .map(inv => ({
         ...inv,
         daysOverdue: Math.max(0, Math.floor((new Date().getTime() - new Date(inv.due_date).getTime()) / (1000 * 60 * 60 * 24)))
@@ -558,7 +597,7 @@ export default function DashboardPage() {
       .slice(0, 5)
   }, [invoices])
 
-  // Loading
+  // Loading state
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -600,7 +639,7 @@ export default function DashboardPage() {
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
                   period === p 
                     ? 'bg-emerald-500 text-white' 
                     : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
@@ -613,34 +652,32 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           label="Revenue"
-          value={formatCurrency(metrics.totalRevenue, true)}
+          value={formatCurrency(metrics.totalRevenue)}
           subValue={`Gross Margin: ${metrics.grossMargin.toFixed(1)}%`}
           icon={DollarSign}
           href="/invoices"
         />
         <MetricCard
           label="Expenses"
-          value={formatCurrency(metrics.totalExpenses, true)}
-          subValue={`Direct: ${formatCurrency(metrics.directCosts, true)} | OH: ${formatCurrency(metrics.overhead, true)}`}
+          value={formatCurrency(metrics.totalExpenses)}
+          subValue={`Direct: ${formatCurrency(metrics.directCosts)} | OH: ${formatCurrency(metrics.overhead)}`}
           icon={Receipt}
           href="/expenses"
         />
         <MetricCard
           label="Outstanding AR"
-          value={formatCurrency(metrics.totalAR, true)}
+          value={formatCurrency(metrics.totalAR)}
           subValue={`${metrics.openInvoicesCount} open invoices`}
-          trend={metrics.overdueAR > 0 ? -(metrics.overdueAR / Math.max(metrics.totalAR, 1) * 100) : undefined}
-          trendLabel={metrics.overdueAR > 0 ? 'overdue' : undefined}
           icon={FileText}
           href="/invoices"
         />
         <MetricCard
           label="Team Hours"
-          value={`${formatNumber(metrics.totalHours, 0)}h`}
+          value={`${metrics.totalHours.toFixed(0)}h`}
           subValue={`${metrics.billableRate.toFixed(0)}% billable`}
           icon={Users}
           href="/team"
@@ -649,26 +686,28 @@ export default function DashboardPage() {
 
       {/* Charts Row 1 */}
       <div className="grid grid-cols-12 gap-4">
-        {/* Revenue vs Expenses */}
+        {/* Revenue vs Expenses Chart */}
         <div className="col-span-12 lg:col-span-8">
           <Section title="Revenue vs Expenses" subtitle="Monthly comparison">
-            <div className="h-52">
+            <div className="h-64">
               {revenueExpenseData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={revenueExpenseData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <BarChart data={revenueExpenseData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={THEME.chart.grid} vertical={false} />
-                    <XAxis dataKey="month" tick={{ fill: THEME.chart.axis, fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <XAxis dataKey="month" tick={{ fill: THEME.chart.axis, fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: THEME.chart.axis, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
                     <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                    <Bar dataKey="revenue" name="Revenue" fill={THEME.chart.primary} radius={[4, 4, 0, 0]} barSize={24} />
-                    <Bar dataKey="expenses" name="Expenses" fill={THEME.chart.secondary} radius={[4, 4, 0, 0]} barSize={24} />
+                    <Bar dataKey="revenue" name="Revenue" fill={THEME.chart.primary} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="expenses" name="Expenses" fill={THEME.chart.secondary} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className={`flex items-center justify-center h-full ${THEME.textMuted} text-sm`}>No data for selected period</div>
+                <div className={`flex items-center justify-center h-full ${THEME.textMuted} text-sm`}>
+                  No data for selected period
+                </div>
               )}
             </div>
-            <div className={`flex items-center gap-6 mt-3 pt-3 border-t ${THEME.glassBorder}`}>
+            <div className="flex items-center gap-4 mt-3">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded" style={{ backgroundColor: THEME.chart.primary }} />
                 <span className={`text-xs ${THEME.textMuted}`}>Revenue</span>
@@ -751,7 +790,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ) : (
-                <div className={`flex items-center justify-center h-full ${THEME.textMuted} text-sm`}>No time entries</div>
+                <div className={`flex items-center justify-center h-full ${THEME.textMuted} text-sm py-8`}>No time entries</div>
               )}
             </div>
           </Section>
@@ -816,22 +855,22 @@ export default function DashboardPage() {
                     <div className={`flex-1 text-xs font-medium uppercase tracking-wider ${THEME.textDim}`}>Client</div>
                     <div className={`w-24 text-xs font-medium uppercase tracking-wider ${THEME.textDim}`}>Invoice</div>
                     <div className={`w-24 text-xs font-medium uppercase tracking-wider ${THEME.textDim}`}>Due</div>
-                    <div className={`w-28 text-xs font-medium uppercase tracking-wider text-right ${THEME.textDim}`}>Amount</div>
+                    <div className={`w-28 text-xs font-medium uppercase tracking-wider text-right ${THEME.textDim}`}>Balance</div>
                     <div className={`w-24 text-xs font-medium uppercase tracking-wider text-right ${THEME.textDim}`}>Status</div>
                   </div>
                   {/* Rows */}
                   {recentInvoices.map((inv) => (
                     <div key={inv.id} className={`flex items-center px-5 py-3 border-b border-white/[0.05] hover:bg-white/[0.03] transition-colors`}>
-                      <div className={`flex-1 text-sm font-medium truncate ${THEME.textSecondary}`}>{inv.client_name || '—'}</div>
-                      <div className={`w-24 text-sm ${THEME.textMuted}`}>{inv.invoice_number || inv.doc_number || 'Draft'}</div>
+                      <div className={`flex-1 text-sm font-medium truncate ${THEME.textSecondary}`}>{inv.client || '—'}</div>
+                      <div className={`w-24 text-sm ${THEME.textMuted}`}>{inv.invoice_number || 'Draft'}</div>
                       <div className={`w-24 text-sm ${THEME.textMuted}`}>{formatDate(inv.due_date)}</div>
                       <div className={`w-28 text-sm font-medium text-right tabular-nums ${THEME.textPrimary}`}>
-                        {formatCurrency(parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0)}
+                        {formatCurrency(parseFloat(inv.balance_due) || 0)}
                       </div>
                       <div className="w-24 text-right">
                         {inv.daysOverdue > 0 ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-500/15 text-rose-400 border border-rose-500/20">
-                            {inv.daysOverdue}d
+                            {inv.daysOverdue}d overdue
                           </span>
                         ) : (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/[0.05] text-slate-400 border border-white/[0.1]">
