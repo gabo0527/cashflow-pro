@@ -42,7 +42,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={20} />, adminOnly: true },
   { label: 'Cash Flow', href: '/cash-flow', icon: <Wallet size={20} />, adminOnly: true },
-  { label: 'Invoices & AR', href: '/invoices', icon: <FileText size={20} />, adminOnly: true },
+  { label: 'Invoices', href: '/invoices', icon: <FileText size={20} />, adminOnly: true },
   { label: 'Expenses', href: '/expenses', icon: <Receipt size={20} />, adminOnly: true },
   { label: 'Projects', href: '/projects', icon: <FolderKanban size={20} />, adminOnly: true },
   { label: 'Clients', href: '/clients', icon: <Users size={20} />, adminOnly: true },
