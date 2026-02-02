@@ -112,9 +112,9 @@ export default function AppShell({ children }: AppShellProps) {
   }
 
   // Skip shell for login page
-  if (pathname === '/login') {
+  if (['/login', '/timesheet', '/expense-report', '/terms', '/privacy'].includes(pathname)) {
     return <>{children}</>
-  }
+}
 
   // Loading state with glassmorphism
   if (loading) {
