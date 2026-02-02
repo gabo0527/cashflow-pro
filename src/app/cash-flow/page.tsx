@@ -4,12 +4,13 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { 
   TrendingUp, TrendingDown, DollarSign, CreditCard, Wallet, Building2,
   ChevronRight, ChevronDown, ChevronUp, Plus, RefreshCw, ArrowUpRight, 
-  ArrowDownRight, Percent, Receipt, PiggyBank
+  ArrowDownRight, Percent, Receipt, PiggyBank, FileText, Users,
+  AlertCircle, Clock, ArrowRight
 } from 'lucide-react'
 import Link from 'next/link'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, AreaChart, Area
+  PieChart, Pie, Cell, AreaChart, Area, ComposedChart, Line, ReferenceLine
 } from 'recharts'
 import { createClient } from '@supabase/supabase-js'
 import { getCurrentUser } from '@/lib/supabase'
@@ -30,8 +31,10 @@ const THEME = {
   textDim: 'text-slate-500',
   chart: {
     primary: '#10B981',
-    secondary: '#64748b',
+    secondary: '#3B82F6',
+    tertiary: '#64748b',
     negative: '#EF4444',
+    warning: '#F59E0B',
     grid: 'rgba(255,255,255,0.06)',
     axis: '#64748b',
   }
@@ -76,13 +79,13 @@ function MetricCard({
   valueColor?: string
 }) {
   const content = (
-    <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-6 transition-all duration-200 ${THEME.glassHover} group`}>
+    <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-5 transition-all duration-200 ${THEME.glassHover} group`}>
       <div className="flex items-start justify-between">
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <p className={`text-sm font-medium ${THEME.textMuted}`}>{label}</p>
           <p className={`text-2xl font-semibold tracking-tight ${valueColor}`}>{value}</p>
           {subValue && (
-            <p className={`text-xs mt-1 ${THEME.textDim}`}>{subValue}</p>
+            <p className={`text-xs ${THEME.textDim}`}>{subValue}</p>
           )}
           {trend !== undefined && (
             <div className="flex items-center gap-1.5 pt-1">
@@ -134,7 +137,7 @@ function Section({
   return (
     <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
       <div 
-        className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder} ${collapsible ? 'cursor-pointer hover:bg-white/[0.03] transition-colors' : ''}`}
+        className={`flex items-center justify-between px-5 py-4 border-b ${THEME.glassBorder} ${collapsible ? 'cursor-pointer hover:bg-white/[0.03] transition-colors' : ''}`}
         onClick={collapsible ? () => setIsExpanded(!isExpanded) : undefined}
       >
         <div className="flex items-center gap-3">
@@ -174,7 +177,7 @@ function Section({
         )}
       </div>
       {(!collapsible || isExpanded) && (
-        <div className={noPadding ? '' : 'p-6'}>
+        <div className={noPadding ? '' : 'p-5'}>
           {children}
         </div>
       )}
@@ -182,7 +185,7 @@ function Section({
   )
 }
 
-// Glass P&L Row
+// P&L Row with progress bar
 function PLRow({ 
   label, 
   value, 
@@ -212,13 +215,13 @@ function PLRow({
   }
   
   return (
-    <div className={`flex items-center justify-between py-3.5 ${indent ? 'pl-6' : ''}`}>
+    <div className={`flex items-center justify-between py-3 ${indent ? 'pl-5' : ''}`}>
       <div className="flex items-center gap-4 flex-1 min-w-0">
         <span className={`text-sm ${bold ? `font-semibold ${THEME.textPrimary}` : indent ? THEME.textMuted : `font-medium ${THEME.textSecondary}`}`}>
           {label}
         </span>
         {percentage !== undefined && (
-          <div className="flex-1 max-w-40 hidden sm:block">
+          <div className="flex-1 max-w-32 hidden sm:block">
             <div className="h-1.5 bg-white/[0.08] rounded-full overflow-hidden">
               <div 
                 className="h-full rounded-full transition-all duration-500"
@@ -243,7 +246,7 @@ function PLRow({
   )
 }
 
-// Glass Chart Tooltip
+// Chart Tooltip
 const ChartTooltip = ({ active, payload, label, formatter }: any) => {
   if (!active || !payload?.length) return null
   return (
@@ -264,6 +267,7 @@ export default function CashFlowPage() {
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [transactions, setTransactions] = useState<any[]>([])
   const [invoices, setInvoices] = useState<any[]>([])
+  const [bills, setBills] = useState<any[]>([])
   const [expenses, setExpenses] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
   const [clients, setClients] = useState<any[]>([])
@@ -275,7 +279,7 @@ export default function CashFlowPage() {
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
   const years = [2026, 2025, 2024, 2023]
 
-  // Data fetching - matches original page tables
+  // ============ DATA FETCHING ============
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -288,10 +292,11 @@ export default function CashFlowPage() {
 
         setCompanyId(profile.company_id)
 
-        // Pull from same tables as original Cash Flow page
-        const [txRes, invRes, expRes, projRes, clientRes, settingsRes] = await Promise.all([
+        // Fetch all relevant tables including bills for AP
+        const [txRes, invRes, billsRes, expRes, projRes, clientRes, settingsRes] = await Promise.all([
           supabase.from('transactions').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
           supabase.from('invoices').select('*').eq('company_id', profile.company_id).order('invoice_date', { ascending: false }),
+          supabase.from('bills').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
           supabase.from('expenses').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
           supabase.from('projects').select('*').eq('company_id', profile.company_id),
           supabase.from('clients').select('*').eq('company_id', profile.company_id),
@@ -300,6 +305,7 @@ export default function CashFlowPage() {
 
         setTransactions(txRes.data || [])
         setInvoices(invRes.data || [])
+        setBills(billsRes.data || [])
         setExpenses(expRes.data || [])
         setProjects(projRes.data || [])
         setClients(clientRes.data || [])
@@ -313,18 +319,23 @@ export default function CashFlowPage() {
     loadData()
   }, [])
 
-  // Period filtering
+  // ============ PERIOD FILTERING ============
   const periodRange = useMemo(() => {
     const monthIndex = months.indexOf(selectedMonth)
     const startDate = new Date(selectedYear, monthIndex, 1)
     const endDate = new Date(selectedYear, monthIndex + 1, 0, 23, 59, 59)
-    return { startDate, endDate }
+    return { startDate, endDate, monthIndex }
   }, [selectedYear, selectedMonth])
 
   const filteredInvoices = useMemo(() => invoices.filter(inv => {
-    const d = new Date(inv.invoice_date || inv.created_at)
+    const d = new Date(inv.invoice_date)
     return d >= periodRange.startDate && d <= periodRange.endDate
   }), [invoices, periodRange])
+
+  const filteredBills = useMemo(() => bills.filter(bill => {
+    const d = new Date(bill.date)
+    return d >= periodRange.startDate && d <= periodRange.endDate
+  }), [bills, periodRange])
 
   const filteredExpenses = useMemo(() => expenses.filter(exp => {
     const d = new Date(exp.date)
@@ -336,104 +347,177 @@ export default function CashFlowPage() {
     return d >= periodRange.startDate && d <= periodRange.endDate
   }), [transactions, periodRange])
 
-  // Metrics calculation - matches original logic
+  // ============ METRICS CALCULATION ============
+  // Data Model:
+  // - Revenue = invoices.amount (what clients owe/paid)
+  // - Direct Costs = bills.amount (contractor/vendor invoices - AP)
+  // - Overhead = expenses.amount (bank transactions - rent, utilities, etc.)
+  // - Cash Position = company_settings.beginning_balance + sum(transactions.amount)
+  
   const metrics = useMemo(() => {
-    // Cash position from company settings
-    const cashOnHand = companySettings?.beginning_balance || 0
+    // Cash Position
+    const beginningBalance = parseFloat(companySettings?.beginning_balance) || 0
+    const transactionSum = transactions.reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0)
+    const cashPosition = beginningBalance + transactionSum
     
-    // Credit card debt from transactions (negative CC transactions)
-    const creditCardDebt = Math.abs(
-      transactions
-        .filter(tx => tx.account_type === 'credit_card' && tx.amount < 0)
-        .reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0)
-    )
+    // AR - Outstanding invoices (balance_due > 0)
+    const openInvoices = invoices.filter(inv => (parseFloat(inv.balance_due) || 0) > 0)
+    const totalAR = openInvoices.reduce((sum, inv) => sum + (parseFloat(inv.balance_due) || 0), 0)
+    const overdueAR = openInvoices
+      .filter(inv => new Date(inv.due_date) < new Date())
+      .reduce((sum, inv) => sum + (parseFloat(inv.balance_due) || 0), 0)
     
-    const netPosition = cashOnHand - creditCardDebt
-
-    // Revenue from invoices
-    const revenue = filteredInvoices.reduce((sum, inv) => 
-      sum + (parseFloat(inv.amount) || parseFloat(inv.total_amount) || 0), 0)
-
-    // Expenses breakdown - uses category field (directCosts vs overhead)
-    const directCosts = filteredExpenses
-      .filter(e => e.category === 'directCosts')
-      .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
+    // AP - Outstanding bills (balance > 0 or amount - paid_amount)
+    const openBills = bills.filter(bill => {
+      const balance = parseFloat(bill.balance) || (parseFloat(bill.amount) - (parseFloat(bill.paid_amount) || 0))
+      return balance > 0
+    })
+    const totalAP = openBills.reduce((sum, bill) => {
+      return sum + (parseFloat(bill.balance) || (parseFloat(bill.amount) - (parseFloat(bill.paid_amount) || 0)))
+    }, 0)
+    const overdueAP = openBills
+      .filter(bill => new Date(bill.due_date) < new Date())
+      .reduce((sum, bill) => {
+        return sum + (parseFloat(bill.balance) || (parseFloat(bill.amount) - (parseFloat(bill.paid_amount) || 0)))
+      }, 0)
     
-    const overhead = filteredExpenses
-      .filter(e => e.category === 'overhead')
-      .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
+    // Net Working Capital
+    const netWorkingCapital = totalAR - totalAP
     
-    const totalExpenses = directCosts + overhead
-
-    // Profit calculations
+    // Period P&L
+    const revenue = filteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0)
+    const directCosts = filteredBills.reduce((sum, bill) => sum + (parseFloat(bill.amount) || 0), 0)
+    const overhead = filteredExpenses.reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0)
+    
     const grossProfit = revenue - directCosts
     const grossMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0
     const netProfit = grossProfit - overhead
     const netMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0
 
-    // Open invoices (current state, not period filtered)
-    const openInvoices = invoices.filter(inv => 
-      (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0) > 0
-    )
-    const totalAR = openInvoices.reduce((sum, inv) => 
-      sum + (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0), 0)
-    const overdueAR = openInvoices
-      .filter(inv => new Date(inv.due_date) < new Date())
-      .reduce((sum, inv) => sum + (parseFloat(inv.balance_due) || parseFloat(inv.balance) || 0), 0)
-
-    // Expense by category for breakdown
-    const expenseByCategory: { [key: string]: number } = {}
-    filteredExpenses.forEach(exp => {
-      const cat = exp.description || exp.vendor || 'Other'
-      expenseByCategory[cat] = (expenseByCategory[cat] || 0) + (parseFloat(exp.amount) || 0)
-    })
-
     // Previous month comparison
-    const prevMonthIndex = months.indexOf(selectedMonth) - 1
+    const prevMonthIndex = periodRange.monthIndex - 1
     const prevYear = prevMonthIndex < 0 ? selectedYear - 1 : selectedYear
     const prevMonth = prevMonthIndex < 0 ? 11 : prevMonthIndex
     const prevStart = new Date(prevYear, prevMonth, 1)
     const prevEnd = new Date(prevYear, prevMonth + 1, 0, 23, 59, 59)
     
     const prevRevenue = invoices.filter(inv => {
-      const d = new Date(inv.invoice_date || inv.created_at)
+      const d = new Date(inv.invoice_date)
       return d >= prevStart && d <= prevEnd
-    }).reduce((sum, inv) => sum + (parseFloat(inv.amount) || parseFloat(inv.total_amount) || 0), 0)
+    }).reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0)
     
     const revenueChange = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : 0
 
+    // Period cash flow
+    const periodInflows = filteredTransactions.filter(tx => (parseFloat(tx.amount) || 0) > 0)
+      .reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0)
+    const periodOutflows = Math.abs(filteredTransactions.filter(tx => (parseFloat(tx.amount) || 0) < 0)
+      .reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0))
+    const netCashFlow = periodInflows - periodOutflows
+
     return {
-      cashOnHand,
-      creditCardDebt,
-      netPosition,
+      cashPosition,
+      totalAR,
+      overdueAR,
+      totalAP,
+      overdueAP,
+      netWorkingCapital,
       revenue,
       directCosts,
       overhead,
-      totalExpenses,
       grossProfit,
       grossMargin,
       netProfit,
       netMargin,
-      totalAR,
-      overdueAR,
+      revenueChange,
+      periodInflows,
+      periodOutflows,
+      netCashFlow,
       openInvoicesCount: openInvoices.length,
-      expenseByCategory,
-      revenueChange
+      openBillsCount: openBills.length
     }
-  }, [companySettings, transactions, filteredInvoices, filteredExpenses, invoices, selectedMonth, selectedYear])
+  }, [companySettings, transactions, invoices, bills, filteredInvoices, filteredBills, filteredExpenses, filteredTransactions, periodRange, selectedYear])
 
-  // Revenue by project
+  // ============ CHART DATA ============
+  
+  // Cash Flow Trend (6 months)
+  const cashFlowTrendData = useMemo(() => {
+    const data: { month: string; inflows: number; outflows: number; net: number }[] = []
+    
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(selectedYear, periodRange.monthIndex - i, 1)
+      const monthStart = new Date(d.getFullYear(), d.getMonth(), 1)
+      const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59)
+      const monthName = d.toLocaleString('en-US', { month: 'short' })
+      
+      const monthTx = transactions.filter(tx => {
+        const txDate = new Date(tx.date)
+        return txDate >= monthStart && txDate <= monthEnd
+      })
+      
+      const inflows = monthTx.filter(tx => (parseFloat(tx.amount) || 0) > 0)
+        .reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0)
+      const outflows = Math.abs(monthTx.filter(tx => (parseFloat(tx.amount) || 0) < 0)
+        .reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0))
+      
+      data.push({
+        month: monthName,
+        inflows,
+        outflows,
+        net: inflows - outflows
+      })
+    }
+    
+    return data
+  }, [transactions, selectedYear, periodRange])
+
+  // Revenue vs Costs by Month
+  const revenueVsCostsData = useMemo(() => {
+    const data: { month: string; revenue: number; directCosts: number; overhead: number }[] = []
+    
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(selectedYear, periodRange.monthIndex - i, 1)
+      const monthStart = new Date(d.getFullYear(), d.getMonth(), 1)
+      const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59)
+      const monthName = d.toLocaleString('en-US', { month: 'short' })
+      
+      const monthRevenue = invoices.filter(inv => {
+        const invDate = new Date(inv.invoice_date)
+        return invDate >= monthStart && invDate <= monthEnd
+      }).reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0)
+      
+      const monthDirectCosts = bills.filter(bill => {
+        const billDate = new Date(bill.date)
+        return billDate >= monthStart && billDate <= monthEnd
+      }).reduce((sum, bill) => sum + (parseFloat(bill.amount) || 0), 0)
+      
+      const monthOverhead = expenses.filter(exp => {
+        const expDate = new Date(exp.date)
+        return expDate >= monthStart && expDate <= monthEnd
+      }).reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0)
+      
+      data.push({
+        month: monthName,
+        revenue: monthRevenue,
+        directCosts: monthDirectCosts,
+        overhead: monthOverhead
+      })
+    }
+    
+    return data
+  }, [invoices, bills, expenses, selectedYear, periodRange])
+
+  // Revenue by Project (current period)
   const revenueByProject = useMemo(() => {
     const projectRevenue: { [key: string]: number } = {}
     
     filteredInvoices.forEach(inv => {
       const project = projects.find(p => p.id === inv.project_id)
       const name = project?.name || 'Unassigned'
-      projectRevenue[name] = (projectRevenue[name] || 0) + (parseFloat(inv.amount) || parseFloat(inv.total_amount) || 0)
+      projectRevenue[name] = (projectRevenue[name] || 0) + (parseFloat(inv.amount) || 0)
     })
 
-    // Glass theme colors
-    const colors = ['#10B981', '#64748b', '#94a3b8', '#cbd5e1', '#475569']
+    const colors = ['#10B981', '#3B82F6', '#F59E0B', '#64748b', '#94a3b8']
     
     return Object.entries(projectRevenue)
       .map(([name, value], i) => ({ name, value, color: colors[i % colors.length] }))
@@ -442,14 +526,62 @@ export default function CashFlowPage() {
       .slice(0, 5)
   }, [filteredInvoices, projects])
 
-  // Display transactions (limited unless expanded)
+  // Top AR (who owes you)
+  const topAR = useMemo(() => {
+    const clientAR: { [key: string]: { amount: number; daysOverdue: number } } = {}
+    
+    invoices.filter(inv => (parseFloat(inv.balance_due) || 0) > 0).forEach(inv => {
+      const clientName = inv.client || 'Unknown'
+      const balance = parseFloat(inv.balance_due) || 0
+      const daysOverdue = Math.max(0, Math.floor((new Date().getTime() - new Date(inv.due_date).getTime()) / (1000 * 60 * 60 * 24)))
+      
+      if (!clientAR[clientName]) {
+        clientAR[clientName] = { amount: 0, daysOverdue: 0 }
+      }
+      clientAR[clientName].amount += balance
+      clientAR[clientName].daysOverdue = Math.max(clientAR[clientName].daysOverdue, daysOverdue)
+    })
+    
+    return Object.entries(clientAR)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5)
+  }, [invoices])
+
+  // Top AP (who you owe)
+  const topAP = useMemo(() => {
+    const vendorAP: { [key: string]: { amount: number; daysOverdue: number } } = {}
+    
+    bills.filter(bill => {
+      const balance = parseFloat(bill.balance) || (parseFloat(bill.amount) - (parseFloat(bill.paid_amount) || 0))
+      return balance > 0
+    }).forEach(bill => {
+      const vendorName = bill.vendor || bill.contractor || 'Unknown'
+      const balance = parseFloat(bill.balance) || (parseFloat(bill.amount) - (parseFloat(bill.paid_amount) || 0))
+      const daysOverdue = Math.max(0, Math.floor((new Date().getTime() - new Date(bill.due_date).getTime()) / (1000 * 60 * 60 * 24)))
+      
+      if (!vendorAP[vendorName]) {
+        vendorAP[vendorName] = { amount: 0, daysOverdue: 0 }
+      }
+      vendorAP[vendorName].amount += balance
+      vendorAP[vendorName].daysOverdue = Math.max(vendorAP[vendorName].daysOverdue, daysOverdue)
+    })
+    
+    return Object.entries(vendorAP)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5)
+  }, [bills])
+
+  // Display transactions
   const displayTransactions = useMemo(() => {
     const sorted = [...filteredTransactions].sort((a, b) => 
       new Date(b.date).getTime() - new Date(a.date).getTime()
     )
-    return showAllTransactions ? sorted : sorted.slice(0, 5)
+    return showAllTransactions ? sorted : sorted.slice(0, 8)
   }, [filteredTransactions, showAllTransactions])
 
+  // ============ LOADING ============
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -461,13 +593,14 @@ export default function CashFlowPage() {
     )
   }
 
+  // ============ RENDER ============
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className={`text-xl font-semibold ${THEME.textPrimary}`}>Cash Flow</h1>
-          <p className={`text-sm mt-1 ${THEME.textMuted}`}>Real-time cash position & profitability</p>
+          <p className={`text-sm mt-1 ${THEME.textMuted}`}>Cash position, working capital & profitability</p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -513,53 +646,157 @@ export default function CashFlowPage() {
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          label="Cash on Hand"
-          value={formatCurrency(metrics.cashOnHand)}
-          subValue="Bank accounts"
+          label="Cash Position"
+          value={formatCurrency(metrics.cashPosition)}
+          subValue="Available cash"
           icon={Wallet}
-          valueColor="text-emerald-400"
+          valueColor={metrics.cashPosition >= 0 ? 'text-emerald-400' : 'text-rose-400'}
         />
         <MetricCard
-          label="Credit Card Debt"
-          value={formatCurrency(metrics.creditCardDebt)}
-          subValue="Outstanding balance"
-          icon={CreditCard}
-          valueColor="text-rose-400"
+          label="AR Outstanding"
+          value={formatCurrency(metrics.totalAR)}
+          subValue={`${metrics.openInvoicesCount} open invoices`}
+          icon={FileText}
+          href="/invoices"
+          valueColor="text-blue-400"
         />
         <MetricCard
-          label="Net Position"
-          value={formatCurrency(metrics.netPosition)}
-          subValue="Cash - CC debt"
+          label="AP Outstanding"
+          value={formatCurrency(metrics.totalAP)}
+          subValue={`${metrics.openBillsCount} unpaid bills`}
+          icon={Receipt}
+          href="/invoices"
+          valueColor="text-amber-400"
+        />
+        <MetricCard
+          label="Net Working Capital"
+          value={formatCurrency(metrics.netWorkingCapital)}
+          subValue="AR - AP"
           trend={metrics.revenueChange}
           trendLabel="vs last month"
-          icon={DollarSign}
-          valueColor={metrics.netPosition >= 0 ? 'text-emerald-400' : 'text-rose-400'}
-        />
-        <MetricCard
-          label="Gross Margin"
-          value={`${metrics.grossMargin.toFixed(1)}%`}
-          subValue={formatCurrency(metrics.grossProfit)}
-          icon={Percent}
-          valueColor={metrics.grossMargin >= 30 ? 'text-emerald-400' : metrics.grossMargin >= 15 ? 'text-amber-400' : 'text-rose-400'}
+          icon={TrendingUp}
+          valueColor={metrics.netWorkingCapital >= 0 ? 'text-emerald-400' : 'text-rose-400'}
         />
       </div>
 
+      {/* Charts Row */}
+      <div className="grid grid-cols-12 gap-4">
+        {/* Cash Flow Trend */}
+        <div className="col-span-12 lg:col-span-6">
+          <Section title="Cash Flow Trend" subtitle="Inflows vs Outflows (6 months)">
+            <div className="h-64">
+              {cashFlowTrendData.some(d => d.inflows > 0 || d.outflows > 0) ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={cashFlowTrendData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={THEME.chart.grid} vertical={false} />
+                    <XAxis dataKey="month" tick={{ fill: THEME.chart.axis, fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: THEME.chart.axis, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                    <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                    <Bar dataKey="inflows" name="Inflows" fill={THEME.chart.primary} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="outflows" name="Outflows" fill={THEME.chart.negative} radius={[4, 4, 0, 0]} />
+                    <Line type="monotone" dataKey="net" name="Net" stroke={THEME.chart.secondary} strokeWidth={2} dot={{ fill: THEME.chart.secondary, strokeWidth: 0, r: 4 }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className={`flex items-center justify-center h-full ${THEME.textMuted} text-sm`}>
+                  No transaction data available
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/[0.05]">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: THEME.chart.primary }} />
+                <span className={`text-xs ${THEME.textMuted}`}>Inflows</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: THEME.chart.negative }} />
+                <span className={`text-xs ${THEME.textMuted}`}>Outflows</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-0.5 rounded" style={{ backgroundColor: THEME.chart.secondary }} />
+                <span className={`text-xs ${THEME.textMuted}`}>Net</span>
+              </div>
+            </div>
+          </Section>
+        </div>
+
+        {/* Revenue vs Costs */}
+        <div className="col-span-12 lg:col-span-6">
+          <Section title="Revenue vs Costs" subtitle="Monthly comparison (6 months)">
+            <div className="h-64">
+              {revenueVsCostsData.some(d => d.revenue > 0 || d.directCosts > 0) ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={revenueVsCostsData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={THEME.chart.grid} vertical={false} />
+                    <XAxis dataKey="month" tick={{ fill: THEME.chart.axis, fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: THEME.chart.axis, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                    <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                    <Bar dataKey="revenue" name="Revenue" fill={THEME.chart.primary} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="directCosts" name="Direct Costs" fill={THEME.chart.warning} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="overhead" name="Overhead" fill={THEME.chart.tertiary} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className={`flex items-center justify-center h-full ${THEME.textMuted} text-sm`}>
+                  No revenue/cost data available
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/[0.05]">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: THEME.chart.primary }} />
+                <span className={`text-xs ${THEME.textMuted}`}>Revenue</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: THEME.chart.warning }} />
+                <span className={`text-xs ${THEME.textMuted}`}>Direct Costs</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: THEME.chart.tertiary }} />
+                <span className={`text-xs ${THEME.textMuted}`}>Overhead</span>
+              </div>
+            </div>
+          </Section>
+        </div>
+      </div>
+
       {/* P&L + Revenue by Project */}
-      <div className="grid grid-cols-12 gap-6">
+      <div className="grid grid-cols-12 gap-4">
         {/* Profit & Loss */}
         <div className="col-span-12 lg:col-span-8">
           <Section title="Profit & Loss" subtitle={`${selectedMonth} ${selectedYear}`}>
             <div className="divide-y divide-white/[0.05]">
               <PLRow label="Revenue" value={metrics.revenue} percentage={100} type="positive" bold />
-              <PLRow label="Contractor Labor" value={metrics.directCosts} percentage={metrics.revenue > 0 ? (metrics.directCosts / metrics.revenue) * 100 : 0} type="negative" indent />
+              <PLRow label="Direct Costs (Contractors)" value={metrics.directCosts} percentage={metrics.revenue > 0 ? (metrics.directCosts / metrics.revenue) * 100 : 0} type="negative" indent />
               <div className="h-px bg-white/[0.1] my-1" />
               <PLRow label="Gross Profit" value={metrics.grossProfit} percentage={metrics.grossMargin} type={metrics.grossProfit >= 0 ? 'positive' : 'negative'} bold />
-              <PLRow label="Overhead" value={metrics.overhead} percentage={metrics.revenue > 0 ? (metrics.overhead / metrics.revenue) * 100 : 0} type="muted" indent />
+              <PLRow label="Overhead (Operating)" value={metrics.overhead} percentage={metrics.revenue > 0 ? (metrics.overhead / metrics.revenue) * 100 : 0} type="muted" indent />
               <div className="h-px bg-white/[0.1] my-1" />
               <PLRow label="Net Profit" value={metrics.netProfit} percentage={metrics.netMargin} type={metrics.netProfit >= 0 ? 'positive' : 'negative'} bold />
+            </div>
+            
+            {/* Period Cash Flow Summary */}
+            <div className="mt-5 pt-5 border-t border-white/[0.08]">
+              <h4 className={`text-xs font-medium uppercase tracking-wider ${THEME.textDim} mb-3`}>Period Cash Flow</h4>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-white/[0.03] rounded-lg p-3">
+                  <p className={`text-xs ${THEME.textMuted} mb-1`}>Inflows</p>
+                  <p className="text-lg font-semibold text-emerald-400">{formatCurrency(metrics.periodInflows)}</p>
+                </div>
+                <div className="bg-white/[0.03] rounded-lg p-3">
+                  <p className={`text-xs ${THEME.textMuted} mb-1`}>Outflows</p>
+                  <p className="text-lg font-semibold text-rose-400">{formatCurrency(metrics.periodOutflows)}</p>
+                </div>
+                <div className="bg-white/[0.03] rounded-lg p-3">
+                  <p className={`text-xs ${THEME.textMuted} mb-1`}>Net Cash Flow</p>
+                  <p className={`text-lg font-semibold ${metrics.netCashFlow >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {formatCurrency(metrics.netCashFlow)}
+                  </p>
+                </div>
+              </div>
             </div>
           </Section>
         </div>
@@ -569,15 +806,15 @@ export default function CashFlowPage() {
           <Section title="Revenue by Project" action={{ label: 'View All', href: '/projects' }}>
             {revenueByProject.length > 0 ? (
               <>
-                <div className="h-44 -mx-2">
+                <div className="h-40 -mx-2">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
                         data={revenueByProject}
                         cx="50%"
                         cy="50%"
-                        innerRadius={45}
-                        outerRadius={70}
+                        innerRadius={40}
+                        outerRadius={65}
                         paddingAngle={2}
                         dataKey="value"
                       >
@@ -589,10 +826,10 @@ export default function CashFlowPage() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="space-y-2.5 mt-2">
+                <div className="space-y-2 mt-2">
                   {revenueByProject.map((project, i) => (
                     <div key={i} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
                         <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: project.color }} />
                         <span className={`${THEME.textSecondary} truncate`}>{project.name}</span>
                       </div>
@@ -602,7 +839,7 @@ export default function CashFlowPage() {
                 </div>
               </>
             ) : (
-              <div className={`flex items-center justify-center h-44 ${THEME.textMuted} text-sm`}>
+              <div className={`flex items-center justify-center h-40 ${THEME.textMuted} text-sm`}>
                 No project revenue this period
               </div>
             )}
@@ -610,32 +847,92 @@ export default function CashFlowPage() {
         </div>
       </div>
 
-      {/* Expense Breakdown */}
-      {Object.keys(metrics.expenseByCategory).length > 0 && (
-        <Section title="Expense Breakdown" subtitle="By vendor/description">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {Object.entries(metrics.expenseByCategory)
-              .sort(([,a], [,b]) => b - a)
-              .slice(0, 5)
-              .map(([category, amount], i) => {
-                const colors = ['#EF4444', '#F59E0B', '#10B981', '#64748b', '#94a3b8']
-                return (
-                  <div key={i} className="bg-white/[0.03] border border-white/[0.08] rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: colors[i] }} />
-                      <span className={`text-xs ${THEME.textMuted} truncate`}>{category}</span>
+      {/* AR/AP Summary Row */}
+      <div className="grid grid-cols-12 gap-4">
+        {/* Top AR */}
+        <div className="col-span-12 lg:col-span-6">
+          <Section title="Accounts Receivable" subtitle="Who owes you" badge={metrics.openInvoicesCount} action={{ label: 'View All', href: '/invoices' }} noPadding>
+            {topAR.length > 0 ? (
+              <div>
+                <div className={`flex items-center px-5 py-2 bg-white/[0.03] border-b ${THEME.glassBorder}`}>
+                  <div className={`flex-1 text-xs font-medium uppercase tracking-wider ${THEME.textDim}`}>Client</div>
+                  <div className={`w-24 text-xs font-medium uppercase tracking-wider text-right ${THEME.textDim}`}>Balance</div>
+                  <div className={`w-20 text-xs font-medium uppercase tracking-wider text-right ${THEME.textDim}`}>Status</div>
+                </div>
+                {topAR.map((item, i) => (
+                  <div key={i} className="flex items-center px-5 py-3 border-b border-white/[0.05] hover:bg-white/[0.03] transition-colors">
+                    <div className={`flex-1 text-sm font-medium ${THEME.textSecondary} truncate`}>{item.name}</div>
+                    <div className={`w-24 text-sm font-semibold text-right tabular-nums ${THEME.textPrimary}`}>{formatCurrency(item.amount)}</div>
+                    <div className="w-20 text-right">
+                      {item.daysOverdue > 0 ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-500/15 text-rose-400 border border-rose-500/20">
+                          {item.daysOverdue}d late
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                          Current
+                        </span>
+                      )}
                     </div>
-                    <span className={`text-lg font-semibold ${THEME.textPrimary}`}>{formatCurrency(amount)}</span>
                   </div>
-                )
-              })}
-          </div>
-        </Section>
-      )}
+                ))}
+                <div className="flex items-center justify-between px-5 py-3 bg-white/[0.02]">
+                  <span className={`text-sm font-medium ${THEME.textMuted}`}>Total AR</span>
+                  <span className={`text-sm font-bold ${THEME.textPrimary}`}>{formatCurrency(metrics.totalAR)}</span>
+                </div>
+              </div>
+            ) : (
+              <div className={`flex items-center justify-center py-12 ${THEME.textMuted} text-sm`}>
+                No outstanding receivables
+              </div>
+            )}
+          </Section>
+        </div>
 
-      {/* Transactions - Collapsible */}
+        {/* Top AP */}
+        <div className="col-span-12 lg:col-span-6">
+          <Section title="Accounts Payable" subtitle="Who you owe" badge={metrics.openBillsCount} action={{ label: 'View All', href: '/invoices' }} noPadding>
+            {topAP.length > 0 ? (
+              <div>
+                <div className={`flex items-center px-5 py-2 bg-white/[0.03] border-b ${THEME.glassBorder}`}>
+                  <div className={`flex-1 text-xs font-medium uppercase tracking-wider ${THEME.textDim}`}>Vendor</div>
+                  <div className={`w-24 text-xs font-medium uppercase tracking-wider text-right ${THEME.textDim}`}>Balance</div>
+                  <div className={`w-20 text-xs font-medium uppercase tracking-wider text-right ${THEME.textDim}`}>Status</div>
+                </div>
+                {topAP.map((item, i) => (
+                  <div key={i} className="flex items-center px-5 py-3 border-b border-white/[0.05] hover:bg-white/[0.03] transition-colors">
+                    <div className={`flex-1 text-sm font-medium ${THEME.textSecondary} truncate`}>{item.name}</div>
+                    <div className={`w-24 text-sm font-semibold text-right tabular-nums text-amber-400`}>{formatCurrency(item.amount)}</div>
+                    <div className="w-20 text-right">
+                      {item.daysOverdue > 0 ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-500/15 text-rose-400 border border-rose-500/20">
+                          {item.daysOverdue}d late
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/[0.05] text-slate-400 border border-white/[0.1]">
+                          Current
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between px-5 py-3 bg-white/[0.02]">
+                  <span className={`text-sm font-medium ${THEME.textMuted}`}>Total AP</span>
+                  <span className={`text-sm font-bold text-amber-400`}>{formatCurrency(metrics.totalAP)}</span>
+                </div>
+              </div>
+            ) : (
+              <div className={`flex items-center justify-center py-12 ${THEME.textMuted} text-sm`}>
+                No outstanding payables
+              </div>
+            )}
+          </Section>
+        </div>
+      </div>
+
+      {/* Transactions */}
       <Section 
-        title="Transactions" 
+        title="Recent Transactions" 
         subtitle={`${filteredTransactions.length} this period`}
         collapsible
         defaultExpanded={true}
@@ -644,33 +941,38 @@ export default function CashFlowPage() {
       >
         <div>
           {/* Header */}
-          <div className={`flex items-center px-6 py-3 bg-white/[0.03] border-b ${THEME.glassBorder}`}>
+          <div className={`flex items-center px-5 py-2 bg-white/[0.03] border-b ${THEME.glassBorder}`}>
             <div className={`flex-1 text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Description</div>
+            <div className={`w-28 text-xs font-medium ${THEME.textDim} uppercase tracking-wider hidden sm:block`}>Category</div>
             <div className={`w-24 text-xs font-medium ${THEME.textDim} uppercase tracking-wider hidden sm:block`}>Date</div>
-            <div className={`w-32 text-xs font-medium ${THEME.textDim} uppercase tracking-wider text-right`}>Amount</div>
+            <div className={`w-28 text-xs font-medium ${THEME.textDim} uppercase tracking-wider text-right`}>Amount</div>
           </div>
           
           {/* Rows */}
           {displayTransactions.length > 0 ? (
             <>
               {displayTransactions.map((tx, i) => (
-                <div key={i} className="flex items-center px-6 py-3.5 border-b border-white/[0.05] hover:bg-white/[0.03] transition-colors">
+                <div key={i} className="flex items-center px-5 py-3 border-b border-white/[0.05] hover:bg-white/[0.03] transition-colors">
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm ${THEME.textSecondary} truncate`}>{tx.description || tx.name || 'Transaction'}</p>
                     <p className={`text-xs ${THEME.textDim} sm:hidden`}>{formatDate(tx.date)}</p>
                   </div>
+                  <div className={`w-28 hidden sm:block`}>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/[0.05] ${THEME.textMuted} border border-white/[0.08]`}>
+                      {tx.category || tx.type || 'Other'}
+                    </span>
+                  </div>
                   <div className={`w-24 text-sm ${THEME.textMuted} hidden sm:block`}>{formatDate(tx.date)}</div>
-                  <div className={`w-32 text-sm font-semibold text-right tabular-nums ${(parseFloat(tx.amount) || 0) < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  <div className={`w-28 text-sm font-semibold text-right tabular-nums ${(parseFloat(tx.amount) || 0) < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
                     {formatCurrency(parseFloat(tx.amount) || 0)}
                   </div>
                 </div>
               ))}
               
-              {/* Show more/less toggle */}
-              {filteredTransactions.length > 5 && (
+              {filteredTransactions.length > 8 && (
                 <button 
                   onClick={() => setShowAllTransactions(!showAllTransactions)}
-                  className={`w-full px-6 py-3 text-sm font-medium ${THEME.textMuted} hover:text-white hover:bg-white/[0.03] transition-colors flex items-center justify-center gap-1`}
+                  className={`w-full px-5 py-3 text-sm font-medium ${THEME.textMuted} hover:text-white hover:bg-white/[0.03] transition-colors flex items-center justify-center gap-1`}
                 >
                   {showAllTransactions ? (
                     <>Show Less <ChevronUp size={14} /></>
