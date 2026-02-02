@@ -114,7 +114,7 @@ function MetricCard({ label, value, subtitle, icon: Icon, color = 'emerald' }: {
   )
 }
 
-// Category Badge
+// Category Badge (display only)
 function CategoryBadge({ category }: { category: string }) {
   const isDirectCost = category === 'directCosts'
   return (
@@ -123,6 +123,91 @@ function CategoryBadge({ category }: { category: string }) {
     }`}>
       {isDirectCost ? 'Direct Cost' : 'Overhead'}
     </span>
+  )
+}
+
+// Editable Category Badge - click to toggle between Direct Cost and Overhead
+function EditableCategoryBadge({ category, subcategory, onUpdate }: { 
+  category: string; subcategory: string; onUpdate: (updates: { category: string; subcategory: string }) => void 
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const isDirectCost = category === 'directCosts'
+  
+  return (
+    <div className="relative">
+      <button onClick={() => setIsOpen(!isOpen)}
+        className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium cursor-pointer transition-all group ${
+          isDirectCost ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20'
+        }`}>
+        {isDirectCost ? 'Direct Cost' : 'Overhead'}
+        <Edit2 size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+      </button>
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+          <div className={`absolute top-full left-0 mt-1 w-56 ${THEME.glass} border ${THEME.glassBorder} rounded-lg shadow-xl z-20 overflow-hidden`}>
+            <div className="p-2 border-b border-white/[0.08]">
+              <p className={`text-xs font-medium ${THEME.textDim} px-1`}>Main Category</p>
+            </div>
+            <button onClick={() => { 
+              if (category !== 'directCosts') onUpdate({ category: 'directCosts', subcategory: 'labor' }); 
+              setIsOpen(false); 
+            }} className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-white/[0.05] transition-colors ${category === 'directCosts' ? 'text-rose-400 bg-rose-500/10' : THEME.textSecondary}`}>
+              <span className="w-2 h-2 rounded-full bg-rose-400" /> Direct Cost
+            </button>
+            <button onClick={() => { 
+              if (category !== 'overhead') onUpdate({ category: 'overhead', subcategory: 'software' }); 
+              setIsOpen(false); 
+            }} className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-white/[0.05] transition-colors ${category === 'overhead' ? 'text-amber-400 bg-amber-500/10' : THEME.textSecondary}`}>
+              <span className="w-2 h-2 rounded-full bg-amber-400" /> Overhead
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// Editable Subcategory (Type) - click to pick from available subcategories
+function EditableSubcategory({ category, subcategory, onUpdate }: { 
+  category: string; subcategory: string; onUpdate: (subcategory: string) => void 
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const catConfig = category === 'directCosts' ? EXPENSE_CATEGORIES.directCosts : EXPENSE_CATEGORIES.overhead
+  const subcatConfig = catConfig.subcategories.find(s => s.id === subcategory)
+  
+  return (
+    <div className="relative">
+      <button onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center gap-1 text-xs ${THEME.textMuted} hover:text-white transition-colors group cursor-pointer`}>
+        <span>{subcatConfig?.name || subcategory || 'Assign'}</span>
+        <Edit2 size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+      </button>
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+          <div className={`absolute top-full left-0 mt-1 w-56 ${THEME.glass} border ${THEME.glassBorder} rounded-lg shadow-xl z-20 overflow-hidden`}>
+            <div className="p-2 border-b border-white/[0.08]">
+              <p className={`text-xs font-medium ${THEME.textDim} px-1`}>{catConfig.label} Types</p>
+            </div>
+            <div className="max-h-48 overflow-y-auto">
+              {catConfig.subcategories.map(sub => {
+                const IconComp = sub.icon
+                return (
+                  <button key={sub.id} onClick={() => { onUpdate(sub.id); setIsOpen(false); }}
+                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-white/[0.05] transition-colors ${
+                      sub.id === subcategory ? 'text-emerald-400 bg-emerald-500/10' : THEME.textSecondary
+                    }`}>
+                    <IconComp size={14} className={THEME.textDim} />
+                    {sub.name}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 
@@ -242,8 +327,14 @@ function ExpenseRow({ expense, teamMembers, projects, clients, onUpdate, onDelet
       </div>
       <div className="w-20 shrink-0"><p className={`text-sm ${THEME.textMuted}`}>{formatDateShort(expense.date)}</p></div>
       <div className="flex-1 min-w-0"><p className={`text-sm ${THEME.textPrimary} truncate`}>{expense.description}</p></div>
-      <div className="w-24 shrink-0"><CategoryBadge category={expense.category} /></div>
-      <div className="w-32 shrink-0"><p className={`text-xs ${THEME.textMuted}`}>{subcatConfig?.name || expense.subcategory}</p></div>
+      <div className="w-28 shrink-0">
+        <EditableCategoryBadge category={expense.category} subcategory={expense.subcategory} 
+          onUpdate={(updates) => onUpdate(expense.id, updates)} />
+      </div>
+      <div className="w-36 shrink-0">
+        <EditableSubcategory category={expense.category} subcategory={expense.subcategory} 
+          onUpdate={(subcategory) => onUpdate(expense.id, { subcategory })} />
+      </div>
       <div className="w-28 shrink-0">
         {showTeamMember ? (
           <EditableSelect value={expense.team_member_id || ''} options={teamMembers} onChange={(value) => onUpdate(expense.id, { team_member_id: value || null })} placeholder="Assign" />
@@ -256,7 +347,12 @@ function ExpenseRow({ expense, teamMembers, projects, clients, onUpdate, onDelet
         {client ? <p className={`text-xs ${THEME.textMuted} truncate`}>{client.name}</p> : <span className={`text-xs ${THEME.textDim}`}>—</span>}
       </div>
       <div className="w-24 text-right shrink-0"><p className="text-sm font-semibold text-rose-400">{formatCurrency(expense.amount)}</p></div>
-      <div className="w-20 shrink-0"><StatusBadge status={expense.status} /></div>
+      <div className="w-20 shrink-0">
+        <button onClick={() => onUpdate(expense.id, { status: expense.status === 'paid' ? 'pending' : 'paid' })}
+          className="cursor-pointer">
+          <StatusBadge status={expense.status} />
+        </button>
+      </div>
       <div className="w-12 shrink-0 flex items-center justify-end">
         <button onClick={() => onDelete(expense.id)} className="p-1 hover:bg-white/[0.05] rounded transition-colors" title="Delete">
           <Trash2 size={14} className={`${THEME.textDim} hover:text-rose-400`} />
@@ -685,7 +781,7 @@ export default function ExpensesPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                   <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-                  <Tooltip content={<CustomTooltip formatter={(v: number) => formatCurrency(v)} />} />
+                  <Tooltip content={<CustomTooltip formatter={(v: number) => formatCurrency(v)} />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
                   <Bar dataKey="directCosts" name="Direct Costs" fill={COLORS.rose} radius={[4, 4, 0, 0]} />
                   <Bar dataKey="overhead" name="Overhead" fill={COLORS.amber} radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -762,9 +858,27 @@ export default function ExpensesPage() {
         {selectedExpenses.length > 0 && (
           <div className="flex items-center gap-4 px-6 py-3 bg-emerald-500/10 border-b border-emerald-500/20">
             <span className="text-sm font-medium text-emerald-400">{selectedExpenses.length} selected</span>
-            <button className={`text-sm ${THEME.textSecondary} hover:text-white transition-colors`}>Mark as Paid</button>
-            <button className={`text-sm ${THEME.textSecondary} hover:text-white transition-colors`}>Delete</button>
-            <button className={`text-sm ${THEME.textSecondary} hover:text-white transition-colors`}>Export</button>
+            <button onClick={async () => {
+              for (const id of selectedExpenses) { await handleUpdateExpense(id, { status: 'paid' }) }
+              setSelectedExpenses([])
+            }} className={`text-sm ${THEME.textSecondary} hover:text-white transition-colors`}>Mark as Paid</button>
+            <button onClick={async () => {
+              if (!confirm(`Delete ${selectedExpenses.length} expenses?`)) return
+              for (const id of selectedExpenses) {
+                await supabase.from('expenses').delete().eq('id', id)
+              }
+              setExpenses(prev => prev.filter(exp => !selectedExpenses.includes(exp.id)))
+              setSelectedExpenses([])
+            }} className={`text-sm ${THEME.textSecondary} hover:text-rose-400 transition-colors`}>Delete</button>
+            <button onClick={() => {
+              const csv = ['Date,Description,Category,Subcategory,Project,Amount,Status']
+              filteredExpenses.filter(e => selectedExpenses.includes(e.id)).forEach(e => {
+                csv.push(`${e.date},"${e.description}",${e.category},${e.subcategory},"${projects.find(p => p.id === e.project_id)?.name || ''}",${e.amount},${e.status}`)
+              })
+              const blob = new Blob([csv.join('\n')], { type: 'text/csv' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a'); a.href = url; a.download = 'expenses-export.csv'; a.click()
+            }} className={`text-sm ${THEME.textSecondary} hover:text-white transition-colors`}>Export</button>
           </div>
         )}
 
@@ -777,8 +891,8 @@ export default function ExpensesPage() {
             Date {sortField === 'date' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
           </button>
           <div className="flex-1">Description</div>
-          <div className="w-24 shrink-0">Category</div>
-          <div className="w-32 shrink-0">Type</div>
+          <div className="w-28 shrink-0">Category</div>
+          <div className="w-36 shrink-0">Type</div>
           <div className="w-28 shrink-0">Person</div>
           <div className="w-32 shrink-0">Project</div>
           <div className="w-24 shrink-0">Client</div>
