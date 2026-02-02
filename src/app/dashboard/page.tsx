@@ -310,7 +310,7 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<any[]>([])
   const [timeEntries, setTimeEntries] = useState<any[]>([])
   const [teamMembers, setTeamMembers] = useState<any[]>([])
-  const [period, setPeriod] = useState<'week' | 'month' | 'quarter' | 'ytd'>('month')
+  const [period, setPeriod] = useState<'week' | 'month' | 'quarter' | 'ytd'>('ytd')
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
 
   const availableYears = [2026, 2025, 2024, 2023]
@@ -455,11 +455,16 @@ export default function DashboardPage() {
       months[month].expenses += parseFloat(exp.amount) || 0
     })
     
-    return Object.entries(months).map(([month, data]) => ({
-      month,
-      revenue: data.revenue,
-      expenses: data.expenses,
-    })).slice(-6)
+    const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    
+    return Object.entries(months)
+      .map(([month, data]) => ({
+        month,
+        revenue: data.revenue,
+        expenses: data.expenses,
+      }))
+      .sort((a, b) => monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month))
+      .slice(-6)
   }, [filteredInvoices, filteredExpenses])
 
   // AR Aging
@@ -654,7 +659,7 @@ export default function DashboardPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke={THEME.chart.grid} vertical={false} />
                     <XAxis dataKey="month" tick={{ fill: THEME.chart.axis, fontSize: 12 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: THEME.chart.axis, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-                    <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} />
+                    <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
                     <Bar dataKey="revenue" name="Revenue" fill={THEME.chart.primary} radius={[4, 4, 0, 0]} barSize={24} />
                     <Bar dataKey="expenses" name="Expenses" fill={THEME.chart.secondary} radius={[4, 4, 0, 0]} barSize={24} />
                   </BarChart>
@@ -767,7 +772,7 @@ export default function DashboardPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke={THEME.chart.grid} vertical={false} />
                   <XAxis dataKey="week" tick={{ fill: THEME.chart.axis, fontSize: 10 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: THEME.chart.axis, fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-                  <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} />
+                  <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }} />
                   <ReferenceLine y={50000} stroke={THEME.warning} strokeDasharray="5 5" strokeWidth={1} />
                   <Area type="monotone" dataKey="projected" name="Projected" stroke={THEME.chart.primary} strokeWidth={2} fill="url(#cashGradient)" />
                 </AreaChart>
