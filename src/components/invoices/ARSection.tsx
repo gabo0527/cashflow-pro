@@ -103,7 +103,10 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
     return Object.entries(clientAR).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
   }, [invoices, clients])
 
-  const handleSort = (field: string) => { if (sortField === field) setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); else { setSortField(field); setSortDir('asc') } }
+  const handleSort = (field: string) => { 
+    if (sortField === field) setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
+    else { setSortField(field); setSortDir('asc') } 
+  }
   const handleSelectAll = () => setSelectedInvoices(prev => prev.length === filteredInvoices.length ? [] : filteredInvoices.map(i => i.id))
 
   const handleBulkMarkPaid = async () => {
@@ -117,7 +120,7 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
   return (
     <div className="space-y-6">
       {/* Metrics */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <MetricCard label="Total AR" value={formatCurrency(arMetrics.totalAR)} subtitle={`${arMetrics.unpaidCount} unpaid invoices`} icon={DollarSign} color="amber" />
         <MetricCard label="Current" value={formatCurrency(arMetrics.aging.current.amount)} subtitle={`${arMetrics.aging.current.count} invoices`} icon={CheckCircle2} color="emerald" />
         <MetricCard label="Overdue" value={formatCurrency(arMetrics.overdueTotal)} subtitle="Past due date" icon={AlertTriangle} color="rose" />
@@ -168,8 +171,8 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
                   {arByClient.slice(0, 5).map((item, i) => (
                     <div key={i} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                        <span className={`text-xs ${THEME.textSecondary} truncate max-w-24`}>{item.name}</span>
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                        <span className={`text-xs ${THEME.textSecondary} truncate max-w-28`}>{item.name}</span>
                       </div>
                       <span className={`text-xs font-semibold ${THEME.textPrimary}`}>{formatCurrency(item.value)}</span>
                     </div>
@@ -203,14 +206,14 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
               <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search invoices..."
                 className="bg-white/[0.05] border border-white/[0.1] rounded-lg pl-9 pr-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 w-48 focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
             </div>
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30">
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer">
               <option value="all" className="bg-slate-900">All Status</option>
               <option value="unpaid" className="bg-slate-900">Unpaid</option>
               <option value="paid" className="bg-slate-900">Paid</option>
               <option value="current" className="bg-slate-900">Current</option>
               <option value="overdue" className="bg-slate-900">Overdue</option>
             </select>
-            <select value={filterClient} onChange={(e) => setFilterClient(e.target.value)} className="bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30">
+            <select value={filterClient} onChange={(e) => setFilterClient(e.target.value)} className="bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer">
               <option value="all" className="bg-slate-900">All Clients</option>
               {clients.map(c => <option key={c.id} value={c.id} className="bg-slate-900">{c.name}</option>)}
             </select>
@@ -238,16 +241,29 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
 
         {/* Column Headers */}
         <div className={`flex items-center gap-3 py-2.5 px-4 bg-white/[0.03] border-b ${THEME.glassBorder} text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>
-          <div className="w-8 shrink-0"><input type="checkbox" checked={selectedInvoices.length === filteredInvoices.length && filteredInvoices.length > 0} onChange={handleSelectAll} className="w-4 h-4 rounded border-white/20 bg-white/5 text-emerald-500 focus:ring-emerald-500/30" /></div>
-          <button onClick={() => handleSort('invoice_number')} className="w-20 shrink-0 flex items-center gap-1 hover:text-white transition-colors">Inv # {sortField === 'invoice_number' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}</button>
+          <div className="w-8 shrink-0">
+            <input type="checkbox" checked={selectedInvoices.length === filteredInvoices.length && filteredInvoices.length > 0} onChange={handleSelectAll} 
+              className="w-4 h-4 rounded border-white/20 bg-white/5 text-emerald-500 focus:ring-emerald-500/30 cursor-pointer" />
+          </div>
+          <button onClick={() => handleSort('invoice_number')} className="w-20 shrink-0 flex items-center gap-1 hover:text-white transition-colors">
+            Inv # {sortField === 'invoice_number' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+          </button>
           <div className="w-14 shrink-0 flex items-center gap-1"><Zap size={10} className="text-emerald-400" /> Prob</div>
-          <button onClick={() => handleSort('invoice_date')} className="w-20 shrink-0 flex items-center gap-1 hover:text-white transition-colors">Date {sortField === 'invoice_date' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}</button>
-          <button onClick={() => handleSort('due_date')} className="w-20 shrink-0 flex items-center gap-1 hover:text-white transition-colors">Due {sortField === 'due_date' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}</button>
+          <button onClick={() => handleSort('invoice_date')} className="w-20 shrink-0 flex items-center gap-1 hover:text-white transition-colors">
+            Date {sortField === 'invoice_date' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+          </button>
+          <button onClick={() => handleSort('due_date')} className="w-20 shrink-0 flex items-center gap-1 hover:text-white transition-colors">
+            Due {sortField === 'due_date' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+          </button>
           <div className="w-28 shrink-0">Client</div>
           <div className="w-36 shrink-0">Project</div>
           <div className="flex-1">QBO Customer</div>
-          <button onClick={() => handleSort('amount')} className="w-24 text-right shrink-0 flex items-center justify-end gap-1 hover:text-white transition-colors">Amount {sortField === 'amount' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}</button>
-          <button onClick={() => handleSort('balance')} className="w-24 text-right shrink-0 flex items-center justify-end gap-1 hover:text-white transition-colors">Balance {sortField === 'balance' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}</button>
+          <button onClick={() => handleSort('amount')} className="w-24 text-right shrink-0 flex items-center justify-end gap-1 hover:text-white transition-colors">
+            Amount {sortField === 'amount' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+          </button>
+          <button onClick={() => handleSort('balance')} className="w-24 text-right shrink-0 flex items-center justify-end gap-1 hover:text-white transition-colors">
+            Balance {sortField === 'balance' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+          </button>
           <div className="w-24 shrink-0">Status</div>
           <div className="w-20 shrink-0"></div>
         </div>
@@ -263,7 +279,10 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
 
             return (
               <div key={invoice.id} className={`flex items-center gap-3 py-3 px-4 hover:bg-white/[0.03] transition-colors border-b border-white/[0.05] ${selectedInvoices.includes(invoice.id) ? 'bg-emerald-500/10' : ''}`}>
-                <div className="w-8 shrink-0"><input type="checkbox" checked={selectedInvoices.includes(invoice.id)} onChange={() => setSelectedInvoices(prev => prev.includes(invoice.id) ? prev.filter(i => i !== invoice.id) : [...prev, invoice.id])} className="w-4 h-4 rounded border-white/20 bg-white/5 text-emerald-500 focus:ring-emerald-500/30" /></div>
+                <div className="w-8 shrink-0">
+                  <input type="checkbox" checked={selectedInvoices.includes(invoice.id)} onChange={() => setSelectedInvoices(prev => prev.includes(invoice.id) ? prev.filter(i => i !== invoice.id) : [...prev, invoice.id])} 
+                    className="w-4 h-4 rounded border-white/20 bg-white/5 text-emerald-500 focus:ring-emerald-500/30 cursor-pointer" />
+                </div>
                 <div className="w-20 shrink-0"><p className="text-sm font-medium text-emerald-400">#{invoice.invoice_number}</p></div>
                 <div className="w-14 shrink-0">{probability ? <ProbabilityBadge score={probability.score} color={probability.color} /> : <span className="text-xs text-emerald-400">✓</span>}</div>
                 <div className="w-20 shrink-0"><p className={`text-sm ${THEME.textMuted}`}>{formatDateShort(invoice.invoice_date)}</p></div>
@@ -283,24 +302,38 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
               </div>
             )
           }) : (
-            <div className={`flex items-center justify-center py-12 ${THEME.textMuted}`}>No invoices found</div>
+            <div className={`flex flex-col items-center justify-center py-16 gap-4`}>
+              <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                <DollarSign size={28} className="text-emerald-400" />
+              </div>
+              <div className="text-center">
+                <p className={`font-medium ${THEME.textSecondary}`}>No invoices found</p>
+                <p className={`text-sm ${THEME.textDim} mt-1`}>Sync with QuickBooks to import invoices</p>
+              </div>
+            </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className={`flex items-center justify-between px-6 py-3 bg-white/[0.03] border-t ${THEME.glassBorder}`}>
-          <p className={`text-sm ${THEME.textMuted}`}>Showing {filteredInvoices.length} of {invoices.length} invoices</p>
-          <div className="flex items-center gap-6 text-sm">
-            <div><span className={THEME.textMuted}>Total: </span><span className={`font-semibold ${THEME.textPrimary}`}>{formatCurrency(filteredInvoices.reduce((s, i) => s + i.amount, 0))}</span></div>
-            <div><span className={THEME.textMuted}>Balance: </span><span className="font-semibold text-amber-400">{formatCurrency(filteredInvoices.reduce((s, i) => s + i.balance, 0))}</span></div>
+        {filteredInvoices.length > 0 && (
+          <div className={`flex items-center justify-between px-6 py-3 bg-white/[0.03] border-t ${THEME.glassBorder}`}>
+            <p className={`text-sm ${THEME.textMuted}`}>Showing {filteredInvoices.length} of {invoices.length} invoices</p>
+            <div className="flex items-center gap-6 text-sm">
+              <div><span className={THEME.textMuted}>Total: </span><span className={`font-semibold ${THEME.textPrimary}`}>{formatCurrency(filteredInvoices.reduce((s, i) => s + i.amount, 0))}</span></div>
+              <div><span className={THEME.textMuted}>Balance: </span><span className="font-semibold text-amber-400">{formatCurrency(filteredInvoices.reduce((s, i) => s + i.balance, 0))}</span></div>
+            </div>
           </div>
-        </div>
+        )}
       </CollapsibleSection>
 
       {/* Payment Modal */}
       {paymentInvoice && (
-        <PaymentModal invoice={paymentInvoice} onClose={() => setPaymentInvoice(null)}
-          onSave={(id, amount) => { onRecordPayment(id, amount); setPaymentInvoice(null) }} />
+        <PaymentModal 
+          invoice={paymentInvoice} 
+          onClose={() => setPaymentInvoice(null)}
+          onSave={(id, amount) => { onRecordPayment(id, amount); setPaymentInvoice(null) }}
+          type="invoice"
+        />
       )}
     </div>
   )
