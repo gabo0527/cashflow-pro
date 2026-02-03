@@ -10,7 +10,7 @@ import {
   PieChart as RePieChart, Pie, Cell, Legend
 } from 'recharts'
 import {
-  THEME, COLORS, EXPENSE_CATEGORIES, getCategoryConfig,
+  THEME, COLORS, EXPENSE_CATEGORIES,
   formatCurrency, MetricCard, ExpenseBar, CustomTooltip
 } from './shared'
 
@@ -19,9 +19,13 @@ interface OverviewSectionProps {
   projects: any[]
   selectedYear: number
   selectedMonth: string
+  categories?: typeof EXPENSE_CATEGORIES
 }
 
-export default function OverviewSection({ expenses, projects, selectedYear, selectedMonth }: OverviewSectionProps) {
+export default function OverviewSection({ expenses, projects, selectedYear, selectedMonth, categories = EXPENSE_CATEGORIES }: OverviewSectionProps) {
+  
+  // Use custom categories or default
+  const CATS = categories
   
   // Filter expenses by period
   const filteredExpenses = useMemo(() => {
@@ -49,8 +53,8 @@ export default function OverviewSection({ expenses, projects, selectedYear, sele
     // By subcategory
     const bySubcategory: Record<string, { name: string; amount: number; category: string }> = {}
     filteredExpenses.forEach(exp => {
-      const cat = getCategoryConfig(exp.category)
-      const subcat = cat.subcategories.find(s => s.id === exp.subcategory)
+      const cat = CATS[exp.category as keyof typeof CATS]
+      const subcat = cat?.subcategories.find(s => s.id === exp.subcategory)
       const key = `${exp.category}-${exp.subcategory}`
       if (!bySubcategory[key]) {
         bySubcategory[key] = { name: subcat?.name || exp.subcategory, amount: 0, category: exp.category }
@@ -79,7 +83,7 @@ export default function OverviewSection({ expenses, projects, selectedYear, sele
       bySubcategory: Object.values(bySubcategory).sort((a, b) => b.amount - a.amount),
       byProject: Object.values(byProject).sort((a, b) => b.amount - a.amount)
     }
-  }, [filteredExpenses, projects])
+  }, [filteredExpenses, projects, CATS])
 
   // Monthly chart data
   const monthlyData = useMemo(() => {
@@ -102,12 +106,12 @@ export default function OverviewSection({ expenses, projects, selectedYear, sele
   // Category pie data
   const categoryPieData = useMemo(() => {
     return [
-      { name: 'Direct Costs', value: metrics.directCosts, color: COLORS.rose },
-      { name: 'Overhead', value: metrics.overhead, color: COLORS.amber },
-      { name: 'Other Business', value: metrics.otherBusiness, color: COLORS.blue },
-      { name: 'Personal', value: metrics.personal, color: COLORS.cyan },
+      { name: CATS.directCosts.label, value: metrics.directCosts, color: CATS.directCosts.hex },
+      { name: CATS.overhead.label, value: metrics.overhead, color: CATS.overhead.hex },
+      { name: CATS.otherBusiness.label, value: metrics.otherBusiness, color: CATS.otherBusiness.hex },
+      { name: CATS.personal.label, value: metrics.personal, color: CATS.personal.hex },
     ].filter(d => d.value > 0)
-  }, [metrics])
+  }, [metrics, CATS])
 
   const periodLabel = selectedMonth === 'all' ? `${selectedYear}` : `${selectedMonth.charAt(0).toUpperCase() + selectedMonth.slice(1)} ${selectedYear}`
 
@@ -164,19 +168,19 @@ export default function OverviewSection({ expenses, projects, selectedYear, sele
               </div>
               <div className="flex items-center gap-4 text-xs">
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS.rose }} />
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CATS.directCosts.hex }} />
                   <span className={THEME.textMuted}>Direct</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS.amber }} />
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CATS.overhead.hex }} />
                   <span className={THEME.textMuted}>Overhead</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS.blue }} />
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CATS.otherBusiness.hex }} />
                   <span className={THEME.textMuted}>Other</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS.cyan }} />
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CATS.personal.hex }} />
                   <span className={THEME.textMuted}>Personal</span>
                 </div>
               </div>
@@ -187,10 +191,10 @@ export default function OverviewSection({ expenses, projects, selectedYear, sele
                   <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
                   <Tooltip content={<CustomTooltip formatter={(v: number) => formatCurrency(v)} />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                  <Bar dataKey="directCosts" name="Direct Costs" stackId="a" fill={COLORS.rose} radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="overhead" name="Overhead" stackId="a" fill={COLORS.amber} radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="otherBusiness" name="Other Business" stackId="a" fill={COLORS.blue} radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="personal" name="Personal" stackId="a" fill={COLORS.cyan} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="directCosts" name="Direct Costs" stackId="a" fill={CATS.directCosts.hex} radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="overhead" name="Overhead" stackId="a" fill={CATS.overhead.hex} radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="otherBusiness" name="Other Business" stackId="a" fill={CATS.otherBusiness.hex} radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="personal" name="Personal" stackId="a" fill={CATS.personal.hex} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -241,9 +245,9 @@ export default function OverviewSection({ expenses, projects, selectedYear, sele
             {metrics.bySubcategory.length > 0 ? (
               <div className="space-y-1">
                 {metrics.bySubcategory.slice(0, 6).map((item, i) => {
-                  const cat = getCategoryConfig(item.category)
+                  const cat = CATS[item.category as keyof typeof CATS]
                   return (
-                    <ExpenseBar key={i} label={item.name} amount={item.amount} total={metrics.total} color={cat.hex} />
+                    <ExpenseBar key={i} label={item.name} amount={item.amount} total={metrics.total} color={cat?.hex || COLORS.slate} />
                   )
                 })}
               </div>
