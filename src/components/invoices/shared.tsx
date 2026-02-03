@@ -120,7 +120,7 @@ export function MetricCard({ label, value, subtitle, icon: Icon, trend, color = 
 export function StatusBadge({ status, daysOverdue }: { status: string; daysOverdue?: number }) {
   const config = STATUS_CONFIG[status] || STATUS_CONFIG.current
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ${config.bg} ${config.text} border ${config.border}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${config.bg} ${config.text} border ${config.border}`}>
       {config.label}
       {daysOverdue && daysOverdue > 0 && !['paid', 'partial', 'current'].includes(status) && (
         <span className="opacity-75">({daysOverdue}d)</span>
@@ -204,8 +204,9 @@ export function EditableSelect({ value, options, onChange, placeholder = 'Select
   )
 }
 
-export function CollapsibleSection({ title, subtitle, badge, children, defaultExpanded = true, noPadding = false }: {
+export function CollapsibleSection({ title, subtitle, badge, children, defaultExpanded = true, noPadding = false, action }: {
   title: string; subtitle?: string; badge?: string | number; children: React.ReactNode; defaultExpanded?: boolean; noPadding?: boolean
+  action?: { label: string; onClick: () => void }
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
   return (
@@ -222,6 +223,14 @@ export function CollapsibleSection({ title, subtitle, badge, children, defaultEx
             {subtitle && <p className={`text-xs ${THEME.textDim} mt-0.5`}>{subtitle}</p>}
           </div>
         </div>
+        {action && (
+          <button 
+            onClick={(e) => { e.stopPropagation(); action.onClick(); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/20 transition-colors"
+          >
+            + {action.label}
+          </button>
+        )}
       </div>
       {isExpanded && <div className={noPadding ? '' : 'p-6'}>{children}</div>}
     </div>
@@ -229,10 +238,18 @@ export function CollapsibleSection({ title, subtitle, badge, children, defaultEx
 }
 
 // Payment Modal
-export function PaymentModal({ invoice, onClose, onSave }: { invoice: any; onClose: () => void; onSave: (id: string, amount: number) => void }) {
+export function PaymentModal({ invoice, onClose, onSave, type = 'invoice' }: { 
+  invoice: any; 
+  onClose: () => void; 
+  onSave: (id: string, amount: number) => void
+  type?: 'invoice' | 'bill'
+}) {
   const [paymentAmount, setPaymentAmount] = useState(invoice?.balance?.toString() || '0')
 
   if (!invoice) return null
+
+  const label = type === 'bill' ? 'Bill' : 'Invoice'
+  const number = type === 'bill' ? invoice.bill_number : invoice.invoice_number
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
@@ -242,28 +259,37 @@ export function PaymentModal({ invoice, onClose, onSave }: { invoice: any; onClo
           <button onClick={onClose} className="p-1 hover:bg-white/[0.05] rounded-lg transition-colors"><X size={20} className={THEME.textMuted} /></button>
         </div>
         <div className="p-6 space-y-4">
-          <div>
-            <p className={`text-sm ${THEME.textMuted}`}>Invoice #{invoice.invoice_number}</p>
-            <p className={`text-xs ${THEME.textDim} mt-1`}>Balance: {formatCurrency(invoice.balance)}</p>
+          <div className="bg-white/[0.03] border border-white/[0.08] rounded-lg p-4">
+            <p className={`text-sm font-medium ${THEME.textSecondary}`}>{label} #{number}</p>
+            <div className="flex items-center justify-between mt-2">
+              <span className={`text-xs ${THEME.textDim}`}>Outstanding Balance</span>
+              <span className="text-lg font-semibold text-amber-400">{formatCurrency(invoice.balance)}</span>
+            </div>
           </div>
           <div>
             <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Payment Amount</label>
             <div className="relative">
               <span className={`absolute left-3 top-1/2 -translate-y-1/2 ${THEME.textDim}`}>$</span>
               <input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)}
-                className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg pl-7 pr-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
+                className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg pl-7 pr-3 py-2.5 text-lg font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
             </div>
           </div>
           <div className="flex gap-2">
             <button onClick={() => setPaymentAmount(invoice.balance.toString())}
-              className="px-3 py-1.5 text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/20 transition-colors">Full Amount</button>
+              className="px-3 py-1.5 text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/20 transition-colors">
+              Pay in Full
+            </button>
+            <button onClick={() => setPaymentAmount((invoice.balance / 2).toFixed(2))}
+              className="px-3 py-1.5 text-xs font-medium bg-white/[0.05] text-slate-300 border border-white/[0.1] rounded-lg hover:bg-white/[0.08] transition-colors">
+              50%
+            </button>
           </div>
         </div>
         <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
           <button onClick={onClose} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white transition-colors`}>Cancel</button>
           <button onClick={() => { onSave(invoice.id, parseFloat(paymentAmount) || 0); onClose(); }}
             disabled={!paymentAmount || parseFloat(paymentAmount) <= 0}
-            className="px-4 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+            className="px-5 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-emerald-500/20">
             Record Payment
           </button>
         </div>
