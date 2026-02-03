@@ -1,12 +1,12 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { RefreshCw, Download, ChevronDown, Plus, FileText, Users } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import { getCurrentUser } from '@/lib/supabase'
 import { THEME } from '@/components/invoices/shared'
 import ARSection from '@/components/invoices/ARSection'
-import APSection from '@/components/invoices/APSection'
+import APSection, { APSectionHandle } from '@/components/invoices/APSection'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -25,6 +25,9 @@ export default function InvoicesPage() {
   const [clients, setClients] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
   const [teamMembers, setTeamMembers] = useState<any[]>([])
+
+  // Ref for AP Section to trigger Add Bill modal
+  const apSectionRef = useRef<APSectionHandle>(null)
 
   useEffect(() => {
     const loadData = async () => {
@@ -146,10 +149,18 @@ export default function InvoicesPage() {
     setBills(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b))
   }
 
+  // Handle Add Bill button click
+  const handleAddBillClick = () => {
+    apSectionRef.current?.openAddModal()
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
-        <div className="text-center"><RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" /><p className={`text-sm ${THEME.textMuted}`}>Loading invoices...</p></div>
+        <div className="text-center">
+          <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" />
+          <p className={`text-sm ${THEME.textMuted}`}>Loading invoices...</p>
+        </div>
       </div>
     )
   }
@@ -180,8 +191,10 @@ export default function InvoicesPage() {
             <Download size={14} /> Export
           </button>
           {activeTab === 'ap' && (
-            <button onClick={() => {/* AP section handles its own modal */}}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors">
+            <button 
+              onClick={handleAddBillClick}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20"
+            >
               <Plus size={14} /> Add Bill
             </button>
           )}
@@ -232,6 +245,7 @@ export default function InvoicesPage() {
         />
       ) : (
         <APSection
+          ref={apSectionRef}
           bills={bills}
           clients={clients}
           projects={projects}
