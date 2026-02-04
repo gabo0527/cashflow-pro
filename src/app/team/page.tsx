@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
-  Search, Filter, Download, Plus, Edit2, X, Users, Mail, Phone,
-  Eye, EyeOff, Briefcase, DollarSign, Trash2, BarChart3, FileText,
-  Layers, Building2, MapPin, CreditCard, Upload, ExternalLink,
-  Calendar, Clock, CheckCircle, AlertCircle, RefreshCw, ChevronRight
+  Search, Download, Plus, Edit2, X, Users, Mail, Phone,
+  Eye, EyeOff, Briefcase, DollarSign, Trash2, BarChart3,
+  FileText, Building2, MapPin, Upload, Calendar, Clock,
+  CheckCircle, AlertCircle, RefreshCw, ExternalLink, TrendingUp,
+  User, UserCheck, Filter, ChevronDown, ChevronRight
 } from 'lucide-react'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend
 } from 'recharts'
 import { supabase, getCurrentUser } from '@/lib/supabase'
 
@@ -30,14 +30,11 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
   return (
     <div className="fixed bottom-4 right-4 z-50 space-y-2">
       {toasts.map(toast => (
-        <div
-          key={toast.id}
-          className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg backdrop-blur-xl border ${
-            toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' :
-            toast.type === 'error' ? 'bg-rose-500/20 border-rose-500/30 text-rose-400' :
-            'bg-blue-500/20 border-blue-500/30 text-blue-400'
-          }`}
-        >
+        <div key={toast.id} className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg backdrop-blur-xl border ${
+          toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' :
+          toast.type === 'error' ? 'bg-rose-500/20 border-rose-500/30 text-rose-400' :
+          'bg-blue-500/20 border-blue-500/30 text-blue-400'
+        }`}>
           {toast.type === 'success' && <CheckCircle size={18} />}
           {toast.type === 'error' && <AlertCircle size={18} />}
           {toast.type === 'info' && <AlertCircle size={18} />}
@@ -57,6 +54,7 @@ interface TeamMember {
   phone: string | null
   role: string | null
   status: 'active' | 'inactive'
+  employment_type: 'employee' | 'contractor'
   start_date: string | null
   entity_name: string | null
   entity_type: string | null
@@ -68,7 +66,6 @@ interface TeamMember {
   payment_method: string | null
   cost_type: string | null
   cost_amount: number | null
-  services: string[]
 }
 
 interface ProjectAssignment {
@@ -76,18 +73,25 @@ interface ProjectAssignment {
   team_member_id: string
   project_id: string
   project_name: string
+  client_id: string | null
   client_name: string
-  service: string | null
   payment_type: 'lump_sum' | 'tm'
   rate: number
+  bill_rate?: number
 }
 
 interface Project {
   id: string
   name: string
   client_id: string | null
-  client_name: string | null
+  client_name?: string
   status: string
+  budget: number
+}
+
+interface Client {
+  id: string
+  name: string
 }
 
 interface TimeEntry {
@@ -95,23 +99,20 @@ interface TimeEntry {
   team_member_id: string
   project_id: string
   hours: number
+  billable_hours: number | null
+  is_billable: boolean
   date: string
-}
-
-interface TeamDocument {
-  id: string
-  team_member_id: string
-  document_type: string
-  file_name: string
-  file_url: string
-  related_project_id: string | null
-  created_at: string
 }
 
 // ============ CONSTANTS ============
 const STATUS_OPTIONS = [
-  { id: 'active', label: 'Active', color: 'emerald' },
-  { id: 'inactive', label: 'Inactive', color: 'slate' },
+  { id: 'active', label: 'Active' },
+  { id: 'inactive', label: 'Inactive' },
+]
+
+const EMPLOYMENT_TYPES = [
+  { id: 'employee', label: 'W-2 Employee', icon: UserCheck, color: 'blue' },
+  { id: 'contractor', label: '1099 Contractor', icon: User, color: 'purple' },
 ]
 
 const ENTITY_TYPES = [
@@ -122,9 +123,14 @@ const ENTITY_TYPES = [
   { id: 'partnership', label: 'Partnership' },
 ]
 
-const COST_TYPES = [
-  { id: 'Lump Sum', label: 'Lump Sum (Monthly)' },
-  { id: 'T&M', label: 'Time & Materials (Hourly)' },
+const PAYMENT_TYPES = [
+  { id: 'lump_sum', label: 'Lump Sum' },
+  { id: 'tm', label: 'T&M (Hourly)' },
+]
+
+const ACCOUNT_TYPES = [
+  { id: 'checking', label: 'Checking' },
+  { id: 'savings', label: 'Savings' },
 ]
 
 const PAYMENT_METHODS = [
@@ -134,30 +140,25 @@ const PAYMENT_METHODS = [
   { id: 'zelle', label: 'Zelle' },
 ]
 
-const ACCOUNT_TYPES = [
-  { id: 'checking', label: 'Checking' },
-  { id: 'savings', label: 'Savings' },
-]
-
-const DOCUMENT_TYPES = [
-  { id: 'NDA', label: 'NDA' },
-  { id: 'MPSA', label: 'MPSA' },
-  { id: 'PO', label: 'Purchase Order' },
-  { id: 'Schedule', label: 'Schedule/SOW' },
-  { id: 'W9', label: 'W-9' },
-  { id: 'Other', label: 'Other' },
-]
-
-const CHART_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
-
-// ============ UTILITIES ============
-const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value)
+const CHART_COLORS = {
+  cost: '#ef4444',
+  revenue: '#10b981',
+  margin: '#3b82f6',
 }
 
-const maskNumber = (value: string | null): string => {
-  if (!value) return '—'
-  return '••••' + value.slice(-4)
+// ============ UTILITIES ============
+const formatCurrency = (value: number): string => 
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value)
+
+const formatCompactCurrency = (value: number): string => {
+  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`
+  if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`
+  return `$${value.toFixed(0)}`
+}
+
+const maskNumber = (num: string | null): string => {
+  if (!num) return '—'
+  return '•••• ' + num.slice(-4)
 }
 
 const getStatusStyle = (status: string) => {
@@ -165,103 +166,59 @@ const getStatusStyle = (status: string) => {
   return { bg: 'bg-slate-500/10', text: 'text-slate-400', border: 'border-slate-500/30' }
 }
 
-// ============ DETAIL FLYOUT ============
+const getEmploymentStyle = (type: string) => {
+  if (type === 'employee') return { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30' }
+  return { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30' }
+}
+
+// ============ MEMBER DETAIL FLYOUT ============
 function MemberDetailFlyout({
   member,
   assignments,
-  documents,
-  projects,
-  timeEntries,
   onClose,
   onEdit,
-  onAddAssignment,
-  onRemoveAssignment,
-  addToast
 }: {
   member: TeamMember
   assignments: ProjectAssignment[]
-  documents: TeamDocument[]
-  projects: Project[]
-  timeEntries: TimeEntry[]
   onClose: () => void
   onEdit: () => void
-  onAddAssignment: (data: any) => Promise<void>
-  onRemoveAssignment: (id: string) => Promise<void>
-  addToast: (type: Toast['type'], message: string) => void
 }) {
   const [showBanking, setShowBanking] = useState(false)
-  const [assignForm, setAssignForm] = useState({ project_id: '', payment_type: 'tm' as 'lump_sum' | 'tm', rate: '' })
-
   const memberAssignments = assignments.filter(a => a.team_member_id === member.id)
-  const memberDocs = documents.filter(d => d.team_member_id === member.id)
-  
-  // Calculate MTD hours and cost
-  const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-  const mtdEntries = timeEntries.filter(t => t.team_member_id === member.id && t.date >= monthStart)
-  const mtdHours = mtdEntries.reduce((sum, t) => sum + (t.hours || 0), 0)
-  const mtdCost = member.cost_type === 'T&M' && member.cost_amount
-    ? mtdHours * member.cost_amount
-    : member.cost_amount || 0
-
-  const handleAddAssignment = async () => {
-    if (!assignForm.project_id) return
-    const project = projects.find(p => p.id === assignForm.project_id)
-    await onAddAssignment({
-      team_member_id: member.id,
-      project_id: assignForm.project_id,
-      payment_type: assignForm.payment_type,
-      rate: parseFloat(assignForm.rate) || 0,
-      project_name: project?.name,
-      client_name: project?.client_name,
-    })
-    setAssignForm({ project_id: '', payment_type: 'tm', rate: '' })
-  }
+  const empStyle = getEmploymentStyle(member.employment_type)
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50" onClick={onClose}>
-      <div 
-        className={`w-full max-w-xl h-full ${THEME.glass} border-l ${THEME.glassBorder} overflow-y-auto`}
-        onClick={e => e.stopPropagation()}
-      >
+      <div className={`w-full max-w-xl h-full ${THEME.glass} border-l ${THEME.glassBorder} overflow-y-auto`} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className={`sticky top-0 ${THEME.glass} border-b ${THEME.glassBorder} px-6 py-4 z-10`}>
           <div className="flex items-start justify-between">
             <div>
-              <h2 className={`text-lg font-semibold ${THEME.textPrimary}`}>{member.name}</h2>
-              <p className={`text-sm ${THEME.textMuted}`}>{member.role || 'Team Member'}</p>
+              <div className="flex items-center gap-2">
+                <h2 className={`text-lg font-semibold ${THEME.textPrimary}`}>{member.name}</h2>
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${empStyle.bg} ${empStyle.text}`}>
+                  {member.employment_type === 'employee' ? 'W-2' : '1099'}
+                </span>
+              </div>
+              <p className={`text-sm ${THEME.textMuted} mt-0.5`}>{member.role || 'No role'}</p>
               {member.entity_name && (
-                <p className={`text-xs ${THEME.textDim} mt-1`}>{member.entity_name} ({ENTITY_TYPES.find(t => t.id === member.entity_type)?.label || member.entity_type})</p>
+                <p className={`text-xs ${THEME.textDim} mt-1 flex items-center gap-1`}>
+                  <Building2 size={12} /> {member.entity_name}
+                </p>
               )}
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={onEdit} className="p-2 rounded-lg hover:bg-white/[0.08] transition-colors">
-                <Edit2 size={18} className={THEME.textMuted} />
+              <button onClick={onEdit} className="p-2 rounded-lg hover:bg-white/[0.08]">
+                <Edit2 size={16} className={THEME.textMuted} />
               </button>
-              <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/[0.08] transition-colors">
-                <X size={20} className={THEME.textMuted} />
+              <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/[0.08]">
+                <X size={18} className={THEME.textMuted} />
               </button>
             </div>
           </div>
         </div>
 
         <div className="p-6 space-y-6">
-          {/* Quick Stats */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="p-3 rounded-lg bg-white/[0.03] text-center">
-              <p className="text-lg font-semibold text-white">{mtdHours.toFixed(1)}</p>
-              <p className={`text-xs ${THEME.textMuted}`}>Hours (MTD)</p>
-            </div>
-            <div className="p-3 rounded-lg bg-white/[0.03] text-center">
-              <p className="text-lg font-semibold text-orange-400">{formatCurrency(mtdCost)}</p>
-              <p className={`text-xs ${THEME.textMuted}`}>Cost (MTD)</p>
-            </div>
-            <div className="p-3 rounded-lg bg-white/[0.03] text-center">
-              <p className="text-lg font-semibold text-emerald-400">{memberAssignments.length}</p>
-              <p className={`text-xs ${THEME.textMuted}`}>Projects</p>
-            </div>
-          </div>
-
           {/* Contact Info */}
           <div className="space-y-3">
             <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Contact Information</h3>
@@ -287,168 +244,427 @@ function MemberDetailFlyout({
             </div>
           </div>
 
-          {/* Cost Structure */}
-          <div className="space-y-3">
-            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Cost Structure</h3>
-            <div className="p-4 rounded-lg bg-white/[0.03] border border-white/[0.08]">
-              <div className="flex items-center justify-between">
-                <span className={THEME.textMuted}>Type</span>
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                  member.cost_type === 'Lump Sum' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'
-                }`}>{member.cost_type || 'Not set'}</span>
-              </div>
-              {member.cost_amount && (
-                <div className="flex items-center justify-between mt-2">
-                  <span className={THEME.textMuted}>Rate</span>
-                  <span className="text-orange-400 font-semibold">
-                    {formatCurrency(member.cost_amount)}{member.cost_type === 'T&M' ? '/hr' : '/mo'}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Banking Info */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Banking Information</h3>
-              <button
-                onClick={() => setShowBanking(!showBanking)}
-                className={`text-xs ${THEME.textMuted} hover:text-white flex items-center gap-1`}
-              >
-                {showBanking ? <EyeOff size={14} /> : <Eye size={14} />}
-                {showBanking ? 'Hide' : 'Show'}
-              </button>
+              {member.bank_name && (
+                <button onClick={() => setShowBanking(!showBanking)} className={`text-xs ${THEME.textMuted} hover:text-white flex items-center gap-1`}>
+                  {showBanking ? <EyeOff size={14} /> : <Eye size={14} />} {showBanking ? 'Hide' : 'Show'}
+                </button>
+              )}
             </div>
             {member.bank_name ? (
-              <div className="p-4 rounded-lg bg-white/[0.03] border border-white/[0.08] space-y-2">
-                <div className="flex justify-between">
-                  <span className={THEME.textMuted}>Bank</span>
-                  <span className={THEME.textSecondary}>{member.bank_name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className={THEME.textMuted}>Account Type</span>
-                  <span className={THEME.textSecondary}>{ACCOUNT_TYPES.find(t => t.id === member.account_type)?.label || '—'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className={THEME.textMuted}>Routing #</span>
-                  <span className="font-mono text-sm">{showBanking ? member.routing_number : maskNumber(member.routing_number)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className={THEME.textMuted}>Account #</span>
-                  <span className="font-mono text-sm">{showBanking ? member.account_number : maskNumber(member.account_number)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className={THEME.textMuted}>Payment Method</span>
-                  <span className={THEME.textSecondary}>{PAYMENT_METHODS.find(m => m.id === member.payment_method)?.label || '—'}</span>
-                </div>
+              <div className="p-4 rounded-lg bg-white/[0.03] space-y-2">
+                <div className="flex justify-between"><span className={THEME.textMuted}>Bank</span><span className={THEME.textPrimary}>{member.bank_name}</span></div>
+                <div className="flex justify-between"><span className={THEME.textMuted}>Account Type</span><span className={THEME.textPrimary}>{ACCOUNT_TYPES.find(t => t.id === member.account_type)?.label || '—'}</span></div>
+                <div className="flex justify-between"><span className={THEME.textMuted}>Routing #</span><span className="font-mono text-sm">{showBanking ? member.routing_number : maskNumber(member.routing_number)}</span></div>
+                <div className="flex justify-between"><span className={THEME.textMuted}>Account #</span><span className="font-mono text-sm">{showBanking ? member.account_number : maskNumber(member.account_number)}</span></div>
+                <div className="flex justify-between"><span className={THEME.textMuted}>Payment</span><span className={THEME.textPrimary}>{PAYMENT_METHODS.find(m => m.id === member.payment_method)?.label || '—'}</span></div>
               </div>
             ) : (
               <p className={`text-sm ${THEME.textMuted} p-4 rounded-lg bg-white/[0.03] text-center`}>No banking info on file</p>
             )}
           </div>
 
-          {/* Project Assignments */}
+          {/* Contracts Summary */}
           <div className="space-y-3">
-            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Project Assignments ({memberAssignments.length})</h3>
+            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Active Contracts ({memberAssignments.length})</h3>
             {memberAssignments.length > 0 ? (
               <div className="space-y-2">
                 {memberAssignments.map(a => (
                   <div key={a.id} className="flex items-center justify-between p-3 rounded-lg bg-white/[0.03]">
                     <div>
-                      <p className={`text-sm ${THEME.textPrimary}`}>{a.project_name}</p>
+                      <p className={`text-sm font-medium ${THEME.textPrimary}`}>{a.project_name}</p>
                       <p className={`text-xs ${THEME.textDim}`}>{a.client_name}</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <span className={`text-xs px-2 py-0.5 rounded ${
-                          a.payment_type === 'lump_sum' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'
-                        }`}>{a.payment_type === 'lump_sum' ? 'LS' : 'T&M'}</span>
-                        <p className={`text-sm ${THEME.textSecondary} mt-1`}>
-                          {formatCurrency(a.rate)}{a.payment_type === 'tm' ? '/hr' : '/mo'}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => onRemoveAssignment(a.id)}
-                        className="p-1.5 rounded bg-rose-500/10 text-rose-400 hover:bg-rose-500/20"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                    <div className="text-right">
+                      <span className={`text-xs px-2 py-0.5 rounded ${a.payment_type === 'lump_sum' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                        {a.payment_type === 'lump_sum' ? 'LS' : 'T&M'}
+                      </span>
+                      <p className={`text-sm text-orange-400 mt-0.5`}>
+                        {formatCurrency(a.rate)}{a.payment_type === 'tm' ? '/hr' : '/mo'}
+                      </p>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className={`text-sm ${THEME.textMuted} p-4 rounded-lg bg-white/[0.03] text-center`}>No project assignments</p>
+              <p className={`text-sm ${THEME.textMuted} text-center py-4`}>No active contracts</p>
             )}
-            
-            {/* Add Assignment */}
-            <div className="p-4 rounded-lg bg-white/[0.02] border border-dashed border-white/[0.1] space-y-3">
-              <p className={`text-xs font-medium ${THEME.textMuted}`}>Add Assignment</p>
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={assignForm.project_id}
-                  onChange={e => setAssignForm(p => ({ ...p, project_id: e.target.value }))}
-                  className="col-span-2 px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                >
-                  <option value="">Select project...</option>
-                  {projects.filter(p => p.status === 'active').map(p => (
-                    <option key={p.id} value={p.id}>{p.client_name ? `${p.client_name} - ` : ''}{p.name}</option>
-                  ))}
-                </select>
-                <select
-                  value={assignForm.payment_type}
-                  onChange={e => setAssignForm(p => ({ ...p, payment_type: e.target.value as any }))}
-                  className="px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                >
-                  <option value="tm">T&M</option>
-                  <option value="lump_sum">Lump Sum</option>
-                </select>
-                <input
-                  type="number"
-                  value={assignForm.rate}
-                  onChange={e => setAssignForm(p => ({ ...p, rate: e.target.value }))}
-                  placeholder={assignForm.payment_type === 'tm' ? '$/hr' : '$/mo'}
-                  className="px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                />
-              </div>
-              <button
-                onClick={handleAddAssignment}
-                disabled={!assignForm.project_id}
-                className="w-full px-3 py-2 text-sm font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-500/30 disabled:opacity-50 transition-colors"
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============ CONTRACT MODAL ============
+function ContractModal({
+  isOpen,
+  onClose,
+  onSave,
+  editingContract,
+  teamMembers,
+  projects,
+  clients,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  onSave: (data: any) => Promise<void>
+  editingContract: ProjectAssignment | null
+  teamMembers: TeamMember[]
+  projects: Project[]
+  clients: Client[]
+}) {
+  const [form, setForm] = useState({
+    team_member_id: '',
+    client_id: '',
+    project_id: '',
+    payment_type: 'tm' as 'lump_sum' | 'tm',
+    rate: '',
+    bill_rate: '',
+  })
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    if (editingContract) {
+      setForm({
+        team_member_id: editingContract.team_member_id,
+        client_id: editingContract.client_id || '',
+        project_id: editingContract.project_id,
+        payment_type: editingContract.payment_type,
+        rate: editingContract.rate.toString(),
+        bill_rate: editingContract.bill_rate?.toString() || '',
+      })
+    } else {
+      setForm({ team_member_id: '', client_id: '', project_id: '', payment_type: 'tm', rate: '', bill_rate: '' })
+    }
+  }, [editingContract, isOpen])
+
+  const filteredProjects = form.client_id 
+    ? projects.filter(p => p.client_id === form.client_id)
+    : projects
+
+  const handleSave = async () => {
+    if (!form.team_member_id || !form.project_id) return
+    setIsSaving(true)
+    try {
+      await onSave({
+        ...form,
+        rate: parseFloat(form.rate) || 0,
+        bill_rate: form.bill_rate ? parseFloat(form.bill_rate) : null,
+      })
+      onClose()
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-2xl w-full max-w-lg`}>
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder}`}>
+          <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>
+            {editingContract ? 'Edit Contract' : 'New Contract'}
+          </h3>
+          <button onClick={onClose} className="p-1 hover:bg-white/[0.05] rounded-lg">
+            <X size={20} className={THEME.textMuted} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div>
+            <label className={`block text-xs ${THEME.textMuted} mb-1`}>Team Member *</label>
+            <select
+              value={form.team_member_id}
+              onChange={e => setForm(p => ({ ...p, team_member_id: e.target.value }))}
+              className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
+            >
+              <option value="">Select team member...</option>
+              {teamMembers.filter(m => m.status === 'active').map(m => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className={`block text-xs ${THEME.textMuted} mb-1`}>Client</label>
+            <select
+              value={form.client_id}
+              onChange={e => setForm(p => ({ ...p, client_id: e.target.value, project_id: '' }))}
+              className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
+            >
+              <option value="">All clients...</option>
+              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className={`block text-xs ${THEME.textMuted} mb-1`}>Project *</label>
+            <select
+              value={form.project_id}
+              onChange={e => setForm(p => ({ ...p, project_id: e.target.value }))}
+              className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
+            >
+              <option value="">Select project...</option>
+              {filteredProjects.map(p => (
+                <option key={p.id} value={p.id}>{p.client_name ? `${p.client_name} - ` : ''}{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={`block text-xs ${THEME.textMuted} mb-1`}>Payment Type</label>
+              <select
+                value={form.payment_type}
+                onChange={e => setForm(p => ({ ...p, payment_type: e.target.value as any }))}
+                className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
               >
-                Add Assignment
-              </button>
+                {PAYMENT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={`block text-xs ${THEME.textMuted} mb-1`}>
+                Cost Rate ({form.payment_type === 'lump_sum' ? '/mo' : '/hr'})
+              </label>
+              <input
+                type="number"
+                value={form.rate}
+                onChange={e => setForm(p => ({ ...p, rate: e.target.value }))}
+                className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
+                placeholder="0"
+              />
             </div>
           </div>
 
-          {/* Documents */}
-          <div className="space-y-3">
-            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Documents ({memberDocs.length})</h3>
-            {memberDocs.length > 0 ? (
-              <div className="space-y-2">
-                {memberDocs.map(doc => (
-                  <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg bg-white/[0.03]">
-                    <div className="flex items-center gap-3">
-                      <FileText size={16} className={THEME.textMuted} />
-                      <div>
-                        <p className={`text-sm ${THEME.textPrimary}`}>{doc.file_name}</p>
-                        <p className={`text-xs ${THEME.textDim}`}>{doc.document_type}</p>
-                      </div>
-                    </div>
-                    <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
-                      <ExternalLink size={14} />
-                    </a>
-                  </div>
-                ))}
+          {form.payment_type === 'tm' && (
+            <div>
+              <label className={`block text-xs ${THEME.textMuted} mb-1`}>Bill Rate (/hr) — What client pays</label>
+              <input
+                type="number"
+                value={form.bill_rate}
+                onChange={e => setForm(p => ({ ...p, bill_rate: e.target.value }))}
+                className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
+                placeholder="Optional — used for profitability"
+              />
+            </div>
+          )}
+        </div>
+
+        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
+          <button onClick={onClose} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white`}>Cancel</button>
+          <button
+            onClick={handleSave}
+            disabled={!form.team_member_id || !form.project_id || isSaving}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50"
+          >
+            {isSaving && <RefreshCw size={14} className="animate-spin" />}
+            {editingContract ? 'Save Changes' : 'Create Contract'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============ MEMBER MODAL ============
+function MemberModal({
+  isOpen,
+  onClose,
+  onSave,
+  editingMember,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  onSave: (data: any) => Promise<void>
+  editingMember: TeamMember | null
+}) {
+  const [form, setForm] = useState({
+    name: '', email: '', phone: '', role: '', status: 'active',
+    employment_type: 'contractor', start_date: '',
+    entity_name: '', entity_type: '', address: '',
+    bank_name: '', account_type: '', routing_number: '', account_number: '', payment_method: '',
+  })
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    if (editingMember) {
+      setForm({
+        name: editingMember.name || '',
+        email: editingMember.email || '',
+        phone: editingMember.phone || '',
+        role: editingMember.role || '',
+        status: editingMember.status || 'active',
+        employment_type: editingMember.employment_type || 'contractor',
+        start_date: editingMember.start_date || '',
+        entity_name: editingMember.entity_name || '',
+        entity_type: editingMember.entity_type || '',
+        address: editingMember.address || '',
+        bank_name: editingMember.bank_name || '',
+        account_type: editingMember.account_type || '',
+        routing_number: editingMember.routing_number || '',
+        account_number: editingMember.account_number || '',
+        payment_method: editingMember.payment_method || '',
+      })
+    } else {
+      setForm({
+        name: '', email: '', phone: '', role: '', status: 'active',
+        employment_type: 'contractor', start_date: '',
+        entity_name: '', entity_type: '', address: '',
+        bank_name: '', account_type: '', routing_number: '', account_number: '', payment_method: '',
+      })
+    }
+  }, [editingMember, isOpen])
+
+  const handleSave = async () => {
+    if (!form.name || !form.email) return
+    setIsSaving(true)
+    try {
+      await onSave(form)
+      onClose()
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto`}>
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder}`}>
+          <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>
+            {editingMember ? 'Edit Team Member' : 'Add Team Member'}
+          </h3>
+          <button onClick={onClose} className="p-1 hover:bg-white/[0.05] rounded-lg">
+            <X size={20} className={THEME.textMuted} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Basic Info */}
+          <div>
+            <h4 className={`text-sm font-semibold ${THEME.textPrimary} mb-3`}>Basic Information</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={`block text-xs ${THEME.textMuted} mb-1`}>Name *</label>
+                <input type="text" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" />
               </div>
-            ) : (
-              <p className={`text-sm ${THEME.textMuted} p-4 rounded-lg bg-white/[0.03] text-center`}>No documents uploaded</p>
-            )}
-            <button className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium bg-white/[0.03] border border-dashed border-white/[0.1] rounded-lg text-slate-400 hover:bg-white/[0.05] hover:text-white transition-colors">
-              <Upload size={14} /> Upload Document
-            </button>
+              <div>
+                <label className={`block text-xs ${THEME.textMuted} mb-1`}>Email *</label>
+                <input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" />
+              </div>
+              <div>
+                <label className={`block text-xs ${THEME.textMuted} mb-1`}>Phone</label>
+                <input type="tel" value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" />
+              </div>
+              <div>
+                <label className={`block text-xs ${THEME.textMuted} mb-1`}>Role</label>
+                <input type="text" value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="e.g., Project Manager" />
+              </div>
+              <div>
+                <label className={`block text-xs ${THEME.textMuted} mb-1`}>Employment Type</label>
+                <select value={form.employment_type} onChange={e => setForm(p => ({ ...p, employment_type: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white">
+                  {EMPLOYMENT_TYPES.map(t => <option key={t.id} value={t.id} className="bg-slate-900">{t.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={`block text-xs ${THEME.textMuted} mb-1`}>Status</label>
+                <select value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white">
+                  {STATUS_OPTIONS.map(s => <option key={s.id} value={s.id} className="bg-slate-900">{s.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={`block text-xs ${THEME.textMuted} mb-1`}>Start Date</label>
+                <input type="date" value={form.start_date} onChange={e => setForm(p => ({ ...p, start_date: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" />
+              </div>
+            </div>
           </div>
+
+          {/* Entity Info - Only for contractors */}
+          {form.employment_type === 'contractor' && (
+            <div className={`pt-4 border-t ${THEME.glassBorder}`}>
+              <h4 className={`text-sm font-semibold ${THEME.textPrimary} mb-3`}>Entity Information (1099)</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={`block text-xs ${THEME.textMuted} mb-1`}>Entity Name</label>
+                  <input type="text" value={form.entity_name} onChange={e => setForm(p => ({ ...p, entity_name: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="e.g., Smith Consulting LLC" />
+                </div>
+                <div>
+                  <label className={`block text-xs ${THEME.textMuted} mb-1`}>Entity Type</label>
+                  <select value={form.entity_type} onChange={e => setForm(p => ({ ...p, entity_type: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white">
+                    <option value="" className="bg-slate-900">Select...</option>
+                    {ENTITY_TYPES.map(t => <option key={t.id} value={t.id} className="bg-slate-900">{t.label}</option>)}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className={`block text-xs ${THEME.textMuted} mb-1`}>Address</label>
+                  <input type="text" value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="123 Main St, City, State ZIP" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Banking */}
+          <div className={`pt-4 border-t ${THEME.glassBorder}`}>
+            <h4 className={`text-sm font-semibold ${THEME.textPrimary} mb-3`}>Banking Information</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={`block text-xs ${THEME.textMuted} mb-1`}>Bank Name</label>
+                <input type="text" value={form.bank_name} onChange={e => setForm(p => ({ ...p, bank_name: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" />
+              </div>
+              <div>
+                <label className={`block text-xs ${THEME.textMuted} mb-1`}>Account Type</label>
+                <select value={form.account_type} onChange={e => setForm(p => ({ ...p, account_type: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white">
+                  <option value="" className="bg-slate-900">Select...</option>
+                  {ACCOUNT_TYPES.map(t => <option key={t.id} value={t.id} className="bg-slate-900">{t.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={`block text-xs ${THEME.textMuted} mb-1`}>Routing Number</label>
+                <input type="text" value={form.routing_number} onChange={e => setForm(p => ({ ...p, routing_number: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" />
+              </div>
+              <div>
+                <label className={`block text-xs ${THEME.textMuted} mb-1`}>Account Number</label>
+                <input type="text" value={form.account_number} onChange={e => setForm(p => ({ ...p, account_number: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" />
+              </div>
+              <div>
+                <label className={`block text-xs ${THEME.textMuted} mb-1`}>Payment Method</label>
+                <select value={form.payment_method} onChange={e => setForm(p => ({ ...p, payment_method: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white">
+                  <option value="" className="bg-slate-900">Select...</option>
+                  {PAYMENT_METHODS.map(m => <option key={m.id} value={m.id} className="bg-slate-900">{m.label}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
+          <button onClick={onClose} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white`}>Cancel</button>
+          <button onClick={handleSave} disabled={!form.name || !form.email || isSaving}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50">
+            {isSaving && <RefreshCw size={14} className="animate-spin" />}
+            {editingMember ? 'Save Changes' : 'Add Member'}
+          </button>
         </div>
       </div>
     </div>
@@ -461,19 +677,9 @@ export default function TeamPage() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [assignments, setAssignments] = useState<ProjectAssignment[]>([])
   const [projects, setProjects] = useState<Project[]>([])
-  const [clients, setClients] = useState<{ id: string; name: string }[]>([])
+  const [clients, setClients] = useState<Client[]>([])
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
-  const [documents, setDocuments] = useState<TeamDocument[]>([])
   const [companyId, setCompanyId] = useState<string | null>(null)
-
-  // UI State
-  const [activeTab, setActiveTab] = useState('directory')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedStatus, setSelectedStatus] = useState('all')
-  const [showMemberModal, setShowMemberModal] = useState(false)
-  const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
-  const [selectedMemberDetail, setSelectedMemberDetail] = useState<TeamMember | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
 
   // Toast
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -483,13 +689,15 @@ export default function TeamPage() {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
   }, [])
 
-  // Form State
-  const [formData, setFormData] = useState({
-    name: '', email: '', phone: '', role: '', status: 'active',
-    start_date: '', entity_name: '', entity_type: '', address: '',
-    bank_name: '', account_type: '', routing_number: '', account_number: '',
-    payment_method: '', cost_type: 'Lump Sum', cost_amount: ''
-  })
+  // UI State
+  const [activeTab, setActiveTab] = useState<'directory' | 'contracts' | 'profitability'>('directory')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [employmentFilter, setEmploymentFilter] = useState<'all' | 'employee' | 'contractor'>('all')
+  const [showMemberModal, setShowMemberModal] = useState(false)
+  const [showContractModal, setShowContractModal] = useState(false)
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
+  const [editingContract, setEditingContract] = useState<ProjectAssignment | null>(null)
+  const [selectedMemberDetail, setSelectedMemberDetail] = useState<TeamMember | null>(null)
 
   // Load Data
   useEffect(() => {
@@ -499,48 +707,45 @@ export default function TeamPage() {
         const user = result?.user
         if (!user) { setLoading(false); return }
 
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single()
-
+        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
         if (!profile?.company_id) { setLoading(false); return }
+
         setCompanyId(profile.company_id)
 
-        const [membersRes, projectsRes, clientsRes, assignmentsRes, timeRes, docsRes] = await Promise.all([
+        const [membersRes, projectsRes, clientsRes, assignmentsRes, timeRes] = await Promise.all([
           supabase.from('team_members').select('*').eq('company_id', profile.company_id).order('name'),
-          supabase.from('projects').select('id, name, client_id, status').eq('company_id', profile.company_id),
+          supabase.from('projects').select('*').eq('company_id', profile.company_id),
           supabase.from('clients').select('id, name').eq('company_id', profile.company_id),
           supabase.from('project_assignments').select('*').eq('company_id', profile.company_id),
-          supabase.from('timesheet_entries').select('id, team_member_id, project_id, hours, date').eq('company_id', profile.company_id),
-          supabase.from('team_member_documents').select('*'),
+          supabase.from('time_entries').select('*').eq('company_id', profile.company_id),
         ])
 
-        const clientMap = new Map((clientsRes.data || []).map(c => [c.id, c.name]))
-        
         setTeamMembers(membersRes.data || [])
-        setProjects((projectsRes.data || []).map(p => ({
-          ...p,
-          client_name: clientMap.get(p.client_id) || null
-        })))
         setClients(clientsRes.data || [])
         
-        // Enrich assignments with names
-        const enrichedAssignments = (assignmentsRes.data || []).map(a => {
-          const project = projectsRes.data?.find(p => p.id === a.project_id)
+        const clientMap = new Map((clientsRes.data || []).map(c => [c.id, c.name]))
+        setProjects((projectsRes.data || []).map(p => ({
+          ...p,
+          budget: parseFloat(p.budget) || 0,
+          client_name: clientMap.get(p.client_id) || '',
+        })))
+
+        // Enrich assignments
+        const projectMap = new Map((projectsRes.data || []).map(p => [p.id, p]))
+        setAssignments((assignmentsRes.data || []).map(a => {
+          const project = projectMap.get(a.project_id)
           return {
             ...a,
             project_name: project?.name || 'Unknown',
-            client_name: clientMap.get(project?.client_id) || ''
+            client_id: project?.client_id,
+            client_name: clientMap.get(project?.client_id) || '',
           }
-        })
-        setAssignments(enrichedAssignments)
+        }))
+
         setTimeEntries(timeRes.data || [])
-        setDocuments(docsRes.data || [])
       } catch (error) {
         console.error('Error loading data:', error)
-        addToast('error', 'Failed to load team data')
+        addToast('error', 'Failed to load data')
       } finally {
         setLoading(false)
       }
@@ -553,131 +758,121 @@ export default function TeamPage() {
     return teamMembers.filter(m => {
       if (searchQuery) {
         const q = searchQuery.toLowerCase()
-        if (!m.name?.toLowerCase().includes(q) && !m.email?.toLowerCase().includes(q) && !m.role?.toLowerCase().includes(q)) return false
+        if (!m.name?.toLowerCase().includes(q) && !m.email?.toLowerCase().includes(q)) return false
       }
-      if (selectedStatus !== 'all' && m.status !== selectedStatus) return false
+      if (employmentFilter !== 'all' && m.employment_type !== employmentFilter) return false
       return true
     })
-  }, [teamMembers, searchQuery, selectedStatus])
+  }, [teamMembers, searchQuery, employmentFilter])
 
-  // Summary
+  // Grouped members by employment type
+  const groupedMembers = useMemo(() => ({
+    employees: filteredMembers.filter(m => m.employment_type === 'employee'),
+    contractors: filteredMembers.filter(m => m.employment_type === 'contractor'),
+  }), [filteredMembers])
+
+  // Summary stats
   const summary = useMemo(() => {
     const active = teamMembers.filter(m => m.status === 'active')
-    const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-    const mtdEntries = timeEntries.filter(t => t.date >= monthStart)
-    const mtdHours = mtdEntries.reduce((sum, t) => sum + (t.hours || 0), 0)
+    const employees = teamMembers.filter(m => m.employment_type === 'employee')
+    const contractors = teamMembers.filter(m => m.employment_type === 'contractor')
     
-    let mtdCost = 0
-    active.forEach(m => {
-      const memberEntries = mtdEntries.filter(t => t.team_member_id === m.id)
-      const memberHours = memberEntries.reduce((sum, t) => sum + (t.hours || 0), 0)
-      if (m.cost_type === 'T&M' && m.cost_amount) {
-        mtdCost += memberHours * m.cost_amount
-      } else if (m.cost_amount) {
-        mtdCost += m.cost_amount
+    // Calculate costs from assignments
+    let totalMonthlyCost = 0
+    assignments.forEach(a => {
+      if (a.payment_type === 'lump_sum') {
+        totalMonthlyCost += a.rate
       }
+      // T&M costs calculated from time entries
     })
 
-    return {
-      total: teamMembers.length,
-      active: active.length,
-      mtdHours,
-      mtdCost,
-      avgCostPerHour: mtdHours > 0 ? mtdCost / mtdHours : 0
-    }
-  }, [teamMembers, timeEntries])
+    return { total: teamMembers.length, active: active.length, employees: employees.length, contractors: contractors.length, totalMonthlyCost }
+  }, [teamMembers, assignments])
+
+  // Profitability data
+  const profitabilityData = useMemo(() => {
+    const memberStats = teamMembers.map(member => {
+      const memberAssignments = assignments.filter(a => a.team_member_id === member.id)
+      const memberTime = timeEntries.filter(t => t.team_member_id === member.id)
+      
+      let totalCost = 0
+      let totalRevenue = 0
+      
+      memberAssignments.forEach(a => {
+        const projectTime = memberTime.filter(t => t.project_id === a.project_id)
+        const actualHours = projectTime.reduce((sum, t) => sum + (t.hours || 0), 0)
+        const billableHours = projectTime.reduce((sum, t) => sum + (t.billable_hours || t.hours || 0), 0)
+        
+        if (a.payment_type === 'lump_sum') {
+          totalCost += a.rate
+        } else {
+          totalCost += actualHours * a.rate
+        }
+        
+        if (a.bill_rate) {
+          totalRevenue += billableHours * a.bill_rate
+        }
+      })
+      
+      return {
+        id: member.id,
+        name: member.name,
+        cost: totalCost,
+        revenue: totalRevenue,
+        margin: totalRevenue - totalCost,
+        marginPct: totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue) * 100 : 0,
+      }
+    }).filter(m => m.cost > 0 || m.revenue > 0)
+
+    return memberStats
+  }, [teamMembers, assignments, timeEntries])
 
   // Handlers
-  const resetForm = () => {
-    setFormData({
-      name: '', email: '', phone: '', role: '', status: 'active',
-      start_date: '', entity_name: '', entity_type: '', address: '',
-      bank_name: '', account_type: '', routing_number: '', account_number: '',
-      payment_method: '', cost_type: 'Lump Sum', cost_amount: ''
-    })
-    setEditingMember(null)
-  }
-
-  const openAddMember = () => {
-    resetForm()
-    setShowMemberModal(true)
-  }
-
-  const openEditMember = (member: TeamMember) => {
-    setEditingMember(member)
-    setFormData({
-      name: member.name || '',
-      email: member.email || '',
-      phone: member.phone || '',
-      role: member.role || '',
-      status: member.status || 'active',
-      start_date: member.start_date || '',
-      entity_name: member.entity_name || '',
-      entity_type: member.entity_type || '',
-      address: member.address || '',
-      bank_name: member.bank_name || '',
-      account_type: member.account_type || '',
-      routing_number: member.routing_number || '',
-      account_number: member.account_number || '',
-      payment_method: member.payment_method || '',
-      cost_type: member.cost_type || 'Lump Sum',
-      cost_amount: member.cost_amount?.toString() || ''
-    })
-    setShowMemberModal(true)
-    setSelectedMemberDetail(null)
-  }
-
-  const saveMember = async () => {
-    if (!companyId || !formData.name || !formData.email) return
-
-    setIsSaving(true)
+  const handleSaveMember = async (data: any) => {
+    if (!companyId) return
     try {
-      const data = {
-        company_id: companyId,
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone || null,
-        role: formData.role || null,
-        status: formData.status,
-        start_date: formData.start_date || null,
-        entity_name: formData.entity_name || null,
-        entity_type: formData.entity_type || null,
-        address: formData.address || null,
-        bank_name: formData.bank_name || null,
-        account_type: formData.account_type || null,
-        routing_number: formData.routing_number || null,
-        account_number: formData.account_number || null,
-        payment_method: formData.payment_method || null,
-        cost_type: formData.cost_type || null,
-        cost_amount: formData.cost_amount ? parseFloat(formData.cost_amount) : null
-      }
-
       if (editingMember) {
         const { error } = await supabase.from('team_members').update(data).eq('id', editingMember.id)
         if (error) throw error
-        setTeamMembers(prev => prev.map(m => m.id === editingMember.id ? { ...m, ...data } as TeamMember : m))
+        setTeamMembers(prev => prev.map(m => m.id === editingMember.id ? { ...m, ...data } : m))
         addToast('success', 'Team member updated')
       } else {
-        const { data: newMember, error } = await supabase.from('team_members').insert(data).select().single()
+        const { data: newMember, error } = await supabase.from('team_members').insert({ company_id: companyId, ...data }).select().single()
         if (error) throw error
         setTeamMembers(prev => [...prev, newMember])
         addToast('success', 'Team member added')
       }
-
-      setShowMemberModal(false)
-      resetForm()
+      setEditingMember(null)
     } catch (error: any) {
-      console.error('Error saving member:', error)
       addToast('error', `Failed to save: ${error.message}`)
-    } finally {
-      setIsSaving(false)
+      throw error
     }
   }
 
-  const deleteMember = async (id: string, name: string) => {
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return
+  const handleSaveContract = async (data: any) => {
+    if (!companyId) return
+    const project = projects.find(p => p.id === data.project_id)
+    try {
+      if (editingContract) {
+        const { error } = await supabase.from('project_assignments').update(data).eq('id', editingContract.id)
+        if (error) throw error
+        setAssignments(prev => prev.map(a => a.id === editingContract.id ? { ...a, ...data, project_name: project?.name, client_name: project?.client_name } : a))
+        addToast('success', 'Contract updated')
+      } else {
+        const { data: newAssignment, error } = await supabase.from('project_assignments').insert({ company_id: companyId, ...data }).select().single()
+        if (error) throw error
+        setAssignments(prev => [...prev, { ...newAssignment, project_name: project?.name, client_name: project?.client_name || '' }])
+        addToast('success', 'Contract created')
+      }
+      setEditingContract(null)
+    } catch (error: any) {
+      addToast('error', `Failed to save: ${error.message}`)
+      throw error
+    }
+  }
 
+  const handleDeleteMember = async (id: string) => {
+    if (!confirm('Delete this team member?')) return
     try {
       const { error } = await supabase.from('team_members').delete().eq('id', id)
       if (error) throw error
@@ -688,52 +883,22 @@ export default function TeamPage() {
     }
   }
 
-  const addAssignment = async (data: any) => {
-    if (!companyId) return
-
-    try {
-      const { data: newAssignment, error } = await supabase
-        .from('project_assignments')
-        .insert({
-          company_id: companyId,
-          team_member_id: data.team_member_id,
-          project_id: data.project_id,
-          payment_type: data.payment_type,
-          rate: data.rate
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      setAssignments(prev => [...prev, {
-        ...newAssignment,
-        project_name: data.project_name,
-        client_name: data.client_name
-      }])
-      addToast('success', 'Assignment added')
-    } catch (error: any) {
-      addToast('error', `Failed to add assignment: ${error.message}`)
-    }
-  }
-
-  const removeAssignment = async (id: string) => {
+  const handleDeleteContract = async (id: string) => {
+    if (!confirm('Delete this contract?')) return
     try {
       const { error } = await supabase.from('project_assignments').delete().eq('id', id)
       if (error) throw error
       setAssignments(prev => prev.filter(a => a.id !== id))
-      addToast('success', 'Assignment removed')
+      addToast('success', 'Contract deleted')
     } catch (error: any) {
-      addToast('error', `Failed to remove: ${error.message}`)
+      addToast('error', `Failed to delete: ${error.message}`)
     }
   }
 
   const exportToCSV = () => {
-    const headers = ['Name', 'Email', 'Phone', 'Role', 'Entity', 'Status', 'Cost Type', 'Cost Amount']
-    const rows = teamMembers.map(m => [
-      m.name, m.email, m.phone || '', m.role || '', m.entity_name || '', m.status, m.cost_type || '', m.cost_amount || ''
-    ])
-    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n')
+    const headers = ['Name', 'Email', 'Type', 'Entity', 'Status', 'Role']
+    const rows = teamMembers.map(m => [m.name, m.email, m.employment_type, m.entity_name, m.status, m.role])
+    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c || ''}"`).join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -762,15 +927,22 @@ export default function TeamPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className={`text-xl font-semibold ${THEME.textPrimary}`}>Team</h1>
-          <p className={`text-sm ${THEME.textMuted} mt-1`}>Manage team members, assignments, and costs</p>
+          <p className={`text-sm ${THEME.textMuted} mt-1`}>Manage team members, contracts, and profitability</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={exportToCSV} className="flex items-center gap-2 px-4 py-2 border border-white/[0.1] rounded-lg text-sm font-medium text-slate-300 hover:bg-white/[0.05]">
             <Download size={14} /> Export
           </button>
-          <button onClick={openAddMember} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 shadow-lg shadow-emerald-500/20">
-            <Plus size={14} /> Add Member
-          </button>
+          {activeTab === 'directory' && (
+            <button onClick={() => { setEditingMember(null); setShowMemberModal(true) }} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 shadow-lg shadow-emerald-500/20">
+              <Plus size={14} /> Add Member
+            </button>
+          )}
+          {activeTab === 'contracts' && (
+            <button onClick={() => { setEditingContract(null); setShowContractModal(true) }} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 shadow-lg shadow-emerald-500/20">
+              <Plus size={14} /> New Contract
+            </button>
+          )}
         </div>
       </div>
 
@@ -778,400 +950,364 @@ export default function TeamPage() {
       <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-1.5 inline-flex gap-1`}>
         {[
           { id: 'directory', label: 'Directory', icon: Users },
+          { id: 'contracts', label: 'Contracts', icon: FileText },
           { id: 'profitability', label: 'Profitability', icon: BarChart3 },
         ].map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => setActiveTab(tab.id as any)}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
               activeTab === tab.id
-                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-lg'
                 : `${THEME.textMuted} hover:text-white hover:bg-white/[0.05]`
             }`}
           >
-            <tab.icon size={16} />
-            {tab.label}
+            <tab.icon size={16} /> {tab.label}
           </button>
         ))}
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
           <p className={`text-xs font-medium ${THEME.textMuted} uppercase`}>Total Members</p>
           <p className="text-2xl font-bold text-white mt-1">{summary.total}</p>
+          <p className={`text-xs ${THEME.textDim} mt-1`}>{summary.active} active</p>
         </div>
         <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
-          <p className={`text-xs font-medium ${THEME.textMuted} uppercase`}>Active</p>
-          <p className="text-2xl font-bold text-emerald-400 mt-1">{summary.active}</p>
+          <p className={`text-xs font-medium ${THEME.textMuted} uppercase`}>W-2 Employees</p>
+          <p className="text-2xl font-bold text-blue-400 mt-1">{summary.employees}</p>
         </div>
         <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
-          <p className={`text-xs font-medium ${THEME.textMuted} uppercase`}>Hours (MTD)</p>
-          <p className="text-2xl font-bold text-white mt-1">{summary.mtdHours.toFixed(1)}</p>
+          <p className={`text-xs font-medium ${THEME.textMuted} uppercase`}>1099 Contractors</p>
+          <p className="text-2xl font-bold text-purple-400 mt-1">{summary.contractors}</p>
         </div>
         <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
-          <p className={`text-xs font-medium ${THEME.textMuted} uppercase`}>Labor Cost (MTD)</p>
-          <p className="text-2xl font-bold text-orange-400 mt-1">{formatCurrency(summary.mtdCost)}</p>
-        </div>
-        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
-          <p className={`text-xs font-medium ${THEME.textMuted} uppercase`}>Cost/Hour</p>
-          <p className="text-2xl font-bold text-blue-400 mt-1">{formatCurrency(summary.avgCostPerHour)}</p>
+          <p className={`text-xs font-medium ${THEME.textMuted} uppercase`}>Active Contracts</p>
+          <p className="text-2xl font-bold text-orange-400 mt-1">{assignments.length}</p>
         </div>
       </div>
 
       {/* Directory Tab */}
       {activeTab === 'directory' && (
         <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
-          {/* Search & Filters */}
+          {/* Filters */}
           <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder}`}>
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search..."
-                className="bg-white/[0.05] border border-white/[0.1] rounded-lg pl-9 pr-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 w-64"
-              />
-            </div>
-            <select
-              value={selectedStatus}
-              onChange={e => setSelectedStatus(e.target.value)}
-              className="bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-1.5 text-sm text-slate-200"
-            >
-              <option value="all">All Status</option>
-              {STATUS_OPTIONS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </select>
-          </div>
-
-          {/* Table */}
-          <table className="w-full text-sm">
-            <thead>
-              <tr className={`bg-white/[0.02] border-b ${THEME.glassBorder}`}>
-                <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Name</th>
-                <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Role</th>
-                <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Entity</th>
-                <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium`}>Projects</th>
-                <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium`}>Status</th>
-                <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Hours (MTD)</th>
-                <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Cost</th>
-                <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium w-24`}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredMembers.length > 0 ? filteredMembers.map(member => {
-                const memberAssignments = assignments.filter(a => a.team_member_id === member.id)
-                const now = new Date()
-                const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-                const mtdHours = timeEntries.filter(t => t.team_member_id === member.id && t.date >= monthStart).reduce((s, t) => s + (t.hours || 0), 0)
-                const statusStyle = getStatusStyle(member.status)
-
-                return (
-                  <tr
-                    key={member.id}
-                    className="border-b border-white/[0.05] hover:bg-white/[0.03] cursor-pointer"
-                    onClick={() => setSelectedMemberDetail(member)}
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search..."
+                  className="bg-white/[0.05] border border-white/[0.1] rounded-lg pl-9 pr-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 w-64"
+                />
+              </div>
+              <div className="flex items-center gap-1 p-1 bg-white/[0.03] rounded-lg">
+                {[
+                  { id: 'all', label: 'All' },
+                  { id: 'employee', label: 'W-2' },
+                  { id: 'contractor', label: '1099' },
+                ].map(f => (
+                  <button
+                    key={f.id}
+                    onClick={() => setEmploymentFilter(f.id as any)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      employmentFilter === f.id
+                        ? 'bg-white/[0.1] text-white'
+                        : `${THEME.textMuted} hover:text-white`
+                    }`}
                   >
-                    <td className="px-4 py-3">
-                      <div>
-                        <p className={`font-medium ${THEME.textPrimary}`}>{member.name}</p>
-                        <p className={`text-xs ${THEME.textDim}`}>{member.email}</p>
-                      </div>
-                    </td>
-                    <td className={`px-4 py-3 ${THEME.textSecondary}`}>{member.role || '—'}</td>
-                    <td className={`px-4 py-3 ${THEME.textMuted}`}>
-                      {member.entity_name ? (
-                        <div>
-                          <p className={THEME.textSecondary}>{member.entity_name}</p>
-                          <p className={`text-xs ${THEME.textDim}`}>{ENTITY_TYPES.find(t => t.id === member.entity_type)?.label}</p>
-                        </div>
-                      ) : '—'}
-                    </td>
-                    <td className={`px-4 py-3 text-center ${THEME.textSecondary}`}>{memberAssignments.length}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
-                        {member.status}
-                      </span>
-                    </td>
-                    <td className={`px-4 py-3 text-right ${THEME.textSecondary}`}>{mtdHours.toFixed(1)}</td>
-                    <td className={`px-4 py-3 text-right`}>
-                      {member.cost_amount ? (
-                        <span className="text-orange-400 font-medium">
-                          {formatCurrency(member.cost_amount)}{member.cost_type === 'T&M' ? '/hr' : '/mo'}
-                        </span>
-                      ) : <span className={THEME.textDim}>—</span>}
-                    </td>
-                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => setSelectedMemberDetail(member)} className="p-1.5 rounded hover:bg-white/[0.08] text-slate-500 hover:text-blue-400">
-                          <Eye size={14} />
-                        </button>
-                        <button onClick={() => openEditMember(member)} className="p-1.5 rounded hover:bg-white/[0.08] text-slate-500 hover:text-slate-300">
-                          <Edit2 size={14} />
-                        </button>
-                        <button onClick={() => deleteMember(member.id, member.name)} className="p-1.5 rounded hover:bg-rose-500/20 text-slate-500 hover:text-rose-400">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              }) : (
-                <tr>
-                  <td colSpan={8} className={`px-4 py-12 text-center ${THEME.textMuted}`}>
-                    No team members found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-
-          {/* Footer */}
-          <div className={`flex items-center justify-between px-6 py-3 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <p className={`text-sm ${THEME.textMuted}`}>{filteredMembers.length} members</p>
           </div>
+
+          {/* Grouped Table */}
+          {employmentFilter === 'all' ? (
+            <div>
+              {/* Employees Section */}
+              {groupedMembers.employees.length > 0 && (
+                <div>
+                  <div className={`px-6 py-3 bg-blue-500/5 border-b ${THEME.glassBorder}`}>
+                    <div className="flex items-center gap-2">
+                      <UserCheck size={16} className="text-blue-400" />
+                      <span className="text-sm font-medium text-blue-400">W-2 Employees ({groupedMembers.employees.length})</span>
+                    </div>
+                  </div>
+                  <MemberTable members={groupedMembers.employees} assignments={assignments} onView={setSelectedMemberDetail} onEdit={m => { setEditingMember(m); setShowMemberModal(true) }} onDelete={handleDeleteMember} />
+                </div>
+              )}
+              
+              {/* Contractors Section */}
+              {groupedMembers.contractors.length > 0 && (
+                <div>
+                  <div className={`px-6 py-3 bg-purple-500/5 border-b border-t ${THEME.glassBorder}`}>
+                    <div className="flex items-center gap-2">
+                      <User size={16} className="text-purple-400" />
+                      <span className="text-sm font-medium text-purple-400">1099 Contractors ({groupedMembers.contractors.length})</span>
+                    </div>
+                  </div>
+                  <MemberTable members={groupedMembers.contractors} assignments={assignments} onView={setSelectedMemberDetail} onEdit={m => { setEditingMember(m); setShowMemberModal(true) }} onDelete={handleDeleteMember} />
+                </div>
+              )}
+            </div>
+          ) : (
+            <MemberTable members={filteredMembers} assignments={assignments} onView={setSelectedMemberDetail} onEdit={m => { setEditingMember(m); setShowMemberModal(true) }} onDelete={handleDeleteMember} />
+          )}
+
+          {filteredMembers.length === 0 && (
+            <div className={`px-6 py-12 text-center ${THEME.textMuted}`}>No team members found</div>
+          )}
         </div>
       )}
 
-      {/* Profitability Tab - Placeholder */}
+      {/* Contracts Tab */}
+      {activeTab === 'contracts' && (
+        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
+          <div className={`px-6 py-4 border-b ${THEME.glassBorder}`}>
+            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Active Contracts</h3>
+            <p className={`text-xs ${THEME.textMuted} mt-1`}>Per-client/project cost agreements</p>
+          </div>
+
+          {assignments.length > 0 ? (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className={`bg-white/[0.02] border-b ${THEME.glassBorder}`}>
+                  <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Team Member</th>
+                  <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Client</th>
+                  <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Project</th>
+                  <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium`}>Type</th>
+                  <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Cost Rate</th>
+                  <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Bill Rate</th>
+                  <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium w-20`}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {assignments.map(a => {
+                  const member = teamMembers.find(m => m.id === a.team_member_id)
+                  return (
+                    <tr key={a.id} className="border-b border-white/[0.05] hover:bg-white/[0.03]">
+                      <td className={`px-4 py-3 font-medium ${THEME.textPrimary}`}>{member?.name || 'Unknown'}</td>
+                      <td className={`px-4 py-3 ${THEME.textSecondary}`}>{a.client_name || '—'}</td>
+                      <td className={`px-4 py-3 ${THEME.textSecondary}`}>{a.project_name}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          a.payment_type === 'lump_sum' ? 'bg-blue-500/10 text-blue-400' : 'bg-emerald-500/10 text-emerald-400'
+                        }`}>
+                          {a.payment_type === 'lump_sum' ? 'Lump Sum' : 'T&M'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="text-orange-400 font-medium">
+                          {formatCurrency(a.rate)}<span className={`text-xs ${THEME.textDim}`}>{a.payment_type === 'tm' ? '/hr' : '/mo'}</span>
+                        </span>
+                      </td>
+                      <td className={`px-4 py-3 text-right ${a.bill_rate ? 'text-emerald-400' : THEME.textMuted}`}>
+                        {a.bill_rate ? `${formatCurrency(a.bill_rate)}/hr` : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => { setEditingContract(a); setShowContractModal(true) }} className="p-1.5 rounded hover:bg-white/[0.08] text-slate-500 hover:text-slate-300">
+                            <Edit2 size={14} />
+                          </button>
+                          <button onClick={() => handleDeleteContract(a.id)} className="p-1.5 rounded hover:bg-rose-500/20 text-slate-500 hover:text-rose-400">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          ) : (
+            <div className={`px-6 py-12 text-center ${THEME.textMuted}`}>
+              <FileText size={48} className="mx-auto text-slate-600 mb-4" />
+              <p>No contracts yet</p>
+              <button
+                onClick={() => { setEditingContract(null); setShowContractModal(true) }}
+                className="mt-4 px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-lg text-sm font-medium hover:bg-emerald-500/30"
+              >
+                Create First Contract
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Profitability Tab */}
       {activeTab === 'profitability' && (
-        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-8 text-center`}>
-          <BarChart3 size={48} className="mx-auto text-slate-600 mb-4" />
-          <p className={THEME.textMuted}>Profitability analysis coming soon</p>
-          <p className={`text-sm ${THEME.textDim} mt-1`}>Track team costs vs revenue by project and client</p>
+        <div className="space-y-6">
+          <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-6`}>
+            <h3 className={`text-sm font-semibold ${THEME.textPrimary} mb-4`}>Team Profitability</h3>
+            {profitabilityData.length > 0 ? (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={profitabilityData} margin={{ left: 20, right: 20 }}>
+                    <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => formatCompactCurrency(v)} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                      formatter={(value: number, name: string) => [formatCurrency(value), name === 'cost' ? 'Cost' : 'Revenue']}
+                    />
+                    <Legend />
+                    <Bar dataKey="cost" name="Cost" fill={CHART_COLORS.cost} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="revenue" name="Revenue" fill={CHART_COLORS.revenue} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className={`text-center py-12 ${THEME.textMuted}`}>
+                <BarChart3 size={48} className="mx-auto text-slate-600 mb-4" />
+                <p>No profitability data yet</p>
+                <p className={`text-xs ${THEME.textDim} mt-1`}>Add contracts with bill rates to see profitability</p>
+              </div>
+            )}
+          </div>
+
+          {profitabilityData.length > 0 && (
+            <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
+              <div className={`px-6 py-4 border-b ${THEME.glassBorder}`}>
+                <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Margin by Team Member</h3>
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className={`bg-white/[0.02] border-b ${THEME.glassBorder}`}>
+                    <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Name</th>
+                    <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Cost</th>
+                    <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Revenue</th>
+                    <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Margin</th>
+                    <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Margin %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {profitabilityData.map(row => (
+                    <tr key={row.id} className="border-b border-white/[0.05]">
+                      <td className={`px-4 py-3 font-medium ${THEME.textPrimary}`}>{row.name}</td>
+                      <td className="px-4 py-3 text-right text-rose-400">{formatCurrency(row.cost)}</td>
+                      <td className="px-4 py-3 text-right text-emerald-400">{formatCurrency(row.revenue)}</td>
+                      <td className={`px-4 py-3 text-right font-medium ${row.margin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {formatCurrency(row.margin)}
+                      </td>
+                      <td className={`px-4 py-3 text-right ${row.marginPct >= 20 ? 'text-emerald-400' : row.marginPct >= 0 ? 'text-amber-400' : 'text-rose-400'}`}>
+                        {row.marginPct.toFixed(1)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Detail Flyout */}
+      {/* Modals */}
+      <MemberModal
+        isOpen={showMemberModal}
+        onClose={() => { setShowMemberModal(false); setEditingMember(null) }}
+        onSave={handleSaveMember}
+        editingMember={editingMember}
+      />
+
+      <ContractModal
+        isOpen={showContractModal}
+        onClose={() => { setShowContractModal(false); setEditingContract(null) }}
+        onSave={handleSaveContract}
+        editingContract={editingContract}
+        teamMembers={teamMembers}
+        projects={projects}
+        clients={clients}
+      />
+
       {selectedMemberDetail && (
         <MemberDetailFlyout
           member={selectedMemberDetail}
           assignments={assignments}
-          documents={documents}
-          projects={projects}
-          timeEntries={timeEntries}
           onClose={() => setSelectedMemberDetail(null)}
-          onEdit={() => openEditMember(selectedMemberDetail)}
-          onAddAssignment={addAssignment}
-          onRemoveAssignment={removeAssignment}
-          addToast={addToast}
+          onEdit={() => { setEditingMember(selectedMemberDetail); setShowMemberModal(true); setSelectedMemberDetail(null) }}
         />
       )}
-
-      {/* Member Modal */}
-      {showMemberModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto`}>
-            <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder}`}>
-              <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>
-                {editingMember ? 'Edit Member' : 'Add Member'}
-              </h3>
-              <button onClick={() => { setShowMemberModal(false); resetForm() }} className="p-1 hover:bg-white/[0.05] rounded-lg">
-                <X size={20} className={THEME.textMuted} />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              {/* Basic Info */}
-              <div className="space-y-4">
-                <h4 className={`text-sm font-semibold ${THEME.textSecondary}`}>Basic Information</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={`block text-xs ${THEME.textMuted} mb-1`}>Name *</label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-xs ${THEME.textMuted} mb-1`}>Email *</label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={e => setFormData(p => ({ ...p, email: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-xs ${THEME.textMuted} mb-1`}>Phone</label>
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-xs ${THEME.textMuted} mb-1`}>Role</label>
-                    <input
-                      type="text"
-                      value={formData.role}
-                      onChange={e => setFormData(p => ({ ...p, role: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-xs ${THEME.textMuted} mb-1`}>Start Date</label>
-                    <input
-                      type="date"
-                      value={formData.start_date}
-                      onChange={e => setFormData(p => ({ ...p, start_date: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-xs ${THEME.textMuted} mb-1`}>Status</label>
-                    <select
-                      value={formData.status}
-                      onChange={e => setFormData(p => ({ ...p, status: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                    >
-                      {STATUS_OPTIONS.map(s => <option key={s.id} value={s.id} className="bg-slate-900">{s.label}</option>)}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Entity Info */}
-              <div className="space-y-4">
-                <h4 className={`text-sm font-semibold ${THEME.textSecondary}`}>Entity Information</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={`block text-xs ${THEME.textMuted} mb-1`}>Entity Name</label>
-                    <input
-                      type="text"
-                      value={formData.entity_name}
-                      onChange={e => setFormData(p => ({ ...p, entity_name: e.target.value }))}
-                      placeholder="e.g., John Doe LLC"
-                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-xs ${THEME.textMuted} mb-1`}>Entity Type</label>
-                    <select
-                      value={formData.entity_type}
-                      onChange={e => setFormData(p => ({ ...p, entity_type: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                    >
-                      <option value="" className="bg-slate-900">Select...</option>
-                      {ENTITY_TYPES.map(t => <option key={t.id} value={t.id} className="bg-slate-900">{t.label}</option>)}
-                    </select>
-                  </div>
-                  <div className="col-span-2">
-                    <label className={`block text-xs ${THEME.textMuted} mb-1`}>Address</label>
-                    <input
-                      type="text"
-                      value={formData.address}
-                      onChange={e => setFormData(p => ({ ...p, address: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Cost Structure */}
-              <div className="space-y-4">
-                <h4 className={`text-sm font-semibold ${THEME.textSecondary}`}>Cost Structure</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={`block text-xs ${THEME.textMuted} mb-1`}>Cost Type</label>
-                    <select
-                      value={formData.cost_type}
-                      onChange={e => setFormData(p => ({ ...p, cost_type: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                    >
-                      {COST_TYPES.map(t => <option key={t.id} value={t.id} className="bg-slate-900">{t.label}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={`block text-xs ${THEME.textMuted} mb-1`}>
-                      Amount ({formData.cost_type === 'T&M' ? '/hr' : '/mo'})
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.cost_amount}
-                      onChange={e => setFormData(p => ({ ...p, cost_amount: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Banking Info */}
-              <div className="space-y-4">
-                <h4 className={`text-sm font-semibold ${THEME.textSecondary}`}>Banking Information</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={`block text-xs ${THEME.textMuted} mb-1`}>Bank Name</label>
-                    <input
-                      type="text"
-                      value={formData.bank_name}
-                      onChange={e => setFormData(p => ({ ...p, bank_name: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-xs ${THEME.textMuted} mb-1`}>Account Type</label>
-                    <select
-                      value={formData.account_type}
-                      onChange={e => setFormData(p => ({ ...p, account_type: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                    >
-                      <option value="" className="bg-slate-900">Select...</option>
-                      {ACCOUNT_TYPES.map(t => <option key={t.id} value={t.id} className="bg-slate-900">{t.label}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={`block text-xs ${THEME.textMuted} mb-1`}>Routing Number</label>
-                    <input
-                      type="text"
-                      value={formData.routing_number}
-                      onChange={e => setFormData(p => ({ ...p, routing_number: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-xs ${THEME.textMuted} mb-1`}>Account Number</label>
-                    <input
-                      type="text"
-                      value={formData.account_number}
-                      onChange={e => setFormData(p => ({ ...p, account_number: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className={`block text-xs ${THEME.textMuted} mb-1`}>Payment Method</label>
-                    <select
-                      value={formData.payment_method}
-                      onChange={e => setFormData(p => ({ ...p, payment_method: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                    >
-                      <option value="" className="bg-slate-900">Select...</option>
-                      {PAYMENT_METHODS.map(m => <option key={m.id} value={m.id} className="bg-slate-900">{m.label}</option>)}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
-              <button onClick={() => { setShowMemberModal(false); resetForm() }} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white`}>
-                Cancel
-              </button>
-              <button
-                onClick={saveMember}
-                disabled={!formData.name || !formData.email || isSaving}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50"
-              >
-                {isSaving && <RefreshCw size={14} className="animate-spin" />}
-                {editingMember ? 'Save Changes' : 'Add Member'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
+  )
+}
+
+// ============ MEMBER TABLE COMPONENT ============
+function MemberTable({
+  members,
+  assignments,
+  onView,
+  onEdit,
+  onDelete,
+}: {
+  members: TeamMember[]
+  assignments: ProjectAssignment[]
+  onView: (m: TeamMember) => void
+  onEdit: (m: TeamMember) => void
+  onDelete: (id: string) => void
+}) {
+  return (
+    <table className="w-full text-sm">
+      <thead>
+        <tr className={`bg-white/[0.02] border-b ${THEME.glassBorder}`}>
+          <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Name</th>
+          <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Role</th>
+          <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Entity</th>
+          <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium`}>Contracts</th>
+          <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium`}>Status</th>
+          <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium w-24`}>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {members.map(member => {
+          const memberAssignments = assignments.filter(a => a.team_member_id === member.id)
+          const statusStyle = getStatusStyle(member.status)
+          
+          return (
+            <tr key={member.id} className="border-b border-white/[0.05] hover:bg-white/[0.03] cursor-pointer" onClick={() => onView(member)}>
+              <td className="px-4 py-3">
+                <div>
+                  <p className={`font-medium ${THEME.textPrimary}`}>{member.name}</p>
+                  <p className={`text-xs ${THEME.textDim}`}>{member.email}</p>
+                </div>
+              </td>
+              <td className={`px-4 py-3 ${THEME.textSecondary}`}>{member.role || '—'}</td>
+              <td className={`px-4 py-3 ${THEME.textMuted}`}>
+                {member.entity_name || (member.employment_type === 'employee' ? 'N/A' : '—')}
+              </td>
+              <td className="px-4 py-3 text-center">
+                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                  memberAssignments.length > 0 ? 'bg-blue-500/10 text-blue-400' : `bg-white/[0.05] ${THEME.textMuted}`
+                }`}>
+                  {memberAssignments.length}
+                </span>
+              </td>
+              <td className="px-4 py-3 text-center">
+                <span className={`px-2 py-1 rounded text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
+                  {member.status}
+                </span>
+              </td>
+              <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-center gap-1">
+                  <button onClick={() => onView(member)} className="p-1.5 rounded hover:bg-white/[0.08] text-slate-500 hover:text-blue-400">
+                    <Eye size={14} />
+                  </button>
+                  <button onClick={() => onEdit(member)} className="p-1.5 rounded hover:bg-white/[0.08] text-slate-500 hover:text-slate-300">
+                    <Edit2 size={14} />
+                  </button>
+                  <button onClick={() => onDelete(member.id)} className="p-1.5 rounded hover:bg-rose-500/20 text-slate-500 hover:text-rose-400">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
   )
 }
