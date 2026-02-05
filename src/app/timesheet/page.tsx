@@ -433,29 +433,88 @@ export default function TimesheetPage() {
       if (memberError || !memberData) { setError('Email not found.'); setLoading(false); return }
       setMember(memberData)
 
-      const { data: assignData } = await supabase
-        .from('team_project_assignments').select('id, project_id, service, payment_type, rate')
+      // Get contracts for this team member
+      const { data: contractsData } = await supabase
+        .from('team_member_contracts')
+        .select('id, client_id, contract_type, cost_rate, total_amount, baseline_hours, bill_rate, is_default')
         .eq('team_member_id', memberData.id)
+        .eq('is_active', true)
 
-      if (!assignData || assignData.length === 0) { setAssignments([]); setLoading(false); return }
+      if (!contractsData || contractsData.length === 0) { setAssignments([]); setLoading(false); return }
 
-      const projectIds = assignData.map((a: any) => a.project_id).filter(Boolean)
-      const { data: projectsData } = await supabase.from('projects').select('id, name, client_id').in('id', projectIds)
+      // Get contract_projects links for these contracts
+      const contractIds = contractsData.map((c: any) => c.id)
+      const { data: contractProjectsData } = await supabase
+        .from('contract_projects')
+        .select('contract_id, project_id')
+        .in('contract_id', contractIds)
 
-      const clientIds = Array.from(new Set((projectsData || []).map((p: any) => p.client_id).filter(Boolean)))
-      let clientsMap: Record<string, string> = {}
+      // Get all projects for clients (for contracts without specific project links)
+      const clientIds = contractsData.filter((c: any) => c.client_id).map((c: any) => c.client_id)
+      let allClientProjects: any[] = []
       if (clientIds.length > 0) {
-        const { data: clientsData } = await supabase.from('clients').select('id, name').in('id', clientIds)
+        const { data: clientProjectsData } = await supabase
+          .from('projects')
+          .select('id, name, client_id')
+          .in('client_id', clientIds)
+          .eq('status', 'active')
+        allClientProjects = clientProjectsData || []
+      }
+
+      // Build project assignments
+      const projectIds = new Set<string>()
+      const contractByProject = new Map<string, any>()
+
+      // First add explicitly linked projects
+      contractProjectsData?.forEach((cp: any) => {
+        projectIds.add(cp.project_id)
+        const contract = contractsData.find((c: any) => c.id === cp.contract_id)
+        if (contract) contractByProject.set(cp.project_id, contract)
+      })
+
+      // Then add all projects for clients (if contract has client but no specific projects)
+      contractsData.forEach((contract: any) => {
+        if (contract.client_id) {
+          const contractProjects = contractProjectsData?.filter((cp: any) => cp.contract_id === contract.id) || []
+          if (contractProjects.length === 0) {
+            // No specific projects linked, add all projects for this client
+            allClientProjects.filter((p: any) => p.client_id === contract.client_id).forEach((p: any) => {
+              projectIds.add(p.id)
+              if (!contractByProject.has(p.id)) contractByProject.set(p.id, contract)
+            })
+          }
+        }
+      })
+
+      // Also handle default contracts (applies to all projects)
+      const defaultContract = contractsData.find((c: any) => c.is_default)
+      
+      if (projectIds.size === 0) { setAssignments([]); setLoading(false); return }
+
+      // Fetch full project details
+      const { data: projectsData } = await supabase
+        .from('projects')
+        .select('id, name, client_id')
+        .in('id', Array.from(projectIds))
+
+      // Get client names
+      const allClientIds = Array.from(new Set((projectsData || []).map((p: any) => p.client_id).filter(Boolean)))
+      let clientsMap: Record<string, string> = {}
+      if (allClientIds.length > 0) {
+        const { data: clientsData } = await supabase.from('clients').select('id, name').in('id', allClientIds)
         if (clientsData) clientsData.forEach((c: any) => { clientsMap[c.id] = c.name })
       }
 
-      setAssignments(assignData.map((a: any) => {
-        const project = (projectsData || []).find((p: any) => p?.id === a.project_id)
+      setAssignments((projectsData || []).map((p: any) => {
+        const contract = contractByProject.get(p.id) || defaultContract
         return {
-          id: a.id, project_id: a.project_id,
-          project_name: project?.name || 'Unknown Project',
-          client_name: project?.client_id ? clientsMap[project.client_id] : 'Other',
-          service: a.service, payment_type: a.payment_type, rate: a.rate || 0
+          id: `${p.id}-${contract?.id || 'default'}`,
+          project_id: p.id,
+          project_name: p.name || 'Unknown Project',
+          client_name: p.client_id ? clientsMap[p.client_id] : 'Other',
+          service: null,
+          payment_type: contract?.contract_type === 'lump_sum' ? 'lump_sum' : 'tm',
+          rate: contract?.bill_rate || 0
         }
       }))
     } catch (err) { console.error('Error:', err); setError('An unexpected error occurred.') }
