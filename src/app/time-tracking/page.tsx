@@ -361,7 +361,7 @@ export default function TimeTrackingPage() {
           supabase.from('projects').select('*').eq('company_id', profile.company_id),
           supabase.from('clients').select('*').eq('company_id', profile.company_id),
           supabase.from('time_entries').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
-          supabase.from('project_assignments').select('*').eq('company_id', profile.company_id),
+          supabase.from('team_project_assignments').select('*').eq('company_id', profile.company_id),
         ])
 
         const projectMap: Record<string, any> = {}; (projRes.data || []).forEach((p: any) => { projectMap[p.id] = p })
