@@ -75,6 +75,7 @@ interface Contract {
   name: string | null
   contract_type: 'tm' | 'lump_sum'
   cost_rate: number
+  bill_rate: number
   total_amount: number
   baseline_hours: number
   allocation_method: 'by_hours' | 'fixed'
@@ -344,6 +345,7 @@ function ContractModal({
     name: '',
     contract_type: 'tm' as 'tm' | 'lump_sum',
     cost_rate: '',
+    bill_rate: '',
     total_amount: '',
     baseline_hours: '172',
     allocation_method: 'by_hours' as 'by_hours' | 'fixed',
@@ -364,6 +366,7 @@ function ContractModal({
         name: editingContract.name || '',
         contract_type: editingContract.contract_type,
         cost_rate: editingContract.cost_rate?.toString() || '',
+        bill_rate: editingContract.bill_rate?.toString() || '',
         total_amount: editingContract.total_amount?.toString() || '',
         baseline_hours: editingContract.baseline_hours?.toString() || '172',
         allocation_method: editingContract.allocation_method || 'by_hours',
@@ -381,7 +384,7 @@ function ContractModal({
     } else {
       setForm({
         team_member_id: '', client_id: '', name: '', contract_type: 'tm',
-        cost_rate: '', total_amount: '', baseline_hours: '172',
+        cost_rate: '', bill_rate: '', total_amount: '', baseline_hours: '172',
         allocation_method: 'by_hours', period_type: 'monthly',
         start_date: '', end_date: '', is_default: false,
       })
@@ -393,6 +396,14 @@ function ContractModal({
   const filteredProjects = form.client_id 
     ? projects.filter(p => p.client_id === form.client_id)
     : projects
+
+  // Clear selected projects that don't match the client when client changes
+  useEffect(() => {
+    if (form.client_id) {
+      const validProjectIds = new Set(filteredProjects.map(p => p.id))
+      setSelectedProjects(prev => prev.filter(id => validProjectIds.has(id)))
+    }
+  }, [form.client_id, filteredProjects])
 
   const effectiveRate = form.contract_type === 'lump_sum' && form.total_amount && form.baseline_hours
     ? parseFloat(form.total_amount) / parseFloat(form.baseline_hours)
@@ -408,6 +419,7 @@ function ContractModal({
       await onSave({
         ...form,
         cost_rate: parseFloat(form.cost_rate) || 0,
+        bill_rate: parseFloat(form.bill_rate) || 0,
         total_amount: parseFloat(form.total_amount) || 0,
         baseline_hours: parseFloat(form.baseline_hours) || 172,
         client_id: form.client_id || null,
@@ -473,14 +485,31 @@ function ContractModal({
                   <label className={`block text-xs ${THEME.textMuted} mb-1`}>Cost Rate ($/hr) *</label>
                   <input type="number" value={form.cost_rate} onChange={e => setForm(p => ({ ...p, cost_rate: e.target.value }))}
                     className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="150" />
+                  <p className={`text-xs ${THEME.textDim} mt-1`}>What you pay them</p>
                 </div>
-                <div className="flex items-end pb-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={form.is_default} onChange={e => setForm(p => ({ ...p, is_default: e.target.checked, client_id: '' }))}
-                      className="w-4 h-4 rounded border-white/[0.2] bg-white/[0.05] text-emerald-500 focus:ring-emerald-500/50" />
-                    <span className={`text-sm ${THEME.textSecondary}`}>Default for all work</span>
-                  </label>
+                <div>
+                  <label className={`block text-xs ${THEME.textMuted} mb-1`}>Bill Rate ($/hr)</label>
+                  <input type="number" value={form.bill_rate} onChange={e => setForm(p => ({ ...p, bill_rate: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="250" />
+                  <p className={`text-xs ${THEME.textDim} mt-1`}>What client pays you</p>
                 </div>
+              </div>
+
+              {form.cost_rate && form.bill_rate && (
+                <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                  <p className="text-sm text-emerald-400">
+                    Margin: <span className="font-semibold">${(parseFloat(form.bill_rate) - parseFloat(form.cost_rate)).toFixed(2)}/hr</span>
+                    <span className={`${THEME.textDim} ml-2`}>({((parseFloat(form.bill_rate) - parseFloat(form.cost_rate)) / parseFloat(form.bill_rate) * 100).toFixed(1)}%)</span>
+                  </p>
+                </div>
+              )}
+
+              <div className="flex items-center">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={form.is_default} onChange={e => setForm(p => ({ ...p, is_default: e.target.checked, client_id: '' }))}
+                    className="w-4 h-4 rounded border-white/[0.2] bg-white/[0.05] text-emerald-500 focus:ring-emerald-500/50" />
+                  <span className={`text-sm ${THEME.textSecondary}`}>Default rate for all work</span>
+                </label>
               </div>
 
               {!form.is_default && (
@@ -527,12 +556,24 @@ function ContractModal({
                 </div>
               </div>
 
+              <div>
+                <label className={`block text-xs ${THEME.textMuted} mb-1`}>Bill Rate ($/hr) — What client pays</label>
+                <input type="number" value={form.bill_rate} onChange={e => setForm(p => ({ ...p, bill_rate: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="240" />
+              </div>
+
               {effectiveRate && (
-                <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                  <p className="text-sm text-emerald-400">
-                    Effective Rate: <span className="font-semibold">${effectiveRate.toFixed(2)}/hr</span>
+                <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                  <p className="text-sm text-blue-400">
+                    Effective Cost Rate: <span className="font-semibold">${effectiveRate.toFixed(2)}/hr</span>
                     <span className={`${THEME.textDim} ml-2`}>({formatCurrency(parseFloat(form.total_amount))} ÷ {form.baseline_hours} hrs)</span>
                   </p>
+                  {form.bill_rate && (
+                    <p className="text-sm text-emerald-400 mt-1">
+                      Margin: <span className="font-semibold">${(parseFloat(form.bill_rate) - effectiveRate).toFixed(2)}/hr</span>
+                      <span className={`${THEME.textDim} ml-2`}>({((parseFloat(form.bill_rate) - effectiveRate) / parseFloat(form.bill_rate) * 100).toFixed(1)}%)</span>
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -901,33 +942,45 @@ export default function TeamPage() {
       const memberTime = timeEntries.filter(t => t.contractor_id === member.id)
       
       let totalCost = 0
+      let totalRevenue = 0
       const totalHours = memberTime.reduce((sum, t) => sum + (t.hours || 0), 0)
       
       memberContracts.forEach(c => {
+        // Calculate hours for this contract's scope
+        let scopeHours = totalHours
+        if (c.client_id) {
+          scopeHours = memberTime.filter(t => {
+            const proj = projects.find(p => p.id === t.project_id)
+            return proj?.client_id === c.client_id
+          }).reduce((sum, t) => sum + (t.hours || 0), 0)
+        }
+
+        // Calculate cost
         if (c.contract_type === 'lump_sum') {
           totalCost += c.total_amount
         } else {
-          // T&M: get hours for this scope
-          const scopeHours = c.client_id
-            ? memberTime.filter(t => {
-                const proj = projects.find(p => p.id === t.project_id)
-                return proj?.client_id === c.client_id
-              }).reduce((sum, t) => sum + (t.hours || 0), 0)
-            : totalHours
           totalCost += scopeHours * c.cost_rate
         }
+
+        // Calculate revenue using bill_rate
+        if (c.bill_rate && c.bill_rate > 0) {
+          totalRevenue += scopeHours * c.bill_rate
+        }
       })
+
+      const margin = totalRevenue - totalCost
+      const marginPct = totalRevenue > 0 ? (margin / totalRevenue) * 100 : 0
 
       return {
         id: member.id,
         name: member.name,
         hours: totalHours,
         cost: totalCost,
-        revenue: 0, // Would need bill_rate from projects
-        margin: -totalCost,
-        marginPct: 0,
+        revenue: totalRevenue,
+        margin,
+        marginPct,
       }
-    }).filter(m => m.cost > 0 || m.hours > 0)
+    }).filter(m => m.cost > 0 || m.revenue > 0 || m.hours > 0)
   }, [teamMembers, contracts, timeEntries, projects])
 
   // Handlers
@@ -1237,7 +1290,8 @@ export default function TeamPage() {
                   <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Team Member</th>
                   <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Contract</th>
                   <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium`}>Type</th>
-                  <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Rate / Amount</th>
+                  <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Cost</th>
+                  <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Bill Rate</th>
                   <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium`}>Scope</th>
                   <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium w-20`}>Actions</th>
                 </tr>
@@ -1245,6 +1299,12 @@ export default function TeamPage() {
               <tbody>
                 {contracts.filter(c => c.is_active).map(c => {
                   const typeStyle = getContractTypeStyle(c.contract_type)
+                  const effectiveCostRate = c.contract_type === 'lump_sum' && c.baseline_hours > 0
+                    ? c.total_amount / c.baseline_hours
+                    : c.cost_rate
+                  const margin = c.bill_rate > 0 && effectiveCostRate > 0 
+                    ? ((c.bill_rate - effectiveCostRate) / c.bill_rate * 100).toFixed(0)
+                    : null
                   return (
                     <tr key={c.id} className="border-b border-white/[0.05] hover:bg-white/[0.03]">
                       <td className={`px-4 py-3 font-medium ${THEME.textPrimary}`}>{c.team_member_name}</td>
@@ -1260,13 +1320,23 @@ export default function TeamPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <span className="text-orange-400 font-medium">
+                        <span className="text-rose-400">
                           {c.contract_type === 'tm' 
                             ? `${formatCurrency(c.cost_rate)}/hr` 
                             : formatCurrency(c.total_amount)}
                         </span>
                         {c.contract_type === 'lump_sum' && (
-                          <p className={`text-xs ${THEME.textDim}`}>/{c.period_type}</p>
+                          <p className={`text-xs ${THEME.textDim}`}>~${effectiveCostRate.toFixed(0)}/hr</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {c.bill_rate > 0 ? (
+                          <>
+                            <span className="text-emerald-400">${c.bill_rate}/hr</span>
+                            {margin && <p className={`text-xs ${parseInt(margin) >= 20 ? 'text-emerald-400' : 'text-amber-400'}`}>{margin}% margin</p>}
+                          </>
+                        ) : (
+                          <span className={THEME.textDim}>—</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -1310,7 +1380,7 @@ export default function TeamPage() {
       {activeTab === 'profitability' && (
         <div className="space-y-6">
           <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-6`}>
-            <h3 className={`text-sm font-semibold ${THEME.textPrimary} mb-4`}>Team Cost Overview</h3>
+            <h3 className={`text-sm font-semibold ${THEME.textPrimary} mb-4`}>Team Profitability</h3>
             {profitabilityData.length > 0 ? (
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
@@ -1319,9 +1389,13 @@ export default function TeamPage() {
                     <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => formatCompactCurrency(v)} />
                     <Tooltip
                       contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                      formatter={(value: number, name: string) => [formatCurrency(value), name === 'cost' ? 'Cost' : 'Hours']}
+                      labelStyle={{ color: '#fff' }}
+                      formatter={(value: number, name: string) => [formatCurrency(value), name === 'cost' ? 'Cost' : 'Revenue']}
+                      cursor={false}
                     />
+                    <Legend wrapperStyle={{ paddingTop: '10px' }} />
                     <Bar dataKey="cost" name="Cost" fill={CHART_COLORS.cost} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="revenue" name="Revenue" fill={CHART_COLORS.revenue} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1337,7 +1411,7 @@ export default function TeamPage() {
           {profitabilityData.length > 0 && (
             <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
               <div className={`px-6 py-4 border-b ${THEME.glassBorder}`}>
-                <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Cost by Team Member</h3>
+                <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Margin by Team Member</h3>
               </div>
               <table className="w-full text-sm">
                 <thead>
@@ -1345,6 +1419,9 @@ export default function TeamPage() {
                     <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Name</th>
                     <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Hours</th>
                     <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Cost</th>
+                    <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Revenue</th>
+                    <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Margin</th>
+                    <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>%</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1353,6 +1430,13 @@ export default function TeamPage() {
                       <td className={`px-4 py-3 font-medium ${THEME.textPrimary}`}>{row.name}</td>
                       <td className={`px-4 py-3 text-right ${THEME.textSecondary}`}>{row.hours.toFixed(1)}</td>
                       <td className="px-4 py-3 text-right text-rose-400">{formatCurrency(row.cost)}</td>
+                      <td className="px-4 py-3 text-right text-emerald-400">{formatCurrency(row.revenue)}</td>
+                      <td className={`px-4 py-3 text-right font-medium ${row.margin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {formatCurrency(row.margin)}
+                      </td>
+                      <td className={`px-4 py-3 text-right ${row.marginPct >= 20 ? 'text-emerald-400' : row.marginPct >= 0 ? 'text-amber-400' : 'text-rose-400'}`}>
+                        {row.marginPct.toFixed(1)}%
+                      </td>
                     </tr>
                   ))}
                 </tbody>
