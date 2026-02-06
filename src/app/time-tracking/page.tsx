@@ -401,8 +401,10 @@ export default function TimeTrackingPage() {
           // Tier 1: Rate card has custom cost (cost_amount > 0) → use it
           // Tier 2: Fall back to team member default cost
           let costRate = 0
+          const normalizeCostType = (t: string) => (t || '').toLowerCase().replace(/\s+/g, '_')
+          
           if (rateCard && rateCard.cost_amount > 0) {
-            if (rateCard.cost_type === 'hourly') {
+            if (normalizeCostType(rateCard.cost_type) === 'hourly') {
               costRate = rateCard.cost_amount
             } else {
               // Lump sum: effective hourly = cost_amount / baseline_hours
@@ -410,9 +412,10 @@ export default function TimeTrackingPage() {
             }
           } else if (teamMember) {
             // Tier 2: team member default
-            if (teamMember.cost_type === 'hourly') {
+            const memberCostType = normalizeCostType(teamMember.cost_type)
+            if (memberCostType === 'hourly') {
               costRate = teamMember.cost_amount || 0
-            } else if (teamMember.cost_type === 'lump_sum' && teamMember.cost_amount > 0) {
+            } else if ((memberCostType === 'lump_sum' || memberCostType === 'lump sum') && teamMember.cost_amount > 0) {
               // Effective hourly from lump sum (use 172 as default baseline)
               costRate = teamMember.cost_amount / (teamMember.baseline_hours || 172)
             }
@@ -603,13 +606,15 @@ export default function TimeTrackingPage() {
       const billRate = rateCard?.rate || assignment?.bill_rate || project?.bill_rate || 0
       
       // Cost rate (two-tier)
+      const normCostType = (t: string) => (t || '').toLowerCase().replace(/\s+/g, '_')
       let costRate = 0
       if (rateCard && rateCard.cost_amount > 0) {
-        costRate = rateCard.cost_type === 'hourly' ? rateCard.cost_amount : (rateCard.baseline_hours > 0 ? rateCard.cost_amount / rateCard.baseline_hours : 0)
+        costRate = normCostType(rateCard.cost_type) === 'hourly' ? rateCard.cost_amount : (rateCard.baseline_hours > 0 ? rateCard.cost_amount / rateCard.baseline_hours : 0)
       } else if (teamMember) {
         const tm = teamMembers.find(t => t.id === formData.team_member_id) as any
-        if (tm?.cost_type === 'hourly') costRate = tm.cost_amount || 0
-        else if (tm?.cost_type === 'lump_sum' && tm?.cost_amount > 0) costRate = tm.cost_amount / (tm.baseline_hours || 172)
+        const tmType = normCostType(tm?.cost_type)
+        if (tmType === 'hourly') costRate = tm.cost_amount || 0
+        else if ((tmType === 'lump_sum' || tmType === 'lump sum') && tm?.cost_amount > 0) costRate = tm.cost_amount / (tm.baseline_hours || 172)
       }
       if (costRate === 0) costRate = assignment?.rate || 0
       const hours = parseFloat(formData.hours)
