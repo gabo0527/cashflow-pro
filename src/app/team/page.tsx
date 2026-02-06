@@ -1,43 +1,43 @@
-'use client'
+"use client"
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from "react"
 import {
   Search, Download, Plus, Edit2, X, Users, Mail, Phone,
   Eye, EyeOff, Briefcase, DollarSign, Trash2, BarChart3,
   FileText, Building2, MapPin, Upload, Calendar, Clock,
   CheckCircle, AlertCircle, RefreshCw, ExternalLink, TrendingUp,
   User, UserCheck, Filter, ChevronDown, ChevronRight, Link2
-} from 'lucide-react'
+} from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend
-} from 'recharts'
-import { supabase, getCurrentUser } from '@/lib/supabase'
+} from "recharts"
+import { supabase, getCurrentUser } from "@/lib/supabase"
 
 // ============ THEME ============
 const THEME = {
-  glass: 'bg-slate-900/70 backdrop-blur-xl',
-  glassBorder: 'border-white/[0.08]',
-  textPrimary: 'text-white',
-  textSecondary: 'text-slate-300',
-  textMuted: 'text-slate-400',
-  textDim: 'text-slate-500',
+  glass: "bg-slate-900/70 backdrop-blur-xl",
+  glassBorder: "border-white/[0.08]",
+  textPrimary: "text-white",
+  textSecondary: "text-slate-300",
+  textMuted: "text-slate-400",
+  textDim: "text-slate-500",
 }
 
 // ============ TOAST ============
-interface Toast { id: number; type: 'success' | 'error' | 'info'; message: string }
+interface Toast { id: number; type: "success" | "error" | "info"; message: string }
 
 function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: number) => void }) {
   return (
     <div className="fixed bottom-4 right-4 z-50 space-y-2">
       {toasts.map(toast => (
         <div key={toast.id} className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg backdrop-blur-xl border ${
-          toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' :
-          toast.type === 'error' ? 'bg-rose-500/20 border-rose-500/30 text-rose-400' :
-          'bg-blue-500/20 border-blue-500/30 text-blue-400'
+          toast.type === "success" ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400" :
+          toast.type === "error" ? "bg-rose-500/20 border-rose-500/30 text-rose-400" :
+          "bg-blue-500/20 border-blue-500/30 text-blue-400"
         }`}>
-          {toast.type === 'success' && <CheckCircle size={18} />}
-          {toast.type === 'error' && <AlertCircle size={18} />}
-          {toast.type === 'info' && <AlertCircle size={18} />}
+          {toast.type === "success" && <CheckCircle size={18} />}
+          {toast.type === "error" && <AlertCircle size={18} />}
+          {toast.type === "info" && <AlertCircle size={18} />}
           <span className="text-sm font-medium">{toast.message}</span>
           <button onClick={() => onDismiss(toast.id)} className="ml-2 hover:opacity-70"><X size={16} /></button>
         </div>
@@ -49,15 +49,16 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
 // ============ TYPES ============
 interface TeamMember {
   id: string; name: string; email: string; phone: string | null; role: string | null
-  status: 'active' | 'inactive'; employment_type: 'employee' | 'contractor'
+  status: "active" | "inactive"; employment_type: "employee" | "contractor"
   start_date: string | null; entity_name: string | null; entity_type: string | null
   address: string | null; bank_name: string | null; account_type: string | null
   routing_number: string | null; account_number: string | null; payment_method: string | null
-  cost_type: 'hourly' | 'lump_sum'; cost_amount: number | null
+  cost_type: "hourly" | "lump_sum"; cost_amount: number | null
 }
 
 interface BillRate {
-  id: string; team_member_id: string; client_id: string; rate: number
+  id: string; team_member_id: string; client_id: string
+  rate: number; cost_type: "hourly" | "lump_sum"; cost_amount: number; baseline_hours: number
   is_active: boolean; notes: string | null
   team_member_name?: string; client_name?: string
 }
@@ -73,35 +74,80 @@ interface Client { id: string; name: string }
 interface TimeEntry { id: string; contractor_id: string; project_id: string; hours: number; billable_hours: number | null; is_billable: boolean; date: string }
 
 // ============ CONSTANTS ============
-const STATUS_OPTIONS = [{ id: 'active', label: 'Active' }, { id: 'inactive', label: 'Inactive' }]
+const STATUS_OPTIONS = [{ id: "active", label: "Active" }, { id: "inactive", label: "Inactive" }]
 const EMPLOYMENT_TYPES = [
-  { id: 'employee', label: 'W-2 Employee', icon: UserCheck, color: 'blue' },
-  { id: 'contractor', label: '1099 Contractor', icon: User, color: 'purple' },
+  { id: "employee", label: "W-2 Employee", icon: UserCheck, color: "blue" },
+  { id: "contractor", label: "1099 Contractor", icon: User, color: "purple" },
 ]
 const ENTITY_TYPES = [
-  { id: 'individual', label: 'Individual' }, { id: 'llc', label: 'LLC' },
-  { id: 'corp', label: 'Corporation' }, { id: 's_corp', label: 'S-Corp' }, { id: 'partnership', label: 'Partnership' },
+  { id: "individual", label: "Individual" }, { id: "llc", label: "LLC" },
+  { id: "corp", label: "Corporation" }, { id: "s_corp", label: "S-Corp" }, { id: "partnership", label: "Partnership" },
 ]
 const COST_TYPES = [
-  { id: 'hourly', label: 'Hourly (T&M)', description: 'Paid per hour worked' },
-  { id: 'lump_sum', label: 'Monthly Fixed', description: 'Fixed amount per month' },
+  { id: "hourly", label: "Hourly (T&M)", description: "Paid per hour worked" },
+  { id: "lump_sum", label: "Monthly Fixed", description: "Fixed amount per month" },
 ]
-const ACCOUNT_TYPES = [{ id: 'checking', label: 'Checking' }, { id: 'savings', label: 'Savings' }]
+const ACCOUNT_TYPES = [{ id: "checking", label: "Checking" }, { id: "savings", label: "Savings" }]
 const PAYMENT_METHODS = [
-  { id: 'ach', label: 'ACH Transfer' }, { id: 'wire', label: 'Wire Transfer' },
-  { id: 'check', label: 'Check' }, { id: 'zelle', label: 'Zelle' },
+  { id: "ach", label: "ACH Transfer" }, { id: "wire", label: "Wire Transfer" },
+  { id: "check", label: "Check" }, { id: "zelle", label: "Zelle" },
 ]
-const CHART_COLORS = { cost: '#ef4444', revenue: '#10b981', margin: '#3b82f6' }
+const CHART_COLORS = { cost: "#ef4444", revenue: "#10b981", margin: "#3b82f6" }
 
 // ============ UTILITIES ============
-const formatCurrency = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
-const formatCurrencyDecimal = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)
+const formatCurrency = (v: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
+const formatCurrencyDecimal = (v: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)
 const formatCompactCurrency = (v: number) => { if (v >= 1e6) return `$${(v/1e6).toFixed(1)}M`; if (v >= 1e3) return `$${(v/1e3).toFixed(0)}k`; return `$${v.toFixed(0)}` }
-const maskNumber = (num: string | null) => num ? '•••• ' + num.slice(-4) : '—'
-const getStatusStyle = (s: string) => s === 'active' ? { bg: 'bg-emerald-500/10', text: 'text-emerald-400' } : { bg: 'bg-slate-500/10', text: 'text-slate-400' }
-const getEmploymentStyle = (t: string) => t === 'employee' ? { bg: 'bg-blue-500/10', text: 'text-blue-400' } : { bg: 'bg-purple-500/10', text: 'text-purple-400' }
-const getCurrentMonth = () => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}` }
-const formatMonth = (m: string) => { const [y, mo] = m.split('-'); return new Date(parseInt(y), parseInt(mo)-1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) }
+const maskNumber = (num: string | null) => num ? "\u2022\u2022\u2022\u2022 " + num.slice(-4) : "\u2014"
+const getStatusStyle = (s: string) => s === "active" ? { bg: "bg-emerald-500/10", text: "text-emerald-400" } : { bg: "bg-slate-500/10", text: "text-slate-400" }
+const getEmploymentStyle = (t: string) => t === "employee" ? { bg: "bg-blue-500/10", text: "text-blue-400" } : { bg: "bg-purple-500/10", text: "text-purple-400" }
+
+const getCurrentMonth = () => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}` }
+const formatMonth = (m: string) => { const [y, mo] = m.split("-"); return new Date(parseInt(y), parseInt(mo)-1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }) }
+
+// Period helpers
+type PeriodType = "month" | "quarter" | "year"
+const getCurrentQuarter = () => { const n = new Date(); return `${n.getFullYear()}-Q${Math.ceil((n.getMonth()+1)/3)}` }
+const getCurrentYear = () => `${new Date().getFullYear()}`
+const formatQuarter = (q: string) => { const [y, qn] = q.split("-Q"); return `Q${qn} ${y}` }
+
+function getMonthsInPeriod(period: string, periodType: PeriodType): string[] {
+  if (periodType === "month") return [period]
+  if (periodType === "quarter") {
+    const [y, qn] = period.split("-Q").map(Number)
+    const sm = (qn - 1) * 3 + 1
+    return [1, 2, 3].map(i => `${y}-${String(sm + i - 1).padStart(2, "0")}`)
+  }
+  const y = parseInt(period)
+  return Array.from({ length: 12 }, (_, i) => `${y}-${String(i + 1).padStart(2, "0")}`)
+}
+
+function formatPeriodLabel(period: string, periodType: PeriodType): string {
+  if (periodType === "month") return formatMonth(period)
+  if (periodType === "quarter") return formatQuarter(period)
+  return period
+}
+
+function stepPeriod(period: string, periodType: PeriodType, dir: -1 | 1): string {
+  if (periodType === "month") {
+    const [y, m] = period.split("-").map(Number)
+    const d = new Date(y, m - 1 + dir, 1)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+  }
+  if (periodType === "quarter") {
+    const [y, qn] = period.split("-Q").map(Number)
+    let nq = qn + dir, ny = y
+    if (nq > 4) { nq = 1; ny++ } else if (nq < 1) { nq = 4; ny-- }
+    return `${ny}-Q${nq}`
+  }
+  return `${parseInt(period) + dir}`
+}
+
+function getDefaultPeriod(pt: PeriodType): string {
+  if (pt === "month") return getCurrentMonth()
+  if (pt === "quarter") return getCurrentQuarter()
+  return getCurrentYear()
+}
 
 // ============ MEMBER DETAIL FLYOUT ============
 function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
@@ -120,10 +166,10 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
               <div className="flex items-center gap-2">
                 <h2 className={`text-lg font-semibold ${THEME.textPrimary}`}>{member.name}</h2>
                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${empStyle.bg} ${empStyle.text}`}>
-                  {member.employment_type === 'employee' ? 'W-2' : '1099'}
+                  {member.employment_type === "employee" ? "W-2" : "1099"}
                 </span>
               </div>
-              <p className={`text-sm ${THEME.textMuted} mt-0.5`}>{member.role || 'No role'}</p>
+              <p className={`text-sm ${THEME.textMuted} mt-0.5`}>{member.role || "No role"}</p>
             </div>
             <div className="flex items-center gap-2">
               <button onClick={onEdit} className="p-2 rounded-lg hover:bg-white/[0.08]"><Edit2 size={16} className={THEME.textMuted} /></button>
@@ -141,54 +187,54 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
               {member.start_date && <p className={`flex items-center gap-2 text-sm ${THEME.textMuted}`}><Calendar size={14} /> Started {new Date(member.start_date).toLocaleDateString()}</p>}
             </div>
           </div>
+
           <div className="space-y-3">
-            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Cost Structure</h3>
-            <div className="p-4 rounded-lg bg-white/[0.03] space-y-2">
-              <div className="flex justify-between"><span className={THEME.textMuted}>Type</span>
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${member.cost_type === 'hourly' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'}`}>
-                  {member.cost_type === 'hourly' ? 'T&M' : 'Monthly Fixed'}
-                </span>
+            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Default Cost (fallback)</h3>
+            <div className="p-3 rounded-lg bg-white/[0.03]">
+              <div className="flex justify-between">
+                <span className={THEME.textMuted}>{member.cost_type === "hourly" ? "T&M" : "Fixed"}</span>
+                <span className="text-orange-400 font-medium">{member.cost_amount ? (member.cost_type === "hourly" ? `$${member.cost_amount}/hr` : `${formatCurrency(member.cost_amount)}/mo`) : "\u2014"}</span>
               </div>
-              <div className="flex justify-between"><span className={THEME.textMuted}>Amount</span>
-                <span className="text-orange-400 font-medium">{member.cost_amount ? (member.cost_type === 'hourly' ? `$${member.cost_amount}/hr` : `${formatCurrency(member.cost_amount)}/mo`) : '—'}</span>
-              </div>
-              {member.cost_type === 'lump_sum' && member.cost_amount && (
-                <div className="flex justify-between"><span className={THEME.textMuted}>Eff. Rate</span><span className={THEME.textDim}>~${(member.cost_amount/172).toFixed(0)}/hr</span></div>
-              )}
             </div>
           </div>
+
           <div className="space-y-3">
-            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Bill Rates ({memberRates.length})</h3>
+            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Rate Card ({memberRates.length} client{memberRates.length !== 1 ? "s" : ""})</h3>
             {memberRates.length > 0 ? (
               <div className="space-y-2">
                 {memberRates.map(r => {
-                  const cr = member.cost_type === 'hourly' ? (member.cost_amount||0) : ((member.cost_amount||0)/172)
-                  const mg = r.rate > 0 ? ((r.rate-cr)/r.rate*100) : 0
+                  const effCost = r.cost_type === "hourly" ? r.cost_amount : (r.baseline_hours > 0 ? r.cost_amount / r.baseline_hours : 0)
+                  const mg = r.rate > 0 ? ((r.rate - effCost) / r.rate * 100) : 0
                   return (
-                    <div key={r.id} className="p-3 rounded-lg bg-white/[0.03] flex items-center justify-between">
-                      <div><p className={`text-sm font-medium ${THEME.textPrimary}`}>{r.client_name}</p>
-                        <p className={`text-xs ${mg >= 20 ? 'text-emerald-400' : mg >= 0 ? 'text-amber-400' : 'text-rose-400'}`}>{mg.toFixed(0)}% margin</p></div>
-                      <span className="text-emerald-400 font-medium">${r.rate}/hr</span>
+                    <div key={r.id} className="p-3 rounded-lg bg-white/[0.03]">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className={`text-sm font-medium ${THEME.textPrimary}`}>{r.client_name}</p>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded ${mg >= 20 ? "bg-emerald-500/10 text-emerald-400" : mg >= 0 ? "bg-amber-500/10 text-amber-400" : "bg-rose-500/10 text-rose-400"}`}>{mg.toFixed(0)}% GM</span>
+                      </div>
+                      <div className="flex gap-4 text-xs">
+                        <span className="text-orange-400">Cost: {r.cost_type === "hourly" ? `$${r.cost_amount}/hr` : `${formatCurrency(r.cost_amount)}/mo (${r.baseline_hours}h)`}</span>
+                        <span className="text-emerald-400">Bill: ${r.rate}/hr</span>
+                      </div>
                     </div>
                   )
                 })}
               </div>
-            ) : <p className={`text-sm ${THEME.textMuted} text-center py-4`}>No bill rates set</p>}
+            ) : <p className={`text-sm ${THEME.textMuted} text-center py-4`}>No rates configured</p>}
           </div>
+
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Banking</h3>
               {member.bank_name && <button onClick={() => setShowBanking(!showBanking)} className={`text-xs ${THEME.textMuted} hover:text-white flex items-center gap-1`}>
-                {showBanking ? <EyeOff size={14} /> : <Eye size={14} />} {showBanking ? 'Hide' : 'Show'}
+                {showBanking ? <EyeOff size={14} /> : <Eye size={14} />} {showBanking ? "Hide" : "Show"}
               </button>}
             </div>
             {member.bank_name ? (
               <div className="p-4 rounded-lg bg-white/[0.03] space-y-2">
                 <div className="flex justify-between"><span className={THEME.textMuted}>Bank</span><span className={THEME.textPrimary}>{member.bank_name}</span></div>
-                <div className="flex justify-between"><span className={THEME.textMuted}>Type</span><span className={THEME.textPrimary}>{ACCOUNT_TYPES.find(t=>t.id===member.account_type)?.label||'—'}</span></div>
                 <div className="flex justify-between"><span className={THEME.textMuted}>Routing</span><span className="font-mono text-sm">{showBanking?member.routing_number:maskNumber(member.routing_number)}</span></div>
                 <div className="flex justify-between"><span className={THEME.textMuted}>Account</span><span className="font-mono text-sm">{showBanking?member.account_number:maskNumber(member.account_number)}</span></div>
-                <div className="flex justify-between"><span className={THEME.textMuted}>Method</span><span className={THEME.textPrimary}>{PAYMENT_METHODS.find(m=>m.id===member.payment_method)?.label||'—'}</span></div>
+                <div className="flex justify-between"><span className={THEME.textMuted}>Method</span><span className={THEME.textPrimary}>{PAYMENT_METHODS.find(m=>m.id===member.payment_method)?.label||"\u2014"}</span></div>
               </div>
             ) : <p className={`text-sm ${THEME.textMuted} p-4 rounded-lg bg-white/[0.03] text-center`}>No banking info</p>}
           </div>
@@ -198,85 +244,155 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
   )
 }
 
-// ============ BILL RATE MODAL ============
-function BillRateModal({ isOpen, onClose, onSave, editingRate, teamMembers, clients }: {
+// ============ RATE CARD MODAL (Cost + Revenue per client) ============
+function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clients }: {
   isOpen: boolean; onClose: () => void; onSave: (data: any) => Promise<void>
   editingRate: BillRate | null; teamMembers: TeamMember[]; clients: Client[]
 }) {
-  const [form, setForm] = useState({ team_member_id: '', client_id: '', rate: '', notes: '' })
+  const [form, setForm] = useState({
+    team_member_id: "", client_id: "", rate: "", notes: "",
+    cost_type: "hourly" as "hourly" | "lump_sum", cost_amount: "", baseline_hours: "172",
+  })
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     if (editingRate) {
-      setForm({ team_member_id: editingRate.team_member_id, client_id: editingRate.client_id, rate: editingRate.rate.toString(), notes: editingRate.notes || '' })
+      setForm({
+        team_member_id: editingRate.team_member_id, client_id: editingRate.client_id,
+        rate: editingRate.rate.toString(), notes: editingRate.notes || "",
+        cost_type: editingRate.cost_type || "hourly",
+        cost_amount: editingRate.cost_amount?.toString() || "",
+        baseline_hours: editingRate.baseline_hours?.toString() || "172",
+      })
     } else {
-      setForm({ team_member_id: '', client_id: '', rate: '', notes: '' })
+      setForm({ team_member_id: "", client_id: "", rate: "", notes: "", cost_type: "hourly", cost_amount: "", baseline_hours: "172" })
     }
   }, [editingRate, isOpen])
 
-  const selectedMember = teamMembers.find(m => m.id === form.team_member_id)
-  const costRate = selectedMember ? (selectedMember.cost_type === 'hourly' ? (selectedMember.cost_amount||0) : ((selectedMember.cost_amount||0)/172)) : 0
+  const handleMemberChange = (id: string) => {
+    const member = teamMembers.find(m => m.id === id)
+    if (member && !editingRate) {
+      setForm(p => ({
+        ...p, team_member_id: id,
+        cost_type: member.cost_type || "hourly",
+        cost_amount: member.cost_amount?.toString() || "",
+      }))
+    } else {
+      setForm(p => ({ ...p, team_member_id: id }))
+    }
+  }
+
+  const costAmt = parseFloat(form.cost_amount) || 0
+  const baseHrs = parseFloat(form.baseline_hours) || 172
+  const effCostRate = form.cost_type === "hourly" ? costAmt : (baseHrs > 0 ? costAmt / baseHrs : 0)
   const billRate = parseFloat(form.rate) || 0
-  const margin = billRate > 0 ? ((billRate-costRate)/billRate*100) : 0
+  const margin = billRate > 0 ? ((billRate - effCostRate) / billRate * 100) : 0
 
   const handleSave = async () => {
     if (!form.team_member_id || !form.client_id || !form.rate) return
     setIsSaving(true)
-    try { await onSave({ ...form, rate: parseFloat(form.rate)||0, is_active: true }); onClose() } finally { setIsSaving(false) }
+    try {
+      await onSave({
+        team_member_id: form.team_member_id, client_id: form.client_id,
+        rate: parseFloat(form.rate) || 0, is_active: true, notes: form.notes || null,
+        cost_type: form.cost_type, cost_amount: parseFloat(form.cost_amount) || 0,
+        baseline_hours: parseFloat(form.baseline_hours) || 172,
+      })
+      onClose()
+    } finally { setIsSaving(false) }
   }
 
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-2xl w-full max-w-lg`}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-2xl w-full max-w-lg my-8`}>
         <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder}`}>
-          <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>{editingRate ? 'Edit Bill Rate' : 'Add Bill Rate'}</h3>
+          <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>{editingRate ? "Edit Rate Card" : "Add Rate Card"}</h3>
           <button onClick={onClose} className="p-1 hover:bg-white/[0.05] rounded-lg"><X size={20} className={THEME.textMuted} /></button>
         </div>
-        <div className="p-6 space-y-5">
-          <div>
-            <label className={`block text-xs ${THEME.textMuted} mb-1`}>Team Member *</label>
-            <select value={form.team_member_id} onChange={e => setForm(p=>({...p,team_member_id:e.target.value}))} disabled={!!editingRate}
-              className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white disabled:opacity-50">
-              <option value="">Select team member...</option>
-              {teamMembers.filter(m=>m.status==='active').map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+        <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={`block text-xs ${THEME.textMuted} mb-1`}>Team Member *</label>
+              <select value={form.team_member_id} onChange={e => handleMemberChange(e.target.value)} disabled={!!editingRate}
+                className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white disabled:opacity-50">
+                <option value="">Select...</option>
+                {teamMembers.filter(m=>m.status==="active").map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={`block text-xs ${THEME.textMuted} mb-1`}>Client *</label>
+              <select value={form.client_id} onChange={e => setForm(p=>({...p,client_id:e.target.value}))} disabled={!!editingRate}
+                className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white disabled:opacity-50">
+                <option value="">Select...</option>
+                {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
           </div>
-          <div>
-            <label className={`block text-xs ${THEME.textMuted} mb-1`}>Client *</label>
-            <select value={form.client_id} onChange={e => setForm(p=>({...p,client_id:e.target.value}))} disabled={!!editingRate}
-              className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white disabled:opacity-50">
-              <option value="">Select client...</option>
-              {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+
+          <div className="p-4 rounded-lg border border-orange-500/20 bg-orange-500/5">
+            <p className="text-xs font-semibold text-orange-400 mb-3">COST SIDE &mdash; What You Pay</p>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              {COST_TYPES.map(t => (
+                <button key={t.id} type="button" onClick={() => setForm(p=>({...p, cost_type: t.id as any}))}
+                  className={`p-2 rounded-lg border text-left transition-all ${form.cost_type===t.id ? "border-orange-500 bg-orange-500/10" : "border-white/[0.08] hover:border-white/[0.15]"}`}>
+                  <p className={`text-xs font-medium ${form.cost_type===t.id ? "text-orange-400" : THEME.textPrimary}`}>{t.label}</p>
+                </button>
+              ))}
+            </div>
+            <div className={form.cost_type === "lump_sum" ? "grid grid-cols-2 gap-3" : ""}>
+              <div>
+                <label className={`block text-xs ${THEME.textDim} mb-1`}>{form.cost_type === "hourly" ? "Cost Rate ($/hr)" : "Monthly Amount ($/mo)"}</label>
+                <input type="number" value={form.cost_amount} onChange={e => setForm(p=>({...p,cost_amount:e.target.value}))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder={form.cost_type==="hourly"?"35":"13525"} />
+              </div>
+              {form.cost_type === "lump_sum" && (
+                <div>
+                  <label className={`block text-xs ${THEME.textDim} mb-1`}>Baseline Hrs/mo</label>
+                  <input type="number" value={form.baseline_hours} onChange={e => setForm(p=>({...p,baseline_hours:e.target.value}))}
+                    className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="340" />
+                </div>
+              )}
+            </div>
+            {form.cost_type === "lump_sum" && costAmt > 0 && (
+              <p className={`text-xs ${THEME.textDim} mt-2`}>Effective: ~${effCostRate.toFixed(2)}/hr ({formatCurrency(costAmt)} &divide; {baseHrs} hrs)</p>
+            )}
           </div>
-          <div>
-            <label className={`block text-xs ${THEME.textMuted} mb-1`}>Bill Rate ($/hr) * — What you charge the client</label>
-            <input type="number" value={form.rate} onChange={e => setForm(p=>({...p,rate:e.target.value}))}
-              className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="185" />
+
+          <div className="p-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
+            <p className="text-xs font-semibold text-emerald-400 mb-3">REVENUE SIDE &mdash; What You Charge</p>
+            <div>
+              <label className={`block text-xs ${THEME.textDim} mb-1`}>Bill Rate ($/hr) *</label>
+              <input type="number" value={form.rate} onChange={e => setForm(p=>({...p,rate:e.target.value}))}
+                className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="112" />
+            </div>
           </div>
-          {form.team_member_id && billRate > 0 && (
-            <div className={`p-4 rounded-lg border ${margin >= 20 ? 'bg-emerald-500/10 border-emerald-500/20' : margin >= 0 ? 'bg-amber-500/10 border-amber-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
-              <div className="flex justify-between text-sm"><span className={THEME.textSecondary}>Cost Rate</span><span className="text-orange-400">${costRate.toFixed(2)}/hr</span></div>
+
+          {effCostRate > 0 && billRate > 0 && (
+            <div className={`p-4 rounded-lg border ${margin >= 20 ? "bg-emerald-500/10 border-emerald-500/20" : margin >= 0 ? "bg-amber-500/10 border-amber-500/20" : "bg-rose-500/10 border-rose-500/20"}`}>
+              <div className="flex justify-between text-sm"><span className={THEME.textSecondary}>Eff. Cost</span><span className="text-orange-400">${effCostRate.toFixed(2)}/hr</span></div>
               <div className="flex justify-between text-sm mt-1"><span className={THEME.textSecondary}>Bill Rate</span><span className="text-emerald-400">${billRate.toFixed(2)}/hr</span></div>
               <div className={`flex justify-between text-sm mt-2 pt-2 border-t ${THEME.glassBorder}`}>
                 <span className="font-medium text-white">Gross Margin</span>
-                <span className={`font-semibold ${margin >= 20 ? 'text-emerald-400' : margin >= 0 ? 'text-amber-400' : 'text-rose-400'}`}>{margin.toFixed(1)}% (${(billRate-costRate).toFixed(2)}/hr)</span>
+                <span className={`font-semibold ${margin >= 20 ? "text-emerald-400" : margin >= 0 ? "text-amber-400" : "text-rose-400"}`}>
+                  {margin.toFixed(1)}% (${(billRate - effCostRate).toFixed(2)}/hr)
+                </span>
               </div>
             </div>
           )}
+
           <div>
             <label className={`block text-xs ${THEME.textMuted} mb-1`}>Notes</label>
             <input value={form.notes} onChange={e => setForm(p=>({...p,notes:e.target.value}))}
-              className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="Optional..." />
+              className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="e.g. Covers PM + analyst, 2 FTEs..." />
           </div>
         </div>
         <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
           <button onClick={onClose} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white`}>Cancel</button>
           <button onClick={handleSave} disabled={!form.team_member_id||!form.client_id||!form.rate||isSaving}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50">
-            {isSaving && <RefreshCw size={14} className="animate-spin" />}{editingRate ? 'Save Changes' : 'Add Rate'}
+            {isSaving && <RefreshCw size={14} className="animate-spin" />}{editingRate ? "Save Changes" : "Add Rate"}
           </button>
         </div>
       </div>
@@ -285,15 +401,19 @@ function BillRateModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
 }
 
 // ============ COST OVERRIDE MODAL ============
-function CostOverrideModal({ isOpen, onClose, onSave, teamMembers, clients, selectedMonth }: {
+function CostOverrideModal({ isOpen, onClose, onSave, billRates, teamMembers, clients, selectedMonth }: {
   isOpen: boolean; onClose: () => void; onSave: (data: any) => Promise<void>
-  teamMembers: TeamMember[]; clients: Client[]; selectedMonth: string
+  billRates: BillRate[]; teamMembers: TeamMember[]; clients: Client[]; selectedMonth: string
 }) {
-  const [form, setForm] = useState({ team_member_id: '', client_id: '', fixed_amount: '', notes: '' })
+  const [form, setForm] = useState({ team_member_id: "", client_id: "", fixed_amount: "", notes: "" })
   const [isSaving, setIsSaving] = useState(false)
-  useEffect(() => { setForm({ team_member_id: '', client_id: '', fixed_amount: '', notes: '' }) }, [isOpen])
+  useEffect(() => { setForm({ team_member_id: "", client_id: "", fixed_amount: "", notes: "" }) }, [isOpen])
 
-  const lumpSumMembers = teamMembers.filter(m => m.cost_type === 'lump_sum' && m.status === 'active')
+  const lumpSumMemberIds = new Set(billRates.filter(r => r.cost_type === "lump_sum" && r.is_active).map(r => r.team_member_id))
+  const eligibleMembers = teamMembers.filter(m => lumpSumMemberIds.has(m.id) && m.status === "active")
+  const eligibleClients = form.team_member_id
+    ? clients.filter(c => billRates.some(r => r.team_member_id === form.team_member_id && r.client_id === c.id && r.cost_type === "lump_sum" && r.is_active))
+    : clients
 
   const handleSave = async () => {
     if (!form.team_member_id || !form.client_id || !form.fixed_amount) return
@@ -315,11 +435,11 @@ function CostOverrideModal({ isOpen, onClose, onSave, teamMembers, clients, sele
         </div>
         <div className="p-6 space-y-5">
           <div>
-            <label className={`block text-xs ${THEME.textMuted} mb-1`}>Team Member (Fixed-Cost Only) *</label>
-            <select value={form.team_member_id} onChange={e => setForm(p=>({...p,team_member_id:e.target.value}))}
+            <label className={`block text-xs ${THEME.textMuted} mb-1`}>Team Member (Lump-Sum Only) *</label>
+            <select value={form.team_member_id} onChange={e => setForm(p=>({...p,team_member_id:e.target.value,client_id:""}))}
               className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white">
               <option value="">Select...</option>
-              {lumpSumMembers.map(m=><option key={m.id} value={m.id}>{m.name} ({formatCurrency(m.cost_amount||0)}/mo)</option>)}
+              {eligibleMembers.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>
           <div>
@@ -327,7 +447,7 @@ function CostOverrideModal({ isOpen, onClose, onSave, teamMembers, clients, sele
             <select value={form.client_id} onChange={e => setForm(p=>({...p,client_id:e.target.value}))}
               className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white">
               <option value="">Select...</option>
-              {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+              {eligibleClients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div>
@@ -359,30 +479,30 @@ function MemberModal({ isOpen, onClose, onSave, editingMember }: {
   isOpen: boolean; onClose: () => void; onSave: (data: any) => Promise<void>; editingMember: TeamMember | null
 }) {
   const [form, setForm] = useState({
-    name: '', email: '', phone: '', role: '', status: 'active',
-    employment_type: 'contractor', start_date: '',
-    entity_name: '', entity_type: '', address: '',
-    bank_name: '', account_type: '', routing_number: '', account_number: '', payment_method: '',
-    cost_type: 'hourly' as 'hourly' | 'lump_sum', cost_amount: '',
+    name: "", email: "", phone: "", role: "", status: "active",
+    employment_type: "contractor", start_date: "",
+    entity_name: "", entity_type: "", address: "",
+    bank_name: "", account_type: "", routing_number: "", account_number: "", payment_method: "",
+    cost_type: "hourly" as "hourly" | "lump_sum", cost_amount: "",
   })
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     if (editingMember) {
       setForm({
-        name: editingMember.name||'', email: editingMember.email||'', phone: editingMember.phone||'',
-        role: editingMember.role||'', status: editingMember.status||'active',
-        employment_type: editingMember.employment_type||'contractor', start_date: editingMember.start_date||'',
-        entity_name: editingMember.entity_name||'', entity_type: editingMember.entity_type||'',
-        address: editingMember.address||'', bank_name: editingMember.bank_name||'',
-        account_type: editingMember.account_type||'', routing_number: editingMember.routing_number||'',
-        account_number: editingMember.account_number||'', payment_method: editingMember.payment_method||'',
-        cost_type: editingMember.cost_type||'hourly', cost_amount: editingMember.cost_amount?.toString()||'',
+        name: editingMember.name||"", email: editingMember.email||"", phone: editingMember.phone||"",
+        role: editingMember.role||"", status: editingMember.status||"active",
+        employment_type: editingMember.employment_type||"contractor", start_date: editingMember.start_date||"",
+        entity_name: editingMember.entity_name||"", entity_type: editingMember.entity_type||"",
+        address: editingMember.address||"", bank_name: editingMember.bank_name||"",
+        account_type: editingMember.account_type||"", routing_number: editingMember.routing_number||"",
+        account_number: editingMember.account_number||"", payment_method: editingMember.payment_method||"",
+        cost_type: editingMember.cost_type||"hourly", cost_amount: editingMember.cost_amount?.toString()||"",
       })
     } else {
-      setForm({ name:'',email:'',phone:'',role:'',status:'active',employment_type:'contractor',start_date:'',
-        entity_name:'',entity_type:'',address:'',bank_name:'',account_type:'',routing_number:'',account_number:'',
-        payment_method:'',cost_type:'hourly',cost_amount:'' })
+      setForm({ name:"",email:"",phone:"",role:"",status:"active",employment_type:"contractor",start_date:"",
+        entity_name:"",entity_type:"",address:"",bank_name:"",account_type:"",routing_number:"",account_number:"",
+        payment_method:"",cost_type:"hourly",cost_amount:"" })
     }
   }, [editingMember, isOpen])
 
@@ -398,7 +518,7 @@ function MemberModal({ isOpen, onClose, onSave, editingMember }: {
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-2xl w-full max-w-2xl my-8 flex flex-col max-h-[90vh]`}>
         <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder}`}>
-          <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>{editingMember ? 'Edit Team Member' : 'Add Team Member'}</h3>
+          <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>{editingMember ? "Edit Team Member" : "Add Team Member"}</h3>
           <button onClick={onClose} className="p-1 hover:bg-white/[0.05] rounded-lg"><X size={20} className={THEME.textMuted} /></button>
         </div>
         <div className="p-6 space-y-4 overflow-y-auto flex-1">
@@ -430,30 +550,29 @@ function MemberModal({ isOpen, onClose, onSave, editingMember }: {
                 className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" /></div>
           </div>
 
-          {/* Cost Structure */}
           <div className={`pt-4 border-t ${THEME.glassBorder}`}>
-            <h4 className={`text-sm font-medium ${THEME.textSecondary} mb-3`}>Cost Structure — What You Pay Them</h4>
+            <h4 className={`text-sm font-medium ${THEME.textSecondary} mb-3`}>Default Cost (fallback when no rate card entry)</h4>
             <div className="grid grid-cols-2 gap-3 mb-4">
               {COST_TYPES.map(t=>(
                 <button key={t.id} type="button" onClick={()=>setForm(p=>({...p,cost_type:t.id as any}))}
-                  className={`p-3 rounded-lg border text-left transition-all ${form.cost_type===t.id?'border-orange-500 bg-orange-500/10':'border-white/[0.08] hover:border-white/[0.15]'}`}>
-                  <p className={`text-sm font-medium ${form.cost_type===t.id?'text-orange-400':THEME.textPrimary}`}>{t.label}</p>
+                  className={`p-3 rounded-lg border text-left transition-all ${form.cost_type===t.id?"border-orange-500 bg-orange-500/10":"border-white/[0.08] hover:border-white/[0.15]"}`}>
+                  <p className={`text-sm font-medium ${form.cost_type===t.id?"text-orange-400":THEME.textPrimary}`}>{t.label}</p>
                   <p className={`text-xs ${THEME.textDim} mt-0.5`}>{t.description}</p>
                 </button>
               ))}
             </div>
             <div>
-              <label className={`block text-xs ${THEME.textMuted} mb-1`}>{form.cost_type==='hourly'?'Hourly Rate ($/hr)':'Monthly Amount ($/mo)'}</label>
+              <label className={`block text-xs ${THEME.textMuted} mb-1`}>{form.cost_type==="hourly"?"Hourly Rate ($/hr)":"Monthly Amount ($/mo)"}</label>
               <input type="number" value={form.cost_amount} onChange={e=>setForm(p=>({...p,cost_amount:e.target.value}))}
                 className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
-                placeholder={form.cost_type==='hourly'?'75':'35000'} />
-              {form.cost_type==='lump_sum' && form.cost_amount && (
+                placeholder={form.cost_type==="hourly"?"75":"35000"} />
+              {form.cost_type==="lump_sum" && form.cost_amount && (
                 <p className={`text-xs ${THEME.textDim} mt-1`}>Effective rate: ~${(parseFloat(form.cost_amount)/172).toFixed(2)}/hr (172 hrs/mo)</p>
               )}
             </div>
           </div>
 
-          {form.employment_type === 'contractor' && (
+          {form.employment_type === "contractor" && (
             <>
               <div className={`pt-4 border-t ${THEME.glassBorder}`}>
                 <h4 className={`text-sm font-medium ${THEME.textSecondary} mb-3`}>Entity Information</h4>
@@ -504,7 +623,7 @@ function MemberModal({ isOpen, onClose, onSave, editingMember }: {
           <button onClick={onClose} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white`}>Cancel</button>
           <button onClick={handleSave} disabled={!form.name||!form.email||isSaving}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50">
-            {isSaving && <RefreshCw size={14} className="animate-spin" />}{editingMember ? 'Save Changes' : 'Add Member'}
+            {isSaving && <RefreshCw size={14} className="animate-spin" />}{editingMember ? "Save Changes" : "Add Member"}
           </button>
         </div>
       </div>
@@ -524,14 +643,17 @@ export default function TeamPage() {
   const [clients, setClients] = useState<Client[]>([])
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
 
-  const [activeTab, setActiveTab] = useState<'directory' | 'rates' | 'profitability'>('directory')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [employmentFilter, setEmploymentFilter] = useState<'all' | 'employee' | 'contractor'>('all')
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth())
-  const [profitView, setProfitView] = useState<'summary' | 'revenue' | 'cost'>('summary')
+  const [activeTab, setActiveTab] = useState<"directory" | "rates" | "profitability">("directory")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [employmentFilter, setEmploymentFilter] = useState<"all" | "employee" | "contractor">("all")
+
+  // Period state
+  const [periodType, setPeriodType] = useState<PeriodType>("month")
+  const [selectedPeriod, setSelectedPeriod] = useState(getCurrentMonth())
+  const [profitView, setProfitView] = useState<"summary" | "revenue" | "cost">("summary")
 
   const [toasts, setToasts] = useState<Toast[]>([])
-  const addToast = useCallback((type: Toast['type'], message: string) => {
+  const addToast = useCallback((type: Toast["type"], message: string) => {
     const id = Date.now()
     setToasts(prev => [...prev, { id, type, message }])
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
@@ -544,6 +666,12 @@ export default function TeamPage() {
   const [showOverrideModal, setShowOverrideModal] = useState(false)
   const [selectedMemberDetail, setSelectedMemberDetail] = useState<TeamMember | null>(null)
 
+  // Reset period value when switching period type
+  const handlePeriodTypeChange = (pt: PeriodType) => {
+    setPeriodType(pt)
+    setSelectedPeriod(getDefaultPeriod(pt))
+  }
+
   // ---- DATA LOADING ----
   useEffect(() => {
     async function loadData() {
@@ -551,17 +679,17 @@ export default function TeamPage() {
         const result = await getCurrentUser()
         const user = result?.user
         if (!user) { setLoading(false); return }
-        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
+        const { data: profile } = await supabase.from("profiles").select("company_id").eq("id", user.id).single()
         if (!profile?.company_id) { setLoading(false); return }
         setCompanyId(profile.company_id)
 
         const [membersRes, clientsRes, projectsRes, billRatesRes, costOverridesRes, timeRes] = await Promise.all([
-          supabase.from('team_members').select('*').eq('company_id', profile.company_id).order('name'),
-          supabase.from('clients').select('id, name').eq('company_id', profile.company_id).order('name'),
-          supabase.from('projects').select('id, name, client_id, status, budget').eq('company_id', profile.company_id),
-          supabase.from('bill_rates').select('*').eq('company_id', profile.company_id),
-          supabase.from('cost_overrides').select('*').eq('company_id', profile.company_id),
-          supabase.from('time_entries').select('id, contractor_id, project_id, hours, billable_hours, is_billable, date').eq('company_id', profile.company_id),
+          supabase.from("team_members").select("*").eq("company_id", profile.company_id).order("name"),
+          supabase.from("clients").select("id, name").eq("company_id", profile.company_id).order("name"),
+          supabase.from("projects").select("id, name, client_id, status, budget").eq("company_id", profile.company_id),
+          supabase.from("bill_rates").select("*").eq("company_id", profile.company_id),
+          supabase.from("cost_overrides").select("*").eq("company_id", profile.company_id),
+          supabase.from("time_entries").select("id, contractor_id, project_id, hours, billable_hours, is_billable, date").eq("company_id", profile.company_id),
         ])
 
         const clientMap = new Map((clientsRes.data || []).map(c => [c.id, c.name]))
@@ -569,17 +697,17 @@ export default function TeamPage() {
 
         setTeamMembers(membersRes.data || [])
         setClients(clientsRes.data || [])
-        setProjects((projectsRes.data || []).map(p => ({ ...p, client_name: clientMap.get(p.client_id) || '' })))
+        setProjects((projectsRes.data || []).map(p => ({ ...p, client_name: clientMap.get(p.client_id) || "" })))
         setBillRates((billRatesRes.data || []).map(r => ({
-          ...r, team_member_name: memberMap.get(r.team_member_id) || 'Unknown', client_name: clientMap.get(r.client_id) || 'Unknown',
+          ...r, team_member_name: memberMap.get(r.team_member_id) || "Unknown", client_name: clientMap.get(r.client_id) || "Unknown",
         })))
         setCostOverrides((costOverridesRes.data || []).map(o => ({
-          ...o, team_member_name: memberMap.get(o.team_member_id) || 'Unknown', client_name: clientMap.get(o.client_id) || 'Unknown',
+          ...o, team_member_name: memberMap.get(o.team_member_id) || "Unknown", client_name: clientMap.get(o.client_id) || "Unknown",
         })))
         setTimeEntries(timeRes.data || [])
       } catch (error) {
-        console.error('Error loading data:', error)
-        addToast('error', 'Failed to load data')
+        console.error("Error loading data:", error)
+        addToast("error", "Failed to load data")
       } finally {
         setLoading(false)
       }
@@ -594,98 +722,103 @@ export default function TeamPage() {
         const q = searchQuery.toLowerCase()
         if (!m.name?.toLowerCase().includes(q) && !m.email?.toLowerCase().includes(q)) return false
       }
-      if (employmentFilter !== 'all' && m.employment_type !== employmentFilter) return false
+      if (employmentFilter !== "all" && m.employment_type !== employmentFilter) return false
       return true
     })
   }, [teamMembers, searchQuery, employmentFilter])
 
   const summary = useMemo(() => {
-    const active = teamMembers.filter(m => m.status === 'active')
+    const active = teamMembers.filter(m => m.status === "active")
     return {
       total: teamMembers.length, active: active.length,
-      employees: teamMembers.filter(m => m.employment_type === 'employee').length,
-      contractors: teamMembers.filter(m => m.employment_type === 'contractor').length,
+      employees: teamMembers.filter(m => m.employment_type === "employee").length,
+      contractors: teamMembers.filter(m => m.employment_type === "contractor").length,
       activeRates: billRates.filter(r => r.is_active).length,
     }
   }, [teamMembers, billRates])
 
-  // ---- PROFITABILITY ENGINE ----
+  // ---- PROFITABILITY ENGINE (reads from timesheet + rate card) ----
   const profitabilityData = useMemo(() => {
-    const monthEntries = timeEntries.filter(t => t.date?.startsWith(selectedMonth))
-    const monthOverrides = costOverrides.filter(o => o.month === selectedMonth)
-    const projectClientMap = new Map(projects.map(p => [p.id, p.client_id || '']))
+    const months = getMonthsInPeriod(selectedPeriod, periodType)
+    const periodEntries = timeEntries.filter(t => {
+      const m = t.date?.substring(0, 7)
+      return months.includes(m)
+    })
+    const projectClientMap = new Map(projects.map(p => [p.id, p.client_id || ""]))
 
     return teamMembers.map(member => {
-      const memberTime = monthEntries.filter(t => t.contractor_id === member.id)
+      const memberTime = periodEntries.filter(t => t.contractor_id === member.id)
       const totalHours = memberTime.reduce((sum, t) => sum + (t.hours || 0), 0)
-      if (totalHours === 0 && !member.cost_amount) return null
+      if (totalHours === 0) return null
 
       // Group hours by client
       const hoursByClient: Record<string, number> = {}
       memberTime.forEach(t => {
-        const clientId = projectClientMap.get(t.project_id) || 'unknown'
+        const clientId = projectClientMap.get(t.project_id) || "unknown"
         hoursByClient[clientId] = (hoursByClient[clientId] || 0) + (t.hours || 0)
       })
 
-      // REVENUE by client = hours × bill rate
+      // REVENUE by client = hours x bill rate (from rate card)
       const revenueByClient: Record<string, number> = {}
       let totalRevenue = 0
       Object.entries(hoursByClient).forEach(([clientId, hours]) => {
-        const rate = billRates.find(r => r.team_member_id === member.id && r.client_id === clientId && r.is_active)
-        const rev = hours * (rate?.rate || 0)
+        const rc = billRates.find(r => r.team_member_id === member.id && r.client_id === clientId && r.is_active)
+        const rev = hours * (rc?.rate || 0)
         revenueByClient[clientId] = rev
         totalRevenue += rev
       })
 
-      // COST by client
+      // COST by client - from RATE CARD per client (not team_member default)
       const costByClient: Record<string, number> = {}
       let totalCost = 0
 
-      if (member.cost_type === 'hourly') {
-        Object.entries(hoursByClient).forEach(([clientId, hours]) => {
-          const cost = hours * (member.cost_amount || 0)
-          costByClient[clientId] = cost
-          totalCost += cost
-        })
-      } else {
-        // Lump sum: check overrides first, then auto-distribute remainder by hours
-        const memberOverrides = monthOverrides.filter(o => o.team_member_id === member.id)
-        const overrideMap = new Map(memberOverrides.map(o => [o.client_id, o.fixed_amount]))
-        let overrideTotal = 0
-        const overriddenClients = new Set<string>()
+      Object.entries(hoursByClient).forEach(([clientId, hours]) => {
+        const rc = billRates.find(r => r.team_member_id === member.id && r.client_id === clientId && r.is_active)
 
-        memberOverrides.forEach(o => {
-          costByClient[o.client_id] = o.fixed_amount
-          overrideTotal += o.fixed_amount
-          overriddenClients.add(o.client_id)
-        })
-
-        const remainingCost = (member.cost_amount || 0) - overrideTotal
-        const nonOverrideHours = Object.entries(hoursByClient)
-          .filter(([cid]) => !overriddenClients.has(cid))
-          .reduce((sum, [, h]) => sum + h, 0)
-
-        Object.entries(hoursByClient).forEach(([clientId, hours]) => {
-          if (!overriddenClients.has(clientId) && nonOverrideHours > 0) {
-            costByClient[clientId] = (hours / nonOverrideHours) * remainingCost
+        if (rc) {
+          if (rc.cost_type === "hourly") {
+            // T&M: hours x cost rate
+            costByClient[clientId] = hours * rc.cost_amount
+          } else {
+            // Lump sum: check for monthly overrides first
+            let lsCost = 0
+            months.forEach(mo => {
+              const override = costOverrides.find(o => o.team_member_id === member.id && o.client_id === clientId && o.month === mo)
+              lsCost += override ? override.fixed_amount : rc.cost_amount
+            })
+            costByClient[clientId] = lsCost
           }
-        })
-
-        totalCost = member.cost_amount || 0
-      }
+        } else {
+          // Fallback to team member default cost
+          if (member.cost_type === "hourly") {
+            costByClient[clientId] = hours * (member.cost_amount || 0)
+          } else {
+            // Auto-distribute member default across clients by hours
+            const pct = totalHours > 0 ? hours / totalHours : 0
+            costByClient[clientId] = pct * (member.cost_amount || 0) * months.length
+          }
+        }
+        totalCost += costByClient[clientId]
+      })
 
       const margin = totalRevenue - totalCost
       const marginPct = totalRevenue > 0 ? (margin / totalRevenue) * 100 : (totalCost > 0 ? -100 : 0)
 
-      return { id: member.id, name: member.name, costType: member.cost_type, hours: totalHours,
+      // Determine display cost type from dominant rate card entries
+      const memberRates = billRates.filter(r => r.team_member_id === member.id && r.is_active)
+      const hasLS = memberRates.some(r => r.cost_type === "lump_sum")
+      const hasTM = memberRates.some(r => r.cost_type === "hourly")
+      const costLabel = hasLS && hasTM ? "Mixed" : hasLS ? "Fixed" : "T&M"
+
+      return { id: member.id, name: member.name, costLabel, hours: totalHours,
         cost: totalCost, revenue: totalRevenue, margin, marginPct,
         hoursByClient, revenueByClient, costByClient }
     }).filter(Boolean) as Array<{
-      id: string; name: string; costType: string; hours: number; cost: number; revenue: number
+      id: string; name: string; costLabel: string; hours: number; cost: number; revenue: number
       margin: number; marginPct: number
       hoursByClient: Record<string, number>; revenueByClient: Record<string, number>; costByClient: Record<string, number>
     }>
-  }, [teamMembers, billRates, costOverrides, timeEntries, projects, selectedMonth])
+  }, [teamMembers, billRates, costOverrides, timeEntries, projects, selectedPeriod, periodType])
 
   const profitClients = useMemo(() => {
     const ids = new Set<string>()
@@ -693,13 +826,14 @@ export default function TeamPage() {
       Object.keys(m.revenueByClient).forEach(id => ids.add(id))
       Object.keys(m.costByClient).forEach(id => ids.add(id))
     })
-    return Array.from(ids).map(id => ({ id, name: clients.find(c => c.id === id)?.name || 'Unknown' })).sort((a, b) => a.name.localeCompare(b.name))
+    return Array.from(ids).map(id => ({ id, name: clients.find(c => c.id === id)?.name || "Unknown" })).sort((a, b) => a.name.localeCompare(b.name))
   }, [profitabilityData, clients])
 
   const profitTotals = useMemo(() => {
     const c = profitabilityData.reduce((s, m) => s + m.cost, 0)
     const r = profitabilityData.reduce((s, m) => s + m.revenue, 0)
-    return { cost: c, revenue: r, margin: r - c, marginPct: r > 0 ? ((r - c) / r * 100) : 0 }
+    return { cost: c, revenue: r, margin: r - c, marginPct: r > 0 ? ((r - c) / r * 100) : 0,
+      hours: profitabilityData.reduce((s, m) => s + m.hours, 0) }
   }, [profitabilityData])
 
   // ---- HANDLERS ----
@@ -707,18 +841,18 @@ export default function TeamPage() {
     if (!companyId) return
     try {
       if (editingMember) {
-        const { error } = await supabase.from('team_members').update(data).eq('id', editingMember.id)
+        const { error } = await supabase.from("team_members").update(data).eq("id", editingMember.id)
         if (error) throw error
         setTeamMembers(prev => prev.map(m => m.id === editingMember.id ? { ...m, ...data } : m))
-        addToast('success', 'Team member updated')
+        addToast("success", "Team member updated")
       } else {
-        const { data: newMember, error } = await supabase.from('team_members').insert({ company_id: companyId, ...data }).select().single()
+        const { data: newMember, error } = await supabase.from("team_members").insert({ company_id: companyId, ...data }).select().single()
         if (error) throw error
         setTeamMembers(prev => [...prev, newMember])
-        addToast('success', 'Team member added')
+        addToast("success", "Team member added")
       }
       setEditingMember(null)
-    } catch (error: any) { addToast('error', `Failed to save: ${error.message}`); throw error }
+    } catch (error: any) { addToast("error", `Failed to save: ${error.message}`); throw error }
   }
 
   const handleSaveRate = async (data: any) => {
@@ -727,34 +861,37 @@ export default function TeamPage() {
       const memberName = teamMembers.find(m => m.id === data.team_member_id)?.name
       const clientName = clients.find(c => c.id === data.client_id)?.name
       if (editingRate) {
-        const { error } = await supabase.from('bill_rates').update({ rate: data.rate, notes: data.notes }).eq('id', editingRate.id)
+        const { error } = await supabase.from("bill_rates").update({
+          rate: data.rate, notes: data.notes,
+          cost_type: data.cost_type, cost_amount: data.cost_amount, baseline_hours: data.baseline_hours,
+        }).eq("id", editingRate.id)
         if (error) throw error
-        setBillRates(prev => prev.map(r => r.id === editingRate.id ? { ...r, rate: data.rate, notes: data.notes, team_member_name: memberName, client_name: clientName } : r))
-        addToast('success', 'Bill rate updated')
+        setBillRates(prev => prev.map(r => r.id === editingRate.id ? { ...r, ...data, team_member_name: memberName, client_name: clientName } : r))
+        addToast("success", "Rate card updated")
       } else {
-        const { data: newRate, error } = await supabase.from('bill_rates').insert({ company_id: companyId, ...data }).select().single()
+        const { data: newRate, error } = await supabase.from("bill_rates").insert({ company_id: companyId, ...data }).select().single()
         if (error) throw error
         setBillRates(prev => [...prev, { ...newRate, team_member_name: memberName, client_name: clientName }])
-        addToast('success', 'Bill rate added')
+        addToast("success", "Rate card added")
       }
       setEditingRate(null)
-    } catch (error: any) { addToast('error', `Failed to save: ${error.message}`); throw error }
+    } catch (error: any) { addToast("error", `Failed to save: ${error.message}`); throw error }
   }
 
   const handleDeleteRate = async (id: string) => {
     try {
-      const { error } = await supabase.from('bill_rates').delete().eq('id', id)
+      const { error } = await supabase.from("bill_rates").delete().eq("id", id)
       if (error) throw error
       setBillRates(prev => prev.filter(r => r.id !== id))
-      addToast('success', 'Bill rate removed')
-    } catch (error: any) { addToast('error', `Failed to delete: ${error.message}`) }
+      addToast("success", "Rate card removed")
+    } catch (error: any) { addToast("error", `Failed to delete: ${error.message}`) }
   }
 
   const handleSaveOverride = async (data: any) => {
     if (!companyId) return
     try {
-      const { data: newOverride, error } = await supabase.from('cost_overrides')
-        .upsert({ company_id: companyId, ...data }, { onConflict: 'company_id,team_member_id,client_id,month' })
+      const { data: newOverride, error } = await supabase.from("cost_overrides")
+        .upsert({ company_id: companyId, ...data }, { onConflict: "company_id,team_member_id,client_id,month" })
         .select().single()
       if (error) throw error
       const memberName = teamMembers.find(m => m.id === data.team_member_id)?.name
@@ -765,38 +902,27 @@ export default function TeamPage() {
         if (idx >= 0) { const u = [...prev]; u[idx] = enriched; return u }
         return [...prev, enriched]
       })
-      addToast('success', 'Cost override saved')
-    } catch (error: any) { addToast('error', `Failed to save: ${error.message}`); throw error }
+      addToast("success", "Cost override saved")
+    } catch (error: any) { addToast("error", `Failed to save: ${error.message}`); throw error }
   }
 
   const handleDeleteOverride = async (id: string) => {
     try {
-      const { error } = await supabase.from('cost_overrides').delete().eq('id', id)
+      const { error } = await supabase.from("cost_overrides").delete().eq("id", id)
       if (error) throw error
       setCostOverrides(prev => prev.filter(o => o.id !== id))
-      addToast('success', 'Override removed')
-    } catch (error: any) { addToast('error', `Failed to delete: ${error.message}`) }
+      addToast("success", "Override removed")
+    } catch (error: any) { addToast("error", `Failed to delete: ${error.message}`) }
   }
 
   const exportToCSV = () => {
-    const headers = ['Name', 'Email', 'Type', 'Entity', 'Status', 'Role', 'Cost Type', 'Cost Amount']
+    const headers = ["Name", "Email", "Type", "Entity", "Status", "Role", "Cost Type", "Cost Amount"]
     const rows = teamMembers.map(m => [m.name, m.email, m.employment_type, m.entity_name, m.status, m.role, m.cost_type, m.cost_amount])
-    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c || ''}"`).join(','))].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
+    const csv = [headers.join(","), ...rows.map(r => r.map(c => `"${c || ""}"`).join(","))].join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = `team-${new Date().toISOString().split('T')[0]}.csv`; a.click()
-    addToast('success', 'Export complete')
-  }
-
-  const prevMonth = () => {
-    const [y, m] = selectedMonth.split('-').map(Number)
-    const d = new Date(y, m - 2, 1)
-    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`)
-  }
-  const nextMonth = () => {
-    const [y, m] = selectedMonth.split('-').map(Number)
-    const d = new Date(y, m, 1)
-    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`)
+    const a = document.createElement("a"); a.href = url; a.download = `team-${new Date().toISOString().split("T")[0]}.csv`; a.click()
+    addToast("success", "Export complete")
   }
 
   if (loading) return (
@@ -822,17 +948,17 @@ export default function TeamPage() {
           <button onClick={exportToCSV} className="flex items-center gap-2 px-4 py-2 border border-white/[0.1] rounded-lg text-sm font-medium text-slate-300 hover:bg-white/[0.05]">
             <Download size={14} /> Export
           </button>
-          {activeTab === 'directory' && (
+          {activeTab === "directory" && (
             <button onClick={() => { setEditingMember(null); setShowMemberModal(true) }} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 shadow-lg shadow-emerald-500/20">
               <Plus size={14} /> Add Member
             </button>
           )}
-          {activeTab === 'rates' && (
+          {activeTab === "rates" && (
             <button onClick={() => { setEditingRate(null); setShowRateModal(true) }} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 shadow-lg shadow-emerald-500/20">
-              <Plus size={14} /> Add Bill Rate
+              <Plus size={14} /> Add Rate Card
             </button>
           )}
-          {activeTab === 'profitability' && (
+          {activeTab === "profitability" && (
             <button onClick={() => setShowOverrideModal(true)} className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 shadow-lg shadow-orange-500/20">
               <Edit2 size={14} /> Cost Override
             </button>
@@ -843,13 +969,13 @@ export default function TeamPage() {
       {/* Tabs */}
       <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-1.5 inline-flex gap-1`}>
         {([
-          { id: 'directory' as const, label: 'Directory', icon: Users },
-          { id: 'rates' as const, label: 'Rates', icon: DollarSign },
-          { id: 'profitability' as const, label: 'Profitability', icon: BarChart3 },
+          { id: "directory" as const, label: "Directory", icon: Users },
+          { id: "rates" as const, label: "Rates", icon: DollarSign },
+          { id: "profitability" as const, label: "Profitability", icon: BarChart3 },
         ]).map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              activeTab === tab.id ? 'bg-emerald-500/20 text-emerald-400' : `${THEME.textMuted} hover:text-white hover:bg-white/[0.05]`
+              activeTab === tab.id ? "bg-emerald-500/20 text-emerald-400" : `${THEME.textMuted} hover:text-white hover:bg-white/[0.05]`
             }`}>
             <tab.icon size={16} /> {tab.label}
           </button>
@@ -872,19 +998,19 @@ export default function TeamPage() {
           <p className="text-2xl font-bold text-purple-400 mt-1">{summary.contractors}</p>
         </div>
         <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
-          <p className={`text-xs ${THEME.textMuted} uppercase tracking-wider`}>Active Bill Rates</p>
+          <p className={`text-xs ${THEME.textMuted} uppercase tracking-wider`}>Active Rate Cards</p>
           <p className="text-2xl font-bold text-emerald-400 mt-1">{summary.activeRates}</p>
         </div>
         <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
-          <p className={`text-xs ${THEME.textMuted} uppercase tracking-wider`}>GM% ({formatMonth(selectedMonth).split(' ')[0]})</p>
-          <p className={`text-2xl font-bold mt-1 ${profitTotals.marginPct >= 20 ? 'text-emerald-400' : profitTotals.marginPct >= 0 ? 'text-amber-400' : 'text-rose-400'}`}>
-            {profitTotals.revenue > 0 ? `${profitTotals.marginPct.toFixed(1)}%` : '—'}
+          <p className={`text-xs ${THEME.textMuted} uppercase tracking-wider`}>GM% ({formatPeriodLabel(selectedPeriod, periodType).split(" ")[0]})</p>
+          <p className={`text-2xl font-bold mt-1 ${profitTotals.marginPct >= 20 ? "text-emerald-400" : profitTotals.marginPct >= 0 ? "text-amber-400" : "text-rose-400"}`}>
+            {profitTotals.revenue > 0 ? `${profitTotals.marginPct.toFixed(1)}%` : "\u2014"}
           </p>
         </div>
       </div>
 
       {/* ============ DIRECTORY TAB ============ */}
-      {activeTab === 'directory' && (
+      {activeTab === "directory" && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             <div className="relative flex-1">
@@ -893,10 +1019,10 @@ export default function TeamPage() {
                 className={`w-full pl-9 pr-4 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-sm text-white placeholder:text-slate-500`} />
             </div>
             <div className="flex gap-1">
-              {(['all', 'employee', 'contractor'] as const).map(f => (
+              {(["all", "employee", "contractor"] as const).map(f => (
                 <button key={f} onClick={() => setEmploymentFilter(f)}
-                  className={`px-3 py-2 text-xs font-medium rounded-lg transition-all ${employmentFilter === f ? 'bg-white/[0.1] text-white' : `${THEME.textDim} hover:text-white`}`}>
-                  {f === 'all' ? 'All' : f === 'employee' ? 'W-2' : '1099'}
+                  className={`px-3 py-2 text-xs font-medium rounded-lg transition-all ${employmentFilter === f ? "bg-white/[0.1] text-white" : `${THEME.textDim} hover:text-white`}`}>
+                  {f === "all" ? "All" : f === "employee" ? "W-2" : "1099"}
                 </button>
               ))}
             </div>
@@ -928,15 +1054,15 @@ export default function TeamPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${empStyle.bg} ${empStyle.text}`}>
-                          {m.employment_type === 'employee' ? 'W-2' : '1099'}
+                          {m.employment_type === "employee" ? "W-2" : "1099"}
                         </span>
                       </td>
-                      <td className={`px-4 py-3 ${THEME.textSecondary}`}>{m.role || '—'}</td>
+                      <td className={`px-4 py-3 ${THEME.textSecondary}`}>{m.role || "\u2014"}</td>
                       <td className="px-4 py-3 text-right">
                         <span className="text-orange-400 font-medium">
-                          {m.cost_amount ? (m.cost_type === 'hourly' ? `$${m.cost_amount}/hr` : `${formatCurrency(m.cost_amount)}/mo`) : '—'}
+                          {m.cost_amount ? (m.cost_type === "hourly" ? `$${m.cost_amount}/hr` : `${formatCurrency(m.cost_amount)}/mo`) : "\u2014"}
                         </span>
-                        {rateCount > 0 && <p className={`text-xs ${THEME.textDim}`}>{rateCount} bill rate{rateCount > 1 ? 's' : ''}</p>}
+                        {rateCount > 0 && <p className={`text-xs ${THEME.textDim}`}>{rateCount} rate card{rateCount > 1 ? "s" : ""}</p>}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${stStyle.bg} ${stStyle.text}`}>{m.status}</span>
@@ -961,11 +1087,11 @@ export default function TeamPage() {
       )}
 
       {/* ============ RATES TAB ============ */}
-      {activeTab === 'rates' && (
+      {activeTab === "rates" && (
         <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
           <div className={`px-6 py-4 border-b ${THEME.glassBorder}`}>
-            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Bill Rate Card</h3>
-            <p className={`text-xs ${THEME.textMuted} mt-0.5`}>What you charge each client for your team&#39;s time</p>
+            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Rate Card</h3>
+            <p className={`text-xs ${THEME.textMuted} mt-0.5`}>Cost + Revenue per team member per client</p>
           </div>
           {billRates.filter(r => r.is_active).length > 0 ? (
             <table className="w-full text-sm">
@@ -973,7 +1099,7 @@ export default function TeamPage() {
                 <tr className={`bg-white/[0.02] border-b ${THEME.glassBorder}`}>
                   <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Team Member</th>
                   <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Client</th>
-                  <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Cost Rate</th>
+                  <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Cost</th>
                   <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Bill Rate</th>
                   <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Margin</th>
                   <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium w-20`}>Actions</th>
@@ -981,25 +1107,24 @@ export default function TeamPage() {
               </thead>
               <tbody>
                 {billRates.filter(r => r.is_active).map(r => {
-                  const member = teamMembers.find(m => m.id === r.team_member_id)
-                  const costRate = member ? (member.cost_type === 'hourly' ? (member.cost_amount||0) : ((member.cost_amount||0)/172)) : 0
-                  const margin = r.rate > 0 ? ((r.rate - costRate) / r.rate * 100) : 0
-                  const spread = r.rate - costRate
+                  const effCost = r.cost_type === "hourly" ? r.cost_amount : (r.baseline_hours > 0 ? r.cost_amount / r.baseline_hours : 0)
+                  const margin = r.rate > 0 ? ((r.rate - effCost) / r.rate * 100) : 0
+                  const spread = r.rate - effCost
                   return (
                     <tr key={r.id} className="border-b border-white/[0.05] hover:bg-white/[0.03]">
                       <td className={`px-4 py-3 font-medium ${THEME.textPrimary}`}>
                         {r.team_member_name}
-                        <p className={`text-xs ${THEME.textDim}`}>{member?.cost_type === 'lump_sum' ? 'Fixed Monthly' : 'T&M'}</p>
+                        <p className={`text-xs ${THEME.textDim}`}>{r.cost_type === "lump_sum" ? "Fixed Monthly" : "T&M"}</p>
                       </td>
                       <td className={`px-4 py-3 ${THEME.textSecondary}`}>{r.client_name}</td>
                       <td className="px-4 py-3 text-right">
-                        <span className="text-orange-400">${costRate.toFixed(2)}/hr</span>
-                        {member?.cost_type === 'lump_sum' && <p className={`text-xs ${THEME.textDim}`}>{formatCurrency(member.cost_amount||0)}/mo</p>}
+                        <span className="text-orange-400">{r.cost_type === "hourly" ? `$${r.cost_amount}/hr` : `${formatCurrency(r.cost_amount)}/mo`}</span>
+                        {r.cost_type === "lump_sum" && <p className={`text-xs ${THEME.textDim}`}>~${effCost.toFixed(2)}/hr ({r.baseline_hours}h)</p>}
                       </td>
                       <td className="px-4 py-3 text-right"><span className="text-emerald-400 font-medium">${r.rate}/hr</span></td>
                       <td className="px-4 py-3 text-right">
-                        <span className={`font-medium ${margin >= 20 ? 'text-emerald-400' : margin >= 0 ? 'text-amber-400' : 'text-rose-400'}`}>{margin.toFixed(0)}%</span>
-                        <p className={`text-xs ${spread >= 0 ? 'text-emerald-400/60' : 'text-rose-400/60'}`}>${spread.toFixed(2)}/hr</p>
+                        <span className={`font-medium ${margin >= 20 ? "text-emerald-400" : margin >= 0 ? "text-amber-400" : "text-rose-400"}`}>{margin.toFixed(0)}%</span>
+                        <p className={`text-xs ${spread >= 0 ? "text-emerald-400/60" : "text-rose-400/60"}`}>${spread.toFixed(2)}/hr</p>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-1">
@@ -1015,11 +1140,11 @@ export default function TeamPage() {
           ) : (
             <div className={`px-6 py-12 text-center ${THEME.textMuted}`}>
               <DollarSign size={48} className="mx-auto text-slate-600 mb-4" />
-              <p>No bill rates configured yet</p>
-              <p className={`text-xs ${THEME.textDim} mt-1`}>Add rates to start tracking profitability</p>
+              <p>No rate cards configured yet</p>
+              <p className={`text-xs ${THEME.textDim} mt-1`}>Add rate cards to define cost + bill rates per client</p>
               <button onClick={() => { setEditingRate(null); setShowRateModal(true) }}
                 className="mt-4 px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-lg text-sm font-medium hover:bg-emerald-500/30">
-                Add First Bill Rate
+                Add First Rate Card
               </button>
             </div>
           )}
@@ -1027,24 +1152,35 @@ export default function TeamPage() {
       )}
 
       {/* ============ PROFITABILITY TAB ============ */}
-      {activeTab === 'profitability' && (
+      {activeTab === "profitability" && (
         <div className="space-y-6">
-          {/* Month Navigator + View Toggle */}
-          <div className="flex items-center justify-between">
+          {/* Period Selector + View Toggle */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <button onClick={prevMonth} className={`p-2 rounded-lg border ${THEME.glassBorder} hover:bg-white/[0.05] ${THEME.textMuted}`}>
+              <button onClick={() => setSelectedPeriod(stepPeriod(selectedPeriod, periodType, -1))} className={`p-2 rounded-lg border ${THEME.glassBorder} hover:bg-white/[0.05] ${THEME.textMuted}`}>
                 <ChevronDown size={16} className="rotate-90" />
               </button>
-              <span className={`text-lg font-semibold ${THEME.textPrimary}`}>{formatMonth(selectedMonth)}</span>
-              <button onClick={nextMonth} className={`p-2 rounded-lg border ${THEME.glassBorder} hover:bg-white/[0.05] ${THEME.textMuted}`}>
+              <span className={`text-lg font-semibold ${THEME.textPrimary} min-w-[180px] text-center`}>{formatPeriodLabel(selectedPeriod, periodType)}</span>
+              <button onClick={() => setSelectedPeriod(stepPeriod(selectedPeriod, periodType, 1))} className={`p-2 rounded-lg border ${THEME.glassBorder} hover:bg-white/[0.05] ${THEME.textMuted}`}>
                 <ChevronDown size={16} className="-rotate-90" />
               </button>
+
+              {/* Period Type Selector */}
+              <div className="flex gap-1 bg-white/[0.03] rounded-lg p-1 ml-2">
+                {(["month", "quarter", "year"] as PeriodType[]).map(pt => (
+                  <button key={pt} onClick={() => handlePeriodTypeChange(pt)}
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${periodType === pt ? "bg-white/[0.1] text-white" : `${THEME.textDim} hover:text-white`}`}>
+                    {pt === "month" ? "Month" : pt === "quarter" ? "Quarter" : "Year"}
+                  </button>
+                ))}
+              </div>
             </div>
+
             <div className="flex gap-1 bg-white/[0.03] rounded-lg p-1">
               {([
-                { id: 'summary' as const, label: 'Summary', color: 'text-emerald-400' },
-                { id: 'revenue' as const, label: 'Revenue', color: 'text-blue-400' },
-                { id: 'cost' as const, label: 'Cost', color: 'text-orange-400' },
+                { id: "summary" as const, label: "Summary", color: "text-emerald-400" },
+                { id: "revenue" as const, label: "Revenue", color: "text-blue-400" },
+                { id: "cost" as const, label: "Cost", color: "text-orange-400" },
               ]).map(v => (
                 <button key={v.id} onClick={() => setProfitView(v.id)}
                   className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${profitView === v.id ? `bg-white/[0.1] ${v.color}` : `${THEME.textDim} hover:text-white`}`}>
@@ -1054,17 +1190,43 @@ export default function TeamPage() {
             </div>
           </div>
 
+          {/* Period Totals Bar */}
+          {profitabilityData.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+                <p className={`text-xs ${THEME.textDim}`}>Hours</p>
+                <p className={`text-xl font-bold ${THEME.textPrimary}`}>{profitTotals.hours.toFixed(1)}</p>
+              </div>
+              <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+                <p className={`text-xs ${THEME.textDim}`}>Revenue</p>
+                <p className="text-xl font-bold text-blue-400">{formatCurrency(profitTotals.revenue)}</p>
+              </div>
+              <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+                <p className={`text-xs ${THEME.textDim}`}>Cost</p>
+                <p className="text-xl font-bold text-orange-400">{formatCurrency(profitTotals.cost)}</p>
+              </div>
+              <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+                <p className={`text-xs ${THEME.textDim}`}>Margin</p>
+                <p className={`text-xl font-bold ${profitTotals.margin >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{formatCurrency(profitTotals.margin)}</p>
+              </div>
+              <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+                <p className={`text-xs ${THEME.textDim}`}>GM%</p>
+                <p className={`text-xl font-bold ${profitTotals.marginPct >= 20 ? "text-emerald-400" : profitTotals.marginPct >= 0 ? "text-amber-400" : "text-rose-400"}`}>{profitTotals.marginPct.toFixed(1)}%</p>
+              </div>
+            </div>
+          )}
+
           {/* Chart */}
           {profitabilityData.length > 0 && (
             <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-6`}>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={profitabilityData} margin={{ left: 20, right: 20 }}>
-                    <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => formatCompactCurrency(v)} />
-                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} labelStyle={{ color: '#fff' }}
-                      formatter={(value: number, name: string) => [formatCurrency(value), name === 'cost' ? 'Cost' : 'Revenue']} cursor={false} />
-                    <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                    <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => formatCompactCurrency(v)} />
+                    <Tooltip contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px" }} labelStyle={{ color: "#fff" }}
+                      formatter={(value: number, name: string) => [formatCurrency(value), name === "cost" ? "Cost" : "Revenue"]} cursor={false} />
+                    <Legend wrapperStyle={{ paddingTop: "10px" }} />
                     <Bar dataKey="cost" name="Cost" fill={CHART_COLORS.cost} radius={[4, 4, 0, 0]} />
                     <Bar dataKey="revenue" name="Revenue" fill={CHART_COLORS.revenue} radius={[4, 4, 0, 0]} />
                   </BarChart>
@@ -1073,12 +1235,12 @@ export default function TeamPage() {
             </div>
           )}
 
-          {/* SUMMARY VIEW (Green) */}
-          {profitView === 'summary' && profitabilityData.length > 0 && (
+          {/* SUMMARY VIEW */}
+          {profitView === "summary" && profitabilityData.length > 0 && (
             <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
               <div className={`px-6 py-4 border-b ${THEME.glassBorder} flex items-center gap-2`}>
                 <div className="w-3 h-3 rounded bg-emerald-400" />
-                <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Direct Cost Analysis — {formatMonth(selectedMonth)}</h3>
+                <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Direct Cost Analysis &mdash; {formatPeriodLabel(selectedPeriod, periodType)}</h3>
               </div>
               <table className="w-full text-sm">
                 <thead>
@@ -1096,34 +1258,34 @@ export default function TeamPage() {
                     <tr key={row.id} className="border-b border-white/[0.05]">
                       <td className={`px-4 py-3 font-medium ${THEME.textPrimary}`}>
                         {row.name}
-                        <span className={`ml-2 text-xs ${THEME.textDim}`}>{row.costType === 'lump_sum' ? 'Fixed' : 'T&M'}</span>
+                        <span className={`ml-2 text-xs ${THEME.textDim}`}>{row.costLabel}</span>
                       </td>
                       <td className={`px-4 py-3 text-right ${THEME.textSecondary}`}>{row.hours.toFixed(1)}</td>
                       <td className="px-4 py-3 text-right text-orange-400">{formatCurrencyDecimal(row.cost)}</td>
                       <td className="px-4 py-3 text-right text-blue-400">{formatCurrencyDecimal(row.revenue)}</td>
-                      <td className={`px-4 py-3 text-right font-medium ${row.margin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrencyDecimal(row.margin)}</td>
-                      <td className={`px-4 py-3 text-right font-semibold ${row.marginPct >= 20 ? 'text-emerald-400' : row.marginPct >= 0 ? 'text-amber-400' : 'text-rose-400'}`}>{row.marginPct.toFixed(1)}%</td>
+                      <td className={`px-4 py-3 text-right font-medium ${row.margin >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{formatCurrencyDecimal(row.margin)}</td>
+                      <td className={`px-4 py-3 text-right font-semibold ${row.marginPct >= 20 ? "text-emerald-400" : row.marginPct >= 0 ? "text-amber-400" : "text-rose-400"}`}>{row.marginPct.toFixed(1)}%</td>
                     </tr>
                   ))}
                   <tr className={`bg-white/[0.03] border-t-2 ${THEME.glassBorder} font-bold`}>
                     <td className={`px-4 py-3 ${THEME.textPrimary}`}>Total</td>
-                    <td className={`px-4 py-3 text-right ${THEME.textSecondary}`}>{profitabilityData.reduce((s,m)=>s+m.hours,0).toFixed(1)}</td>
+                    <td className={`px-4 py-3 text-right ${THEME.textSecondary}`}>{profitTotals.hours.toFixed(1)}</td>
                     <td className="px-4 py-3 text-right text-orange-400">{formatCurrencyDecimal(profitTotals.cost)}</td>
                     <td className="px-4 py-3 text-right text-blue-400">{formatCurrencyDecimal(profitTotals.revenue)}</td>
-                    <td className={`px-4 py-3 text-right ${profitTotals.margin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrencyDecimal(profitTotals.margin)}</td>
-                    <td className={`px-4 py-3 text-right ${profitTotals.marginPct >= 20 ? 'text-emerald-400' : 'text-amber-400'}`}>{profitTotals.marginPct.toFixed(1)}%</td>
+                    <td className={`px-4 py-3 text-right ${profitTotals.margin >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{formatCurrencyDecimal(profitTotals.margin)}</td>
+                    <td className={`px-4 py-3 text-right ${profitTotals.marginPct >= 20 ? "text-emerald-400" : "text-amber-400"}`}>{profitTotals.marginPct.toFixed(1)}%</td>
                   </tr>
                 </tbody>
               </table>
             </div>
           )}
 
-          {/* REVENUE VIEW (Blue) */}
-          {profitView === 'revenue' && profitabilityData.length > 0 && (
+          {/* REVENUE VIEW */}
+          {profitView === "revenue" && profitabilityData.length > 0 && (
             <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
               <div className={`px-6 py-4 border-b ${THEME.glassBorder} flex items-center gap-2`}>
                 <div className="w-3 h-3 rounded bg-blue-400" />
-                <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Revenue by Client — {formatMonth(selectedMonth)}</h3>
+                <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Revenue by Client &mdash; {formatPeriodLabel(selectedPeriod, periodType)}</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -1142,7 +1304,7 @@ export default function TeamPage() {
                         <td className={`px-4 py-3 font-medium ${THEME.textPrimary} sticky left-0 bg-slate-900/95 z-10`}>{row.name}</td>
                         {profitClients.map(c => {
                           const val = row.revenueByClient[c.id] || 0
-                          return <td key={c.id} className={`px-4 py-3 text-right ${val > 0 ? 'text-blue-400' : THEME.textDim}`}>{val > 0 ? formatCurrencyDecimal(val) : '—'}</td>
+                          return <td key={c.id} className={`px-4 py-3 text-right ${val > 0 ? "text-blue-400" : THEME.textDim}`}>{val > 0 ? formatCurrencyDecimal(val) : "\u2014"}</td>
                         })}
                         <td className="px-4 py-3 text-right text-blue-400 font-medium">{formatCurrencyDecimal(row.revenue)}</td>
                       </tr>
@@ -1161,12 +1323,12 @@ export default function TeamPage() {
             </div>
           )}
 
-          {/* COST VIEW (Orange) */}
-          {profitView === 'cost' && profitabilityData.length > 0 && (
+          {/* COST VIEW */}
+          {profitView === "cost" && profitabilityData.length > 0 && (
             <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
               <div className={`px-6 py-4 border-b ${THEME.glassBorder} flex items-center gap-2`}>
                 <div className="w-3 h-3 rounded bg-orange-400" />
-                <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Cost by Client — {formatMonth(selectedMonth)}</h3>
+                <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Cost by Client &mdash; {formatPeriodLabel(selectedPeriod, periodType)}</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -1185,11 +1347,12 @@ export default function TeamPage() {
                         <td className={`px-4 py-3 font-medium ${THEME.textPrimary} sticky left-0 bg-slate-900/95 z-10`}>{row.name}</td>
                         {profitClients.map(c => {
                           const val = row.costByClient[c.id] || 0
-                          const isOverride = costOverrides.some(o => o.team_member_id === row.id && o.client_id === c.id && o.month === selectedMonth)
+                          const months = getMonthsInPeriod(selectedPeriod, periodType)
+                          const hasOverride = months.some(mo => costOverrides.some(o => o.team_member_id === row.id && o.client_id === c.id && o.month === mo))
                           return (
-                            <td key={c.id} className={`px-4 py-3 text-right ${val > 0 ? 'text-orange-400' : THEME.textDim}`}>
-                              {val > 0 ? formatCurrencyDecimal(val) : '—'}
-                              {isOverride && <span className="ml-1 text-amber-500 text-xs" title="Manual override">⚡</span>}
+                            <td key={c.id} className={`px-4 py-3 text-right ${val > 0 ? "text-orange-400" : THEME.textDim}`}>
+                              {val > 0 ? formatCurrencyDecimal(val) : "\u2014"}
+                              {hasOverride && <span className="ml-1 text-amber-500 text-xs" title="Manual override">&#9889;</span>}
                             </td>
                           )
                         })}
@@ -1208,28 +1371,33 @@ export default function TeamPage() {
                 </table>
               </div>
 
-              {/* Active overrides for this month */}
-              {costOverrides.filter(o => o.month === selectedMonth).length > 0 && (
-                <div className={`px-6 py-4 border-t ${THEME.glassBorder}`}>
-                  <p className={`text-xs font-medium ${THEME.textMuted} mb-2`}>⚡ Active Overrides — {formatMonth(selectedMonth)}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {costOverrides.filter(o => o.month === selectedMonth).map(o => (
-                      <div key={o.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                        <span className="text-xs text-amber-400">{o.team_member_name} → {o.client_name}: {formatCurrency(o.fixed_amount)}</span>
-                        <button onClick={() => handleDeleteOverride(o.id)} className="text-amber-500/50 hover:text-rose-400"><X size={12} /></button>
-                      </div>
-                    ))}
+              {/* Active overrides list */}
+              {(() => {
+                const months = getMonthsInPeriod(selectedPeriod, periodType)
+                const activeOverrides = costOverrides.filter(o => months.includes(o.month))
+                if (activeOverrides.length === 0) return null
+                return (
+                  <div className={`px-6 py-4 border-t ${THEME.glassBorder}`}>
+                    <p className={`text-xs font-medium ${THEME.textMuted} mb-2`}>&#9889; Active Overrides</p>
+                    <div className="flex flex-wrap gap-2">
+                      {activeOverrides.map(o => (
+                        <div key={o.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                          <span className="text-xs text-amber-400">{o.team_member_name} &rarr; {o.client_name} ({o.month}): {formatCurrency(o.fixed_amount)}</span>
+                          <button onClick={() => handleDeleteOverride(o.id)} className="text-amber-500/50 hover:text-rose-400"><X size={12} /></button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
             </div>
           )}
 
           {profitabilityData.length === 0 && (
             <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-12 text-center`}>
               <BarChart3 size={48} className="mx-auto text-slate-600 mb-4" />
-              <p className={THEME.textMuted}>No data for {formatMonth(selectedMonth)}</p>
-              <p className={`text-xs ${THEME.textDim} mt-1`}>Time entries and bill rates needed to calculate profitability</p>
+              <p className={THEME.textMuted}>No timesheet data for {formatPeriodLabel(selectedPeriod, periodType)}</p>
+              <p className={`text-xs ${THEME.textDim} mt-1`}>Time entries and rate cards needed to calculate profitability</p>
             </div>
           )}
         </div>
@@ -1238,10 +1406,10 @@ export default function TeamPage() {
       {/* ============ MODALS ============ */}
       <MemberModal isOpen={showMemberModal} onClose={() => { setShowMemberModal(false); setEditingMember(null) }}
         onSave={handleSaveMember} editingMember={editingMember} />
-      <BillRateModal isOpen={showRateModal} onClose={() => { setShowRateModal(false); setEditingRate(null) }}
+      <RateCardModal isOpen={showRateModal} onClose={() => { setShowRateModal(false); setEditingRate(null) }}
         onSave={handleSaveRate} editingRate={editingRate} teamMembers={teamMembers} clients={clients} />
       <CostOverrideModal isOpen={showOverrideModal} onClose={() => setShowOverrideModal(false)}
-        onSave={handleSaveOverride} teamMembers={teamMembers} clients={clients} selectedMonth={selectedMonth} />
+        onSave={handleSaveOverride} billRates={billRates} teamMembers={teamMembers} clients={clients} selectedMonth={selectedPeriod.includes("-Q") ? getMonthsInPeriod(selectedPeriod, periodType)[0] : selectedPeriod.length === 4 ? getCurrentMonth() : selectedPeriod} />
       {selectedMemberDetail && (
         <MemberDetailFlyout member={selectedMemberDetail} billRates={billRates} clients={clients}
           onClose={() => setSelectedMemberDetail(null)}
