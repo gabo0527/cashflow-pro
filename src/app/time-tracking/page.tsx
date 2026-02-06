@@ -317,6 +317,7 @@ export default function TimeTrackingPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [assignments, setAssignments] = useState<ProjectAssignment[]>([])
+  const [billRates, setBillRates] = useState<any[]>([])
   const [companyId, setCompanyId] = useState<string | null>(null)
 
   const [datePreset, setDatePreset] = useState<DatePreset>('mtd')
@@ -356,17 +357,24 @@ export default function TimeTrackingPage() {
         if (!profile?.company_id) { setLoading(false); return }
         setCompanyId(profile.company_id)
 
-        const [teamRes, projRes, clientRes, entriesRes, assignRes] = await Promise.all([
+        const [teamRes, projRes, clientRes, entriesRes, assignRes, billRatesRes] = await Promise.all([
           supabase.from('team_members').select('*').eq('company_id', profile.company_id),
           supabase.from('projects').select('*').eq('company_id', profile.company_id),
           supabase.from('clients').select('*').eq('company_id', profile.company_id),
           supabase.from('time_entries').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
           supabase.from('team_project_assignments').select('*').eq('company_id', profile.company_id),
+          supabase.from('bill_rates').select('*').eq('company_id', profile.company_id),
         ])
 
         const projectMap: Record<string, any> = {}; (projRes.data || []).forEach((p: any) => { projectMap[p.id] = p })
         const clientMap: Record<string, any> = {}; (clientRes.data || []).forEach((c: any) => { clientMap[c.id] = c })
         const teamMemberMap: Record<string, any> = {}; (teamRes.data || []).forEach((t: any) => { teamMemberMap[t.id] = t })
+
+        // Build rate card lookup: key = `${team_member_id}_${client_id}`
+        const rateCardLookup: Record<string, any> = {}
+        ;(billRatesRes.data || []).forEach((r: any) => {
+          if (r.is_active) rateCardLookup[`${r.team_member_id}_${r.client_id}`] = r
+        })
 
         // Build assignment lookup: key = `${team_member_id}_${project_id}`
         const assignmentLookup: Record<string, ProjectAssignment> = {}
@@ -379,11 +387,38 @@ export default function TimeTrackingPage() {
           const clientId = project?.client_id || ''
           const clientName = clientId ? clientMap[clientId]?.name || '' : ''
           const teamMemberId = e.contractor_id || e.user_id || ''
+          const teamMember = teamMemberMap[teamMemberId]
           
-          // Get cost rate from assignment
+          // Rate card lookup: member × client (primary source)
+          const rateCard = rateCardLookup[`${teamMemberId}_${clientId}`]
+          // Fallback: project assignment
           const assignment = assignmentLookup[`${teamMemberId}_${e.project_id}`]
-          const costRate = assignment?.rate || 0
-          const billRate = e.bill_rate || assignment?.bill_rate || 0
+
+          // BILL RATE (revenue): rate card > assignment > entry stored > 0
+          const billRate = rateCard?.rate || e.bill_rate || assignment?.bill_rate || 0
+
+          // COST RATE (two-tier model):
+          // Tier 1: Rate card has custom cost (cost_amount > 0) → use it
+          // Tier 2: Fall back to team member default cost
+          let costRate = 0
+          if (rateCard && rateCard.cost_amount > 0) {
+            if (rateCard.cost_type === 'hourly') {
+              costRate = rateCard.cost_amount
+            } else {
+              // Lump sum: effective hourly = cost_amount / baseline_hours
+              costRate = rateCard.baseline_hours > 0 ? rateCard.cost_amount / rateCard.baseline_hours : 0
+            }
+          } else if (teamMember) {
+            // Tier 2: team member default
+            if (teamMember.cost_type === 'hourly') {
+              costRate = teamMember.cost_amount || 0
+            } else if (teamMember.cost_type === 'lump_sum' && teamMember.cost_amount > 0) {
+              // Effective hourly from lump sum (use 172 as default baseline)
+              costRate = teamMember.cost_amount / (teamMember.baseline_hours || 172)
+            }
+          }
+          // Final fallback: assignment rate
+          if (costRate === 0) costRate = assignment?.rate || 0
           
           return {
             id: e.id,
@@ -407,6 +442,7 @@ export default function TimeTrackingPage() {
         setProjects((projRes.data || []).map((p: any) => ({ id: p.id, name: p.name || '', client: p.client || '', client_id: p.client_id || '', bill_rate: p.bill_rate || 0 })))
         setClients((clientRes.data || []).map((c: any) => ({ id: c.id, name: c.name || '' })))
         setAssignments(assignRes.data || [])
+        setBillRates(billRatesRes.data || [])
         setEntries(transformedEntries)
         if (clientRes.data && clientRes.data.length > 0) setExpandedClients(new Set([clientRes.data[0].id]))
       } catch (error) { console.error('Error loading data:', error) }
@@ -560,8 +596,22 @@ export default function TimeTrackingPage() {
       const project = projects.find(p => p.id === formData.project_id)
       const teamMember = teamMembers.find(t => t.id === formData.team_member_id)
       const assignment = assignments.find(a => a.team_member_id === formData.team_member_id && a.project_id === formData.project_id)
-      const billRate = assignment?.bill_rate || project?.bill_rate || 0
-      const costRate = assignment?.rate || 0
+      const clientId = project?.client_id || ''
+      
+      // Rate card lookup (member × client)
+      const rateCard = billRates.find(r => r.team_member_id === formData.team_member_id && r.client_id === clientId && r.is_active)
+      const billRate = rateCard?.rate || assignment?.bill_rate || project?.bill_rate || 0
+      
+      // Cost rate (two-tier)
+      let costRate = 0
+      if (rateCard && rateCard.cost_amount > 0) {
+        costRate = rateCard.cost_type === 'hourly' ? rateCard.cost_amount : (rateCard.baseline_hours > 0 ? rateCard.cost_amount / rateCard.baseline_hours : 0)
+      } else if (teamMember) {
+        const tm = teamMembers.find(t => t.id === formData.team_member_id) as any
+        if (tm?.cost_type === 'hourly') costRate = tm.cost_amount || 0
+        else if (tm?.cost_type === 'lump_sum' && tm?.cost_amount > 0) costRate = tm.cost_amount / (tm.baseline_hours || 172)
+      }
+      if (costRate === 0) costRate = assignment?.rate || 0
       const hours = parseFloat(formData.hours)
       const billableHours = formData.billable_hours ? parseFloat(formData.billable_hours) : hours
 
