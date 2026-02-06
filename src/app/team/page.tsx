@@ -684,7 +684,23 @@ function MemberModal({ isOpen, onClose, onSave, editingMember }: {
   const handleSave = async () => {
     if (!form.name || !form.email) return
     setIsSaving(true)
-    try { await onSave({ ...form, cost_amount: parseFloat(form.cost_amount)||0 }); onClose() } finally { setIsSaving(false) }
+    try {
+      const payload = {
+        ...form,
+        cost_amount: parseFloat(form.cost_amount) || 0,
+        start_date: form.start_date || null,
+        entity_name: form.entity_name || null,
+        entity_type: form.entity_type || null,
+        address: form.address || null,
+        bank_name: form.bank_name || null,
+        account_type: form.account_type || null,
+        routing_number: form.routing_number || null,
+        account_number: form.account_number || null,
+        payment_method: form.payment_method || null,
+        phone: form.phone || null,
+      }
+      await onSave(payload); onClose()
+    } finally { setIsSaving(false) }
   }
 
   if (!isOpen) return null
