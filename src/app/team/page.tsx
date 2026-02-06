@@ -6,7 +6,7 @@ import {
   Eye, EyeOff, Briefcase, DollarSign, Trash2, BarChart3,
   FileText, Building2, MapPin, Upload, Calendar, Clock,
   CheckCircle, AlertCircle, RefreshCw, ExternalLink, TrendingUp,
-  User, UserCheck, Filter, ChevronDown, ChevronRight, Link2
+  User, UserCheck, Filter, ChevronDown, ChevronRight, Link2, Lock, Unlock
 } from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend
@@ -60,6 +60,8 @@ interface BillRate {
   id: string; team_member_id: string; client_id: string
   rate: number; cost_type: "hourly" | "lump_sum"; cost_amount: number; baseline_hours: number
   is_active: boolean; notes: string | null
+  start_date: string | null; end_date: string | null
+  revenue_type: "hourly" | "lump_sum"; revenue_amount: number
   team_member_name?: string; client_name?: string
 }
 
@@ -205,8 +207,8 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
                 {memberRates.map(r => {
                   const hasCustomCost = r.cost_amount > 0
                   const effCost = hasCustomCost ? (r.cost_type === "hourly" ? r.cost_amount : (r.baseline_hours > 0 ? r.cost_amount / r.baseline_hours : 0)) : 0
-                  const isLumpRev = (r as any).revenue_type === "lump_sum"
-                  const revAmt = (r as any).revenue_amount || 0
+                  const isLumpRev = r.revenue_type === "lump_sum"
+                  const revAmt = r.revenue_amount || 0
                   const mg = isLumpRev
                     ? (hasCustomCost && revAmt > 0 ? ((revAmt - (r.cost_type === "hourly" ? r.cost_amount * (r.baseline_hours || 172) : r.cost_amount)) / revAmt * 100) : 0)
                     : (hasCustomCost && r.rate > 0 ? ((r.rate - effCost) / r.rate * 100) : 0)
@@ -268,6 +270,8 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
     customCost: false,
     revenue_type: "hourly" as "hourly" | "lump_sum",
     revenue_amount: "",
+    start_date: new Date().toISOString().split("T")[0],
+    end_date: "",
   })
   const [isSaving, setIsSaving] = useState(false)
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set())
@@ -314,11 +318,13 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
         cost_amount: editingRate.cost_amount?.toString() || "",
         baseline_hours: editingRate.baseline_hours?.toString() || "172",
         customCost: hasCustomCost,
-        revenue_type: (editingRate as any).revenue_type || "hourly",
-        revenue_amount: (editingRate as any).revenue_amount?.toString() || "",
+        revenue_type: editingRate.revenue_type || "hourly",
+        revenue_amount: editingRate.revenue_amount?.toString() || "",
+        start_date: editingRate.start_date || "",
+        end_date: editingRate.end_date || "",
       })
     } else {
-      setForm({ team_member_id: "", client_id: "", rate: "", notes: "", cost_type: "hourly", cost_amount: "", baseline_hours: "172", customCost: false, revenue_type: "hourly", revenue_amount: "" })
+      setForm({ team_member_id: "", client_id: "", rate: "", notes: "", cost_type: "hourly", cost_amount: "", baseline_hours: "172", customCost: false, revenue_type: "hourly", revenue_amount: "", start_date: new Date().toISOString().split("T")[0], end_date: "" })
     }
   }, [editingRate, isOpen])
 
@@ -353,6 +359,8 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
         baseline_hours: form.customCost ? (parseFloat(form.baseline_hours) || 172) : 172,
         revenue_type: form.revenue_type,
         revenue_amount: form.revenue_type === "lump_sum" ? (parseFloat(form.revenue_amount) || 0) : 0,
+        start_date: form.start_date || null,
+        end_date: form.end_date || null,
       })
 
       // Save project assignments
@@ -408,6 +416,20 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
                 <option value="">Select...</option>
                 {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+            </div>
+          </div>
+
+          {/* Effective Date Range */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={`block text-xs ${THEME.textMuted} mb-1`}>Start Date *</label>
+              <input type="date" value={form.start_date} onChange={e => setForm(p => ({ ...p, start_date: e.target.value }))}
+                className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" />
+            </div>
+            <div>
+              <label className={`block text-xs ${THEME.textMuted} mb-1`}>End Date <span className={THEME.textDim}>(blank = ongoing)</span></label>
+              <input type="date" value={form.end_date} onChange={e => setForm(p => ({ ...p, end_date: e.target.value }))}
+                className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" />
             </div>
           </div>
 
@@ -835,6 +857,7 @@ export default function TeamPage() {
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
 
   const [activeTab, setActiveTab] = useState<"directory" | "rates" | "profitability">("directory")
+  const [rateStatusFilter, setRateStatusFilter] = useState<"active" | "archived" | "all">("active")
   const [searchQuery, setSearchQuery] = useState("")
   const [employmentFilter, setEmploymentFilter] = useState<"all" | "employee" | "contractor">("all")
 
@@ -937,10 +960,38 @@ export default function TeamPage() {
     })
     const projectClientMap = new Map(projects.map(p => [p.id, p.client_id || ""]))
 
+    // Helper: check if a rate card is active for the given period
+    const isRateActiveInPeriod = (r: BillRate) => {
+      if (!r.is_active) return false
+      // Check date overlap: rate card [start_date, end_date] overlaps with period months
+      const periodStart = months[0] + "-01"
+      const periodEnd = months[months.length - 1] + "-28" // approximate month end
+      if (r.start_date && r.start_date > periodEnd) return false
+      if (r.end_date && r.end_date < periodStart) return false
+      return true
+    }
+
+    // Count months active for lump sum calculations
+    const countActiveMonths = (r: BillRate) => {
+      return months.filter(mo => {
+        const moStart = mo + "-01"
+        const moEnd = mo + "-28"
+        if (r.start_date && r.start_date > moEnd) return false
+        if (r.end_date && r.end_date < moStart) return false
+        return true
+      }).length
+    }
+
     return teamMembers.map(member => {
       const memberTime = periodEntries.filter(t => t.contractor_id === member.id)
       const totalHours = memberTime.reduce((sum, t) => sum + (t.hours || 0), 0)
-      if (totalHours === 0) return null
+      
+      // Get active rate cards for this member in this period
+      const memberRates = billRates.filter(r => r.team_member_id === member.id && isRateActiveInPeriod(r))
+      const hasLumpSumRevenue = memberRates.some(r => r.revenue_type === "lump_sum" && r.revenue_amount > 0)
+      
+      // Skip if no hours AND no lump sum revenue
+      if (totalHours === 0 && !hasLumpSumRevenue) return null
 
       // Group hours by client
       const hoursByClient: Record<string, number> = {}
@@ -949,60 +1000,66 @@ export default function TeamPage() {
         hoursByClient[clientId] = (hoursByClient[clientId] || 0) + (t.hours || 0)
       })
 
-      // REVENUE by client = hours x bill rate (from rate card)
+      // REVENUE by client
       const revenueByClient: Record<string, number> = {}
       let totalRevenue = 0
+      
+      // Hourly revenue from timesheet hours
       Object.entries(hoursByClient).forEach(([clientId, hours]) => {
-        const rc = billRates.find(r => r.team_member_id === member.id && r.client_id === clientId && r.is_active)
+        const rc = memberRates.find(r => r.client_id === clientId && r.revenue_type !== "lump_sum")
         const rev = hours * (rc?.rate || 0)
-        revenueByClient[clientId] = rev
+        revenueByClient[clientId] = (revenueByClient[clientId] || 0) + rev
         totalRevenue += rev
+      })
+      
+      // Lump sum revenue from rate cards (regardless of hours)
+      memberRates.filter(r => r.revenue_type === "lump_sum" && r.revenue_amount > 0).forEach(r => {
+        const activeMonths = countActiveMonths(r)
+        const lsRev = r.revenue_amount * activeMonths
+        revenueByClient[r.client_id] = (revenueByClient[r.client_id] || 0) + lsRev
+        totalRevenue += lsRev
+        // Ensure client appears in hoursByClient even with 0 hours
+        if (!hoursByClient[r.client_id]) hoursByClient[r.client_id] = 0
       })
 
       // COST by client — TWO-TIER:
-      // Tier 1: If rate card has cost_amount > 0, use it (custom cost per client)
-      // Tier 2: If rate card cost is 0, fall back to member total distributed by hours
       const costByClient: Record<string, number> = {}
       let totalCost = 0
+      const distributedClients: string[] = []
 
-      // First pass: handle custom-cost rate cards
-      const distributedClients: string[] = [] // clients that need member-level distribution
-      Object.entries(hoursByClient).forEach(([clientId, hours]) => {
-        const rc = billRates.find(r => r.team_member_id === member.id && r.client_id === clientId && r.is_active)
+      Object.keys(hoursByClient).forEach(clientId => {
+        const hours = hoursByClient[clientId] || 0
+        const rc = memberRates.find(r => r.client_id === clientId)
 
         if (rc && rc.cost_amount > 0) {
-          // Tier 1: Custom cost defined on rate card for this client
           if (rc.cost_type === "hourly") {
             costByClient[clientId] = hours * rc.cost_amount
           } else {
-            // Lump sum per client: check monthly overrides
             let lsCost = 0
+            const activeMonths = countActiveMonths(rc)
             months.forEach(mo => {
+              // Check if rate is active this month
+              const moStart = mo + "-01"; const moEnd = mo + "-28"
+              if (rc.start_date && rc.start_date > moEnd) return
+              if (rc.end_date && rc.end_date < moStart) return
               const override = costOverrides.find(o => o.team_member_id === member.id && o.client_id === clientId && o.month === mo)
               lsCost += override ? override.fixed_amount : rc.cost_amount
             })
             costByClient[clientId] = lsCost
           }
         } else {
-          // Tier 2: No custom cost — needs distribution from member total
           distributedClients.push(clientId)
         }
       })
 
       // Second pass: distribute member total cost across distributed clients
       if (distributedClients.length > 0 && (member.cost_amount || 0) > 0) {
-        // Subtract any custom-cost totals from the member total
-        const customCostTotal = Object.values(costByClient).reduce((s, v) => s + v, 0)
-
         if (member.cost_type === "hourly") {
-          // Hourly member default: hours x rate per client
           distributedClients.forEach(clientId => {
             costByClient[clientId] = (hoursByClient[clientId] || 0) * (member.cost_amount || 0)
           })
         } else {
-          // Lump sum member default: distribute by % of hours
           const distHours = distributedClients.reduce((s, cid) => s + (hoursByClient[cid] || 0), 0)
-          // Check for overrides on these distributed clients
           distributedClients.forEach(clientId => {
             let clientCost = 0
             months.forEach(mo => {
@@ -1024,8 +1081,6 @@ export default function TeamPage() {
       const margin = totalRevenue - totalCost
       const marginPct = totalRevenue > 0 ? (margin / totalRevenue) * 100 : (totalCost > 0 ? -100 : 0)
 
-      // Determine display cost type
-      const memberRates = billRates.filter(r => r.team_member_id === member.id && r.is_active)
       const hasCustom = memberRates.some(r => r.cost_amount > 0)
       const hasDist = distributedClients.length > 0
       const costLabel = hasCustom && hasDist ? "Mixed" : hasCustom ? "Custom" : "Distributed"
@@ -1085,6 +1140,7 @@ export default function TeamPage() {
           rate: data.rate, notes: data.notes,
           cost_type: data.cost_type, cost_amount: data.cost_amount, baseline_hours: data.baseline_hours,
           revenue_type: data.revenue_type, revenue_amount: data.revenue_amount,
+          start_date: data.start_date, end_date: data.end_date,
         }).eq("id", editingRate.id)
         if (error) throw error
         setBillRates(prev => prev.map(r => r.id === editingRate.id ? { ...r, ...data, team_member_name: memberName, client_name: clientName } : r))
@@ -1101,11 +1157,20 @@ export default function TeamPage() {
 
   const handleDeleteRate = async (id: string) => {
     try {
-      const { error } = await supabase.from("bill_rates").delete().eq("id", id)
+      const { error } = await supabase.from("bill_rates").update({ is_active: false }).eq("id", id)
       if (error) throw error
-      setBillRates(prev => prev.filter(r => r.id !== id))
-      addToast("success", "Rate card removed")
-    } catch (error: any) { addToast("error", `Failed to delete: ${error.message}`) }
+      setBillRates(prev => prev.map(r => r.id === id ? { ...r, is_active: false } : r))
+      addToast("success", "Rate card archived")
+    } catch (error: any) { addToast("error", `Failed to archive: ${error.message}`) }
+  }
+
+  const handleReactivateRate = async (id: string) => {
+    try {
+      const { error } = await supabase.from("bill_rates").update({ is_active: true }).eq("id", id)
+      if (error) throw error
+      setBillRates(prev => prev.map(r => r.id === id ? { ...r, is_active: true } : r))
+      addToast("success", "Rate card reactivated")
+    } catch (error: any) { addToast("error", `Failed to reactivate: ${error.message}`) }
   }
 
   const handleSaveOverride = async (data: any) => {
@@ -1310,40 +1375,59 @@ export default function TeamPage() {
       {/* ============ RATES TAB ============ */}
       {activeTab === "rates" && (
         <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
-          <div className={`px-6 py-4 border-b ${THEME.glassBorder}`}>
-            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Rate Card</h3>
-            <p className={`text-xs ${THEME.textMuted} mt-0.5`}>Cost + Revenue per team member per client</p>
+          <div className={`px-6 py-4 border-b ${THEME.glassBorder} flex items-center justify-between`}>
+            <div>
+              <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Rate Card</h3>
+              <p className={`text-xs ${THEME.textMuted} mt-0.5`}>Cost + Revenue per team member per client</p>
+            </div>
+            <div className="flex items-center gap-1 bg-white/[0.03] rounded-lg p-0.5">
+              {(["active", "archived", "all"] as const).map(f => (
+                <button key={f} onClick={() => setRateStatusFilter(f)}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${rateStatusFilter === f ? "bg-white/[0.1] text-white" : `${THEME.textMuted} hover:text-white`}`}>
+                  {f === "active" ? `Active (${billRates.filter(r => r.is_active).length})` : f === "archived" ? `Archived (${billRates.filter(r => !r.is_active).length})` : `All (${billRates.length})`}
+                </button>
+              ))}
+            </div>
           </div>
-          {billRates.filter(r => r.is_active).length > 0 ? (
+          {(() => {
+            const filteredRates = billRates.filter(r => rateStatusFilter === "all" ? true : rateStatusFilter === "active" ? r.is_active : !r.is_active)
+            return filteredRates.length > 0 ? (
             <table className="w-full text-sm">
               <thead>
                 <tr className={`bg-white/[0.02] border-b ${THEME.glassBorder}`}>
                   <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Team Member</th>
                   <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Client</th>
+                  <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium`}>Period</th>
                   <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Cost</th>
                   <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Revenue</th>
                   <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Margin</th>
-                  <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium w-20`}>Actions</th>
+                  <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium w-24`}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {billRates.filter(r => r.is_active).map(r => {
+                {filteredRates.map(r => {
                   const hasCustomCost = r.cost_amount > 0
                   const effCost = hasCustomCost ? (r.cost_type === "hourly" ? r.cost_amount : (r.baseline_hours > 0 ? r.cost_amount / r.baseline_hours : 0)) : 0
-                  const isLumpRev = (r as any).revenue_type === "lump_sum"
-                  const revAmt = (r as any).revenue_amount || 0
+                  const isLumpRev = r.revenue_type === "lump_sum"
+                  const revAmt = r.revenue_amount || 0
                   const margin = isLumpRev
                     ? (hasCustomCost && revAmt > 0 ? ((revAmt - (r.cost_type === "hourly" ? r.cost_amount * (r.baseline_hours || 172) : r.cost_amount)) / revAmt * 100) : 0)
                     : (hasCustomCost && r.rate > 0 ? ((r.rate - effCost) / r.rate * 100) : 0)
                   const spread = isLumpRev ? 0 : (hasCustomCost ? r.rate - effCost : 0)
                   const member = teamMembers.find(m => m.id === r.team_member_id)
+                  const startStr = r.start_date ? new Date(r.start_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "2-digit" }) : ""
+                  const endStr = r.end_date ? new Date(r.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "2-digit" }) : "Ongoing"
                   return (
-                    <tr key={r.id} className="border-b border-white/[0.05] hover:bg-white/[0.03]">
+                    <tr key={r.id} className={`border-b border-white/[0.05] hover:bg-white/[0.03] ${!r.is_active ? "opacity-50" : ""}`}>
                       <td className={`px-4 py-3 font-medium ${THEME.textPrimary}`}>
                         {r.team_member_name}
                         <p className={`text-xs ${THEME.textDim}`}>{hasCustomCost ? (r.cost_type === "lump_sum" ? "Fixed Monthly" : "T&M") : "Distributed"}</p>
                       </td>
                       <td className={`px-4 py-3 ${THEME.textSecondary}`}>{r.client_name}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`text-xs ${THEME.textMuted}`}>{startStr} → {endStr}</span>
+                        {!r.is_active && <p className="text-[10px] text-rose-400 mt-0.5">Archived</p>}
+                      </td>
                       <td className="px-4 py-3 text-right">
                         {hasCustomCost ? (
                           <>
@@ -1379,7 +1463,11 @@ export default function TeamPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-1">
                           <button onClick={() => { setEditingRate(r); setShowRateModal(true) }} className="p-1.5 rounded hover:bg-white/[0.08] text-slate-500 hover:text-slate-300"><Edit2 size={14} /></button>
-                          <button onClick={() => handleDeleteRate(r.id)} className="p-1.5 rounded hover:bg-rose-500/20 text-slate-500 hover:text-rose-400"><Trash2 size={14} /></button>
+                          {r.is_active ? (
+                            <button onClick={() => handleDeleteRate(r.id)} title="Archive" className="p-1.5 rounded hover:bg-amber-500/20 text-slate-500 hover:text-amber-400"><Lock size={14} /></button>
+                          ) : (
+                            <button onClick={() => handleReactivateRate(r.id)} title="Reactivate" className="p-1.5 rounded hover:bg-emerald-500/20 text-slate-500 hover:text-emerald-400"><Unlock size={14} /></button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1397,7 +1485,8 @@ export default function TeamPage() {
                 Add First Rate Card
               </button>
             </div>
-          )}
+          )
+          })()}
         </div>
       )}
 
