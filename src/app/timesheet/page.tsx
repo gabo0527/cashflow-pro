@@ -450,16 +450,38 @@ export default function TimesheetPage() {
 
         if (!rateCardsData || rateCardsData.length === 0) { setAssignments([]); setLoading(false); return }
 
-        // Get all active projects for rate card clients
         const rcClientIds = Array.from(new Set(rateCardsData.map((r: any) => r.client_id).filter(Boolean)))
+
+        // Check team_project_assignments first for specific project access
+        const { data: tpaData } = await supabase
+          .from('team_project_assignments')
+          .select('project_id')
+          .eq('team_member_id', memberData.id)
+          .eq('company_id', memberData.company_id)
+
+        const assignedProjectIds = new Set((tpaData || []).map((a: any) => a.project_id))
+
+        // Get all active projects for rate card clients
         const { data: rcProjects } = await supabase
           .from('projects').select('id, name, client_id')
           .in('client_id', rcClientIds).eq('status', 'active')
 
         if (!rcProjects || rcProjects.length === 0) { setAssignments([]); setLoading(false); return }
 
+        // Filter: if member has specific assignments for a client, show only those.
+        // If no assignments for that client, show all projects (backwards compatible).
+        const filteredProjects = rcProjects.filter((p: any) => {
+          const clientHasAssignments = rcProjects
+            .filter((cp: any) => cp.client_id === p.client_id)
+            .some((cp: any) => assignedProjectIds.has(cp.id))
+          if (clientHasAssignments) return assignedProjectIds.has(p.id)
+          return true // No assignments for this client → show all
+        })
+
+        if (filteredProjects.length === 0) { setAssignments([]); setLoading(false); return }
+
         // Get client names
-        const rcClientIdsList = Array.from(new Set(rcProjects.map((p: any) => p.client_id).filter(Boolean)))
+        const rcClientIdsList = Array.from(new Set(filteredProjects.map((p: any) => p.client_id).filter(Boolean)))
         let rcClientsMap: Record<string, string> = {}
         if (rcClientIdsList.length > 0) {
           const { data: rcClients } = await supabase.from('clients').select('id, name').in('id', rcClientIdsList)
@@ -470,7 +492,7 @@ export default function TimesheetPage() {
         const rateByClient = new Map<string, number>()
         rateCardsData.forEach((r: any) => { if (r.rate > 0) rateByClient.set(r.client_id, r.rate) })
 
-        setAssignments(rcProjects.map((p: any) => ({
+        setAssignments(filteredProjects.map((p: any) => ({
           id: `rc-${p.id}`,
           project_id: p.id,
           project_name: p.name || 'Unknown Project',
