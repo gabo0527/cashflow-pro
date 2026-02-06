@@ -440,7 +440,48 @@ export default function TimesheetPage() {
         .eq('team_member_id', memberData.id)
         .eq('is_active', true)
 
-      if (!contractsData || contractsData.length === 0) { setAssignments([]); setLoading(false); return }
+      if (!contractsData || contractsData.length === 0) {
+        // No contracts — check bill_rates for rate cards
+        const { data: rateCardsData } = await supabase
+          .from('bill_rates')
+          .select('client_id, rate')
+          .eq('team_member_id', memberData.id)
+          .eq('is_active', true)
+
+        if (!rateCardsData || rateCardsData.length === 0) { setAssignments([]); setLoading(false); return }
+
+        // Get all active projects for rate card clients
+        const rcClientIds = [...new Set(rateCardsData.map((r: any) => r.client_id).filter(Boolean))]
+        const { data: rcProjects } = await supabase
+          .from('projects').select('id, name, client_id')
+          .in('client_id', rcClientIds).eq('status', 'active')
+
+        if (!rcProjects || rcProjects.length === 0) { setAssignments([]); setLoading(false); return }
+
+        // Get client names
+        const rcClientIdsList = [...new Set(rcProjects.map((p: any) => p.client_id).filter(Boolean))]
+        let rcClientsMap: Record<string, string> = {}
+        if (rcClientIdsList.length > 0) {
+          const { data: rcClients } = await supabase.from('clients').select('id, name').in('id', rcClientIdsList)
+          if (rcClients) rcClients.forEach((c: any) => { rcClientsMap[c.id] = c.name })
+        }
+
+        // Build rate lookup by client for bill rate
+        const rateByClient = new Map<string, number>()
+        rateCardsData.forEach((r: any) => { if (r.rate > 0) rateByClient.set(r.client_id, r.rate) })
+
+        setAssignments(rcProjects.map((p: any) => ({
+          id: `rc-${p.id}`,
+          project_id: p.id,
+          project_name: p.name || 'Unknown Project',
+          client_name: p.client_id ? rcClientsMap[p.client_id] || '' : 'Other',
+          service: null,
+          payment_type: 'tm',
+          rate: rateByClient.get(p.client_id) || 0
+        })))
+        setLoading(false)
+        return
+      }
 
       // Get contract_projects links for these contracts (includes bill_rate)
       const contractIds = contractsData.map((c: any) => c.id)
@@ -490,6 +531,42 @@ export default function TimesheetPage() {
 
       // Also handle default contracts (applies to all projects)
       const defaultContract = contractsData.find((c: any) => c.is_default)
+
+      // ALSO check bill_rates for additional client projects not covered by contracts
+      const { data: rateCardsData } = await supabase
+        .from('bill_rates')
+        .select('client_id, rate')
+        .eq('team_member_id', memberData.id)
+        .eq('is_active', true)
+
+      if (rateCardsData && rateCardsData.length > 0) {
+        const rcClientIds = [...new Set(rateCardsData.map((r: any) => r.client_id).filter(Boolean))]
+        // Only fetch projects for clients not already covered
+        const coveredClientIds = new Set(allClientProjects.map((p: any) => p.client_id))
+        const newClientIds = rcClientIds.filter(cid => !coveredClientIds.has(cid))
+        if (newClientIds.length > 0) {
+          const { data: extraProjects } = await supabase
+            .from('projects').select('id, name, client_id')
+            .in('client_id', newClientIds).eq('status', 'active')
+          if (extraProjects) {
+            extraProjects.forEach((p: any) => {
+              projectIds.add(p.id)
+              allClientProjects.push(p)
+            })
+          }
+        }
+        // Also add projects for rate card clients that are already in allClientProjects but not in projectIds
+        allClientProjects.filter((p: any) => rcClientIds.includes(p.client_id)).forEach((p: any) => {
+          projectIds.add(p.id)
+        })
+        // Store rate card bill rates for lookup
+        rateCardsData.forEach((r: any) => {
+          // Apply rate card bill rate to all projects for that client
+          allClientProjects.filter((p: any) => p.client_id === r.client_id).forEach((p: any) => {
+            if (!billRateByProject.has(p.id) && r.rate > 0) billRateByProject.set(p.id, r.rate)
+          })
+        })
+      }
       
       if (projectIds.size === 0) { setAssignments([]); setLoading(false); return }
 
