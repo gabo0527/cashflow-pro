@@ -254,9 +254,9 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
 }
 
 // ============ RATE CARD MODAL (Cost + Revenue per client) ============
-function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clients }: {
+function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clients, projects, companyId }: {
   isOpen: boolean; onClose: () => void; onSave: (data: any) => Promise<void>
-  editingRate: BillRate | null; teamMembers: TeamMember[]; clients: Client[]
+  editingRate: BillRate | null; teamMembers: TeamMember[]; clients: Client[]; projects: Project[]; companyId: string | null
 }) {
   const [form, setForm] = useState({
     team_member_id: "", client_id: "", rate: "", notes: "",
@@ -264,6 +264,39 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
     customCost: false,
   })
   const [isSaving, setIsSaving] = useState(false)
+  const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set())
+  const [loadingAssignments, setLoadingAssignments] = useState(false)
+
+  // Get projects for selected client
+  const clientProjects = useMemo(() => 
+    projects.filter(p => p.client_id === form.client_id && p.status === "active"),
+    [projects, form.client_id]
+  )
+
+  // Load existing project assignments when editing or client changes
+  useEffect(() => {
+    const loadAssignments = async () => {
+      if (!form.team_member_id || !form.client_id || !companyId) { setSelectedProjects(new Set()); return }
+      setLoadingAssignments(true)
+      try {
+        const clientProjectIds = projects.filter(p => p.client_id === form.client_id).map(p => p.id)
+        if (clientProjectIds.length === 0) { setSelectedProjects(new Set()); return }
+        const { data } = await supabase.from("team_project_assignments")
+          .select("project_id")
+          .eq("team_member_id", form.team_member_id)
+          .eq("company_id", companyId)
+          .in("project_id", clientProjectIds)
+        if (data && data.length > 0) {
+          setSelectedProjects(new Set(data.map((d: any) => d.project_id)))
+        } else {
+          // No assignments yet — default to all projects for this client
+          setSelectedProjects(new Set(clientProjectIds))
+        }
+      } catch (e) { console.error("Error loading assignments:", e) }
+      finally { setLoadingAssignments(false) }
+    }
+    if (form.client_id && form.team_member_id) loadAssignments()
+  }, [form.client_id, form.team_member_id, companyId])
 
   useEffect(() => {
     if (editingRate) {
@@ -303,6 +336,30 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
         cost_amount: form.customCost ? (parseFloat(form.cost_amount) || 0) : 0,
         baseline_hours: form.customCost ? (parseFloat(form.baseline_hours) || 172) : 172,
       })
+
+      // Save project assignments
+      if (companyId && selectedProjects.size > 0) {
+        // Delete existing assignments for this member + client's projects
+        const clientProjectIds = projects.filter(p => p.client_id === form.client_id).map(p => p.id)
+        if (clientProjectIds.length > 0) {
+          await supabase.from("team_project_assignments")
+            .delete()
+            .eq("team_member_id", form.team_member_id)
+            .eq("company_id", companyId)
+            .in("project_id", clientProjectIds)
+        }
+        // Insert selected assignments
+        const rows = Array.from(selectedProjects).map(pid => ({
+          company_id: companyId,
+          team_member_id: form.team_member_id,
+          project_id: pid,
+          service: "General",
+          payment_type: "tm",
+        }))
+        if (rows.length > 0) {
+          await supabase.from("team_project_assignments").insert(rows)
+        }
+      }
       onClose()
     } finally { setIsSaving(false) }
   }
@@ -335,6 +392,41 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
               </select>
             </div>
           </div>
+
+          {/* Project Assignments */}
+          {form.client_id && form.team_member_id && clientProjects.length > 0 && (
+            <div className="p-4 rounded-lg border border-blue-500/20 bg-blue-500/5">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-blue-400">PROJECT ACCESS &mdash; Timesheet Visibility</p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setSelectedProjects(new Set(clientProjects.map(p => p.id)))}
+                    className="text-[10px] text-blue-400 hover:text-blue-300">All</button>
+                  <span className="text-[10px] text-slate-600">|</span>
+                  <button type="button" onClick={() => setSelectedProjects(new Set())}
+                    className="text-[10px] text-slate-400 hover:text-slate-300">None</button>
+                </div>
+              </div>
+              {loadingAssignments ? (
+                <div className="flex items-center gap-2 py-2"><RefreshCw size={12} className="animate-spin text-blue-400" /><span className="text-xs text-slate-400">Loading...</span></div>
+              ) : (
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {clientProjects.map(p => (
+                    <label key={p.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-white/[0.03] cursor-pointer group">
+                      <input type="checkbox" checked={selectedProjects.has(p.id)}
+                        onChange={() => setSelectedProjects(prev => {
+                          const next = new Set(prev)
+                          next.has(p.id) ? next.delete(p.id) : next.add(p.id)
+                          return next
+                        })}
+                        className="w-3.5 h-3.5 rounded border-white/20 bg-white/[0.05] text-blue-500 focus:ring-blue-500/30" />
+                      <span className={`text-xs ${selectedProjects.has(p.id) ? "text-white" : "text-slate-500"}`}>{p.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              <p className="text-[10px] text-slate-500 mt-2">{selectedProjects.size} of {clientProjects.length} projects &mdash; member will only see selected projects in timesheet</p>
+            </div>
+          )}
 
           <div className="p-4 rounded-lg border border-orange-500/20 bg-orange-500/5">
             <div className="flex items-center justify-between mb-3">
@@ -1483,7 +1575,7 @@ export default function TeamPage() {
       <MemberModal isOpen={showMemberModal} onClose={() => { setShowMemberModal(false); setEditingMember(null) }}
         onSave={handleSaveMember} editingMember={editingMember} />
       <RateCardModal isOpen={showRateModal} onClose={() => { setShowRateModal(false); setEditingRate(null) }}
-        onSave={handleSaveRate} editingRate={editingRate} teamMembers={teamMembers} clients={clients} />
+        onSave={handleSaveRate} editingRate={editingRate} teamMembers={teamMembers} clients={clients} projects={projects} companyId={companyId} />
       <CostOverrideModal isOpen={showOverrideModal} onClose={() => setShowOverrideModal(false)}
         onSave={handleSaveOverride} billRates={billRates} teamMembers={teamMembers} clients={clients} selectedMonth={selectedPeriod.includes("-Q") ? getMonthsInPeriod(selectedPeriod, periodType)[0] : selectedPeriod.length === 4 ? getCurrentMonth() : selectedPeriod} />
       {selectedMemberDetail && (
