@@ -1564,7 +1564,7 @@ export default function TeamPage() {
                     <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => formatCompactCurrency(v)} />
                     <Tooltip contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px" }} labelStyle={{ color: "#fff" }}
-                      formatter={(value: number, name: string) => [formatCurrency(value), name === "cost" ? "Cost" : "Revenue"]} cursor={false} />
+                      formatter={(value: number, name: string) => [formatCurrency(value), name.toLowerCase() === "cost" ? "Cost" : "Revenue"]} cursor={false} />
                     <Legend wrapperStyle={{ paddingTop: "10px" }} />
                     <Bar dataKey="cost" name="Cost" fill={CHART_COLORS.cost} radius={[4, 4, 0, 0]} />
                     <Bar dataKey="revenue" name="Revenue" fill={CHART_COLORS.revenue} radius={[4, 4, 0, 0]} />
