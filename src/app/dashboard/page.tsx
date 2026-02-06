@@ -440,7 +440,7 @@ export default function DashboardPage() {
     
     // Time tracking
     const totalHours = filteredTimeEntries.reduce((sum, te) => sum + (parseFloat(te.hours) || 0), 0)
-    const billableHours = filteredTimeEntries.filter(te => te.billable).reduce((sum, te) => sum + (parseFloat(te.hours) || 0), 0)
+    const billableHours = filteredTimeEntries.filter(te => te.is_billable).reduce((sum, te) => sum + (parseFloat(te.hours) || 0), 0)
     const billableRate = totalHours > 0 ? (billableHours / totalHours) * 100 : 0
     
     // Health score calculation
