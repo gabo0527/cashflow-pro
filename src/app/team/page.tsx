@@ -932,7 +932,7 @@ export default function TeamPage() {
 
         setContracts((contractsRes.data || []).map(c => {
           const linkedProjects = contractProjectsByContract[c.id] || []
-          const maxBillRate = linkedProjects.reduce<number | null>((max, p) => (p.bill_rate && p.bill_rate > (max || 0)) ? p.bill_rate : max, null)
+          const maxBillRate: number | null = linkedProjects.reduce((max: number | null, p: ContractProject) => (p.bill_rate && p.bill_rate > (max || 0)) ? p.bill_rate : max, null)
           return {
             ...c,
             team_member_name: memberMap.get(c.team_member_id) || 'Unknown',
@@ -1082,7 +1082,7 @@ export default function TeamPage() {
 
         setContracts(prev => prev.map(c => c.id === editingContract.id ? {
           ...c, ...contractData, team_member_name: memberName, client_name: clientName, projects: projectsEnriched,
-          bill_rate: projectsEnriched.reduce<number | null>((max, p) => (p.bill_rate && p.bill_rate > (max || 0)) ? p.bill_rate : max, null),
+          bill_rate: projectsEnriched.reduce((max: number | null, p) => (p.bill_rate && p.bill_rate > (max || 0)) ? p.bill_rate : max, null as number | null),
         } : c))
         addToast('success', 'Contract updated')
       } else {
@@ -1111,7 +1111,7 @@ export default function TeamPage() {
 
         setContracts(prev => [...prev, {
           ...newContract, team_member_name: memberName, client_name: clientName, projects: projectsEnriched,
-          bill_rate: projectsEnriched.reduce<number | null>((max, p) => (p.bill_rate && p.bill_rate > (max || 0)) ? p.bill_rate : max, null),
+          bill_rate: projectsEnriched.reduce((max: number | null, p) => (p.bill_rate && p.bill_rate > (max || 0)) ? p.bill_rate : max, null as number | null),
         }])
         addToast('success', 'Contract created')
       }
@@ -1355,8 +1355,9 @@ export default function TeamPage() {
                   const effectiveCostRate = c.contract_type === 'lump_sum' && c.baseline_hours > 0
                     ? c.total_amount / c.baseline_hours
                     : c.cost_rate
-                  const margin = c.bill_rate > 0 && effectiveCostRate > 0 
-                    ? ((c.bill_rate - effectiveCostRate) / c.bill_rate * 100).toFixed(0)
+                  const billRate = c.bill_rate || 0
+                  const margin = billRate > 0 && effectiveCostRate > 0 
+                    ? ((billRate - effectiveCostRate) / billRate * 100).toFixed(0)
                     : null
                   return (
                     <tr key={c.id} className="border-b border-white/[0.05] hover:bg-white/[0.03]">
@@ -1383,9 +1384,9 @@ export default function TeamPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {c.bill_rate > 0 ? (
+                        {billRate > 0 ? (
                           <>
-                            <span className="text-emerald-400">${c.bill_rate}/hr</span>
+                            <span className="text-emerald-400">${billRate}/hr</span>
                             {margin && <p className={`text-xs ${parseInt(margin) >= 20 ? 'text-emerald-400' : 'text-amber-400'}`}>{margin}% margin</p>}
                           </>
                         ) : (
