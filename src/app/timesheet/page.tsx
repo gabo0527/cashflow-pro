@@ -451,7 +451,7 @@ export default function TimesheetPage() {
         if (!rateCardsData || rateCardsData.length === 0) { setAssignments([]); setLoading(false); return }
 
         // Get all active projects for rate card clients
-        const rcClientIds = [...new Set(rateCardsData.map((r: any) => r.client_id).filter(Boolean))]
+        const rcClientIds = Array.from(new Set(rateCardsData.map((r: any) => r.client_id).filter(Boolean)))
         const { data: rcProjects } = await supabase
           .from('projects').select('id, name, client_id')
           .in('client_id', rcClientIds).eq('status', 'active')
@@ -459,7 +459,7 @@ export default function TimesheetPage() {
         if (!rcProjects || rcProjects.length === 0) { setAssignments([]); setLoading(false); return }
 
         // Get client names
-        const rcClientIdsList = [...new Set(rcProjects.map((p: any) => p.client_id).filter(Boolean))]
+        const rcClientIdsList = Array.from(new Set(rcProjects.map((p: any) => p.client_id).filter(Boolean)))
         let rcClientsMap: Record<string, string> = {}
         if (rcClientIdsList.length > 0) {
           const { data: rcClients } = await supabase.from('clients').select('id, name').in('id', rcClientIdsList)
@@ -540,7 +540,7 @@ export default function TimesheetPage() {
         .eq('is_active', true)
 
       if (rateCardsData && rateCardsData.length > 0) {
-        const rcClientIds = [...new Set(rateCardsData.map((r: any) => r.client_id).filter(Boolean))]
+        const rcClientIds = Array.from(new Set(rateCardsData.map((r: any) => r.client_id).filter(Boolean)))
         // Only fetch projects for clients not already covered
         const coveredClientIds = new Set(allClientProjects.map((p: any) => p.client_id))
         const newClientIds = rcClientIds.filter(cid => !coveredClientIds.has(cid))
