@@ -203,16 +203,25 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
             {memberRates.length > 0 ? (
               <div className="space-y-2">
                 {memberRates.map(r => {
-                  const effCost = r.cost_type === "hourly" ? r.cost_amount : (r.baseline_hours > 0 ? r.cost_amount / r.baseline_hours : 0)
-                  const mg = r.rate > 0 ? ((r.rate - effCost) / r.rate * 100) : 0
+                  const hasCustomCost = r.cost_amount > 0
+                  const effCost = hasCustomCost ? (r.cost_type === "hourly" ? r.cost_amount : (r.baseline_hours > 0 ? r.cost_amount / r.baseline_hours : 0)) : 0
+                  const mg = hasCustomCost && r.rate > 0 ? ((r.rate - effCost) / r.rate * 100) : 0
                   return (
                     <div key={r.id} className="p-3 rounded-lg bg-white/[0.03]">
                       <div className="flex items-center justify-between mb-1">
                         <p className={`text-sm font-medium ${THEME.textPrimary}`}>{r.client_name}</p>
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded ${mg >= 20 ? "bg-emerald-500/10 text-emerald-400" : mg >= 0 ? "bg-amber-500/10 text-amber-400" : "bg-rose-500/10 text-rose-400"}`}>{mg.toFixed(0)}% GM</span>
+                        {hasCustomCost ? (
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded ${mg >= 20 ? "bg-emerald-500/10 text-emerald-400" : mg >= 0 ? "bg-amber-500/10 text-amber-400" : "bg-rose-500/10 text-rose-400"}`}>{mg.toFixed(0)}% GM</span>
+                        ) : (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded bg-blue-500/10 text-blue-400">Distributed</span>
+                        )}
                       </div>
                       <div className="flex gap-4 text-xs">
-                        <span className="text-orange-400">Cost: {r.cost_type === "hourly" ? `$${r.cost_amount}/hr` : `${formatCurrency(r.cost_amount)}/mo (${r.baseline_hours}h)`}</span>
+                        <span className="text-orange-400">
+                          Cost: {hasCustomCost
+                            ? (r.cost_type === "hourly" ? `$${r.cost_amount}/hr` : `${formatCurrency(r.cost_amount)}/mo (${r.baseline_hours}h)`)
+                            : "From member total"}
+                        </span>
                         <span className="text-emerald-400">Bill: ${r.rate}/hr</span>
                       </div>
                     </div>
@@ -252,41 +261,36 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
   const [form, setForm] = useState({
     team_member_id: "", client_id: "", rate: "", notes: "",
     cost_type: "hourly" as "hourly" | "lump_sum", cost_amount: "", baseline_hours: "172",
+    customCost: false,
   })
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     if (editingRate) {
+      const hasCustomCost = (editingRate.cost_amount || 0) > 0
       setForm({
         team_member_id: editingRate.team_member_id, client_id: editingRate.client_id,
         rate: editingRate.rate.toString(), notes: editingRate.notes || "",
         cost_type: editingRate.cost_type || "hourly",
         cost_amount: editingRate.cost_amount?.toString() || "",
         baseline_hours: editingRate.baseline_hours?.toString() || "172",
+        customCost: hasCustomCost,
       })
     } else {
-      setForm({ team_member_id: "", client_id: "", rate: "", notes: "", cost_type: "hourly", cost_amount: "", baseline_hours: "172" })
+      setForm({ team_member_id: "", client_id: "", rate: "", notes: "", cost_type: "hourly", cost_amount: "", baseline_hours: "172", customCost: false })
     }
   }, [editingRate, isOpen])
 
   const handleMemberChange = (id: string) => {
-    const member = teamMembers.find(m => m.id === id)
-    if (member && !editingRate) {
-      setForm(p => ({
-        ...p, team_member_id: id,
-        cost_type: member.cost_type || "hourly",
-        cost_amount: member.cost_amount?.toString() || "",
-      }))
-    } else {
-      setForm(p => ({ ...p, team_member_id: id }))
-    }
+    setForm(p => ({ ...p, team_member_id: id }))
   }
 
-  const costAmt = parseFloat(form.cost_amount) || 0
+  const selectedMember = teamMembers.find(m => m.id === form.team_member_id)
+  const costAmt = form.customCost ? (parseFloat(form.cost_amount) || 0) : 0
   const baseHrs = parseFloat(form.baseline_hours) || 172
-  const effCostRate = form.cost_type === "hourly" ? costAmt : (baseHrs > 0 ? costAmt / baseHrs : 0)
+  const effCostRate = form.customCost ? (form.cost_type === "hourly" ? costAmt : (baseHrs > 0 ? costAmt / baseHrs : 0)) : 0
   const billRate = parseFloat(form.rate) || 0
-  const margin = billRate > 0 ? ((billRate - effCostRate) / billRate * 100) : 0
+  const margin = billRate > 0 && effCostRate > 0 ? ((billRate - effCostRate) / billRate * 100) : 0
 
   const handleSave = async () => {
     if (!form.team_member_id || !form.client_id || !form.rate) return
@@ -295,8 +299,9 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
       await onSave({
         team_member_id: form.team_member_id, client_id: form.client_id,
         rate: parseFloat(form.rate) || 0, is_active: true, notes: form.notes || null,
-        cost_type: form.cost_type, cost_amount: parseFloat(form.cost_amount) || 0,
-        baseline_hours: parseFloat(form.baseline_hours) || 172,
+        cost_type: form.customCost ? form.cost_type : "hourly",
+        cost_amount: form.customCost ? (parseFloat(form.cost_amount) || 0) : 0,
+        baseline_hours: form.customCost ? (parseFloat(form.baseline_hours) || 172) : 172,
       })
       onClose()
     } finally { setIsSaving(false) }
@@ -332,31 +337,52 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
           </div>
 
           <div className="p-4 rounded-lg border border-orange-500/20 bg-orange-500/5">
-            <p className="text-xs font-semibold text-orange-400 mb-3">COST SIDE &mdash; What You Pay</p>
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              {COST_TYPES.map(t => (
-                <button key={t.id} type="button" onClick={() => setForm(p=>({...p, cost_type: t.id as any}))}
-                  className={`p-2 rounded-lg border text-left transition-all ${form.cost_type===t.id ? "border-orange-500 bg-orange-500/10" : "border-white/[0.08] hover:border-white/[0.15]"}`}>
-                  <p className={`text-xs font-medium ${form.cost_type===t.id ? "text-orange-400" : THEME.textPrimary}`}>{t.label}</p>
-                </button>
-              ))}
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-orange-400">COST SIDE &mdash; What You Pay</p>
+              <button type="button" onClick={() => setForm(p => ({ ...p, customCost: !p.customCost }))}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                  form.customCost ? "border-orange-500 bg-orange-500/20 text-orange-400" : "border-white/[0.08] text-slate-400 hover:text-white"
+                }`}>
+                {form.customCost ? "Custom cost for this client" : "Distributed from member total"}
+              </button>
             </div>
-            <div className={form.cost_type === "lump_sum" ? "grid grid-cols-2 gap-3" : ""}>
-              <div>
-                <label className={`block text-xs ${THEME.textDim} mb-1`}>{form.cost_type === "hourly" ? "Cost Rate ($/hr)" : "Monthly Amount ($/mo)"}</label>
-                <input type="number" value={form.cost_amount} onChange={e => setForm(p=>({...p,cost_amount:e.target.value}))}
-                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder={form.cost_type==="hourly"?"35":"13525"} />
-              </div>
-              {form.cost_type === "lump_sum" && (
-                <div>
-                  <label className={`block text-xs ${THEME.textDim} mb-1`}>Baseline Hrs/mo</label>
-                  <input type="number" value={form.baseline_hours} onChange={e => setForm(p=>({...p,baseline_hours:e.target.value}))}
-                    className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="340" />
+
+            {form.customCost ? (
+              <>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {COST_TYPES.map(t => (
+                    <button key={t.id} type="button" onClick={() => setForm(p=>({...p, cost_type: t.id as any}))}
+                      className={`p-2 rounded-lg border text-left transition-all ${form.cost_type===t.id ? "border-orange-500 bg-orange-500/10" : "border-white/[0.08] hover:border-white/[0.15]"}`}>
+                      <p className={`text-xs font-medium ${form.cost_type===t.id ? "text-orange-400" : THEME.textPrimary}`}>{t.label}</p>
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
-            {form.cost_type === "lump_sum" && costAmt > 0 && (
-              <p className={`text-xs ${THEME.textDim} mt-2`}>Effective: ~${effCostRate.toFixed(2)}/hr ({formatCurrency(costAmt)} &divide; {baseHrs} hrs)</p>
+                <div className={form.cost_type === "lump_sum" ? "grid grid-cols-2 gap-3" : ""}>
+                  <div>
+                    <label className={`block text-xs ${THEME.textDim} mb-1`}>{form.cost_type === "hourly" ? "Cost Rate ($/hr)" : "Monthly Amount ($/mo)"}</label>
+                    <input type="number" value={form.cost_amount} onChange={e => setForm(p=>({...p,cost_amount:e.target.value}))}
+                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder={form.cost_type==="hourly"?"35":"13525"} />
+                  </div>
+                  {form.cost_type === "lump_sum" && (
+                    <div>
+                      <label className={`block text-xs ${THEME.textDim} mb-1`}>Baseline Hrs/mo</label>
+                      <input type="number" value={form.baseline_hours} onChange={e => setForm(p=>({...p,baseline_hours:e.target.value}))}
+                        className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="340" />
+                    </div>
+                  )}
+                </div>
+                {form.cost_type === "lump_sum" && costAmt > 0 && (
+                  <p className={`text-xs ${THEME.textDim} mt-2`}>Effective: ~${effCostRate.toFixed(2)}/hr ({formatCurrency(costAmt)} &divide; {baseHrs} hrs)</p>
+                )}
+              </>
+            ) : (
+              <div className="p-3 rounded-lg bg-white/[0.03]">
+                <p className={`text-xs ${THEME.textSecondary}`}>
+                  Cost will be auto-distributed from {selectedMember?.name ? `${selectedMember.name}'s` : "member's"} total
+                  {selectedMember?.cost_amount ? ` (${selectedMember.cost_type === "hourly" ? `$${selectedMember.cost_amount}/hr` : `${formatCurrency(selectedMember.cost_amount)}/mo`})` : ""}
+                  {" "}based on % of hours worked per client.
+                </p>
+              </div>
             )}
           </div>
 
@@ -369,7 +395,7 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
             </div>
           </div>
 
-          {effCostRate > 0 && billRate > 0 && (
+          {form.customCost && effCostRate > 0 && billRate > 0 && (
             <div className={`p-4 rounded-lg border ${margin >= 20 ? "bg-emerald-500/10 border-emerald-500/20" : margin >= 0 ? "bg-amber-500/10 border-amber-500/20" : "bg-rose-500/10 border-rose-500/20"}`}>
               <div className="flex justify-between text-sm"><span className={THEME.textSecondary}>Eff. Cost</span><span className="text-orange-400">${effCostRate.toFixed(2)}/hr</span></div>
               <div className="flex justify-between text-sm mt-1"><span className={THEME.textSecondary}>Bill Rate</span><span className="text-emerald-400">${billRate.toFixed(2)}/hr</span></div>
@@ -379,6 +405,11 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
                   {margin.toFixed(1)}% (${(billRate - effCostRate).toFixed(2)}/hr)
                 </span>
               </div>
+            </div>
+          )}
+          {!form.customCost && billRate > 0 && (
+            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <p className={`text-xs ${THEME.textSecondary}`}>Margin will be calculated from timesheet hours &mdash; member total cost distributed across clients by % of hours worked.</p>
             </div>
           )}
 
@@ -768,19 +799,23 @@ export default function TeamPage() {
         totalRevenue += rev
       })
 
-      // COST by client - from RATE CARD per client (not team_member default)
+      // COST by client — TWO-TIER:
+      // Tier 1: If rate card has cost_amount > 0, use it (custom cost per client)
+      // Tier 2: If rate card cost is 0, fall back to member total distributed by hours
       const costByClient: Record<string, number> = {}
       let totalCost = 0
 
+      // First pass: handle custom-cost rate cards
+      const distributedClients: string[] = [] // clients that need member-level distribution
       Object.entries(hoursByClient).forEach(([clientId, hours]) => {
         const rc = billRates.find(r => r.team_member_id === member.id && r.client_id === clientId && r.is_active)
 
-        if (rc) {
+        if (rc && rc.cost_amount > 0) {
+          // Tier 1: Custom cost defined on rate card for this client
           if (rc.cost_type === "hourly") {
-            // T&M: hours x cost rate
             costByClient[clientId] = hours * rc.cost_amount
           } else {
-            // Lump sum: check for monthly overrides first
+            // Lump sum per client: check monthly overrides
             let lsCost = 0
             months.forEach(mo => {
               const override = costOverrides.find(o => o.team_member_id === member.id && o.client_id === clientId && o.month === mo)
@@ -789,26 +824,51 @@ export default function TeamPage() {
             costByClient[clientId] = lsCost
           }
         } else {
-          // Fallback to team member default cost
-          if (member.cost_type === "hourly") {
-            costByClient[clientId] = hours * (member.cost_amount || 0)
-          } else {
-            // Auto-distribute member default across clients by hours
-            const pct = totalHours > 0 ? hours / totalHours : 0
-            costByClient[clientId] = pct * (member.cost_amount || 0) * months.length
-          }
+          // Tier 2: No custom cost — needs distribution from member total
+          distributedClients.push(clientId)
         }
-        totalCost += costByClient[clientId]
       })
+
+      // Second pass: distribute member total cost across distributed clients
+      if (distributedClients.length > 0 && (member.cost_amount || 0) > 0) {
+        // Subtract any custom-cost totals from the member total
+        const customCostTotal = Object.values(costByClient).reduce((s, v) => s + v, 0)
+
+        if (member.cost_type === "hourly") {
+          // Hourly member default: hours x rate per client
+          distributedClients.forEach(clientId => {
+            costByClient[clientId] = (hoursByClient[clientId] || 0) * (member.cost_amount || 0)
+          })
+        } else {
+          // Lump sum member default: distribute by % of hours
+          const distHours = distributedClients.reduce((s, cid) => s + (hoursByClient[cid] || 0), 0)
+          // Check for overrides on these distributed clients
+          distributedClients.forEach(clientId => {
+            let clientCost = 0
+            months.forEach(mo => {
+              const override = costOverrides.find(o => o.team_member_id === member.id && o.client_id === clientId && o.month === mo)
+              if (override) {
+                clientCost += override.fixed_amount
+              } else {
+                const pct = distHours > 0 ? (hoursByClient[clientId] || 0) / distHours : 0
+                clientCost += pct * (member.cost_amount || 0)
+              }
+            })
+            costByClient[clientId] = clientCost
+          })
+        }
+      }
+
+      totalCost = Object.values(costByClient).reduce((s, v) => s + v, 0)
 
       const margin = totalRevenue - totalCost
       const marginPct = totalRevenue > 0 ? (margin / totalRevenue) * 100 : (totalCost > 0 ? -100 : 0)
 
-      // Determine display cost type from dominant rate card entries
+      // Determine display cost type
       const memberRates = billRates.filter(r => r.team_member_id === member.id && r.is_active)
-      const hasLS = memberRates.some(r => r.cost_type === "lump_sum")
-      const hasTM = memberRates.some(r => r.cost_type === "hourly")
-      const costLabel = hasLS && hasTM ? "Mixed" : hasLS ? "Fixed" : "T&M"
+      const hasCustom = memberRates.some(r => r.cost_amount > 0)
+      const hasDist = distributedClients.length > 0
+      const costLabel = hasCustom && hasDist ? "Mixed" : hasCustom ? "Custom" : "Distributed"
 
       return { id: member.id, name: member.name, costLabel, hours: totalHours,
         cost: totalCost, revenue: totalRevenue, margin, marginPct,
@@ -1107,24 +1167,40 @@ export default function TeamPage() {
               </thead>
               <tbody>
                 {billRates.filter(r => r.is_active).map(r => {
-                  const effCost = r.cost_type === "hourly" ? r.cost_amount : (r.baseline_hours > 0 ? r.cost_amount / r.baseline_hours : 0)
-                  const margin = r.rate > 0 ? ((r.rate - effCost) / r.rate * 100) : 0
-                  const spread = r.rate - effCost
+                  const hasCustomCost = r.cost_amount > 0
+                  const effCost = hasCustomCost ? (r.cost_type === "hourly" ? r.cost_amount : (r.baseline_hours > 0 ? r.cost_amount / r.baseline_hours : 0)) : 0
+                  const margin = hasCustomCost && r.rate > 0 ? ((r.rate - effCost) / r.rate * 100) : 0
+                  const spread = hasCustomCost ? r.rate - effCost : 0
+                  const member = teamMembers.find(m => m.id === r.team_member_id)
                   return (
                     <tr key={r.id} className="border-b border-white/[0.05] hover:bg-white/[0.03]">
                       <td className={`px-4 py-3 font-medium ${THEME.textPrimary}`}>
                         {r.team_member_name}
-                        <p className={`text-xs ${THEME.textDim}`}>{r.cost_type === "lump_sum" ? "Fixed Monthly" : "T&M"}</p>
+                        <p className={`text-xs ${THEME.textDim}`}>{hasCustomCost ? (r.cost_type === "lump_sum" ? "Fixed Monthly" : "T&M") : "Distributed"}</p>
                       </td>
                       <td className={`px-4 py-3 ${THEME.textSecondary}`}>{r.client_name}</td>
                       <td className="px-4 py-3 text-right">
-                        <span className="text-orange-400">{r.cost_type === "hourly" ? `$${r.cost_amount}/hr` : `${formatCurrency(r.cost_amount)}/mo`}</span>
-                        {r.cost_type === "lump_sum" && <p className={`text-xs ${THEME.textDim}`}>~${effCost.toFixed(2)}/hr ({r.baseline_hours}h)</p>}
+                        {hasCustomCost ? (
+                          <>
+                            <span className="text-orange-400">{r.cost_type === "hourly" ? `$${r.cost_amount}/hr` : `${formatCurrency(r.cost_amount)}/mo`}</span>
+                            {r.cost_type === "lump_sum" && <p className={`text-xs ${THEME.textDim}`}>~${effCost.toFixed(2)}/hr ({r.baseline_hours}h)</p>}
+                          </>
+                        ) : (
+                          <span className={`text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-400`}>
+                            From {member?.cost_type === "lump_sum" ? formatCurrency(member?.cost_amount || 0) + "/mo" : `$${member?.cost_amount || 0}/hr`}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right"><span className="text-emerald-400 font-medium">${r.rate}/hr</span></td>
                       <td className="px-4 py-3 text-right">
-                        <span className={`font-medium ${margin >= 20 ? "text-emerald-400" : margin >= 0 ? "text-amber-400" : "text-rose-400"}`}>{margin.toFixed(0)}%</span>
-                        <p className={`text-xs ${spread >= 0 ? "text-emerald-400/60" : "text-rose-400/60"}`}>${spread.toFixed(2)}/hr</p>
+                        {hasCustomCost ? (
+                          <>
+                            <span className={`font-medium ${margin >= 20 ? "text-emerald-400" : margin >= 0 ? "text-amber-400" : "text-rose-400"}`}>{margin.toFixed(0)}%</span>
+                            <p className={`text-xs ${spread >= 0 ? "text-emerald-400/60" : "text-rose-400/60"}`}>${spread.toFixed(2)}/hr</p>
+                          </>
+                        ) : (
+                          <span className={`text-xs ${THEME.textDim}`}>By hours</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-1">
