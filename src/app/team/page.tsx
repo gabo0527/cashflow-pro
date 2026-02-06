@@ -340,7 +340,8 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
     : (billRate > 0 && effCostRate > 0 ? ((billRate - effCostRate) / billRate * 100) : 0)
 
   const handleSave = async () => {
-    if (!form.team_member_id || !form.client_id || !form.rate) return
+    const hasRevenue = form.revenue_type === "hourly" ? !!form.rate : !!form.revenue_amount
+    if (!form.team_member_id || !form.client_id || !hasRevenue) return
     setIsSaving(true)
     try {
       await onSave({
