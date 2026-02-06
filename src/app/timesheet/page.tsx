@@ -436,17 +436,17 @@ export default function TimesheetPage() {
       // Get contracts for this team member
       const { data: contractsData } = await supabase
         .from('team_member_contracts')
-        .select('id, client_id, contract_type, cost_rate, total_amount, baseline_hours, bill_rate, is_default')
+        .select('id, client_id, contract_type, cost_rate, total_amount, baseline_hours, is_default')
         .eq('team_member_id', memberData.id)
         .eq('is_active', true)
 
       if (!contractsData || contractsData.length === 0) { setAssignments([]); setLoading(false); return }
 
-      // Get contract_projects links for these contracts
+      // Get contract_projects links for these contracts (includes bill_rate)
       const contractIds = contractsData.map((c: any) => c.id)
       const { data: contractProjectsData } = await supabase
         .from('contract_projects')
-        .select('contract_id, project_id')
+        .select('contract_id, project_id, bill_rate')
         .in('contract_id', contractIds)
 
       // Get all projects for clients (for contracts without specific project links)
@@ -464,12 +464,14 @@ export default function TimesheetPage() {
       // Build project assignments
       const projectIds = new Set<string>()
       const contractByProject = new Map<string, any>()
+      const billRateByProject = new Map<string, number>()
 
-      // First add explicitly linked projects
+      // First add explicitly linked projects with their bill_rates
       contractProjectsData?.forEach((cp: any) => {
         projectIds.add(cp.project_id)
         const contract = contractsData.find((c: any) => c.id === cp.contract_id)
         if (contract) contractByProject.set(cp.project_id, contract)
+        if (cp.bill_rate) billRateByProject.set(cp.project_id, cp.bill_rate)
       })
 
       // Then add all projects for clients (if contract has client but no specific projects)
@@ -507,6 +509,7 @@ export default function TimesheetPage() {
 
       setAssignments((projectsData || []).map((p: any) => {
         const contract = contractByProject.get(p.id) || defaultContract
+        const billRate = billRateByProject.get(p.id) || 0
         return {
           id: `${p.id}-${contract?.id || 'default'}`,
           project_id: p.id,
@@ -514,7 +517,7 @@ export default function TimesheetPage() {
           client_name: p.client_id ? clientsMap[p.client_id] : 'Other',
           service: null,
           payment_type: contract?.contract_type === 'lump_sum' ? 'lump_sum' : 'tm',
-          rate: contract?.bill_rate || 0
+          rate: billRate
         }
       }))
     } catch (err) { console.error('Error:', err); setError('An unexpected error occurred.') }
