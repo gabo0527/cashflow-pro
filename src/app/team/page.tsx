@@ -75,7 +75,6 @@ interface Contract {
   name: string | null
   contract_type: 'tm' | 'lump_sum'
   cost_rate: number
-  bill_rate: number
   total_amount: number
   baseline_hours: number
   allocation_method: 'by_hours' | 'fixed'
@@ -96,6 +95,7 @@ interface ContractProject {
   project_id: string
   fixed_amount: number | null
   allocation_pct: number | null
+  bill_rate: number | null
   project_name?: string
 }
 
@@ -336,7 +336,7 @@ function MemberDetailFlyout({
 function ContractModal({
   isOpen, onClose, onSave, editingContract, teamMembers, projects, clients
 }: {
-  isOpen: boolean; onClose: () => void; onSave: (data: any, projectIds: string[], projectAmounts: Record<string, number>) => Promise<void>
+  isOpen: boolean; onClose: () => void; onSave: (data: any, projectIds: string[], projectAmounts: Record<string, number>, projectBillRates: Record<string, number>) => Promise<void>
   editingContract: Contract | null; teamMembers: TeamMember[]; projects: Project[]; clients: Client[]
 }) {
   const [form, setForm] = useState({
@@ -345,7 +345,6 @@ function ContractModal({
     name: '',
     contract_type: 'tm' as 'tm' | 'lump_sum',
     cost_rate: '',
-    bill_rate: '',
     total_amount: '',
     baseline_hours: '172',
     allocation_method: 'by_hours' as 'by_hours' | 'fixed',
@@ -356,6 +355,7 @@ function ContractModal({
   })
   const [selectedProjects, setSelectedProjects] = useState<string[]>([])
   const [projectAmounts, setProjectAmounts] = useState<Record<string, number>>({})
+  const [projectBillRates, setProjectBillRates] = useState<Record<string, number>>({})
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
@@ -366,7 +366,6 @@ function ContractModal({
         name: editingContract.name || '',
         contract_type: editingContract.contract_type,
         cost_rate: editingContract.cost_rate?.toString() || '',
-        bill_rate: editingContract.bill_rate?.toString() || '',
         total_amount: editingContract.total_amount?.toString() || '',
         baseline_hours: editingContract.baseline_hours?.toString() || '172',
         allocation_method: editingContract.allocation_method || 'by_hours',
@@ -378,18 +377,24 @@ function ContractModal({
       if (editingContract.projects) {
         setSelectedProjects(editingContract.projects.map(p => p.project_id))
         const amounts: Record<string, number> = {}
-        editingContract.projects.forEach(p => { if (p.fixed_amount) amounts[p.project_id] = p.fixed_amount })
+        const billRates: Record<string, number> = {}
+        editingContract.projects.forEach(p => { 
+          if (p.fixed_amount) amounts[p.project_id] = p.fixed_amount
+          if (p.bill_rate) billRates[p.project_id] = p.bill_rate
+        })
         setProjectAmounts(amounts)
+        setProjectBillRates(billRates)
       }
     } else {
       setForm({
         team_member_id: '', client_id: '', name: '', contract_type: 'tm',
-        cost_rate: '', bill_rate: '', total_amount: '', baseline_hours: '172',
+        cost_rate: '', total_amount: '', baseline_hours: '172',
         allocation_method: 'by_hours', period_type: 'monthly',
         start_date: '', end_date: '', is_default: false,
       })
       setSelectedProjects([])
       setProjectAmounts({})
+      setProjectBillRates({})
     }
   }, [editingContract, isOpen])
 
@@ -419,12 +424,11 @@ function ContractModal({
       await onSave({
         ...form,
         cost_rate: parseFloat(form.cost_rate) || 0,
-        bill_rate: parseFloat(form.bill_rate) || 0,
         total_amount: parseFloat(form.total_amount) || 0,
         baseline_hours: parseFloat(form.baseline_hours) || 172,
         client_id: form.client_id || null,
         is_active: true,
-      }, selectedProjects, projectAmounts)
+      }, selectedProjects, projectAmounts, projectBillRates)
       onClose()
     } finally {
       setIsSaving(false)
@@ -480,29 +484,11 @@ function ContractModal({
           {/* T&M Fields */}
           {form.contract_type === 'tm' && (
             <>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={`block text-xs ${THEME.textMuted} mb-1`}>Cost Rate ($/hr) *</label>
-                  <input type="number" value={form.cost_rate} onChange={e => setForm(p => ({ ...p, cost_rate: e.target.value }))}
-                    className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="150" />
-                  <p className={`text-xs ${THEME.textDim} mt-1`}>What you pay them</p>
-                </div>
-                <div>
-                  <label className={`block text-xs ${THEME.textMuted} mb-1`}>Bill Rate ($/hr)</label>
-                  <input type="number" value={form.bill_rate} onChange={e => setForm(p => ({ ...p, bill_rate: e.target.value }))}
-                    className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="250" />
-                  <p className={`text-xs ${THEME.textDim} mt-1`}>What client pays you</p>
-                </div>
+              <div>
+                <label className={`block text-xs ${THEME.textMuted} mb-1`}>Cost Rate ($/hr) * — What you pay them</label>
+                <input type="number" value={form.cost_rate} onChange={e => setForm(p => ({ ...p, cost_rate: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="150" />
               </div>
-
-              {form.cost_rate && form.bill_rate && (
-                <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                  <p className="text-sm text-emerald-400">
-                    Margin: <span className="font-semibold">${(parseFloat(form.bill_rate) - parseFloat(form.cost_rate)).toFixed(2)}/hr</span>
-                    <span className={`${THEME.textDim} ml-2`}>({((parseFloat(form.bill_rate) - parseFloat(form.cost_rate)) / parseFloat(form.bill_rate) * 100).toFixed(1)}%)</span>
-                  </p>
-                </div>
-              )}
 
               <div className="flex items-center">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -521,6 +507,48 @@ function ContractModal({
                     {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                   <p className={`text-xs ${THEME.textDim} mt-1`}>Leave empty for a general rate, or select to limit to one client</p>
+                </div>
+              )}
+
+              {/* Project Links for T&M */}
+              {!form.is_default && (
+                <div>
+                  <label className={`block text-xs ${THEME.textMuted} mb-2`}>Project Assignments — Bill Rates</label>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {filteredProjects.map(p => {
+                      const isSelected = selectedProjects.includes(p.id)
+                      return (
+                        <div key={p.id} className={`p-3 rounded-lg border transition-all ${isSelected ? 'bg-white/[0.05] border-emerald-500/30' : 'border-white/[0.08]'}`}>
+                          <div className="flex items-center gap-3">
+                            <input type="checkbox" checked={isSelected}
+                              onChange={e => {
+                                if (e.target.checked) setSelectedProjects(prev => [...prev, p.id])
+                                else {
+                                  setSelectedProjects(prev => prev.filter(id => id !== p.id))
+                                  setProjectBillRates(prev => { const n = { ...prev }; delete n[p.id]; return n })
+                                }
+                              }}
+                              className="w-4 h-4 rounded border-white/[0.2] bg-white/[0.05] text-emerald-500" />
+                            <div className="flex-1">
+                              <p className={`text-sm font-medium ${THEME.textPrimary}`}>{p.name}</p>
+                              <p className={`text-xs ${THEME.textDim}`}>{p.client_name}</p>
+                            </div>
+                            {isSelected && (
+                              <div className="w-28">
+                                <input type="number" placeholder="$/hr"
+                                  value={projectBillRates[p.id] || ''}
+                                  onChange={e => setProjectBillRates(prev => ({ ...prev, [p.id]: parseFloat(e.target.value) || 0 }))}
+                                  className="w-full px-2 py-1.5 bg-white/[0.05] border border-white/[0.08] rounded text-sm text-white text-right" />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {selectedProjects.length === 0 && (
+                    <p className={`text-xs ${THEME.textDim} mt-2`}>Select projects to assign this contractor and set bill rates</p>
+                  )}
                 </div>
               )}
             </>
@@ -556,24 +584,12 @@ function ContractModal({
                 </div>
               </div>
 
-              <div>
-                <label className={`block text-xs ${THEME.textMuted} mb-1`}>Bill Rate ($/hr) — What client pays</label>
-                <input type="number" value={form.bill_rate} onChange={e => setForm(p => ({ ...p, bill_rate: e.target.value }))}
-                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="240" />
-              </div>
-
               {effectiveRate && (
                 <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
                   <p className="text-sm text-blue-400">
                     Effective Cost Rate: <span className="font-semibold">${effectiveRate.toFixed(2)}/hr</span>
                     <span className={`${THEME.textDim} ml-2`}>({formatCurrency(parseFloat(form.total_amount))} ÷ {form.baseline_hours} hrs)</span>
                   </p>
-                  {form.bill_rate && (
-                    <p className="text-sm text-emerald-400 mt-1">
-                      Margin: <span className="font-semibold">${(parseFloat(form.bill_rate) - effectiveRate).toFixed(2)}/hr</span>
-                      <span className={`${THEME.textDim} ml-2`}>({((parseFloat(form.bill_rate) - effectiveRate) / parseFloat(form.bill_rate) * 100).toFixed(1)}%)</span>
-                    </p>
-                  )}
                 </div>
               )}
 
@@ -607,37 +623,54 @@ function ContractModal({
 
               {/* Project Links */}
               <div>
-                <label className={`block text-xs ${THEME.textMuted} mb-2`}>Linked Projects</label>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
+                <label className={`block text-xs ${THEME.textMuted} mb-2`}>Linked Projects — Assign Bill Rates</label>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
                   {filteredProjects.map(p => {
                     const isSelected = selectedProjects.includes(p.id)
                     return (
-                      <div key={p.id} className={`flex items-center gap-3 p-2 rounded-lg ${isSelected ? 'bg-white/[0.05]' : ''}`}>
-                        <input type="checkbox" checked={isSelected}
-                          onChange={e => {
-                            if (e.target.checked) setSelectedProjects(prev => [...prev, p.id])
-                            else {
-                              setSelectedProjects(prev => prev.filter(id => id !== p.id))
-                              setProjectAmounts(prev => { const n = { ...prev }; delete n[p.id]; return n })
-                            }
-                          }}
-                          className="w-4 h-4 rounded border-white/[0.2] bg-white/[0.05] text-emerald-500" />
-                        <div className="flex-1">
-                          <p className={`text-sm ${THEME.textPrimary}`}>{p.name}</p>
-                          <p className={`text-xs ${THEME.textDim}`}>{p.client_name}</p>
+                      <div key={p.id} className={`p-3 rounded-lg border transition-all ${isSelected ? 'bg-white/[0.05] border-emerald-500/30' : 'border-white/[0.08]'}`}>
+                        <div className="flex items-center gap-3">
+                          <input type="checkbox" checked={isSelected}
+                            onChange={e => {
+                              if (e.target.checked) setSelectedProjects(prev => [...prev, p.id])
+                              else {
+                                setSelectedProjects(prev => prev.filter(id => id !== p.id))
+                                setProjectAmounts(prev => { const n = { ...prev }; delete n[p.id]; return n })
+                                setProjectBillRates(prev => { const n = { ...prev }; delete n[p.id]; return n })
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-white/[0.2] bg-white/[0.05] text-emerald-500" />
+                          <div className="flex-1">
+                            <p className={`text-sm font-medium ${THEME.textPrimary}`}>{p.name}</p>
+                            <p className={`text-xs ${THEME.textDim}`}>{p.client_name}</p>
+                          </div>
                         </div>
-                        {isSelected && form.allocation_method === 'fixed' && (
-                          <input type="number" placeholder="$0"
-                            value={projectAmounts[p.id] || ''}
-                            onChange={e => setProjectAmounts(prev => ({ ...prev, [p.id]: parseFloat(e.target.value) || 0 }))}
-                            className="w-24 px-2 py-1 bg-white/[0.05] border border-white/[0.08] rounded text-sm text-white text-right" />
+                        {isSelected && (
+                          <div className="mt-3 pt-3 border-t border-white/[0.05] flex items-center gap-4">
+                            <div className="flex-1">
+                              <label className={`block text-xs ${THEME.textDim} mb-1`}>Bill Rate ($/hr)</label>
+                              <input type="number" placeholder="240"
+                                value={projectBillRates[p.id] || ''}
+                                onChange={e => setProjectBillRates(prev => ({ ...prev, [p.id]: parseFloat(e.target.value) || 0 }))}
+                                className="w-full px-2 py-1.5 bg-white/[0.05] border border-white/[0.08] rounded text-sm text-white" />
+                            </div>
+                            {form.allocation_method === 'fixed' && (
+                              <div className="flex-1">
+                                <label className={`block text-xs ${THEME.textDim} mb-1`}>Fixed Cost ($)</label>
+                                <input type="number" placeholder="0"
+                                  value={projectAmounts[p.id] || ''}
+                                  onChange={e => setProjectAmounts(prev => ({ ...prev, [p.id]: parseFloat(e.target.value) || 0 }))}
+                                  className="w-full px-2 py-1.5 bg-white/[0.05] border border-white/[0.08] rounded text-sm text-white" />
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     )
                   })}
                 </div>
                 {selectedProjects.length === 0 && (
-                  <p className={`text-xs ${THEME.textDim} mt-2`}>Select projects this contract covers (for cost allocation)</p>
+                  <p className={`text-xs ${THEME.textDim} mt-2`}>Select projects and assign bill rates for revenue tracking</p>
                 )}
               </div>
             </>
@@ -962,9 +995,15 @@ export default function TeamPage() {
           totalCost += scopeHours * c.cost_rate
         }
 
-        // Calculate revenue using bill_rate
-        if (c.bill_rate && c.bill_rate > 0) {
-          totalRevenue += scopeHours * c.bill_rate
+        // Calculate revenue using bill_rate from contract_projects
+        if (c.projects && c.projects.length > 0) {
+          c.projects.forEach(cp => {
+            const projectTime = memberTime.filter(t => t.project_id === cp.project_id)
+            const projectHours = projectTime.reduce((sum, t) => sum + (t.hours || 0), 0)
+            if (cp.bill_rate && cp.bill_rate > 0) {
+              totalRevenue += projectHours * cp.bill_rate
+            }
+          })
         }
       })
 
@@ -1005,7 +1044,7 @@ export default function TeamPage() {
     }
   }
 
-  const handleSaveContract = async (data: any, projectIds: string[], projectAmounts: Record<string, number>) => {
+  const handleSaveContract = async (data: any, projectIds: string[], projectAmounts: Record<string, number>, projectBillRates: Record<string, number>) => {
     if (!companyId) return
     try {
       const contractData = { company_id: companyId, ...data }
@@ -1021,6 +1060,7 @@ export default function TeamPage() {
             contract_id: editingContract.id,
             project_id: pid,
             fixed_amount: projectAmounts[pid] || null,
+            bill_rate: projectBillRates[pid] || null,
           }))
           await supabase.from('contract_projects').insert(projectLinks)
         }
@@ -1030,6 +1070,7 @@ export default function TeamPage() {
         const projectsEnriched = projectIds.map(pid => ({
           id: '', contract_id: editingContract.id, project_id: pid,
           fixed_amount: projectAmounts[pid] || null, allocation_pct: null,
+          bill_rate: projectBillRates[pid] || null,
           project_name: projects.find(p => p.id === pid)?.name,
         }))
 
@@ -1047,6 +1088,7 @@ export default function TeamPage() {
             contract_id: newContract.id,
             project_id: pid,
             fixed_amount: projectAmounts[pid] || null,
+            bill_rate: projectBillRates[pid] || null,
           }))
           await supabase.from('contract_projects').insert(projectLinks)
         }
@@ -1056,6 +1098,7 @@ export default function TeamPage() {
         const projectsEnriched = projectIds.map(pid => ({
           id: '', contract_id: newContract.id, project_id: pid,
           fixed_amount: projectAmounts[pid] || null, allocation_pct: null,
+          bill_rate: projectBillRates[pid] || null,
           project_name: projects.find(p => p.id === pid)?.name,
         }))
 
