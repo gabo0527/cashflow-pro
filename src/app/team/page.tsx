@@ -205,12 +205,16 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
                 {memberRates.map(r => {
                   const hasCustomCost = r.cost_amount > 0
                   const effCost = hasCustomCost ? (r.cost_type === "hourly" ? r.cost_amount : (r.baseline_hours > 0 ? r.cost_amount / r.baseline_hours : 0)) : 0
-                  const mg = hasCustomCost && r.rate > 0 ? ((r.rate - effCost) / r.rate * 100) : 0
+                  const isLumpRev = (r as any).revenue_type === "lump_sum"
+                  const revAmt = (r as any).revenue_amount || 0
+                  const mg = isLumpRev
+                    ? (hasCustomCost && revAmt > 0 ? ((revAmt - (r.cost_type === "hourly" ? r.cost_amount * (r.baseline_hours || 172) : r.cost_amount)) / revAmt * 100) : 0)
+                    : (hasCustomCost && r.rate > 0 ? ((r.rate - effCost) / r.rate * 100) : 0)
                   return (
                     <div key={r.id} className="p-3 rounded-lg bg-white/[0.03]">
                       <div className="flex items-center justify-between mb-1">
                         <p className={`text-sm font-medium ${THEME.textPrimary}`}>{r.client_name}</p>
-                        {hasCustomCost ? (
+                        {hasCustomCost || isLumpRev ? (
                           <span className={`text-xs font-medium px-2 py-0.5 rounded ${mg >= 20 ? "bg-emerald-500/10 text-emerald-400" : mg >= 0 ? "bg-amber-500/10 text-amber-400" : "bg-rose-500/10 text-rose-400"}`}>{mg.toFixed(0)}% GM</span>
                         ) : (
                           <span className="text-xs font-medium px-2 py-0.5 rounded bg-blue-500/10 text-blue-400">Distributed</span>
@@ -222,7 +226,7 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
                             ? (r.cost_type === "hourly" ? `$${r.cost_amount}/hr` : `${formatCurrency(r.cost_amount)}/mo (${r.baseline_hours}h)`)
                             : "From member total"}
                         </span>
-                        <span className="text-emerald-400">Bill: ${r.rate}/hr</span>
+                        <span className="text-emerald-400">{isLumpRev ? `Rev: ${formatCurrency(revAmt)}/mo` : `Bill: $${r.rate}/hr`}</span>
                       </div>
                     </div>
                   )
@@ -262,6 +266,8 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
     team_member_id: "", client_id: "", rate: "", notes: "",
     cost_type: "hourly" as "hourly" | "lump_sum", cost_amount: "", baseline_hours: "172",
     customCost: false,
+    revenue_type: "hourly" as "hourly" | "lump_sum",
+    revenue_amount: "",
   })
   const [isSaving, setIsSaving] = useState(false)
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set())
@@ -308,9 +314,11 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
         cost_amount: editingRate.cost_amount?.toString() || "",
         baseline_hours: editingRate.baseline_hours?.toString() || "172",
         customCost: hasCustomCost,
+        revenue_type: (editingRate as any).revenue_type || "hourly",
+        revenue_amount: (editingRate as any).revenue_amount?.toString() || "",
       })
     } else {
-      setForm({ team_member_id: "", client_id: "", rate: "", notes: "", cost_type: "hourly", cost_amount: "", baseline_hours: "172", customCost: false })
+      setForm({ team_member_id: "", client_id: "", rate: "", notes: "", cost_type: "hourly", cost_amount: "", baseline_hours: "172", customCost: false, revenue_type: "hourly", revenue_amount: "" })
     }
   }, [editingRate, isOpen])
 
@@ -323,7 +331,13 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
   const baseHrs = parseFloat(form.baseline_hours) || 172
   const effCostRate = form.customCost ? (form.cost_type === "hourly" ? costAmt : (baseHrs > 0 ? costAmt / baseHrs : 0)) : 0
   const billRate = parseFloat(form.rate) || 0
-  const margin = billRate > 0 && effCostRate > 0 ? ((billRate - effCostRate) / billRate * 100) : 0
+  const revenueAmount = parseFloat(form.revenue_amount) || 0
+  const isLumpRevenue = form.revenue_type === "lump_sum"
+  const monthlyRevenue = isLumpRevenue ? revenueAmount : 0
+  const monthlyCost = form.customCost ? (form.cost_type === "hourly" ? costAmt * baseHrs : costAmt) : 0
+  const margin = isLumpRevenue
+    ? (monthlyRevenue > 0 && monthlyCost > 0 ? ((monthlyRevenue - monthlyCost) / monthlyRevenue * 100) : 0)
+    : (billRate > 0 && effCostRate > 0 ? ((billRate - effCostRate) / billRate * 100) : 0)
 
   const handleSave = async () => {
     if (!form.team_member_id || !form.client_id || !form.rate) return
@@ -331,10 +345,13 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
     try {
       await onSave({
         team_member_id: form.team_member_id, client_id: form.client_id,
-        rate: parseFloat(form.rate) || 0, is_active: true, notes: form.notes || null,
+        rate: form.revenue_type === "hourly" ? (parseFloat(form.rate) || 0) : 0,
+        is_active: true, notes: form.notes || null,
         cost_type: form.customCost ? form.cost_type : "hourly",
         cost_amount: form.customCost ? (parseFloat(form.cost_amount) || 0) : 0,
         baseline_hours: form.customCost ? (parseFloat(form.baseline_hours) || 172) : 172,
+        revenue_type: form.revenue_type,
+        revenue_amount: form.revenue_type === "lump_sum" ? (parseFloat(form.revenue_amount) || 0) : 0,
       })
 
       // Save project assignments
@@ -479,29 +496,63 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
           </div>
 
           <div className="p-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
-            <p className="text-xs font-semibold text-emerald-400 mb-3">REVENUE SIDE &mdash; What You Charge</p>
-            <div>
-              <label className={`block text-xs ${THEME.textDim} mb-1`}>Bill Rate ($/hr) *</label>
-              <input type="number" value={form.rate} onChange={e => setForm(p=>({...p,rate:e.target.value}))}
-                className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="112" />
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-emerald-400">REVENUE SIDE &mdash; What You Charge</p>
+              <button type="button" onClick={() => setForm(p => ({ ...p, revenue_type: p.revenue_type === "hourly" ? "lump_sum" : "hourly" }))}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                  form.revenue_type === "lump_sum" ? "border-emerald-500 bg-emerald-500/20 text-emerald-400" : "border-white/[0.08] text-slate-400 hover:text-white"
+                }`}>
+                {form.revenue_type === "lump_sum" ? "Lump Sum (fixed monthly)" : "Hourly (T&M)"}
+              </button>
             </div>
+            {form.revenue_type === "hourly" ? (
+              <div>
+                <label className={`block text-xs ${THEME.textDim} mb-1`}>Bill Rate ($/hr) *</label>
+                <input type="number" value={form.rate} onChange={e => setForm(p=>({...p,rate:e.target.value}))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="112" />
+              </div>
+            ) : (
+              <div>
+                <label className={`block text-xs ${THEME.textDim} mb-1`}>Monthly Revenue Amount ($/mo) *</label>
+                <input type="number" value={form.revenue_amount} onChange={e => setForm(p=>({...p,revenue_amount:e.target.value}))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="6000" />
+                {revenueAmount > 0 && (
+                  <p className={`text-xs ${THEME.textDim} mt-2`}>Fixed {formatCurrency(revenueAmount)}/mo &mdash; no timesheet required for revenue</p>
+                )}
+              </div>
+            )}
           </div>
 
-          {form.customCost && effCostRate > 0 && billRate > 0 && (
+          {form.customCost && ((isLumpRevenue ? monthlyCost > 0 && monthlyRevenue > 0 : effCostRate > 0 && billRate > 0)) && (
             <div className={`p-4 rounded-lg border ${margin >= 20 ? "bg-emerald-500/10 border-emerald-500/20" : margin >= 0 ? "bg-amber-500/10 border-amber-500/20" : "bg-rose-500/10 border-rose-500/20"}`}>
-              <div className="flex justify-between text-sm"><span className={THEME.textSecondary}>Eff. Cost</span><span className="text-orange-400">${effCostRate.toFixed(2)}/hr</span></div>
-              <div className="flex justify-between text-sm mt-1"><span className={THEME.textSecondary}>Bill Rate</span><span className="text-emerald-400">${billRate.toFixed(2)}/hr</span></div>
-              <div className={`flex justify-between text-sm mt-2 pt-2 border-t ${THEME.glassBorder}`}>
-                <span className="font-medium text-white">Gross Margin</span>
-                <span className={`font-semibold ${margin >= 20 ? "text-emerald-400" : margin >= 0 ? "text-amber-400" : "text-rose-400"}`}>
-                  {margin.toFixed(1)}% (${(billRate - effCostRate).toFixed(2)}/hr)
-                </span>
-              </div>
+              {isLumpRevenue ? (
+                <>
+                  <div className="flex justify-between text-sm"><span className={THEME.textSecondary}>Monthly Cost</span><span className="text-orange-400">{formatCurrency(monthlyCost)}/mo</span></div>
+                  <div className="flex justify-between text-sm mt-1"><span className={THEME.textSecondary}>Monthly Revenue</span><span className="text-emerald-400">{formatCurrency(monthlyRevenue)}/mo</span></div>
+                  <div className={`flex justify-between text-sm mt-2 pt-2 border-t ${THEME.glassBorder}`}>
+                    <span className="font-medium text-white">Gross Margin</span>
+                    <span className={`font-semibold ${margin >= 20 ? "text-emerald-400" : margin >= 0 ? "text-amber-400" : "text-rose-400"}`}>
+                      {margin.toFixed(1)}% ({formatCurrency(monthlyRevenue - monthlyCost)}/mo)
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between text-sm"><span className={THEME.textSecondary}>Eff. Cost</span><span className="text-orange-400">${effCostRate.toFixed(2)}/hr</span></div>
+                  <div className="flex justify-between text-sm mt-1"><span className={THEME.textSecondary}>Bill Rate</span><span className="text-emerald-400">${billRate.toFixed(2)}/hr</span></div>
+                  <div className={`flex justify-between text-sm mt-2 pt-2 border-t ${THEME.glassBorder}`}>
+                    <span className="font-medium text-white">Gross Margin</span>
+                    <span className={`font-semibold ${margin >= 20 ? "text-emerald-400" : margin >= 0 ? "text-amber-400" : "text-rose-400"}`}>
+                      {margin.toFixed(1)}% (${(billRate - effCostRate).toFixed(2)}/hr)
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           )}
-          {!form.customCost && billRate > 0 && (
+          {!form.customCost && (billRate > 0 || revenueAmount > 0) && (
             <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-              <p className={`text-xs ${THEME.textSecondary}`}>Margin will be calculated from timesheet hours &mdash; member total cost distributed across clients by % of hours worked.</p>
+              <p className={`text-xs ${THEME.textSecondary}`}>Margin will be calculated from {isLumpRevenue ? "fixed monthly revenue" : "timesheet hours"} &mdash; member total cost distributed across clients by % of hours worked.</p>
             </div>
           )}
 
@@ -513,7 +564,7 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
         </div>
         <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
           <button onClick={onClose} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white`}>Cancel</button>
-          <button onClick={handleSave} disabled={!form.team_member_id||!form.client_id||!form.rate||isSaving}
+          <button onClick={handleSave} disabled={!form.team_member_id||!form.client_id||(form.revenue_type === "hourly" ? !form.rate : !form.revenue_amount)||isSaving}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50">
             {isSaving && <RefreshCw size={14} className="animate-spin" />}{editingRate ? "Save Changes" : "Add Rate"}
           </button>
@@ -1016,6 +1067,7 @@ export default function TeamPage() {
         const { error } = await supabase.from("bill_rates").update({
           rate: data.rate, notes: data.notes,
           cost_type: data.cost_type, cost_amount: data.cost_amount, baseline_hours: data.baseline_hours,
+          revenue_type: data.revenue_type, revenue_amount: data.revenue_amount,
         }).eq("id", editingRate.id)
         if (error) throw error
         setBillRates(prev => prev.map(r => r.id === editingRate.id ? { ...r, ...data, team_member_name: memberName, client_name: clientName } : r))
@@ -1252,7 +1304,7 @@ export default function TeamPage() {
                   <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Team Member</th>
                   <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Client</th>
                   <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Cost</th>
-                  <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Bill Rate</th>
+                  <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Revenue</th>
                   <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Margin</th>
                   <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium w-20`}>Actions</th>
                 </tr>
@@ -1261,8 +1313,12 @@ export default function TeamPage() {
                 {billRates.filter(r => r.is_active).map(r => {
                   const hasCustomCost = r.cost_amount > 0
                   const effCost = hasCustomCost ? (r.cost_type === "hourly" ? r.cost_amount : (r.baseline_hours > 0 ? r.cost_amount / r.baseline_hours : 0)) : 0
-                  const margin = hasCustomCost && r.rate > 0 ? ((r.rate - effCost) / r.rate * 100) : 0
-                  const spread = hasCustomCost ? r.rate - effCost : 0
+                  const isLumpRev = (r as any).revenue_type === "lump_sum"
+                  const revAmt = (r as any).revenue_amount || 0
+                  const margin = isLumpRev
+                    ? (hasCustomCost && revAmt > 0 ? ((revAmt - (r.cost_type === "hourly" ? r.cost_amount * (r.baseline_hours || 172) : r.cost_amount)) / revAmt * 100) : 0)
+                    : (hasCustomCost && r.rate > 0 ? ((r.rate - effCost) / r.rate * 100) : 0)
+                  const spread = isLumpRev ? 0 : (hasCustomCost ? r.rate - effCost : 0)
                   const member = teamMembers.find(m => m.id === r.team_member_id)
                   return (
                     <tr key={r.id} className="border-b border-white/[0.05] hover:bg-white/[0.03]">
@@ -1283,12 +1339,21 @@ export default function TeamPage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right"><span className="text-emerald-400 font-medium">${r.rate}/hr</span></td>
                       <td className="px-4 py-3 text-right">
-                        {hasCustomCost ? (
+                        {isLumpRev ? (
+                          <>
+                            <span className="text-emerald-400 font-medium">{formatCurrency(revAmt)}/mo</span>
+                            <p className={`text-xs ${THEME.textDim}`}>Lump Sum</p>
+                          </>
+                        ) : (
+                          <span className="text-emerald-400 font-medium">${r.rate}/hr</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {(hasCustomCost || isLumpRev) && margin !== 0 ? (
                           <>
                             <span className={`font-medium ${margin >= 20 ? "text-emerald-400" : margin >= 0 ? "text-amber-400" : "text-rose-400"}`}>{margin.toFixed(0)}%</span>
-                            <p className={`text-xs ${spread >= 0 ? "text-emerald-400/60" : "text-rose-400/60"}`}>${spread.toFixed(2)}/hr</p>
+                            {!isLumpRev && <p className={`text-xs ${spread >= 0 ? "text-emerald-400/60" : "text-rose-400/60"}`}>${spread.toFixed(2)}/hr</p>}
                           </>
                         ) : (
                           <span className={`text-xs ${THEME.textDim}`}>By hours</span>
