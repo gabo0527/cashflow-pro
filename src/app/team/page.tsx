@@ -932,7 +932,7 @@ export default function TeamPage() {
 
         setContracts((contractsRes.data || []).map(c => {
           const linkedProjects = contractProjectsByContract[c.id] || []
-          const maxBillRate = linkedProjects.reduce((max, p) => (p.bill_rate && p.bill_rate > (max || 0)) ? p.bill_rate : max, null as number | null)
+          const maxBillRate = linkedProjects.reduce<number | null>((max, p) => (p.bill_rate && p.bill_rate > (max || 0)) ? p.bill_rate : max, null)
           return {
             ...c,
             team_member_name: memberMap.get(c.team_member_id) || 'Unknown',
@@ -1082,7 +1082,7 @@ export default function TeamPage() {
 
         setContracts(prev => prev.map(c => c.id === editingContract.id ? {
           ...c, ...contractData, team_member_name: memberName, client_name: clientName, projects: projectsEnriched,
-          bill_rate: projectsEnriched.reduce((max, p) => (p.bill_rate && p.bill_rate > (max || 0)) ? p.bill_rate : max, null as number | null),
+          bill_rate: projectsEnriched.reduce<number | null>((max, p) => (p.bill_rate && p.bill_rate > (max || 0)) ? p.bill_rate : max, null),
         } : c))
         addToast('success', 'Contract updated')
       } else {
@@ -1111,7 +1111,7 @@ export default function TeamPage() {
 
         setContracts(prev => [...prev, {
           ...newContract, team_member_name: memberName, client_name: clientName, projects: projectsEnriched,
-          bill_rate: projectsEnriched.reduce((max, p) => (p.bill_rate && p.bill_rate > (max || 0)) ? p.bill_rate : max, null as number | null),
+          bill_rate: projectsEnriched.reduce<number | null>((max, p) => (p.bill_rate && p.bill_rate > (max || 0)) ? p.bill_rate : max, null),
         }])
         addToast('success', 'Contract created')
       }
