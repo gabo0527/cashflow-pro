@@ -87,6 +87,7 @@ interface Contract {
   team_member_name?: string
   client_name?: string
   projects?: ContractProject[]
+  bill_rate?: number | null
 }
 
 interface ContractProject {
@@ -929,12 +930,17 @@ export default function TeamPage() {
           return acc
         }, {} as Record<string, ContractProject[]>)
 
-        setContracts((contractsRes.data || []).map(c => ({
-          ...c,
-          team_member_name: memberMap.get(c.team_member_id) || 'Unknown',
-          client_name: clientMap.get(c.client_id) || '',
-          projects: contractProjectsByContract[c.id] || [],
-        })))
+        setContracts((contractsRes.data || []).map(c => {
+          const linkedProjects = contractProjectsByContract[c.id] || []
+          const maxBillRate = linkedProjects.reduce((max, p) => (p.bill_rate && p.bill_rate > (max || 0)) ? p.bill_rate : max, null as number | null)
+          return {
+            ...c,
+            team_member_name: memberMap.get(c.team_member_id) || 'Unknown',
+            client_name: clientMap.get(c.client_id) || '',
+            projects: linkedProjects,
+            bill_rate: maxBillRate,
+          }
+        }))
 
         setTimeEntries(timeRes.data || [])
       } catch (error) {
@@ -1075,7 +1081,8 @@ export default function TeamPage() {
         }))
 
         setContracts(prev => prev.map(c => c.id === editingContract.id ? {
-          ...c, ...contractData, team_member_name: memberName, client_name: clientName, projects: projectsEnriched
+          ...c, ...contractData, team_member_name: memberName, client_name: clientName, projects: projectsEnriched,
+          bill_rate: projectsEnriched.reduce((max, p) => (p.bill_rate && p.bill_rate > (max || 0)) ? p.bill_rate : max, null as number | null),
         } : c))
         addToast('success', 'Contract updated')
       } else {
@@ -1102,7 +1109,10 @@ export default function TeamPage() {
           project_name: projects.find(p => p.id === pid)?.name,
         }))
 
-        setContracts(prev => [...prev, { ...newContract, team_member_name: memberName, client_name: clientName, projects: projectsEnriched }])
+        setContracts(prev => [...prev, {
+          ...newContract, team_member_name: memberName, client_name: clientName, projects: projectsEnriched,
+          bill_rate: projectsEnriched.reduce((max, p) => (p.bill_rate && p.bill_rate > (max || 0)) ? p.bill_rate : max, null as number | null),
+        }])
         addToast('success', 'Contract created')
       }
       setEditingContract(null)
