@@ -548,10 +548,11 @@ export default function TeamPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const user = await getCurrentUser()
-        if (!user) return
+        const result = await getCurrentUser()
+        const user = result?.user
+        if (!user) { setLoading(false); return }
         const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
-        if (!profile?.company_id) return
+        if (!profile?.company_id) { setLoading(false); return }
         setCompanyId(profile.company_id)
 
         const [membersRes, clientsRes, projectsRes, billRatesRes, costOverridesRes, timeRes] = await Promise.all([
