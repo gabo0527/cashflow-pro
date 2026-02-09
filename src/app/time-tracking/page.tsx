@@ -73,85 +73,7 @@ interface ProjectAssignment {
 
 // ============ COST UTILITIES ============
 const normalizeCostType = (t: string) => (t || '').toLowerCase().replace(/\s+/g, '_')
-
-/**
- * Fixed-cost adjustment: For lump sum cost members, recalculates cost_rate
- * based on actual hours in the period so that hours × cost_rate = true monthly cost.
- * 
- * Two scenarios:
- * 1) Rate-card-level lump sum: each client has its own fixed monthly cost
- * 2) Member-level lump sum (Distributed): one monthly cost split across all clients by % of hours
- */
-function adjustEntriesForFixedCosts(
-  periodEntries: TimeEntry[],
-  teamMembers: TeamMember[],
-  billRates: any[],
-  dateStart: string,
-  dateEnd: string
-): TimeEntry[] {
-  if (periodEntries.length === 0) return periodEntries
-
-  // Calculate months in period
-  const startD = new Date(dateStart)
-  const endD = new Date(dateEnd)
-  const monthsInPeriod = Math.max(1,
-    (endD.getFullYear() - startD.getFullYear()) * 12 + (endD.getMonth() - startD.getMonth()) + 1
-  )
-
-  // Step 1: Classify each entry's cost source
-  type CostMeta = TimeEntry & { _fixedSource: 'none' | 'rate_card' | 'member'; _fixedMonthly: number }
-  
-  const classified: CostMeta[] = periodEntries.map(entry => {
-    const rateCard = billRates.find((r: any) => r.is_active && r.team_member_id === entry.team_member_id && r.client_id === entry.client_id)
-    const member = teamMembers.find(m => m.id === entry.team_member_id)
-
-    // Check if rate card specifies its own lump sum cost
-    if (rateCard && rateCard.cost_amount > 0 && normalizeCostType(rateCard.cost_type) === 'lump_sum') {
-      return { ...entry, _fixedSource: 'rate_card', _fixedMonthly: rateCard.cost_amount }
-    }
-    // Check if member default is lump sum (and rate card didn't override)
-    if (member && member.cost_amount && member.cost_amount > 0) {
-      const mct = normalizeCostType(member.cost_type || '')
-      if (mct === 'lump_sum' || mct === 'lump sum') {
-        // Only applies if the rate card didn't set its own cost (Distributed)
-        if (!rateCard || !rateCard.cost_amount || rateCard.cost_amount === 0) {
-          return { ...entry, _fixedSource: 'member', _fixedMonthly: member.cost_amount }
-        }
-      }
-    }
-    return { ...entry, _fixedSource: 'none', _fixedMonthly: 0 }
-  })
-
-  // Step 2: Aggregate hours for rate-card-level fixed costs (per member+client)
-  const rcFixed = new Map<string, { totalHours: number; monthlyCost: number }>()
-  classified.filter(e => e._fixedSource === 'rate_card').forEach(e => {
-    const key = `${e.team_member_id}_${e.client_id}`
-    if (!rcFixed.has(key)) rcFixed.set(key, { totalHours: 0, monthlyCost: e._fixedMonthly })
-    rcFixed.get(key)!.totalHours += e.hours
-  })
-
-  // Step 3: Aggregate hours for member-level fixed costs (across all distributed clients)
-  const memFixed = new Map<string, { totalHours: number; monthlyCost: number }>()
-  classified.filter(e => e._fixedSource === 'member').forEach(e => {
-    if (!memFixed.has(e.team_member_id)) memFixed.set(e.team_member_id, { totalHours: 0, monthlyCost: e._fixedMonthly })
-    memFixed.get(e.team_member_id)!.totalHours += e.hours
-  })
-
-  // Step 4: Recalculate cost_rate so (hours × cost_rate) = correct distributed cost
-  return classified.map(e => {
-    if (e._fixedSource === 'rate_card') {
-      const data = rcFixed.get(`${e.team_member_id}_${e.client_id}`)!
-      const totalCost = data.monthlyCost * monthsInPeriod
-      return { ...e, cost_rate: data.totalHours > 0 ? totalCost / data.totalHours : 0 }
-    }
-    if (e._fixedSource === 'member') {
-      const data = memFixed.get(e.team_member_id)!
-      const totalCost = data.monthlyCost * monthsInPeriod
-      return { ...e, cost_rate: data.totalHours > 0 ? totalCost / data.totalHours : 0 }
-    }
-    return e // hourly — no adjustment needed
-  })
-}
+const STANDARD_MONTHLY_HOURS = 172 // Standard full-time hours for effective hourly conversion
 
 // ============ CONSTANTS ============
 type DatePreset = 'this_week' | 'last_week' | 'mtd' | 'last_month' | 'qtd' | 'ytd' | 'custom'
@@ -485,14 +407,15 @@ export default function TimeTrackingPage() {
           // COST RATE (two-tier model):
           // Tier 1: Rate card has custom cost (cost_amount > 0) → use it
           // Tier 2: Fall back to team member default cost
+          // For lump sum costs: effective hourly = monthly / 172 (standard full-time hours)
           let costRate = 0
           
           if (rateCard && rateCard.cost_amount > 0) {
             if (normalizeCostType(rateCard.cost_type) === 'hourly') {
               costRate = rateCard.cost_amount
             } else {
-              // Lump sum: effective hourly = cost_amount / baseline_hours
-              costRate = rateCard.baseline_hours > 0 ? rateCard.cost_amount / rateCard.baseline_hours : 0
+              // Lump sum at rate card level: effective hourly = cost / standard hours
+              costRate = rateCard.cost_amount / STANDARD_MONTHLY_HOURS
             }
           } else if (teamMember) {
             // Tier 2: team member default
@@ -500,8 +423,8 @@ export default function TimeTrackingPage() {
             if (memberCostType === 'hourly') {
               costRate = teamMember.cost_amount || 0
             } else if ((memberCostType === 'lump_sum' || memberCostType === 'lump sum') && teamMember.cost_amount > 0) {
-              // Effective hourly from lump sum (use 172 as default baseline)
-              costRate = teamMember.cost_amount / (teamMember.baseline_hours || 172)
+              // Effective hourly from lump sum: always use standard 172 hours
+              costRate = teamMember.cost_amount / STANDARD_MONTHLY_HOURS
             }
           }
           // Final fallback: assignment rate
@@ -555,33 +478,20 @@ export default function TimeTrackingPage() {
     return true
   }), [entries, priorPeriod, selectedClient, selectedEmployee, selectedProject])
 
-  // ============ FIXED-COST ADJUSTMENT ============
-  // For lump sum cost members (like Travis at $25K/mo), recalculate cost_rate
-  // so that their FULL monthly cost is distributed by % of hours worked.
-  // This replaces the incorrect "effective hourly" approach.
-  const costAdjustedEntries = useMemo(() => 
-    adjustEntriesForFixedCosts(filteredEntries, teamMembers, billRates, dateRange.start, dateRange.end),
-    [filteredEntries, teamMembers, billRates, dateRange]
-  )
-  const costAdjustedPriorEntries = useMemo(() => 
-    adjustEntriesForFixedCosts(priorPeriodEntries, teamMembers, billRates, priorPeriod.start, priorPeriod.end),
-    [priorPeriodEntries, teamMembers, billRates, priorPeriod]
-  )
-
   // ============ KPIs — DUAL LAYER ============
   const kpis = useMemo(() => {
-    const totalActualHours = costAdjustedEntries.reduce((sum, e) => sum + e.hours, 0)
-    const totalBillableHours = costAdjustedEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours : 0), 0)
-    const totalCost = costAdjustedEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0)
-    const totalRevenue = costAdjustedEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours * e.bill_rate : 0), 0)
+    const totalActualHours = filteredEntries.reduce((sum, e) => sum + e.hours, 0)
+    const totalBillableHours = filteredEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours : 0), 0)
+    const totalCost = filteredEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0)
+    const totalRevenue = filteredEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours * e.bill_rate : 0), 0)
     const grossMargin = totalRevenue - totalCost
     const marginPct = totalRevenue > 0 ? (grossMargin / totalRevenue) * 100 : 0
     const avgBillRate = totalBillableHours > 0 ? totalRevenue / totalBillableHours : 0
     const avgCostRate = totalActualHours > 0 ? totalCost / totalActualHours : 0
 
-    const priorHours = costAdjustedPriorEntries.reduce((sum, e) => sum + e.hours, 0)
-    const priorRevenue = costAdjustedPriorEntries.reduce((sum, e) => sum + (e.is_billable ? (e.billable_hours || e.hours) * e.bill_rate : 0), 0)
-    const priorCost = costAdjustedPriorEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0)
+    const priorHours = priorPeriodEntries.reduce((sum, e) => sum + e.hours, 0)
+    const priorRevenue = priorPeriodEntries.reduce((sum, e) => sum + (e.is_billable ? (e.billable_hours || e.hours) * e.bill_rate : 0), 0)
+    const priorCost = priorPeriodEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0)
     
     const activeMembers = teamMembers.filter(m => m.status === 'active')
     const totalCapacity = activeMembers.length * 160
@@ -591,8 +501,8 @@ export default function TimeTrackingPage() {
     const revenueTrend = priorRevenue > 0 ? ((totalRevenue - priorRevenue) / priorRevenue) * 100 : 0
     const costTrend = priorCost > 0 ? ((totalCost - priorCost) / priorCost) * 100 : 0
 
-    return { totalActualHours, totalBillableHours, totalCost, totalRevenue, grossMargin, marginPct, avgBillRate, avgCostRate, utilization, hoursTrend, revenueTrend, costTrend, uniqueClients: new Set(costAdjustedEntries.map(e => e.client_id).filter(Boolean)).size }
-  }, [costAdjustedEntries, costAdjustedPriorEntries, teamMembers])
+    return { totalActualHours, totalBillableHours, totalCost, totalRevenue, grossMargin, marginPct, avgBillRate, avgCostRate, utilization, hoursTrend, revenueTrend, costTrend, uniqueClients: new Set(filteredEntries.map(e => e.client_id).filter(Boolean)).size }
+  }, [filteredEntries, priorPeriodEntries, teamMembers])
 
   const weekColumns = useMemo(() => getWeekColumns(dateRange.start, dateRange.end), [dateRange])
 
@@ -602,7 +512,7 @@ export default function TimeTrackingPage() {
       projects: Record<string, { id: string; name: string; members: Record<string, { id: string; name: string; billRate: number; costRate: number; weekActualHours: Record<string, number>; weekBillableHours: Record<string, number>; totalActualHours: number; totalBillableHours: number; totalCost: number; totalRevenue: number; weekEntries: Record<string, { id: string; hours: number; billable_hours: number }[]> }>; totalActualHours: number; totalBillableHours: number; totalCost: number; totalRevenue: number }>
     }> = {}
 
-    costAdjustedEntries.forEach(entry => {
+    filteredEntries.forEach(entry => {
       const clientId = entry.client_id || 'unassigned'
       const clientName = entry.client_name || 'Unassigned'
       if (!clientData[clientId]) clientData[clientId] = { id: clientId, name: clientName, totalActualHours: 0, totalBillableHours: 0, totalCost: 0, totalRevenue: 0, projects: {} }
@@ -640,12 +550,12 @@ export default function TimeTrackingPage() {
       })
     })
     return Object.values(clientData).sort((a, b) => b.totalRevenue - a.totalRevenue)
-  }, [costAdjustedEntries, weekColumns])
+  }, [filteredEntries, weekColumns])
 
   // ============ BY EMPLOYEE DATA ============
   const dataByEmployee = useMemo(() => {
     const employeeData: Record<string, { id: string; name: string; empType: string; totalActualHours: number; totalBillableHours: number; totalCost: number; totalRevenue: number; clients: Record<string, { name: string; actualHours: number; billableHours: number; cost: number; revenue: number }> }> = {}
-    costAdjustedEntries.forEach(entry => {
+    filteredEntries.forEach(entry => {
       if (!employeeData[entry.team_member_id]) {
         const member = teamMembers.find(m => m.id === entry.team_member_id)
         employeeData[entry.team_member_id] = { id: entry.team_member_id, name: entry.team_member_name, empType: member?.employment_type || 'contractor', totalActualHours: 0, totalBillableHours: 0, totalCost: 0, totalRevenue: 0, clients: {} }
@@ -659,24 +569,24 @@ export default function TimeTrackingPage() {
       emp.clients[clientKey].cost += entry.hours * entry.cost_rate; emp.clients[clientKey].revenue += entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
     })
     return Object.values(employeeData).sort((a, b) => b.totalActualHours - a.totalActualHours)
-  }, [costAdjustedEntries, teamMembers])
+  }, [filteredEntries, teamMembers])
 
   // ============ PROFITABILITY DATA ============
   const profitabilityByProject = useMemo(() => {
     const projectData: Record<string, { id: string; name: string; clientName: string; actualHours: number; billableHours: number; cost: number; revenue: number; margin: number; marginPct: number }> = {}
-    costAdjustedEntries.forEach(entry => {
+    filteredEntries.forEach(entry => {
       if (!projectData[entry.project_id]) projectData[entry.project_id] = { id: entry.project_id, name: entry.project_name, clientName: entry.client_name, actualHours: 0, billableHours: 0, cost: 0, revenue: 0, margin: 0, marginPct: 0 }
       const p = projectData[entry.project_id]
       p.actualHours += entry.hours; p.billableHours += entry.billable_hours
       p.cost += entry.hours * entry.cost_rate; p.revenue += entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
     })
     return Object.values(projectData).map(p => ({ ...p, margin: p.revenue - p.cost, marginPct: p.revenue > 0 ? ((p.revenue - p.cost) / p.revenue) * 100 : 0 })).sort((a, b) => b.margin - a.margin)
-  }, [costAdjustedEntries])
+  }, [filteredEntries])
 
   const revenueByClientData = useMemo(() => dataByClient.map((c, i) => ({ name: c.name, value: c.totalRevenue, fill: CHART_COLORS[i % CHART_COLORS.length] })), [dataByClient])
 
   const weeklyTrendData = useMemo(() => weekColumns.map(week => {
-    const weekEntries = costAdjustedEntries.filter(e => {
+    const weekEntries = filteredEntries.filter(e => {
       const entryDate = new Date(e.date); const weekStart = new Date(week.start); const weekEnd = new Date(week.end); weekEnd.setHours(23, 59, 59)
       return entryDate >= weekStart && entryDate <= weekEnd
     })
@@ -687,7 +597,7 @@ export default function TimeTrackingPage() {
       cost: weekEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0),
       revenue: weekEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours * e.bill_rate : 0), 0),
     }
-  }), [weekColumns, costAdjustedEntries])
+  }), [weekColumns, filteredEntries])
 
   // ============ ACTIONS ============
   const saveNewEntry = async () => {
@@ -702,16 +612,16 @@ export default function TimeTrackingPage() {
       const rateCard = billRates.find(r => r.team_member_id === formData.team_member_id && r.client_id === clientId && r.is_active)
       const billRate = rateCard?.rate || assignment?.bill_rate || project?.bill_rate || 0
       
-      // Cost rate (two-tier)
+      // Cost rate (two-tier) — lump sum uses standard 172h for effective hourly
       const normCostType = (t: string) => (t || '').toLowerCase().replace(/\s+/g, '_')
       let costRate = 0
       if (rateCard && rateCard.cost_amount > 0) {
-        costRate = normCostType(rateCard.cost_type) === 'hourly' ? rateCard.cost_amount : (rateCard.baseline_hours > 0 ? rateCard.cost_amount / rateCard.baseline_hours : 0)
+        costRate = normCostType(rateCard.cost_type) === 'hourly' ? rateCard.cost_amount : rateCard.cost_amount / STANDARD_MONTHLY_HOURS
       } else if (teamMember) {
         const tm = teamMembers.find(t => t.id === formData.team_member_id) as any
         const tmType = normCostType(tm?.cost_type)
         if (tmType === 'hourly') costRate = tm.cost_amount || 0
-        else if ((tmType === 'lump_sum' || tmType === 'lump sum') && tm?.cost_amount > 0) costRate = tm.cost_amount / (tm.baseline_hours || 172)
+        else if ((tmType === 'lump_sum' || tmType === 'lump sum') && tm?.cost_amount > 0) costRate = tm.cost_amount / STANDARD_MONTHLY_HOURS
       }
       if (costRate === 0) costRate = assignment?.rate || 0
       const hours = parseFloat(formData.hours)
@@ -765,7 +675,7 @@ export default function TimeTrackingPage() {
 
   const exportToCSV = () => {
     const headers = ['Date', 'Employee', 'Client', 'Project', 'Actual Hours', 'Billable Hours', 'Cost Rate', 'Bill Rate', 'Cost', 'Revenue', 'Margin', 'Notes']
-    const rows = costAdjustedEntries.map(e => [
+    const rows = filteredEntries.map(e => [
       e.date, e.team_member_name, e.client_name, e.project_name, e.hours, e.billable_hours,
       e.cost_rate, e.bill_rate, (e.hours * e.cost_rate).toFixed(2), (e.billable_hours * e.bill_rate).toFixed(2),
       ((e.billable_hours * e.bill_rate) - (e.hours * e.cost_rate)).toFixed(2), e.notes || ''
@@ -928,9 +838,9 @@ export default function TimeTrackingPage() {
 
           <CollapsibleSection title="Hours by Project" icon={<Briefcase size={16} />}>
             <div className="h-64">
-              {costAdjustedEntries.length > 0 ? (
+              {filteredEntries.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={Object.values(costAdjustedEntries.reduce((acc, e) => { if (!acc[e.project_id]) acc[e.project_id] = { name: e.project_name.substring(0, 15), hours: 0 }; acc[e.project_id].hours += e.hours; return acc }, {} as Record<string, { name: string; hours: number }>)).sort((a, b) => b.hours - a.hours).slice(0, 8)} layout="vertical">
+                  <BarChart data={Object.values(filteredEntries.reduce((acc, e) => { if (!acc[e.project_id]) acc[e.project_id] = { name: e.project_name.substring(0, 15), hours: 0 }; acc[e.project_id].hours += e.hours; return acc }, {} as Record<string, { name: string; hours: number }>)).sort((a, b) => b.hours - a.hours).slice(0, 8)} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                     <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
                     <YAxis type="category" dataKey="name" width={100} tick={{ fill: '#94a3b8', fontSize: 11 }} />
@@ -1123,7 +1033,7 @@ export default function TimeTrackingPage() {
 
       {/* ============ DETAILED VIEW ============ */}
       {activeTab === 'detailed' && (
-        <CollapsibleSection title="Time Entries" badge={costAdjustedEntries.length} icon={<Calendar size={16} />}>
+        <CollapsibleSection title="Time Entries" badge={filteredEntries.length} icon={<Calendar size={16} />}>
           <div className="mb-3 flex items-center gap-2">
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <div className="flex items-center gap-1"><Lock size={12} /><span>Actual Hours = cost (contractor submitted)</span></div>
@@ -1149,7 +1059,7 @@ export default function TimeTrackingPage() {
                 <th className={`px-3 py-3 text-center font-medium ${THEME.textMuted}`}>⚡</th>
               </tr></thead>
               <tbody>
-                {costAdjustedEntries.length > 0 ? costAdjustedEntries.slice(0, 100).map((entry) => {
+                {filteredEntries.length > 0 ? filteredEntries.slice(0, 100).map((entry) => {
                   const cost = entry.hours * entry.cost_rate
                   const revenue = entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
                   const margin = revenue - cost
@@ -1188,7 +1098,7 @@ export default function TimeTrackingPage() {
               </tbody>
             </table>
           </div>
-          {costAdjustedEntries.length > 100 && <p className="text-center text-sm text-slate-400 mt-2">Showing first 100 of {costAdjustedEntries.length} entries</p>}
+          {filteredEntries.length > 100 && <p className="text-center text-sm text-slate-400 mt-2">Showing first 100 of {filteredEntries.length} entries</p>}
         </CollapsibleSection>
       )}
 
