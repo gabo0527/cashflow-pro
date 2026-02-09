@@ -1426,18 +1426,16 @@ export default function TeamPage() {
                   const clientCount = new Set(group.rates.map(r => r.client_name)).size
                   const member = group.member
 
-                  // Summary calcs for the member header
-                  const totalMonthlyCost = group.rates.reduce((sum, r) => {
-                    if (r.cost_amount > 0) {
-                      return sum + (r.cost_type === "hourly" ? r.cost_amount * (r.baseline_hours || 172) : r.cost_amount)
+                  // Determine member's cost structure label
+                  const costLabel = (() => {
+                    const hasRateCardCosts = group.rates.some(r => r.cost_amount > 0)
+                    if (hasRateCardCosts && group.rates.every(r => r.cost_amount > 0)) return "Per rate card"
+                    if (!hasRateCardCosts && member?.cost_amount && member.cost_amount > 0) {
+                      const mct = (member.cost_type || "").toLowerCase().replace(/\s+/g, "_")
+                      return mct === "lump_sum" ? `${formatCurrency(member.cost_amount)}/mo` : `$${member.cost_amount}/hr`
                     }
-                    return sum
-                  }, 0)
-                  const totalMonthlyRev = group.rates.reduce((sum, r) => {
-                    if (r.revenue_type === "lump_sum") return sum + (r.revenue_amount || 0)
-                    return sum + (r.rate * (r.baseline_hours || 172))
-                  }, 0)
-                  const avgMargin = totalMonthlyRev > 0 ? ((totalMonthlyRev - totalMonthlyCost) / totalMonthlyRev * 100) : 0
+                    return "Mixed"
+                  })()
 
                   return (
                     <div key={memberId}>
@@ -1462,23 +1460,10 @@ export default function TeamPage() {
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-6 text-right">
-                          <div className="hidden sm:block">
-                            <p className={`text-xs ${THEME.textDim}`}>Est. Cost/mo</p>
-                            <p className="text-sm font-medium text-orange-400">{totalMonthlyCost > 0 ? formatCurrency(totalMonthlyCost) : "—"}</p>
-                          </div>
-                          <div className="hidden sm:block">
-                            <p className={`text-xs ${THEME.textDim}`}>Est. Rev/mo</p>
-                            <p className="text-sm font-medium text-emerald-400">{totalMonthlyRev > 0 ? formatCurrency(totalMonthlyRev) : "—"}</p>
-                          </div>
-                          <div className="w-16">
-                            <p className={`text-xs ${THEME.textDim}`}>Margin</p>
-                            {totalMonthlyCost > 0 && totalMonthlyRev > 0 ? (
-                              <p className={`text-sm font-semibold ${avgMargin >= 20 ? "text-emerald-400" : avgMargin >= 0 ? "text-amber-400" : "text-rose-400"}`}>{avgMargin.toFixed(0)}%</p>
-                            ) : (
-                              <p className={`text-sm ${THEME.textDim}`}>—</p>
-                            )}
-                          </div>
+                        <div className="flex items-center gap-4 text-right">
+                          <span className={`text-xs px-2 py-1 rounded-md bg-white/[0.05] ${THEME.textMuted} hidden sm:inline-block`}>
+                            Cost: {costLabel}
+                          </span>
                         </div>
                       </div>
 
