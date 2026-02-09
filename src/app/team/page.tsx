@@ -858,6 +858,7 @@ export default function TeamPage() {
 
   const [activeTab, setActiveTab] = useState<"directory" | "rates" | "profitability">("directory")
   const [rateStatusFilter, setRateStatusFilter] = useState<"active" | "archived" | "all">("active")
+  const [expandedRateMembers, setExpandedRateMembers] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState("")
   const [employmentFilter, setEmploymentFilter] = useState<"all" | "employee" | "contractor">("all")
 
@@ -1380,102 +1381,199 @@ export default function TeamPage() {
               <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Rate Card</h3>
               <p className={`text-xs ${THEME.textMuted} mt-0.5`}>Cost + Revenue per team member per client</p>
             </div>
-            <div className="flex items-center gap-1 bg-white/[0.03] rounded-lg p-0.5">
-              {(["active", "archived", "all"] as const).map(f => (
-                <button key={f} onClick={() => setRateStatusFilter(f)}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${rateStatusFilter === f ? "bg-white/[0.1] text-white" : `${THEME.textMuted} hover:text-white`}`}>
-                  {f === "active" ? `Active (${billRates.filter(r => r.is_active).length})` : f === "archived" ? `Archived (${billRates.filter(r => !r.is_active).length})` : `All (${billRates.length})`}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                <button onClick={() => {
+                  const allIds = new Set(billRates.map(r => r.team_member_id))
+                  setExpandedRateMembers(prev => prev.size === allIds.size ? new Set() : allIds)
+                }} className={`text-[11px] ${THEME.textMuted} hover:text-white transition-colors`}>
+                  {expandedRateMembers.size > 0 ? "Collapse All" : "Expand All"}
                 </button>
-              ))}
+              </div>
+              <div className="flex items-center gap-1 bg-white/[0.03] rounded-lg p-0.5">
+                {(["active", "archived", "all"] as const).map(f => (
+                  <button key={f} onClick={() => setRateStatusFilter(f)}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${rateStatusFilter === f ? "bg-white/[0.1] text-white" : `${THEME.textMuted} hover:text-white`}`}>
+                    {f === "active" ? `Active (${billRates.filter(r => r.is_active).length})` : f === "archived" ? `Archived (${billRates.filter(r => !r.is_active).length})` : `All (${billRates.length})`}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
           {(() => {
             const filteredRates = billRates.filter(r => rateStatusFilter === "all" ? true : rateStatusFilter === "active" ? r.is_active : !r.is_active)
-            return filteredRates.length > 0 ? (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className={`bg-white/[0.02] border-b ${THEME.glassBorder}`}>
-                  <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Team Member</th>
-                  <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Client</th>
-                  <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium`}>Period</th>
-                  <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Cost</th>
-                  <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Revenue</th>
-                  <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Margin</th>
-                  <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium w-24`}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRates.map(r => {
-                  const hasCustomCost = r.cost_amount > 0
-                  const effCost = hasCustomCost ? (r.cost_type === "hourly" ? r.cost_amount : (r.baseline_hours > 0 ? r.cost_amount / r.baseline_hours : 0)) : 0
-                  const isLumpRev = r.revenue_type === "lump_sum"
-                  const revAmt = r.revenue_amount || 0
-                  const margin = isLumpRev
-                    ? (hasCustomCost && revAmt > 0 ? ((revAmt - (r.cost_type === "hourly" ? r.cost_amount * (r.baseline_hours || 172) : r.cost_amount)) / revAmt * 100) : 0)
-                    : (hasCustomCost && r.rate > 0 ? ((r.rate - effCost) / r.rate * 100) : 0)
-                  const spread = isLumpRev ? 0 : (hasCustomCost ? r.rate - effCost : 0)
-                  const member = teamMembers.find(m => m.id === r.team_member_id)
-                  const startStr = r.start_date ? new Date(r.start_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "2-digit" }) : ""
-                  const endStr = r.end_date ? new Date(r.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "2-digit" }) : "Ongoing"
+            
+            // Group by team member
+            const grouped = new Map<string, { member: TeamMember | undefined; memberName: string; rates: BillRate[] }>()
+            filteredRates.forEach(r => {
+              if (!grouped.has(r.team_member_id)) {
+                grouped.set(r.team_member_id, {
+                  member: teamMembers.find(m => m.id === r.team_member_id),
+                  memberName: r.team_member_name || "Unknown",
+                  rates: []
+                })
+              }
+              grouped.get(r.team_member_id)!.rates.push(r)
+            })
+            // Sort by member name
+            const groups = Array.from(grouped.entries()).sort((a, b) => a[1].memberName.localeCompare(b[1].memberName))
+
+            return groups.length > 0 ? (
+              <div>
+                {groups.map(([memberId, group]) => {
+                  const isExpanded = expandedRateMembers.has(memberId)
+                  const activeCount = group.rates.filter(r => r.is_active).length
+                  const clientCount = new Set(group.rates.map(r => r.client_name)).size
+                  const member = group.member
+
+                  // Summary calcs for the member header
+                  const totalMonthlyCost = group.rates.reduce((sum, r) => {
+                    if (r.cost_amount > 0) {
+                      return sum + (r.cost_type === "hourly" ? r.cost_amount * (r.baseline_hours || 172) : r.cost_amount)
+                    }
+                    return sum
+                  }, 0)
+                  const totalMonthlyRev = group.rates.reduce((sum, r) => {
+                    if (r.revenue_type === "lump_sum") return sum + (r.revenue_amount || 0)
+                    return sum + (r.rate * (r.baseline_hours || 172))
+                  }, 0)
+                  const avgMargin = totalMonthlyRev > 0 ? ((totalMonthlyRev - totalMonthlyCost) / totalMonthlyRev * 100) : 0
+
                   return (
-                    <tr key={r.id} className={`border-b border-white/[0.05] hover:bg-white/[0.03] ${!r.is_active ? "opacity-50" : ""}`}>
-                      <td className={`px-4 py-3 font-medium ${THEME.textPrimary}`}>
-                        {r.team_member_name}
-                        <p className={`text-xs ${THEME.textDim}`}>{hasCustomCost ? (r.cost_type === "lump_sum" ? "Fixed Monthly" : "T&M") : "Distributed"}</p>
-                      </td>
-                      <td className={`px-4 py-3 ${THEME.textSecondary}`}>{r.client_name}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`text-xs ${THEME.textMuted}`}>{startStr} → {endStr}</span>
-                        {!r.is_active && <p className="text-[10px] text-rose-400 mt-0.5">Archived</p>}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {hasCustomCost ? (
-                          <>
-                            <span className="text-orange-400">{r.cost_type === "hourly" ? `$${r.cost_amount}/hr` : `${formatCurrency(r.cost_amount)}/mo`}</span>
-                            {r.cost_type === "lump_sum" && <p className={`text-xs ${THEME.textDim}`}>~${effCost.toFixed(2)}/hr ({r.baseline_hours}h)</p>}
-                          </>
-                        ) : (
-                          <span className={`text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-400`}>
-                            From {member?.cost_type === "lump_sum" ? formatCurrency(member?.cost_amount || 0) + "/mo" : `$${member?.cost_amount || 0}/hr`}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {isLumpRev ? (
-                          <>
-                            <span className="text-emerald-400 font-medium">{formatCurrency(revAmt)}/mo</span>
-                            <p className={`text-xs ${THEME.textDim}`}>Lump Sum</p>
-                          </>
-                        ) : (
-                          <span className="text-emerald-400 font-medium">${r.rate}/hr</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {(hasCustomCost || isLumpRev) && margin !== 0 ? (
-                          <>
-                            <span className={`font-medium ${margin >= 20 ? "text-emerald-400" : margin >= 0 ? "text-amber-400" : "text-rose-400"}`}>{margin.toFixed(0)}%</span>
-                            {!isLumpRev && <p className={`text-xs ${spread >= 0 ? "text-emerald-400/60" : "text-rose-400/60"}`}>${spread.toFixed(2)}/hr</p>}
-                          </>
-                        ) : (
-                          <span className={`text-xs ${THEME.textDim}`}>By hours</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => { setEditingRate(r); setShowRateModal(true) }} className="p-1.5 rounded hover:bg-white/[0.08] text-slate-500 hover:text-slate-300"><Edit2 size={14} /></button>
-                          {r.is_active ? (
-                            <button onClick={() => handleDeleteRate(r.id)} title="Archive" className="p-1.5 rounded hover:bg-amber-500/20 text-slate-500 hover:text-amber-400"><Lock size={14} /></button>
-                          ) : (
-                            <button onClick={() => handleReactivateRate(r.id)} title="Reactivate" className="p-1.5 rounded hover:bg-emerald-500/20 text-slate-500 hover:text-emerald-400"><Unlock size={14} /></button>
-                          )}
+                    <div key={memberId}>
+                      {/* Member Header Row */}
+                      <div
+                        onClick={() => setExpandedRateMembers(prev => {
+                          const next = new Set(prev)
+                          next.has(memberId) ? next.delete(memberId) : next.add(memberId)
+                          return next
+                        })}
+                        className={`flex items-center px-4 py-3.5 cursor-pointer hover:bg-white/[0.04] transition-colors border-b border-white/[0.05] ${isExpanded ? "bg-white/[0.03]" : ""}`}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <ChevronRight size={14} className={`${THEME.textDim} transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500/20 to-blue-500/20 border border-white/[0.1] flex items-center justify-center flex-shrink-0">
+                            <span className={`text-xs font-medium ${THEME.textSecondary}`}>{group.memberName.split(" ").map(n => n[0]).join("").slice(0, 2)}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <p className={`text-sm font-medium ${THEME.textPrimary} truncate`}>{group.memberName}</p>
+                            <p className={`text-xs ${THEME.textDim}`}>
+                              {member?.role || "—"} · {clientCount} client{clientCount !== 1 ? "s" : ""} · {activeCount} rate{activeCount !== 1 ? "s" : ""}
+                            </p>
+                          </div>
                         </div>
-                      </td>
-                    </tr>
+                        <div className="flex items-center gap-6 text-right">
+                          <div className="hidden sm:block">
+                            <p className={`text-xs ${THEME.textDim}`}>Est. Cost/mo</p>
+                            <p className="text-sm font-medium text-orange-400">{totalMonthlyCost > 0 ? formatCurrency(totalMonthlyCost) : "—"}</p>
+                          </div>
+                          <div className="hidden sm:block">
+                            <p className={`text-xs ${THEME.textDim}`}>Est. Rev/mo</p>
+                            <p className="text-sm font-medium text-emerald-400">{totalMonthlyRev > 0 ? formatCurrency(totalMonthlyRev) : "—"}</p>
+                          </div>
+                          <div className="w-16">
+                            <p className={`text-xs ${THEME.textDim}`}>Margin</p>
+                            {totalMonthlyCost > 0 && totalMonthlyRev > 0 ? (
+                              <p className={`text-sm font-semibold ${avgMargin >= 20 ? "text-emerald-400" : avgMargin >= 0 ? "text-amber-400" : "text-rose-400"}`}>{avgMargin.toFixed(0)}%</p>
+                            ) : (
+                              <p className={`text-sm ${THEME.textDim}`}>—</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Expanded Rate Cards */}
+                      {isExpanded && (
+                        <div className="bg-white/[0.02]">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className={`border-b ${THEME.glassBorder}`}>
+                                <th className={`pl-14 pr-4 py-2 text-left text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Client</th>
+                                <th className={`px-4 py-2 text-center text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Period</th>
+                                <th className={`px-4 py-2 text-right text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Cost</th>
+                                <th className={`px-4 py-2 text-right text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Revenue</th>
+                                <th className={`px-4 py-2 text-right text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Margin</th>
+                                <th className={`px-4 py-2 text-center text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider w-20`}>Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {group.rates.map(r => {
+                                const hasCustomCost = r.cost_amount > 0
+                                const effCost = hasCustomCost ? (r.cost_type === "hourly" ? r.cost_amount : (r.baseline_hours > 0 ? r.cost_amount / r.baseline_hours : 0)) : 0
+                                const isLumpRev = r.revenue_type === "lump_sum"
+                                const revAmt = r.revenue_amount || 0
+                                const margin = isLumpRev
+                                  ? (hasCustomCost && revAmt > 0 ? ((revAmt - (r.cost_type === "hourly" ? r.cost_amount * (r.baseline_hours || 172) : r.cost_amount)) / revAmt * 100) : 0)
+                                  : (hasCustomCost && r.rate > 0 ? ((r.rate - effCost) / r.rate * 100) : 0)
+                                const spread = isLumpRev ? 0 : (hasCustomCost ? r.rate - effCost : 0)
+                                const startStr = r.start_date ? new Date(r.start_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "2-digit" }) : ""
+                                const endStr = r.end_date ? new Date(r.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "2-digit" }) : "Ongoing"
+                                return (
+                                  <tr key={r.id} className={`border-b border-white/[0.04] hover:bg-white/[0.03] ${!r.is_active ? "opacity-40" : ""}`}>
+                                    <td className={`pl-14 pr-4 py-2.5 ${THEME.textSecondary}`}>
+                                      {r.client_name}
+                                      <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded ${
+                                        hasCustomCost ? (r.cost_type === "lump_sum" ? "bg-purple-500/10 text-purple-400" : "bg-blue-500/10 text-blue-400") : "bg-slate-500/10 text-slate-400"
+                                      }`}>{hasCustomCost ? (r.cost_type === "lump_sum" ? "Fixed" : "T&M") : "Dist"}</span>
+                                    </td>
+                                    <td className="px-4 py-2.5 text-center">
+                                      <span className={`text-xs ${THEME.textMuted}`}>{startStr} → {endStr}</span>
+                                      {!r.is_active && <p className="text-[10px] text-rose-400">Archived</p>}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right">
+                                      {hasCustomCost ? (
+                                        <>
+                                          <span className="text-orange-400 text-xs">{r.cost_type === "hourly" ? `$${r.cost_amount}/hr` : `${formatCurrency(r.cost_amount)}/mo`}</span>
+                                          {r.cost_type === "lump_sum" && <p className={`text-[10px] ${THEME.textDim}`}>~${effCost.toFixed(2)}/hr</p>}
+                                        </>
+                                      ) : (
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400`}>
+                                          From {member?.cost_type === "lump_sum" ? formatCurrency(member?.cost_amount || 0) + "/mo" : `$${member?.cost_amount || 0}/hr`}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right">
+                                      {isLumpRev ? (
+                                        <>
+                                          <span className="text-emerald-400 font-medium text-xs">{formatCurrency(revAmt)}/mo</span>
+                                          <p className={`text-[10px] ${THEME.textDim}`}>Lump Sum</p>
+                                        </>
+                                      ) : (
+                                        <span className="text-emerald-400 font-medium text-xs">${r.rate}/hr</span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right">
+                                      {(hasCustomCost || isLumpRev) && margin !== 0 ? (
+                                        <>
+                                          <span className={`text-xs font-medium ${margin >= 20 ? "text-emerald-400" : margin >= 0 ? "text-amber-400" : "text-rose-400"}`}>{margin.toFixed(0)}%</span>
+                                          {!isLumpRev && spread !== 0 && <p className={`text-[10px] ${spread >= 0 ? "text-emerald-400/60" : "text-rose-400/60"}`}>${spread.toFixed(2)}/hr</p>}
+                                        </>
+                                      ) : (
+                                        <span className={`text-[10px] ${THEME.textDim}`}>By hours</span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-2.5">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <button onClick={(e) => { e.stopPropagation(); setEditingRate(r); setShowRateModal(true) }} className="p-1 rounded hover:bg-white/[0.08] text-slate-500 hover:text-slate-300"><Edit2 size={13} /></button>
+                                        {r.is_active ? (
+                                          <button onClick={(e) => { e.stopPropagation(); handleDeleteRate(r.id) }} title="Archive" className="p-1 rounded hover:bg-amber-500/20 text-slate-500 hover:text-amber-400"><Lock size={13} /></button>
+                                        ) : (
+                                          <button onClick={(e) => { e.stopPropagation(); handleReactivateRate(r.id) }} title="Reactivate" className="p-1 rounded hover:bg-emerald-500/20 text-slate-500 hover:text-emerald-400"><Unlock size={13} /></button>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
                   )
                 })}
-              </tbody>
-            </table>
-          ) : (
+              </div>
+            ) : (
             <div className={`px-6 py-12 text-center ${THEME.textMuted}`}>
               <DollarSign size={48} className="mx-auto text-slate-600 mb-4" />
               <p>No rate cards configured yet</p>
