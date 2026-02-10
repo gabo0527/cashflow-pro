@@ -112,7 +112,7 @@ export default function AppShell({ children }: AppShellProps) {
   }
 
   // Skip shell for login page
-  if (['/login', '/timesheet', '/expense-report', '/terms', '/privacy'].includes(pathname)) {
+  if (['/login', '/portal', '/timesheet', '/expense-report', '/terms', '/privacy'].includes(pathname)) {
     return <>{children}</>
 }
 
