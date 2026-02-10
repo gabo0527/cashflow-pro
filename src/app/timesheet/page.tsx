@@ -178,25 +178,47 @@ export default function ContractorPortal() {
   }, [assignments])
 
   const clientCostTypes = useMemo(() => {
-    const types: Record<string, string> = {}
-    rateCards.forEach(rc => { if (rc.cost_amount > 0) { const ct = normalizeCostType(rc.cost_type); types[rc.client_id] = (ct === 'lump_sum' || ct === 'lump sum') ? 'lump_sum' : 'hourly' } })
+    const types: Record<string, { type: 'lump_sum' | 'hourly'; amount: number; source: 'rate_card' | 'member' }> = {}
+    // Priority 1: rate card overrides per client
+    rateCards.forEach(rc => {
+      if (rc.cost_amount > 0) {
+        const ct = normalizeCostType(rc.cost_type)
+        types[rc.client_id] = {
+          type: (ct === 'lump_sum' || ct === 'lump sum') ? 'lump_sum' : 'hourly',
+          amount: rc.cost_amount,
+          source: 'rate_card'
+        }
+      }
+    })
+    // Priority 2: fall back to member-level cost for unassigned clients
     const memberCt = normalizeCostType(member?.cost_type || '')
     const isMemberLS = (memberCt === 'lump_sum' || memberCt === 'lump sum') && (member?.cost_amount || 0) > 0
-    Object.keys(assignmentsByClient).forEach(cid => { if (!types[cid]) types[cid] = isMemberLS ? 'member_ls' : 'hourly' })
+    Object.keys(assignmentsByClient).forEach(cid => {
+      if (!types[cid]) {
+        types[cid] = {
+          type: isMemberLS ? 'lump_sum' : 'hourly',
+          amount: member?.cost_amount || 0,
+          source: 'member'
+        }
+      }
+    })
     return types
   }, [rateCards, member, assignmentsByClient])
 
-  const isMixedContractor = useMemo(() => new Set(Object.values(clientCostTypes)).size > 1, [clientCostTypes])
-  const isPureMemberLS = useMemo(() => {
-    const ct = normalizeCostType(member?.cost_type || '')
-    return (ct === 'lump_sum' || ct === 'lump sum') && (member?.cost_amount || 0) > 0 && rateCards.every(rc => !rc.cost_amount || rc.cost_amount === 0)
-  }, [member, rateCards])
-
-  const invoiceClientOptions = useMemo(() => {
-    const opts: { id: string; label: string }[] = [{ id: 'all', label: isPureMemberLS ? 'All Clients (distributed)' : 'All Clients' }]
-    if (!isPureMemberLS) Object.entries(assignmentsByClient).forEach(([cid, { clientName }]) => { opts.push({ id: cid, label: clientName }) })
-    return opts
-  }, [assignmentsByClient, isPureMemberLS])
+  // Contractor archetype: determines entire invoice UX
+  // 'pure_ls' = Emily: one fixed cost, distributed across all clients by effort %
+  // 'pure_tm' = Brian: hourly for all clients, submits per-client invoices
+  // 'mixed'   = Mary: some clients LS, some T&M, submits per-client invoices
+  const contractorType = useMemo((): 'pure_ls' | 'pure_tm' | 'mixed' => {
+    const types = Object.values(clientCostTypes).map(c => c.type)
+    const uniqueTypes = new Set(types)
+    if (uniqueTypes.size > 1) return 'mixed'
+    // All same type — but check source: if member-level LS with no rate card overrides, it's pure LS
+    const allMemberSource = Object.values(clientCostTypes).every(c => c.source === 'member')
+    if (types[0] === 'lump_sum' && allMemberSource) return 'pure_ls'
+    if (types[0] === 'lump_sum' && !allMemberSource) return 'mixed' // rate-card LS per client = treat like mixed (separate invoices)
+    return 'pure_tm'
+  }, [clientCostTypes])
 
   // ============ EMAIL LOOKUP ============
   const lookupEmail = async () => {
@@ -267,40 +289,92 @@ export default function ContractorPortal() {
     if (!member) return
     const { data: me } = await supabase.from('time_entries').select('project_id, hours').eq('contractor_id', member.id).gte('date', billingMonth.start).lte('date', billingMonth.end)
     if (!me || me.length === 0) { setInvoiceDistribution([]); return }
+
     const sel = invoiceForm.client_id
+
+    // T&M and mixed must have a client selected
+    if (contractorType !== 'pure_ls' && !sel) { setInvoiceDistribution([]); return }
+
+    // Group time entries by client → project
     const byClient: Record<string, { clientName: string; projects: Record<string, { name: string; hours: number }> }> = {}
-    let totalHours = 0
+    let totalHoursAllClients = 0
     me.forEach((e: any) => {
       const a = assignments.find(x => x.project_id === e.project_id); if (!a) return
-      if (sel !== 'all' && a.client_id !== sel) return
       if (!byClient[a.client_id]) byClient[a.client_id] = { clientName: a.client_name, projects: {} }
       if (!byClient[a.client_id].projects[e.project_id]) byClient[a.client_id].projects[e.project_id] = { name: a.project_name, hours: 0 }
-      byClient[a.client_id].projects[e.project_id].hours += e.hours || 0; totalHours += e.hours || 0
+      byClient[a.client_id].projects[e.project_id].hours += e.hours || 0
+      totalHoursAllClients += e.hours || 0
     })
+
     const lines: InvoiceLine[] = []
-    if (isPureMemberLS) {
-      const mc = member.cost_amount || 0
+
+    if (contractorType === 'pure_ls') {
+      // EMILY: One fixed monthly cost distributed by effort %
+      // Always shows ALL clients — sel is ignored / forced to 'all'
+      const monthlyCost = member.cost_amount || 0
       Object.entries(byClient).forEach(([cid, d]) => {
-        const ch = Object.values(d.projects).reduce((s, p) => s + p.hours, 0)
-        const pct = totalHours > 0 ? (ch / totalHours) * 100 : 0; const amt = totalHours > 0 ? (ch / totalHours) * mc : 0
-        lines.push({ client_id: cid, client_name: d.clientName, hours: ch, amount: Math.round(amt * 100) / 100, allocation_pct: Math.round(pct * 100) / 100 })
+        const clientHours = Object.values(d.projects).reduce((s, p) => s + p.hours, 0)
+        const pct = totalHoursAllClients > 0 ? (clientHours / totalHoursAllClients) * 100 : 0
+        const amt = totalHoursAllClients > 0 ? (clientHours / totalHoursAllClients) * monthlyCost : 0
+        // Show project-level detail under each client for cross-checking
+        Object.entries(d.projects).forEach(([pid, proj]) => {
+          const projPct = clientHours > 0 ? (proj.hours / clientHours) * pct : 0
+          const projAmt = clientHours > 0 ? (proj.hours / clientHours) * amt : 0
+          lines.push({
+            client_id: cid, client_name: d.clientName,
+            project_id: pid, project_name: proj.name,
+            hours: proj.hours, amount: Math.round(projAmt * 100) / 100,
+            allocation_pct: Math.round(projPct * 100) / 100
+          })
+        })
+      })
+    } else if (contractorType === 'pure_tm') {
+      // BRIAN: Hourly for all clients — must pick one client
+      // Filter to selected client only
+      const selectedClient = byClient[sel]
+      if (!selectedClient) { setInvoiceDistribution([]); return }
+      Object.entries(selectedClient.projects).forEach(([pid, proj]) => {
+        const a = assignments.find(x => x.project_id === pid)
+        const rate = a?.rate || 0
+        lines.push({
+          client_id: sel, client_name: selectedClient.clientName,
+          project_id: pid, project_name: proj.name,
+          hours: proj.hours, rate, amount: proj.hours * rate
+        })
       })
     } else {
-      Object.entries(byClient).forEach(([cid, d]) => {
-        const ct = clientCostTypes[cid]; const rc = rateCards.find(r => r.client_id === cid)
-        if (ct === 'lump_sum' && rc) {
-          const ch = Object.values(d.projects).reduce((s, p) => s + p.hours, 0)
-          lines.push({ client_id: cid, client_name: d.clientName, hours: ch, amount: rc.cost_amount, allocation_pct: 100 })
-        } else {
-          Object.entries(d.projects).forEach(([pid, proj]) => {
-            const a = assignments.find(x => x.project_id === pid); const rate = a?.rate || 0
-            lines.push({ client_id: cid, client_name: d.clientName, project_id: pid, project_name: proj.name, hours: proj.hours, rate, amount: proj.hours * rate })
+      // MIXED (Mary): per-client — must pick one client
+      // Determine this client's cost type and calculate accordingly
+      const selectedClient = byClient[sel]
+      if (!selectedClient) { setInvoiceDistribution([]); return }
+      const cct = clientCostTypes[sel]
+      if (cct?.type === 'lump_sum') {
+        // This client is LS — show project hours, fixed total
+        const fixedAmount = cct.amount
+        const clientHours = Object.values(selectedClient.projects).reduce((s, p) => s + p.hours, 0)
+        Object.entries(selectedClient.projects).forEach(([pid, proj]) => {
+          lines.push({
+            client_id: sel, client_name: selectedClient.clientName,
+            project_id: pid, project_name: proj.name,
+            hours: proj.hours, amount: Math.round((proj.hours / clientHours) * fixedAmount * 100) / 100,
+            allocation_pct: Math.round((proj.hours / clientHours) * 100 * 100) / 100
           })
-        }
-      })
+        })
+      } else {
+        // This client is T&M — hours × rate
+        Object.entries(selectedClient.projects).forEach(([pid, proj]) => {
+          const a = assignments.find(x => x.project_id === pid)
+          const rate = a?.rate || 0
+          lines.push({
+            client_id: sel, client_name: selectedClient.clientName,
+            project_id: pid, project_name: proj.name,
+            hours: proj.hours, rate, amount: proj.hours * rate
+          })
+        })
+      }
     }
     setInvoiceDistribution(lines)
-  }, [member, billingMonth, assignments, invoiceForm.client_id, isPureMemberLS, clientCostTypes, rateCards])
+  }, [member, billingMonth, assignments, invoiceForm.client_id, contractorType, clientCostTypes])
 
   useEffect(() => { if (showInvoiceForm && member) calculateDistribution() }, [showInvoiceForm, billingMonth, calculateDistribution, member, invoiceForm.client_id])
 
@@ -488,25 +562,43 @@ export default function ContractorPortal() {
             <div>
               <div className="flex items-center justify-between mb-6">
                 <div><h1 className="text-xl font-bold text-white">Invoices</h1><p className="text-slate-400 text-sm mt-0.5">Submit monthly invoices</p></div>
-                <button onClick={() => setShowInvoiceForm(true)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-xl text-white text-sm font-medium flex items-center gap-2"><Plus size={16} /> New Invoice</button>
+                <button onClick={() => { 
+                  // Pure LS: always 'all'. T&M/Mixed: force client selection (empty = must pick)
+                  const defaultClient = contractorType === 'pure_ls' ? 'all' : ''
+                  setInvoiceForm(p => ({ ...p, client_id: defaultClient }))
+                  setShowInvoiceForm(true) 
+                }} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-xl text-white text-sm font-medium flex items-center gap-2"><Plus size={16} /> New Invoice</button>
               </div>
               {showInvoiceForm && (
                 <div className="bg-slate-900 border border-emerald-500/30 rounded-xl p-5 mb-6">
                   <div className="flex items-center justify-between mb-4"><h2 className="text-white font-medium">Submit Invoice</h2><button onClick={() => { setShowInvoiceForm(false); setInvoiceFile(null) }} className="text-slate-400 hover:text-white"><X size={18} /></button></div>
+                  
+                  {/* Row 1: Invoice number + client selector (or type label for pure LS) */}
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div><label className="block text-xs text-slate-400 mb-1">Invoice Number</label><input type="text" placeholder="INV-2026-001" value={invoiceForm.invoice_number} onChange={e => setInvoiceForm(p => ({ ...p, invoice_number: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div>
-                    <div><label className="block text-xs text-slate-400 mb-1">Payment Terms</label><select value={invoiceForm.payment_terms} onChange={e => setInvoiceForm(p => ({ ...p, payment_terms: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">{PAYMENT_TERMS.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select></div>
+                    {contractorType === 'pure_ls' ? (
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Invoice For</label>
+                        <div className="w-full px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-300 text-sm">
+                          All Clients (distributed by effort)
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">Monthly fixed cost: {formatCurrency(member?.cost_amount || 0)}</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Invoice For</label>
+                        <select value={invoiceForm.client_id} onChange={e => setInvoiceForm(p => ({ ...p, client_id: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                          <option value="">Select a client</option>
+                          {Object.entries(assignmentsByClient).map(([cid, { clientName }]) => {
+                            const cct = clientCostTypes[cid]
+                            const tag = cct?.type === 'lump_sum' ? ' (Fixed)' : ' (Hourly)'
+                            return <option key={cid} value={cid}>{clientName}{Object.keys(assignmentsByClient).length > 1 ? tag : ''}</option>
+                          })}
+                        </select>
+                        {contractorType === 'mixed' && <p className="text-xs text-slate-500 mt-1">Submit a separate invoice for each client.</p>}
+                      </div>
+                    )}
                   </div>
-                  {/* Client scope for mixed/T&M contractors */}
-                  {!isPureMemberLS && Object.keys(assignmentsByClient).length > 1 && (
-                    <div className="mb-4">
-                      <label className="block text-xs text-slate-400 mb-1">Invoice For</label>
-                      <select value={invoiceForm.client_id} onChange={e => setInvoiceForm(p => ({ ...p, client_id: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                        {invoiceClientOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-                      </select>
-                      {isMixedContractor && <p className="text-xs text-slate-500 mt-1">You have different billing structures per client. You can submit one invoice for all or per client.</p>}
-                    </div>
-                  )}
                   {/* Billing period */}
                   <div className="flex items-center gap-3 mb-4">
                     <label className="text-xs text-slate-400">Billing Period:</label>
@@ -517,7 +609,11 @@ export default function ContractorPortal() {
                   {/* Distribution */}
                   {invoiceDistribution.length > 0 ? (
                     <div className="mb-4">
-                      <p className="text-xs text-slate-400 mb-2">{isPureMemberLS ? 'Cost distributed by hours worked:' : isMixedContractor ? 'Line items (mixed billing):' : 'Line items from timesheets:'}</p>
+                      <p className="text-xs text-slate-400 mb-2">
+                        {contractorType === 'pure_ls' 
+                          ? `${formatCurrency(member?.cost_amount || 0)} distributed by hours worked in ${billingMonth.label}:`
+                          : `Verify your hours for ${billingMonth.label}:`}
+                      </p>
                       <div className="bg-slate-800/50 rounded-lg overflow-hidden">
                         <table className="w-full text-sm">
                           <thead><tr className="text-slate-500 text-xs">
@@ -546,14 +642,18 @@ export default function ContractorPortal() {
                         </table>
                       </div>
                     </div>
-                  ) : <div className="mb-4 p-4 bg-slate-800/30 rounded-lg text-center text-slate-500 text-sm">No timesheet entries found for {billingMonth.label}. Submit your timesheet first.</div>}
+                  ) : <div className="mb-4 p-4 bg-slate-800/30 rounded-lg text-center text-slate-500 text-sm">
+                    {contractorType !== 'pure_ls' && !invoiceForm.client_id
+                      ? 'Select a client above to see your hours.'
+                      : `No timesheet entries found for ${billingMonth.label}. Submit your timesheet first.`}
+                  </div>}
                   {/* Invoice file */}
                   <div className="mb-4">
                     <label className="block text-xs text-slate-400 mb-1">Invoice Attachment (PDF)</label>
                     <DropZone file={invoiceFile} onFile={setInvoiceFile} onRemove={() => setInvoiceFile(null)} uploading={submittingInvoice} label="Drop invoice PDF here" accept=".pdf,image/*" />
                   </div>
                   <div className="mb-4"><label className="block text-xs text-slate-400 mb-1">Notes (optional)</label><textarea rows={2} placeholder="Any additional notes..." value={invoiceForm.notes} onChange={e => setInvoiceForm(p => ({ ...p, notes: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none" /></div>
-                  <button onClick={submitInvoice} disabled={submittingInvoice || !invoiceForm.invoice_number || invoiceDistribution.length === 0} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 rounded-xl text-white text-sm font-medium flex items-center justify-center gap-2">
+                  <button onClick={submitInvoice} disabled={submittingInvoice || !invoiceForm.invoice_number || invoiceDistribution.length === 0 || (contractorType !== 'pure_ls' && !invoiceForm.client_id)} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 rounded-xl text-white text-sm font-medium flex items-center justify-center gap-2">
                     {submittingInvoice ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <><Send size={16} /> Submit Invoice</>}
                   </button>
                 </div>
