@@ -163,7 +163,7 @@ export default function ContractorPortal() {
   const [invoices, setInvoices] = useState<ContractorInvoice[]>([])
   const [showInvoiceForm, setShowInvoiceForm] = useState(false)
   const [invoiceMonth, setInvoiceMonth] = useState(new Date())
-  const [invoiceForm, setInvoiceForm] = useState({ invoice_number: '', payment_terms: 'NET30', notes: '', client_id: 'all' })
+  const [invoiceForm, setInvoiceForm] = useState({ invoice_number: '', payment_terms: 'NET30', notes: '', client_id: 'all', amount: '' })
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null)
   const [invoiceDistribution, setInvoiceDistribution] = useState<InvoiceLine[]>([])
   const [submittingInvoice, setSubmittingInvoice] = useState(false)
@@ -284,7 +284,7 @@ export default function ContractorPortal() {
     } catch (err: any) { setError(err.message || 'Failed to submit expense') } finally { setSubmittingExpense(false) }
   }
 
-  // ============ INVOICE DISTRIBUTION ============
+  // ============ TIMESHEET REFERENCE (for cross-checking, not amount calculation) ============
   const calculateDistribution = useCallback(async () => {
     if (!member) return
     const { data: me } = await supabase.from('time_entries').select('project_id, hours').eq('contractor_id', member.id).gte('date', billingMonth.start).lte('date', billingMonth.end)
@@ -309,98 +309,79 @@ export default function ContractorPortal() {
     const lines: InvoiceLine[] = []
 
     if (contractorType === 'pure_ls') {
-      // EMILY: One fixed monthly cost distributed by effort %
-      // Always shows ALL clients — sel is ignored / forced to 'all'
-      const monthlyCost = member.cost_amount || 0
+      // EMILY: Show all clients with hours + allocation % (reference for admin)
       Object.entries(byClient).forEach(([cid, d]) => {
         const clientHours = Object.values(d.projects).reduce((s, p) => s + p.hours, 0)
         const pct = totalHoursAllClients > 0 ? (clientHours / totalHoursAllClients) * 100 : 0
-        const amt = totalHoursAllClients > 0 ? (clientHours / totalHoursAllClients) * monthlyCost : 0
-        // Show project-level detail under each client for cross-checking
         Object.entries(d.projects).forEach(([pid, proj]) => {
-          const projPct = clientHours > 0 ? (proj.hours / clientHours) * pct : 0
-          const projAmt = clientHours > 0 ? (proj.hours / clientHours) * amt : 0
+          const projPct = clientHours > 0 ? (proj.hours / totalHoursAllClients) * 100 : 0
           lines.push({
             client_id: cid, client_name: d.clientName,
             project_id: pid, project_name: proj.name,
-            hours: proj.hours, amount: Math.round(projAmt * 100) / 100,
+            hours: proj.hours, amount: 0,
             allocation_pct: Math.round(projPct * 100) / 100
           })
         })
       })
-    } else if (contractorType === 'pure_tm') {
-      // BRIAN: Hourly for all clients — must pick one client
-      // Filter to selected client only
+    } else {
+      // T&M / MIXED: Show selected client's projects + hours (reference)
       const selectedClient = byClient[sel]
       if (!selectedClient) { setInvoiceDistribution([]); return }
       Object.entries(selectedClient.projects).forEach(([pid, proj]) => {
-        const a = assignments.find(x => x.project_id === pid)
-        const rate = a?.rate || 0
         lines.push({
           client_id: sel, client_name: selectedClient.clientName,
           project_id: pid, project_name: proj.name,
-          hours: proj.hours, rate, amount: proj.hours * rate
+          hours: proj.hours, amount: 0
         })
       })
-    } else {
-      // MIXED (Mary): per-client — must pick one client
-      // Determine this client's cost type and calculate accordingly
-      const selectedClient = byClient[sel]
-      if (!selectedClient) { setInvoiceDistribution([]); return }
-      const cct = clientCostTypes[sel]
-      if (cct?.type === 'lump_sum') {
-        // This client is LS — show project hours, fixed total
-        const fixedAmount = cct.amount
-        const clientHours = Object.values(selectedClient.projects).reduce((s, p) => s + p.hours, 0)
-        Object.entries(selectedClient.projects).forEach(([pid, proj]) => {
-          lines.push({
-            client_id: sel, client_name: selectedClient.clientName,
-            project_id: pid, project_name: proj.name,
-            hours: proj.hours, amount: Math.round((proj.hours / clientHours) * fixedAmount * 100) / 100,
-            allocation_pct: Math.round((proj.hours / clientHours) * 100 * 100) / 100
-          })
-        })
-      } else {
-        // This client is T&M — hours × rate
-        Object.entries(selectedClient.projects).forEach(([pid, proj]) => {
-          const a = assignments.find(x => x.project_id === pid)
-          const rate = a?.rate || 0
-          lines.push({
-            client_id: sel, client_name: selectedClient.clientName,
-            project_id: pid, project_name: proj.name,
-            hours: proj.hours, rate, amount: proj.hours * rate
-          })
-        })
-      }
     }
     setInvoiceDistribution(lines)
-  }, [member, billingMonth, assignments, invoiceForm.client_id, contractorType, clientCostTypes])
+  }, [member, billingMonth, assignments, invoiceForm.client_id, contractorType])
 
   useEffect(() => { if (showInvoiceForm && member) calculateDistribution() }, [showInvoiceForm, billingMonth, calculateDistribution, member, invoiceForm.client_id])
 
   // ============ SUBMIT INVOICE ============
   const submitInvoice = async () => {
-    if (!member || invoiceDistribution.length === 0) return; setSubmittingInvoice(true); setError(null)
+    const enteredAmount = parseFloat(invoiceForm.amount || '0')
+    if (!member || enteredAmount <= 0) return; setSubmittingInvoice(true); setError(null)
     try {
       let receiptUrl: string | null = null
       if (invoiceFile) receiptUrl = await uploadFile(invoiceFile, 'invoices', member.id)
-      const total = invoiceDistribution.reduce((s, l) => s + l.amount, 0)
       const invDate = new Date(); const due = new Date(invDate); const dm: Record<string, number> = { DUE_ON_RECEIPT: 0, NET30: 30, NET45: 45, NET60: 60 }
       due.setDate(due.getDate() + (dm[invoiceForm.payment_terms] || 30))
       const { data: inv, error: ie } = await supabase.from('contractor_invoices').insert({
         team_member_id: member.id, invoice_number: invoiceForm.invoice_number, invoice_date: invDate.toISOString().split('T')[0],
         due_date: due.toISOString().split('T')[0], period_start: billingMonth.start, period_end: billingMonth.end,
-        total_amount: total, payment_terms: invoiceForm.payment_terms, receipt_url: receiptUrl, notes: invoiceForm.notes || null, status: 'submitted'
+        total_amount: enteredAmount, payment_terms: invoiceForm.payment_terms, receipt_url: receiptUrl, notes: invoiceForm.notes || null, status: 'submitted'
       }).select().single()
       if (ie) throw ie
-      await supabase.from('contractor_invoice_lines').insert(invoiceDistribution.map(l => ({
-        invoice_id: inv.id, client_id: l.client_id, project_id: l.project_id || null,
-        description: l.client_name + (l.project_name ? ` - ${l.project_name}` : ''),
-        hours: l.hours || null, rate: l.rate || null, amount: l.amount, allocation_pct: l.allocation_pct || null
-      })))
-      setShowInvoiceForm(false); setInvoiceForm({ invoice_number: '', payment_terms: 'NET30', notes: '', client_id: 'all' }); setInvoiceFile(null)
+      // Save line items with reference hours + allocation %
+      // For LS: distribute entered amount by hour allocation. For T&M: just reference hours.
+      const totalRefHours = invoiceDistribution.reduce((s, l) => s + (l.hours || 0), 0)
+      await supabase.from('contractor_invoice_lines').insert(invoiceDistribution.map(l => {
+        const pct = totalRefHours > 0 ? (l.hours || 0) / totalRefHours : 0
+        return {
+          invoice_id: inv.id, client_id: l.client_id, project_id: l.project_id || null,
+          description: l.client_name + (l.project_name ? ` - ${l.project_name}` : ''),
+          hours: l.hours || null, rate: l.rate || null,
+          amount: contractorType === 'pure_ls' ? Math.round(enteredAmount * pct * 100) / 100 : enteredAmount,
+          allocation_pct: contractorType === 'pure_ls' ? Math.round(pct * 100 * 100) / 100 : null
+        }
+      }))
+      setShowInvoiceForm(false); setInvoiceForm({ invoice_number: '', payment_terms: 'NET30', notes: '', client_id: 'all', amount: '' }); setInvoiceFile(null); setInvoiceDistribution([])
       const { data: upd } = await supabase.from('contractor_invoices').select('*, contractor_invoice_lines(*)').eq('team_member_id', member.id).order('invoice_date', { ascending: false }).limit(20); setInvoices(upd || [])
     } catch (err: any) { setError(err.message || 'Failed to submit invoice') } finally { setSubmittingInvoice(false) }
+  }
+
+  // ============ DELETE INVOICE (only if still 'submitted') ============
+  const deleteInvoice = async (id: string) => {
+    if (!confirm('Delete this invoice? This cannot be undone.')) return
+    setError(null)
+    try {
+      await supabase.from('contractor_invoice_lines').delete().eq('invoice_id', id)
+      await supabase.from('contractor_invoices').delete().eq('id', id)
+      setInvoices(prev => prev.filter(inv => inv.id !== id))
+    } catch (err: any) { setError(err.message || 'Failed to delete') }
   }
 
   const navItems = [{ id: 'time' as const, label: 'Timesheet', icon: Clock }, { id: 'expenses' as const, label: 'Expenses', icon: Receipt }, { id: 'invoices' as const, label: 'Invoices', icon: FileText }]
@@ -573,87 +554,85 @@ export default function ContractorPortal() {
                 <div className="bg-slate-900 border border-emerald-500/30 rounded-xl p-5 mb-6">
                   <div className="flex items-center justify-between mb-4"><h2 className="text-white font-medium">Submit Invoice</h2><button onClick={() => { setShowInvoiceForm(false); setInvoiceFile(null) }} className="text-slate-400 hover:text-white"><X size={18} /></button></div>
                   
-                  {/* Row 1: Invoice number + client selector (or type label for pure LS) */}
+                  {/* Row 1: Invoice number + client */}
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div><label className="block text-xs text-slate-400 mb-1">Invoice Number</label><input type="text" placeholder="INV-2026-001" value={invoiceForm.invoice_number} onChange={e => setInvoiceForm(p => ({ ...p, invoice_number: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div>
                     {contractorType === 'pure_ls' ? (
                       <div>
                         <label className="block text-xs text-slate-400 mb-1">Invoice For</label>
-                        <div className="w-full px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-300 text-sm">
-                          All Clients (distributed by effort)
-                        </div>
-                        <p className="text-xs text-slate-500 mt-1">Monthly fixed cost: {formatCurrency(member?.cost_amount || 0)}</p>
+                        <div className="w-full px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-300 text-sm">All Clients (distributed by effort)</div>
                       </div>
                     ) : (
                       <div>
                         <label className="block text-xs text-slate-400 mb-1">Invoice For</label>
                         <select value={invoiceForm.client_id} onChange={e => setInvoiceForm(p => ({ ...p, client_id: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
                           <option value="">Select a client</option>
-                          {Object.entries(assignmentsByClient).map(([cid, { clientName }]) => {
-                            const cct = clientCostTypes[cid]
-                            const tag = cct?.type === 'lump_sum' ? ' (Fixed)' : ' (Hourly)'
-                            return <option key={cid} value={cid}>{clientName}{Object.keys(assignmentsByClient).length > 1 ? tag : ''}</option>
-                          })}
+                          {Object.entries(assignmentsByClient).map(([cid, { clientName }]) => <option key={cid} value={cid}>{clientName}</option>)}
                         </select>
                         {contractorType === 'mixed' && <p className="text-xs text-slate-500 mt-1">Submit a separate invoice for each client.</p>}
                       </div>
                     )}
                   </div>
-                  {/* Billing period */}
-                  <div className="flex items-center gap-3 mb-4">
-                    <label className="text-xs text-slate-400">Billing Period:</label>
-                    <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() - 1); setInvoiceMonth(d) }} className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"><ChevronLeft size={14} /></button>
-                    <span className="text-white text-sm font-medium px-3 py-1 bg-slate-800 rounded-lg">{billingMonth.label}</span>
-                    <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() + 1); setInvoiceMonth(d) }} className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"><ChevronRight size={14} /></button>
+
+                  {/* Row 2: Billing period + Amount */}
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Billing Period</label>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() - 1); setInvoiceMonth(d) }} className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"><ChevronLeft size={14} /></button>
+                        <span className="text-white text-sm font-medium px-3 py-1.5 bg-slate-800 rounded-lg flex-1 text-center">{billingMonth.label}</span>
+                        <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() + 1); setInvoiceMonth(d) }} className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"><ChevronRight size={14} /></button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Invoice Amount</label>
+                      <div className="relative">
+                        <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <input type="number" placeholder="0.00" step="0.01" min="0" value={invoiceForm.amount} onChange={e => setInvoiceForm(p => ({ ...p, amount: e.target.value }))}
+                          className="w-full pl-8 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                      </div>
+                    </div>
                   </div>
-                  {/* Distribution */}
+
+                  {/* Timesheet reference */}
                   {invoiceDistribution.length > 0 ? (
                     <div className="mb-4">
-                      <p className="text-xs text-slate-400 mb-2">
-                        {contractorType === 'pure_ls' 
-                          ? `${formatCurrency(member?.cost_amount || 0)} distributed by hours worked in ${billingMonth.label}:`
-                          : `Verify your hours for ${billingMonth.label}:`}
-                      </p>
-                      <div className="bg-slate-800/50 rounded-lg overflow-hidden">
+                      <p className="text-xs text-slate-500 mb-2">📋 Timesheet reference for {billingMonth.label}:</p>
+                      <div className="bg-slate-800/30 rounded-lg overflow-hidden">
                         <table className="w-full text-sm">
-                          <thead><tr className="text-slate-500 text-xs">
-                            <th className="text-left px-3 py-2 font-medium">Client</th>
-                            {invoiceDistribution.some(l => l.project_name) && <th className="text-left px-3 py-2 font-medium">Project</th>}
-                            <th className="text-right px-3 py-2 font-medium">Hours</th>
-                            {invoiceDistribution.some(l => l.rate) && <th className="text-right px-3 py-2 font-medium">Rate</th>}
-                            {invoiceDistribution.some(l => l.allocation_pct !== undefined) && <th className="text-right px-3 py-2 font-medium">%</th>}
-                            <th className="text-right px-3 py-2 font-medium">Amount</th>
+                          <thead><tr className="text-slate-600 text-xs">
+                            <th className="text-left px-3 py-1.5 font-medium">Client</th>
+                            {invoiceDistribution.some(l => l.project_name) && <th className="text-left px-3 py-1.5 font-medium">Project</th>}
+                            <th className="text-right px-3 py-1.5 font-medium">Hours</th>
+                            {invoiceDistribution.some(l => l.allocation_pct !== undefined) && <th className="text-right px-3 py-1.5 font-medium">%</th>}
                           </tr></thead>
                           <tbody>{invoiceDistribution.map((l, i) => (
-                            <tr key={i} className="border-t border-slate-700/50">
-                              <td className="px-3 py-2 text-slate-300">{l.client_name}</td>
-                              {invoiceDistribution.some(x => x.project_name) && <td className="px-3 py-2 text-slate-400">{l.project_name || '—'}</td>}
-                              <td className="px-3 py-2 text-right text-slate-300">{l.hours?.toFixed(1)}</td>
-                              {invoiceDistribution.some(x => x.rate) && <td className="px-3 py-2 text-right text-slate-400">{l.rate ? formatCurrency(l.rate) : '—'}</td>}
-                              {invoiceDistribution.some(x => x.allocation_pct !== undefined) && <td className="px-3 py-2 text-right text-slate-400">{l.allocation_pct !== undefined ? `${l.allocation_pct}%` : '—'}</td>}
-                              <td className="px-3 py-2 text-right text-white font-medium">{formatCurrency(l.amount)}</td>
+                            <tr key={i} className="border-t border-slate-700/30">
+                              <td className="px-3 py-1.5 text-slate-400 text-xs">{l.client_name}</td>
+                              {invoiceDistribution.some(x => x.project_name) && <td className="px-3 py-1.5 text-slate-500 text-xs">{l.project_name || '—'}</td>}
+                              <td className="px-3 py-1.5 text-right text-slate-300 text-xs">{l.hours?.toFixed(1)}</td>
+                              {invoiceDistribution.some(x => x.allocation_pct !== undefined) && <td className="px-3 py-1.5 text-right text-slate-500 text-xs">{l.allocation_pct !== undefined ? `${l.allocation_pct}%` : '—'}</td>}
                             </tr>
                           ))}</tbody>
-                          <tfoot><tr className="border-t border-slate-600">
-                            <td colSpan={1 + (invoiceDistribution.some(l => l.project_name) ? 1 : 0) + 1 + (invoiceDistribution.some(l => l.rate) ? 1 : 0)} className="px-3 py-2 text-white font-medium">Total</td>
-                            {invoiceDistribution.some(l => l.allocation_pct !== undefined) && <td className="px-3 py-2 text-right text-slate-300">100%</td>}
-                            <td className="px-3 py-2 text-right text-emerald-400 font-bold">{formatCurrency(invoiceDistribution.reduce((s, l) => s + l.amount, 0))}</td>
+                          <tfoot><tr className="border-t border-slate-600/50">
+                            <td colSpan={invoiceDistribution.some(l => l.project_name) ? 2 : 1} className="px-3 py-1.5 text-slate-400 text-xs font-medium">Total</td>
+                            <td className="px-3 py-1.5 text-right text-white text-xs font-medium">{invoiceDistribution.reduce((s, l) => s + (l.hours || 0), 0).toFixed(1)}h</td>
+                            {invoiceDistribution.some(l => l.allocation_pct !== undefined) && <td className="px-3 py-1.5 text-right text-slate-400 text-xs">100%</td>}
                           </tr></tfoot>
                         </table>
                       </div>
                     </div>
-                  ) : <div className="mb-4 p-4 bg-slate-800/30 rounded-lg text-center text-slate-500 text-sm">
-                    {contractorType !== 'pure_ls' && !invoiceForm.client_id
-                      ? 'Select a client above to see your hours.'
-                      : `No timesheet entries found for ${billingMonth.label}. Submit your timesheet first.`}
-                  </div>}
-                  {/* Invoice file */}
+                  ) : (contractorType !== 'pure_ls' && !invoiceForm.client_id) ? (
+                    <div className="mb-4 p-3 bg-slate-800/30 rounded-lg text-center text-slate-500 text-sm">Select a client above to see your timesheet hours.</div>
+                  ) : null}
+
+                  {/* File + Notes */}
                   <div className="mb-4">
                     <label className="block text-xs text-slate-400 mb-1">Invoice Attachment (PDF)</label>
                     <DropZone file={invoiceFile} onFile={setInvoiceFile} onRemove={() => setInvoiceFile(null)} uploading={submittingInvoice} label="Drop invoice PDF here" accept=".pdf,image/*" />
                   </div>
                   <div className="mb-4"><label className="block text-xs text-slate-400 mb-1">Notes (optional)</label><textarea rows={2} placeholder="Any additional notes..." value={invoiceForm.notes} onChange={e => setInvoiceForm(p => ({ ...p, notes: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none" /></div>
-                  <button onClick={submitInvoice} disabled={submittingInvoice || !invoiceForm.invoice_number || invoiceDistribution.length === 0 || (contractorType !== 'pure_ls' && !invoiceForm.client_id)} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 rounded-xl text-white text-sm font-medium flex items-center justify-center gap-2">
+                  <button onClick={submitInvoice} disabled={submittingInvoice || !invoiceForm.invoice_number || parseFloat(invoiceForm.amount || '0') <= 0 || (contractorType !== 'pure_ls' && !invoiceForm.client_id)} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 rounded-xl text-white text-sm font-medium flex items-center justify-center gap-2">
                     {submittingInvoice ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <><Send size={16} /> Submit Invoice</>}
                   </button>
                 </div>
@@ -667,12 +646,15 @@ export default function ContractorPortal() {
                       <div className="w-9 h-9 bg-blue-500/15 rounded-lg flex items-center justify-center shrink-0"><FileText size={16} className="text-blue-400" /></div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2"><p className="text-white text-sm font-medium">{inv.invoice_number}</p>{inv.receipt_url && <Paperclip size={12} className="text-blue-400" />}</div>
-                        <p className="text-slate-500 text-xs">{formatDate(inv.period_start)} – {formatDate(inv.period_end)} · {PAYMENT_TERMS.find(t => t.id === inv.payment_terms)?.label || inv.payment_terms}</p>
+                        <p className="text-slate-500 text-xs">{formatDate(inv.period_start)} – {formatDate(inv.period_end)}</p>
                       </div>
                       <span className="text-white font-medium text-sm">{formatCurrency(inv.total_amount)}</span>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${st.bg} ${st.text}`}>{inv.status}</span>
+                      {inv.status === 'submitted' && (
+                        <button onClick={() => deleteInvoice(inv.id)} className="p-1.5 rounded-lg text-slate-600 hover:text-red-400 hover:bg-slate-800 transition-colors" title="Delete"><Trash2 size={14} /></button>
+                      )}
                     </div>
-                    {lines.length > 0 && <div className="mt-2 pt-2 border-t border-slate-800 space-y-1">{lines.map((l: any, i: number) => <div key={i} className="flex items-center justify-between text-xs"><span className="text-slate-400">{l.description}</span><span className="text-slate-300">{formatCurrency(l.amount)}</span></div>)}</div>}
+                    {lines.length > 0 && <div className="mt-2 pt-2 border-t border-slate-800 space-y-1">{lines.map((l: any, i: number) => <div key={i} className="flex items-center justify-between text-xs"><span className="text-slate-400">{l.description}</span><span className="text-slate-300">{l.hours ? `${l.hours}h` : ''}{l.allocation_pct ? ` · ${l.allocation_pct}%` : ''}</span></div>)}</div>}
                   </div>
                 )
               })}</div> : <div className="text-center py-12 text-slate-500"><FileText size={32} className="mx-auto mb-3 opacity-40" /><p className="text-sm">No invoices submitted yet</p></div>}
