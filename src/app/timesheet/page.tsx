@@ -539,10 +539,19 @@ export default function ContractorPortal() {
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 mb-4 shadow-lg shadow-orange-500/20">
-              <Building2 className="w-8 h-8 text-white" />
+            <div className="relative inline-flex items-center justify-center w-16 h-16 mb-4">
+              <svg width={48} height={48} viewBox="0 0 40 40" fill="none">
+                <defs>
+                  <linearGradient id="vLogo" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#34d399" />
+                    <stop offset="100%" stopColor="#10b981" />
+                  </linearGradient>
+                </defs>
+                <path d="M8 8L20 32L32 8" stroke="url(#vLogo)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+              <div className="absolute inset-0 blur-xl bg-emerald-500/20 -z-10" />
             </div>
-            <h1 className="text-2xl font-bold text-white">Contractor Portal</h1>
+            <h1 className="text-2xl font-bold text-white">Vantage</h1>
             <p className="text-slate-400 mt-1">Time • Expenses • Invoices</p>
           </div>
 
@@ -554,7 +563,7 @@ export default function ContractorPortal() {
               onChange={e => setEmail(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && lookupEmail()}
               placeholder="yourname@company.com"
-              className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
             />
             {error && (
               <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2 text-red-400 text-sm">
@@ -564,7 +573,7 @@ export default function ContractorPortal() {
             <button
               onClick={lookupEmail}
               disabled={loading}
-              className="w-full mt-4 py-3 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 rounded-xl text-white font-medium transition-colors flex items-center justify-center gap-2"
+              className="w-full mt-4 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-xl text-white font-medium transition-colors flex items-center justify-center gap-2"
             >
               {loading ? <><Loader2 size={18} className="animate-spin" /> Looking up...</> : 'Continue'}
             </button>
@@ -585,10 +594,11 @@ export default function ContractorPortal() {
         <div className="p-4 border-b border-slate-800">
           {!sidebarCollapsed && (
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-9 h-9 bg-orange-500/20 rounded-lg flex items-center justify-center shrink-0">
-                <span className="text-orange-400 font-semibold text-sm">
-                  {member?.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                </span>
+              <div className="w-9 h-9 shrink-0 flex items-center justify-center">
+                <svg width={24} height={24} viewBox="0 0 40 40" fill="none">
+                  <defs><linearGradient id="vSidebar" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#34d399" /><stop offset="100%" stopColor="#10b981" /></linearGradient></defs>
+                  <path d="M8 8L20 32L32 8" stroke="url(#vSidebar)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                </svg>
               </div>
               <div className="min-w-0">
                 <p className="text-white text-sm font-medium truncate">{member?.name}</p>
@@ -612,7 +622,7 @@ export default function ContractorPortal() {
               onClick={() => { setActiveTab(item.id); setError(null) }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                 activeTab === item.id
-                  ? 'bg-orange-500/15 text-orange-400'
+                  ? 'bg-emerald-500/15 text-emerald-400'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
             >
@@ -667,7 +677,7 @@ export default function ContractorPortal() {
                   <ChevronLeft size={18} />
                 </button>
                 <div className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl">
-                  <Calendar size={16} className="text-orange-400" />
+                  <Calendar size={16} className="text-emerald-400" />
                   <span className="text-white text-sm font-medium">{week.label}</span>
                 </div>
                 <button onClick={() => { const d = new Date(weekDate); d.setDate(d.getDate() + 7); setWeekDate(d) }}
@@ -692,7 +702,7 @@ export default function ContractorPortal() {
                         className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-800/50 transition-colors"
                       >
                         <div className="flex items-center gap-2">
-                          <Building2 size={16} className="text-orange-400" />
+                          <Building2 size={16} className="text-emerald-400" />
                           <span className="text-white font-medium text-sm">{clientName}</span>
                           <span className="text-slate-500 text-xs">({projects.length} project{projects.length > 1 ? 's' : ''})</span>
                         </div>
@@ -713,7 +723,7 @@ export default function ContractorPortal() {
                                 step="0.5"
                                 value={timeEntries[proj.project_id]?.hours || ''}
                                 onChange={e => setTimeEntries(prev => ({ ...prev, [proj.project_id]: { ...prev[proj.project_id], hours: e.target.value } }))}
-                                className="w-20 px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                className="w-20 px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                               />
                               <span className="text-slate-500 text-xs w-6">hrs</span>
                             </div>
@@ -734,7 +744,7 @@ export default function ContractorPortal() {
                 <button
                   onClick={submitTime}
                   disabled={submittingTime || totalTimeHours === 0}
-                  className="w-full py-3 bg-orange-600 hover:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl text-white font-medium transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl text-white font-medium transition-colors flex items-center justify-center gap-2"
                 >
                   {submittingTime ? <><Loader2 size={18} className="animate-spin" /> Submitting...</> : <><Send size={18} /> Submit Timesheet</>}
                 </button>
@@ -752,7 +762,7 @@ export default function ContractorPortal() {
                 </div>
                 <button
                   onClick={() => setShowExpenseForm(true)}
-                  className="px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-xl text-white text-sm font-medium transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-xl text-white text-sm font-medium transition-colors flex items-center gap-2"
                 >
                   <Plus size={16} /> New Expense
                 </button>
@@ -760,7 +770,7 @@ export default function ContractorPortal() {
 
               {/* New Expense Form */}
               {showExpenseForm && (
-                <div className="bg-slate-900 border border-orange-500/30 rounded-xl p-5 mb-6">
+                <div className="bg-slate-900 border border-emerald-500/30 rounded-xl p-5 mb-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-white font-medium">New Expense</h2>
                     <button onClick={() => setShowExpenseForm(false)} className="text-slate-400 hover:text-white"><X size={18} /></button>
@@ -770,13 +780,13 @@ export default function ContractorPortal() {
                       <label className="block text-xs text-slate-400 mb-1">Date</label>
                       <input type="date" value={expenseForm.date}
                         onChange={e => setExpenseForm(p => ({ ...p, date: e.target.value }))}
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                     </div>
                     <div>
                       <label className="block text-xs text-slate-400 mb-1">Category</label>
                       <select value={expenseForm.category}
                         onChange={e => setExpenseForm(p => ({ ...p, category: e.target.value }))}
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
                         {EXPENSE_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
                       </select>
                     </div>
@@ -785,7 +795,7 @@ export default function ContractorPortal() {
                       <input type="number" placeholder="0.00" step="0.01" min="0"
                         value={expenseForm.amount}
                         onChange={e => setExpenseForm(p => ({ ...p, amount: e.target.value }))}
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                     </div>
                     <div>
                       <label className="block text-xs text-slate-400 mb-1">Client (optional)</label>
@@ -793,7 +803,7 @@ export default function ContractorPortal() {
                         onChange={e => {
                           setExpenseForm(p => ({ ...p, client_id: e.target.value, project_id: '' }))
                         }}
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
                         <option value="">None</option>
                         {Object.entries(assignmentsByClient).map(([cid, { clientName }]) => (
                           <option key={cid} value={cid}>{clientName}</option>
@@ -805,13 +815,13 @@ export default function ContractorPortal() {
                       <input type="text" placeholder="What was this expense for?"
                         value={expenseForm.description}
                         onChange={e => setExpenseForm(p => ({ ...p, description: e.target.value }))}
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                     </div>
                   </div>
                   <button
                     onClick={submitExpense}
                     disabled={submittingExpense || !expenseForm.description || !expenseForm.amount}
-                    className="w-full mt-4 py-2.5 bg-orange-600 hover:bg-orange-700 disabled:opacity-40 rounded-xl text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    className="w-full mt-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 rounded-xl text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
                   >
                     {submittingExpense ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <><Send size={16} /> Submit Expense</>}
                   </button>
@@ -858,7 +868,7 @@ export default function ContractorPortal() {
                 </div>
                 <button
                   onClick={() => setShowInvoiceForm(true)}
-                  className="px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-xl text-white text-sm font-medium transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-xl text-white text-sm font-medium transition-colors flex items-center gap-2"
                 >
                   <Plus size={16} /> New Invoice
                 </button>
@@ -866,7 +876,7 @@ export default function ContractorPortal() {
 
               {/* New Invoice Form */}
               {showInvoiceForm && (
-                <div className="bg-slate-900 border border-orange-500/30 rounded-xl p-5 mb-6">
+                <div className="bg-slate-900 border border-emerald-500/30 rounded-xl p-5 mb-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-white font-medium">Submit Invoice</h2>
                     <button onClick={() => setShowInvoiceForm(false)} className="text-slate-400 hover:text-white"><X size={18} /></button>
@@ -878,13 +888,13 @@ export default function ContractorPortal() {
                       <input type="text" placeholder="INV-2026-001"
                         value={invoiceForm.invoice_number}
                         onChange={e => setInvoiceForm(p => ({ ...p, invoice_number: e.target.value }))}
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                     </div>
                     <div>
                       <label className="block text-xs text-slate-400 mb-1">Payment Terms</label>
                       <select value={invoiceForm.payment_terms}
                         onChange={e => setInvoiceForm(p => ({ ...p, payment_terms: e.target.value }))}
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
                         {PAYMENT_TERMS.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
                       </select>
                     </div>
@@ -936,7 +946,7 @@ export default function ContractorPortal() {
                             <tr className="border-t border-slate-600">
                               <td colSpan={invoiceDistribution[0]?.project_name ? 3 : 2} className="px-3 py-2 text-white font-medium">Total</td>
                               {invoiceDistribution[0]?.allocation_pct !== undefined && <td className="px-3 py-2 text-right text-slate-300">100%</td>}
-                              <td className="px-3 py-2 text-right text-orange-400 font-bold">
+                              <td className="px-3 py-2 text-right text-emerald-400 font-bold">
                                 {formatCurrency(invoiceDistribution.reduce((s, l) => s + l.amount, 0))}
                               </td>
                             </tr>
@@ -955,13 +965,13 @@ export default function ContractorPortal() {
                     <textarea rows={2} placeholder="Any additional notes..."
                       value={invoiceForm.notes}
                       onChange={e => setInvoiceForm(p => ({ ...p, notes: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" />
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none" />
                   </div>
 
                   <button
                     onClick={submitInvoice}
                     disabled={submittingInvoice || !invoiceForm.invoice_number || invoiceDistribution.length === 0}
-                    className="w-full py-2.5 bg-orange-600 hover:bg-orange-700 disabled:opacity-40 rounded-xl text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 rounded-xl text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
                   >
                     {submittingInvoice ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <><Send size={16} /> Submit Invoice</>}
                   </button>
