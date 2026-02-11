@@ -225,7 +225,7 @@ export default function ContractorPortal() {
     if (!email.trim()) return
     setLoading(true); setError(null)
     try {
-      const { data: md, error: me } = await supabase.from('team_members').select('id, name, email, cost_type, cost_amount').eq('email', email.trim().toLowerCase()).eq('status', 'active').single()
+      const { data: md, error: me } = await supabase.from('team_members').select('id, name, email, cost_type, cost_amount, company_id').eq('email', email.trim().toLowerCase()).eq('status', 'active').single()
       if (me || !md) { setError('Email not found. Contact your administrator.'); setLoading(false); return }
       const { data: rcData } = await supabase.from('bill_rates').select('team_member_id, client_id, rate, cost_type, cost_amount').eq('team_member_id', md.id).eq('is_active', true)
       const { data: clients } = await supabase.from('clients').select('id, name')
@@ -264,7 +264,7 @@ export default function ContractorPortal() {
       if (existingEntries.length > 0) await supabase.from('time_entries').delete().eq('contractor_id', member.id).gte('date', week.start).lte('date', week.end)
       const entries = Object.values(timeEntries).filter(e => parseFloat(e.hours || '0') > 0).map(e => {
         const a = assignments.find(x => x.project_id === e.project_id)
-        return { contractor_id: member.id, project_id: e.project_id, date: week.start, hours: parseFloat(e.hours), billable_hours: parseFloat(e.hours), is_billable: true, bill_rate: a?.rate || 0, description: e.notes || null }
+        return { contractor_id: member.id, project_id: e.project_id, date: week.start, hours: parseFloat(e.hours), billable_hours: parseFloat(e.hours), is_billable: true, bill_rate: a?.rate || 0, description: e.notes || null, company_id: member.company_id }
       })
       if (entries.length > 0) { const { error: ie } = await supabase.from('time_entries').insert(entries); if (ie) throw ie }
       setTimeSuccess(true); setTimeout(() => setTimeSuccess(false), 3000)
