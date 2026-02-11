@@ -156,6 +156,9 @@ export default function ContractorManagement() {
   // Invoice detail
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null)
 
+  // Attachment preview
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
   // Action state
   const [processing, setProcessing] = useState<string | null>(null)
 
@@ -334,6 +337,11 @@ export default function ContractorManagement() {
     setProcessing(null)
   }
 
+  const openPreview = (path: string) => {
+    const { data } = supabase.storage.from('contractor-uploads').getPublicUrl(path)
+    if (data?.publicUrl) setPreviewUrl(data.publicUrl)
+  }
+
   // ============ RENDER ============
   if (loading) {
     return (
@@ -499,10 +507,10 @@ export default function ContractorManagement() {
                         <StatusBadge status={inv.status} />
                         <div>
                           {inv.receipt_url ? (
-                            <a href={`${supabase.storage.from('contractor-uploads').getPublicUrl(inv.receipt_url).data.publicUrl}`} target="_blank" rel="noopener noreferrer"
+                            <button onClick={() => openPreview(inv.receipt_url!)}
                               className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs">
-                              <Paperclip size={12} /> View
-                            </a>
+                              <Eye size={12} /> View
+                            </button>
                           ) : <span className="text-slate-600 text-xs">None</span>}
                         </div>
                         <div className="flex items-center gap-1.5">
@@ -638,8 +646,8 @@ export default function ContractorManagement() {
                   <StatusBadge status={exp.status} />
                   <div className="flex items-center gap-1.5">
                     {exp.receipt_url && (
-                      <a href={`${supabase.storage.from('contractor-uploads').getPublicUrl(exp.receipt_url).data.publicUrl}`} target="_blank" rel="noopener noreferrer"
-                        className="p-1 rounded text-blue-400 hover:text-blue-300"><Paperclip size={12} /></a>
+                      <button onClick={() => openPreview(exp.receipt_url!)}
+                        className="p-1 rounded text-blue-400 hover:text-blue-300"><Eye size={12} /></button>
                     )}
                     {exp.status === 'pending' && (
                       <>
@@ -665,6 +673,39 @@ export default function ContractorManagement() {
                 <p className="text-sm">No expenses found</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ===================== ATTACHMENT PREVIEW MODAL ===================== */}
+      {previewUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setPreviewUrl(null)}>
+          <div className="relative w-full max-w-3xl max-h-[85vh] mx-4 bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+              <span className="text-white text-sm font-medium">Attachment Preview</span>
+              <div className="flex items-center gap-2">
+                <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 text-xs flex items-center gap-1.5 transition-colors">
+                  <ExternalLink size={12} /> Open
+                </a>
+                <a href={previewUrl} download className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 text-xs flex items-center gap-1.5 transition-colors">
+                  <Download size={12} /> Download
+                </a>
+                <button onClick={() => setPreviewUrl(null)} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+            {/* Content */}
+            <div className="h-[75vh] bg-slate-950">
+              {previewUrl.match(/\.(jpg|jpeg|png|gif|webp|heic)$/i) || previewUrl.includes('image') ? (
+                <div className="h-full flex items-center justify-center p-4">
+                  <img src={previewUrl} alt="Attachment" className="max-h-full max-w-full object-contain rounded-lg" />
+                </div>
+              ) : (
+                <iframe src={previewUrl} className="w-full h-full" title="Document preview" />
+              )}
+            </div>
           </div>
         </div>
       )}
