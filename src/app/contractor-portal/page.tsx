@@ -232,9 +232,14 @@ export default function ContractorPortal() {
       const cMap: Record<string, string> = {}; (clients || []).forEach((c: any) => { cMap[c.id] = c.name })
       setRateCards((rcData || []).map((r: any) => ({ team_member_id: r.team_member_id, client_id: r.client_id, client_name: cMap[r.client_id] || 'Unknown', cost_type: r.cost_type || 'hourly', cost_amount: r.cost_amount || 0, rate: r.rate || 0 })))
       const { data: pa } = await supabase.from('team_project_assignments').select('project_id, payment_type, rate, bill_rate').eq('team_member_id', md.id).eq('is_active', true)
-      const { data: projects } = await supabase.from('projects').select('id, name, client_id').eq('status', 'active')
+      const { data: projects } = await supabase.from('projects').select('id, name, client_id, company_id').eq('status', 'active')
       const pMap: Record<string, any> = {}; (projects || []).forEach((p: any) => { pMap[p.id] = p })
       const assigns: Assignment[] = (pa || []).map((a: any) => { const p = pMap[a.project_id]; return { project_id: a.project_id, project_name: p?.name || 'Unknown', client_id: p?.client_id || '', client_name: p?.client_id ? cMap[p.client_id] || '' : '', payment_type: a.payment_type || 'tm', rate: a.bill_rate || a.rate || 0 } }).filter((a: Assignment) => a.project_name !== 'Unknown')
+      // Ensure company_id — fallback to project's company_id if member record is missing it
+      if (!md.company_id && projects && projects.length > 0) {
+        const projectWithCompany = projects.find((p: any) => p.company_id)
+        if (projectWithCompany) md.company_id = projectWithCompany.company_id
+      }
       setMember(md); setAssignments(assigns)
       const init: Record<string, TimeEntryForm> = {}; assigns.forEach(a => { init[a.project_id] = { project_id: a.project_id, hours: '', notes: '' } }); setTimeEntries(init)
       setStep('portal')
