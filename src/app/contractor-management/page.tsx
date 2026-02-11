@@ -680,7 +680,7 @@ export default function ContractorManagement() {
       {/* ===================== ATTACHMENT PREVIEW MODAL ===================== */}
       {previewUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setPreviewUrl(null)}>
-          <div className="relative w-full max-w-3xl max-h-[85vh] mx-4 bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="relative w-[95vw] h-[92vh] mx-4 bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
               <span className="text-white text-sm font-medium">Attachment Preview</span>
@@ -697,7 +697,7 @@ export default function ContractorManagement() {
               </div>
             </div>
             {/* Content */}
-            <div className="h-[75vh] bg-slate-950">
+            <div className="flex-1 bg-slate-950" style={{ height: 'calc(92vh - 52px)' }}>
               {previewUrl.match(/\.(jpg|jpeg|png|gif|webp|heic)$/i) || previewUrl.includes('image') ? (
                 <div className="h-full flex items-center justify-center p-4">
                   <img src={previewUrl} alt="Attachment" className="max-h-full max-w-full object-contain rounded-lg" />
