@@ -14,7 +14,7 @@ const supabase = createClient(
 )
 
 // ============ TYPES ============
-interface TeamMember { id: string; name: string; email: string; cost_type?: string; cost_amount?: number }
+interface TeamMember { id: string; name: string; email: string; cost_type?: string; cost_amount?: number; company_id?: string }
 interface Assignment { project_id: string; project_name: string; client_id: string; client_name: string; payment_type: string; rate: number }
 interface RateCard { team_member_id: string; client_id: string; client_name: string; cost_type: string; cost_amount: number; rate: number }
 interface TimeEntryForm { project_id: string; hours: string; notes: string }
