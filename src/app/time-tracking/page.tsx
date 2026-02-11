@@ -598,31 +598,27 @@ export default function TimeTrackingPage() {
     return true
   }), [entries, priorPeriod, selectedClient, selectedEmployee, selectedProject])
 
-  // ============ FIXED COST ADJUSTMENT ============
+  // ============ FIXED COST ADJUSTMENT (Profitability tab only) ============
   // Recalculate cost_rate for lump sum members so total cost = fixed monthly amount
   const costAdjustedEntries = useMemo(() => 
     adjustEntriesForFixedCosts(filteredEntries, teamMembers, billRates, dateRange.start, dateRange.end),
     [filteredEntries, teamMembers, billRates, dateRange]
   )
-  const costAdjustedPriorEntries = useMemo(() => 
-    adjustEntriesForFixedCosts(priorPeriodEntries, teamMembers, billRates, priorPeriod.start, priorPeriod.end),
-    [priorPeriodEntries, teamMembers, billRates, priorPeriod]
-  )
 
   // ============ KPIs — DUAL LAYER ============
   const kpis = useMemo(() => {
-    const totalActualHours = costAdjustedEntries.reduce((sum, e) => sum + e.hours, 0)
-    const totalBillableHours = costAdjustedEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours : 0), 0)
-    const totalCost = costAdjustedEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0)
-    const totalRevenue = costAdjustedEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours * e.bill_rate : 0), 0)
+    const totalActualHours = filteredEntries.reduce((sum, e) => sum + e.hours, 0)
+    const totalBillableHours = filteredEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours : 0), 0)
+    const totalCost = filteredEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0)
+    const totalRevenue = filteredEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours * e.bill_rate : 0), 0)
     const grossMargin = totalRevenue - totalCost
     const marginPct = totalRevenue > 0 ? (grossMargin / totalRevenue) * 100 : 0
     const avgBillRate = totalBillableHours > 0 ? totalRevenue / totalBillableHours : 0
     const avgCostRate = totalActualHours > 0 ? totalCost / totalActualHours : 0
 
-    const priorHours = costAdjustedPriorEntries.reduce((sum, e) => sum + e.hours, 0)
-    const priorRevenue = costAdjustedPriorEntries.reduce((sum, e) => sum + (e.is_billable ? (e.billable_hours || e.hours) * e.bill_rate : 0), 0)
-    const priorCost = costAdjustedPriorEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0)
+    const priorHours = priorPeriodEntries.reduce((sum, e) => sum + e.hours, 0)
+    const priorRevenue = priorPeriodEntries.reduce((sum, e) => sum + (e.is_billable ? (e.billable_hours || e.hours) * e.bill_rate : 0), 0)
+    const priorCost = priorPeriodEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0)
     
     const activeMembers = teamMembers.filter(m => m.status === 'active')
     const totalCapacity = activeMembers.length * 160
@@ -632,8 +628,8 @@ export default function TimeTrackingPage() {
     const revenueTrend = priorRevenue > 0 ? ((totalRevenue - priorRevenue) / priorRevenue) * 100 : 0
     const costTrend = priorCost > 0 ? ((totalCost - priorCost) / priorCost) * 100 : 0
 
-    return { totalActualHours, totalBillableHours, totalCost, totalRevenue, grossMargin, marginPct, avgBillRate, avgCostRate, utilization, hoursTrend, revenueTrend, costTrend, uniqueClients: new Set(costAdjustedEntries.map(e => e.client_id).filter(Boolean)).size }
-  }, [costAdjustedEntries, costAdjustedPriorEntries, teamMembers])
+    return { totalActualHours, totalBillableHours, totalCost, totalRevenue, grossMargin, marginPct, avgBillRate, avgCostRate, utilization, hoursTrend, revenueTrend, costTrend, uniqueClients: new Set(filteredEntries.map(e => e.client_id).filter(Boolean)).size }
+  }, [filteredEntries, priorPeriodEntries, teamMembers])
 
   const weekColumns = useMemo(() => getWeekColumns(dateRange.start, dateRange.end), [dateRange])
 
@@ -643,7 +639,7 @@ export default function TimeTrackingPage() {
       projects: Record<string, { id: string; name: string; members: Record<string, { id: string; name: string; billRate: number; costRate: number; weekActualHours: Record<string, number>; weekBillableHours: Record<string, number>; totalActualHours: number; totalBillableHours: number; totalCost: number; totalRevenue: number; weekEntries: Record<string, { id: string; hours: number; billable_hours: number }[]> }>; totalActualHours: number; totalBillableHours: number; totalCost: number; totalRevenue: number }>
     }> = {}
 
-    costAdjustedEntries.forEach(entry => {
+    filteredEntries.forEach(entry => {
       const clientId = entry.client_id || 'unassigned'
       const clientName = entry.client_name || 'Unassigned'
       if (!clientData[clientId]) clientData[clientId] = { id: clientId, name: clientName, totalActualHours: 0, totalBillableHours: 0, totalCost: 0, totalRevenue: 0, projects: {} }
@@ -681,12 +677,12 @@ export default function TimeTrackingPage() {
       })
     })
     return Object.values(clientData).sort((a, b) => b.totalRevenue - a.totalRevenue)
-  }, [costAdjustedEntries, weekColumns])
+  }, [filteredEntries, weekColumns])
 
   // ============ BY EMPLOYEE DATA ============
   const dataByEmployee = useMemo(() => {
     const employeeData: Record<string, { id: string; name: string; empType: string; totalActualHours: number; totalBillableHours: number; totalCost: number; totalRevenue: number; clients: Record<string, { name: string; actualHours: number; billableHours: number; cost: number; revenue: number }> }> = {}
-    costAdjustedEntries.forEach(entry => {
+    filteredEntries.forEach(entry => {
       if (!employeeData[entry.team_member_id]) {
         const member = teamMembers.find(m => m.id === entry.team_member_id)
         employeeData[entry.team_member_id] = { id: entry.team_member_id, name: entry.team_member_name, empType: member?.employment_type || 'contractor', totalActualHours: 0, totalBillableHours: 0, totalCost: 0, totalRevenue: 0, clients: {} }
@@ -700,7 +696,7 @@ export default function TimeTrackingPage() {
       emp.clients[clientKey].cost += entry.hours * entry.cost_rate; emp.clients[clientKey].revenue += entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
     })
     return Object.values(employeeData).sort((a, b) => b.totalActualHours - a.totalActualHours)
-  }, [costAdjustedEntries, teamMembers])
+  }, [filteredEntries, teamMembers])
 
   // ============ PROFITABILITY DATA ============
   const profitabilityByProject = useMemo(() => {
@@ -717,7 +713,7 @@ export default function TimeTrackingPage() {
   const revenueByClientData = useMemo(() => dataByClient.map((c, i) => ({ name: c.name, value: c.totalRevenue, fill: CHART_COLORS[i % CHART_COLORS.length] })), [dataByClient])
 
   const weeklyTrendData = useMemo(() => weekColumns.map(week => {
-    const weekEntries = costAdjustedEntries.filter(e => {
+    const weekEntries = filteredEntries.filter(e => {
       const entryDate = new Date(e.date); const weekStart = new Date(week.start); const weekEnd = new Date(week.end); weekEnd.setHours(23, 59, 59)
       return entryDate >= weekStart && entryDate <= weekEnd
     })
@@ -728,7 +724,7 @@ export default function TimeTrackingPage() {
       cost: weekEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0),
       revenue: weekEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours * e.bill_rate : 0), 0),
     }
-  }), [weekColumns, costAdjustedEntries])
+  }), [weekColumns, filteredEntries])
 
   // ============ ACTIONS ============
   const saveNewEntry = async () => {
@@ -806,7 +802,7 @@ export default function TimeTrackingPage() {
 
   const exportToCSV = () => {
     const headers = ['Date', 'Employee', 'Client', 'Project', 'Actual Hours', 'Billable Hours', 'Cost Rate', 'Bill Rate', 'Cost', 'Revenue', 'Margin', 'Notes']
-    const rows = costAdjustedEntries.map(e => [
+    const rows = filteredEntries.map(e => [
       e.date, e.team_member_name, e.client_name, e.project_name, e.hours, e.billable_hours,
       e.cost_rate, e.bill_rate, (e.hours * e.cost_rate).toFixed(2), (e.billable_hours * e.bill_rate).toFixed(2),
       ((e.billable_hours * e.bill_rate) - (e.hours * e.cost_rate)).toFixed(2), e.notes || ''
@@ -969,9 +965,9 @@ export default function TimeTrackingPage() {
 
           <CollapsibleSection title="Hours by Project" icon={<Briefcase size={16} />}>
             <div className="h-64">
-              {costAdjustedEntries.length > 0 ? (
+              {filteredEntries.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={Object.values(costAdjustedEntries.reduce((acc, e) => { if (!acc[e.project_id]) acc[e.project_id] = { name: e.project_name.substring(0, 15), hours: 0 }; acc[e.project_id].hours += e.hours; return acc }, {} as Record<string, { name: string; hours: number }>)).sort((a, b) => b.hours - a.hours).slice(0, 8)} layout="vertical">
+                  <BarChart data={Object.values(filteredEntries.reduce((acc, e) => { if (!acc[e.project_id]) acc[e.project_id] = { name: e.project_name.substring(0, 15), hours: 0 }; acc[e.project_id].hours += e.hours; return acc }, {} as Record<string, { name: string; hours: number }>)).sort((a, b) => b.hours - a.hours).slice(0, 8)} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                     <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
                     <YAxis type="category" dataKey="name" width={100} tick={{ fill: '#94a3b8', fontSize: 11 }} />
@@ -1164,7 +1160,7 @@ export default function TimeTrackingPage() {
 
       {/* ============ DETAILED VIEW ============ */}
       {activeTab === 'detailed' && (
-        <CollapsibleSection title="Time Entries" badge={costAdjustedEntries.length} icon={<Calendar size={16} />}>
+        <CollapsibleSection title="Time Entries" badge={filteredEntries.length} icon={<Calendar size={16} />}>
           <div className="mb-3 flex items-center gap-2">
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <div className="flex items-center gap-1"><Lock size={12} /><span>Actual Hours = cost (contractor submitted)</span></div>
@@ -1190,7 +1186,7 @@ export default function TimeTrackingPage() {
                 <th className={`px-3 py-3 text-center font-medium ${THEME.textMuted}`}>⚡</th>
               </tr></thead>
               <tbody>
-                {costAdjustedEntries.length > 0 ? costAdjustedEntries.slice(0, 100).map((entry) => {
+                {filteredEntries.length > 0 ? filteredEntries.slice(0, 100).map((entry) => {
                   const cost = entry.hours * entry.cost_rate
                   const revenue = entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
                   const margin = revenue - cost
@@ -1229,7 +1225,7 @@ export default function TimeTrackingPage() {
               </tbody>
             </table>
           </div>
-          {costAdjustedEntries.length > 100 && <p className="text-center text-sm text-slate-400 mt-2">Showing first 100 of {costAdjustedEntries.length} entries</p>}
+          {filteredEntries.length > 100 && <p className="text-center text-sm text-slate-400 mt-2">Showing first 100 of {filteredEntries.length} entries</p>}
         </CollapsibleSection>
       )}
 
@@ -1295,19 +1291,29 @@ export default function TimeTrackingPage() {
                       </td>
                     </tr>
                   ))}
+                  {(() => {
+                    const tHrs = profitabilityByProject.reduce((s, r) => s + r.actualHours, 0)
+                    const bHrs = profitabilityByProject.reduce((s, r) => s + r.billableHours, 0)
+                    const tCost = profitabilityByProject.reduce((s, r) => s + r.cost, 0)
+                    const tRev = profitabilityByProject.reduce((s, r) => s + r.revenue, 0)
+                    const gm = tRev - tCost
+                    const mp = tRev > 0 ? (gm / tRev) * 100 : 0
+                    return (
                   <tr className="bg-white/[0.03] font-medium">
                     <td className={`px-4 py-3 ${THEME.textPrimary}`} colSpan={2}>TOTAL</td>
-                    <td className="px-4 py-3 text-right text-blue-400">{kpis.totalActualHours.toFixed(1)}</td>
-                    <td className="px-4 py-3 text-right text-orange-400">{kpis.totalBillableHours.toFixed(1)}</td>
-                    <td className="px-4 py-3 text-right text-rose-400">{formatCurrency(kpis.totalCost)}</td>
-                    <td className="px-4 py-3 text-right text-emerald-400">{formatCurrency(kpis.totalRevenue)}</td>
-                    <td className={`px-4 py-3 text-right font-bold ${kpis.grossMargin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(kpis.grossMargin)}</td>
+                    <td className="px-4 py-3 text-right text-blue-400">{tHrs.toFixed(1)}</td>
+                    <td className="px-4 py-3 text-right text-orange-400">{bHrs.toFixed(1)}</td>
+                    <td className="px-4 py-3 text-right text-rose-400">{formatCurrency(tCost)}</td>
+                    <td className="px-4 py-3 text-right text-emerald-400">{formatCurrency(tRev)}</td>
+                    <td className={`px-4 py-3 text-right font-bold ${gm >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(gm)}</td>
                     <td className="px-4 py-3 text-right">
-                      <span className={`px-2 py-1 rounded text-sm font-bold ${kpis.marginPct >= 20 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                        {kpis.marginPct.toFixed(1)}%
+                      <span className={`px-2 py-1 rounded text-sm font-bold ${mp >= 20 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                        {mp.toFixed(1)}%
                       </span>
                     </td>
                   </tr>
+                    )
+                  })()}
                 </tbody>
               </table>
             </div>
