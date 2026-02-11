@@ -147,6 +147,7 @@ export default function ContractorManagement() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterMember, setFilterMember] = useState('all')
   const [filterClient, setFilterClient] = useState('all')
+  const [groupBy, setGroupBy] = useState<'none' | 'contractor' | 'client'>('none')
 
   // Date range
   const [dateRange, setDateRange] = useState<'month' | 'quarter' | 'year' | 'all'>('month')
@@ -234,6 +235,44 @@ export default function ContractorManagement() {
     return result
   }, [invoices, dateFilter, dateRange, searchQuery, filterStatus, filterMember, filterClient, memberMap])
 
+  // ============ GROUPED INVOICES ============
+  const groupedInvoices = useMemo(() => {
+    if (groupBy === 'none') return [{ key: 'all', label: '', invoices: filteredInvoices, total: filteredInvoices.reduce((s, i) => s + i.total_amount, 0) }]
+    const groups: Record<string, { label: string; invoices: ContractorInvoice[]; total: number }> = {}
+    filteredInvoices.forEach(inv => {
+      if (groupBy === 'contractor') {
+        const key = inv.team_member_id
+        const label = memberMap[key] || 'Unknown'
+        if (!groups[key]) groups[key] = { label, invoices: [], total: 0 }
+        groups[key].invoices.push(inv)
+        groups[key].total += inv.total_amount
+      } else {
+        // Group by client — an invoice can span multiple clients via line items
+        const lines = inv.contractor_invoice_lines || []
+        if (lines.length === 0) {
+          const key = '_unassigned'
+          if (!groups[key]) groups[key] = { label: 'Unassigned', invoices: [], total: 0 }
+          if (!groups[key].invoices.find(i => i.id === inv.id)) groups[key].invoices.push(inv)
+          groups[key].total += inv.total_amount
+        } else {
+          // Dedupe: assign invoice to the client with the largest line amount
+          const clientTotals: Record<string, number> = {}
+          lines.forEach((l: any) => { clientTotals[l.client_id] = (clientTotals[l.client_id] || 0) + l.amount })
+          const primaryClient = Object.entries(clientTotals).sort((a, b) => b[1] - a[1])[0]?.[0] || '_unassigned'
+          const key = primaryClient
+          const label = clientMap[key] || 'Unknown'
+          if (!groups[key]) groups[key] = { label, invoices: [], total: 0 }
+          groups[key].invoices.push(inv)
+          groups[key].total += inv.total_amount
+        }
+      }
+    })
+    return Object.entries(groups).sort((a, b) => b[1].total - a[1].total).map(([key, g]) => ({ key, ...g }))
+  }, [filteredInvoices, groupBy, memberMap, clientMap])
+
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const toggleGroup = (key: string) => setCollapsedGroups(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
+
   // ============ FILTERED EXPENSES ============
   const filteredExpenses = useMemo(() => {
     let result = [...expenses]
@@ -312,7 +351,7 @@ export default function ContractorManagement() {
           <h1 className="text-2xl font-bold text-white">Contractor Management</h1>
           <p className="text-slate-400 text-sm mt-0.5">AP invoices and expenses from your team</p>
         </div>
-        <a href="/portal" target="_blank" rel="noopener noreferrer"
+        <a href="/timesheet" target="_blank" rel="noopener noreferrer"
           className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-slate-300 text-sm transition-colors">
           <ExternalLink size={14} /> Contractor Portal
         </a>
@@ -369,147 +408,168 @@ export default function ContractorManagement() {
             <MetricCard label="Paid" value={formatCurrency(invoiceMetrics.paidAmt)} icon={CreditCard} color="emerald" />
           </div>
 
-          {/* Filters */}
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-xs">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-              <input type="text" placeholder="Search invoices..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
-            </div>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-              className="px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
-              <option value="all">All Statuses</option>
-              <option value="submitted">Submitted</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-              <option value="paid">Paid</option>
-            </select>
-            <select value={filterMember} onChange={e => setFilterMember(e.target.value)}
-              className="px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
-              <option value="all">All Contractors</option>
-              {teamMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-            <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
-              className="px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
-              <option value="all">All Clients</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-
-          {/* Invoice List */}
-          <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
-            {/* Table header */}
-            <div className="grid grid-cols-[1fr_140px_100px_120px_100px_100px_140px] gap-2 px-4 py-2.5 border-b border-white/[0.06] text-xs text-slate-500 font-medium uppercase tracking-wider">
-              <span>Invoice</span>
-              <span>Contractor</span>
-              <span>Period</span>
-              <span className="text-right">Amount</span>
-              <span>Status</span>
-              <span>Attachment</span>
-              <span>Actions</span>
-            </div>
-
-            {filteredInvoices.length > 0 ? filteredInvoices.map(inv => {
-              const lines = inv.contractor_invoice_lines || []
-              const isExpanded = expandedInvoice === inv.id
-              const isProcessing = processing === inv.id
-              return (
-                <div key={inv.id} className="border-b border-white/[0.04] last:border-0">
-                  <div className="grid grid-cols-[1fr_140px_100px_120px_100px_100px_140px] gap-2 px-4 py-3 items-center hover:bg-white/[0.02] transition-colors">
-                    {/* Invoice info */}
-                    <div className="flex items-center gap-3 min-w-0">
-                      <button onClick={() => setExpandedInvoice(isExpanded ? null : inv.id)} className="text-slate-400 hover:text-white">
-                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                      </button>
-                      <div className="min-w-0">
-                        <p className="text-white text-sm font-medium truncate">{inv.invoice_number}</p>
-                        <p className="text-slate-500 text-xs">Submitted {formatDate(inv.submitted_at?.split('T')[0] || inv.invoice_date)}</p>
-                      </div>
-                    </div>
-                    {/* Contractor */}
-                    <span className="text-slate-300 text-sm truncate">{memberMap[inv.team_member_id] || '—'}</span>
-                    {/* Period */}
-                    <span className="text-slate-400 text-xs">{formatDateCompact(inv.period_start)} – {formatDateCompact(inv.period_end)}</span>
-                    {/* Amount */}
-                    <span className="text-white text-sm font-medium text-right">{formatCurrency(inv.total_amount)}</span>
-                    {/* Status */}
-                    <StatusBadge status={inv.status} />
-                    {/* Attachment */}
-                    <div>
-                      {inv.receipt_url ? (
-                        <a href={`${supabase.storage.from('contractor-uploads').getPublicUrl(inv.receipt_url).data.publicUrl}`} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs">
-                          <Paperclip size={12} /> View
-                        </a>
-                      ) : <span className="text-slate-600 text-xs">None</span>}
-                    </div>
-                    {/* Actions */}
-                    <div className="flex items-center gap-1.5">
-                      {inv.status === 'submitted' && (
-                        <>
-                          <button onClick={() => updateInvoiceStatus(inv.id, 'approved')} disabled={isProcessing}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 text-xs font-medium hover:bg-emerald-500/25 disabled:opacity-50 transition-colors">
-                            {isProcessing ? <Loader2 size={12} className="animate-spin" /> : 'Approve'}
-                          </button>
-                          <button onClick={() => updateInvoiceStatus(inv.id, 'rejected')} disabled={isProcessing}
-                            className="px-2.5 py-1 rounded-lg bg-red-500/10 text-red-400 text-xs font-medium hover:bg-red-500/20 disabled:opacity-50 transition-colors">
-                            Reject
-                          </button>
-                        </>
-                      )}
-                      {inv.status === 'approved' && (
-                        <button onClick={() => updateInvoiceStatus(inv.id, 'paid')} disabled={isProcessing}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 text-xs font-medium hover:bg-emerald-500/25 disabled:opacity-50 transition-colors">
-                          Mark Paid
-                        </button>
-                      )}
-                      {(inv.status === 'paid' || inv.status === 'rejected') && (
-                        <span className="text-slate-600 text-xs">{inv.status === 'paid' ? formatDate(inv.paid_at?.split('T')[0] || '') : 'Rejected'}</span>
-                      )}
-                    </div>
-                  </div>
-                  {/* Expanded line items */}
-                  {isExpanded && lines.length > 0 && (
-                    <div className="bg-slate-800/30 px-6 py-3 border-t border-white/[0.04]">
-                      <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-2">Line Items</p>
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="text-slate-500 text-xs">
-                            <th className="text-left pb-1.5 font-medium">Client</th>
-                            <th className="text-left pb-1.5 font-medium">Description</th>
-                            <th className="text-right pb-1.5 font-medium">Hours</th>
-                            <th className="text-right pb-1.5 font-medium">Rate</th>
-                            <th className="text-right pb-1.5 font-medium">%</th>
-                            <th className="text-right pb-1.5 font-medium">Amount</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {lines.map((line: any, i: number) => (
-                            <tr key={i} className="border-t border-white/[0.04]">
-                              <td className="py-1.5 text-slate-300">{clientMap[line.client_id] || line.description?.split(' - ')[0] || '—'}</td>
-                              <td className="py-1.5 text-slate-400">{line.description}</td>
-                              <td className="py-1.5 text-right text-slate-300">{line.hours ? line.hours.toFixed(1) : '—'}</td>
-                              <td className="py-1.5 text-right text-slate-400">{line.rate ? formatCurrency(line.rate) : '—'}</td>
-                              <td className="py-1.5 text-right text-slate-400">{line.allocation_pct ? `${line.allocation_pct}%` : '—'}</td>
-                              <td className="py-1.5 text-right text-white font-medium">{formatCurrency(line.amount)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {inv.notes && (
-                        <p className="mt-2 text-xs text-slate-500 italic">Note: {inv.notes}</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            }) : (
-              <div className="text-center py-12 text-slate-500">
-                <FileText size={32} className="mx-auto mb-3 opacity-40" />
-                <p className="text-sm">No invoices found</p>
+          {/* Filters + Group By */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="relative flex-1 max-w-xs">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input type="text" placeholder="Search invoices..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
               </div>
-            )}
+              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+                className="px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+                <option value="all">All Statuses</option>
+                <option value="submitted">Submitted</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="paid">Paid</option>
+              </select>
+              <select value={filterMember} onChange={e => setFilterMember(e.target.value)}
+                className="px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+                <option value="all">All Contractors</option>
+                {teamMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+              <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
+                className="px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+                <option value="all">All Clients</option>
+                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            {/* Group by toggle */}
+            <div className="flex items-center gap-1 p-0.5 bg-slate-800/50 rounded-lg shrink-0">
+              <span className="text-[10px] text-slate-500 px-1.5">Group:</span>
+              {[{ id: 'none' as const, label: 'None' }, { id: 'contractor' as const, label: 'Contractor' }, { id: 'client' as const, label: 'Client' }].map(g => (
+                <button key={g.id} onClick={() => { setGroupBy(g.id); setCollapsedGroups(new Set()) }}
+                  className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${groupBy === g.id ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}>
+                  {g.label}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* Invoice List (grouped) */}
+          {filteredInvoices.length > 0 ? groupedInvoices.map(group => (
+            <div key={group.key} className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
+              {/* Group header (only if grouping is active) */}
+              {groupBy !== 'none' && (
+                <button onClick={() => toggleGroup(group.key)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-slate-800/40 hover:bg-slate-800/60 transition-colors border-b border-white/[0.06]">
+                  <div className="flex items-center gap-3">
+                    {collapsedGroups.has(group.key) ? <ChevronRight size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+                    <span className="text-white text-sm font-semibold">{group.label}</span>
+                    <span className="text-slate-500 text-xs">{group.invoices.length} invoice{group.invoices.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <span className="text-white text-sm font-bold">{formatCurrency(group.total)}</span>
+                </button>
+              )}
+              {/* Table header + rows */}
+              {!collapsedGroups.has(group.key) && (<>
+                <div className="grid grid-cols-[1fr_140px_100px_120px_100px_100px_140px] gap-2 px-4 py-2.5 border-b border-white/[0.06] text-xs text-slate-500 font-medium uppercase tracking-wider">
+                  <span>Invoice</span>
+                  <span>{groupBy === 'contractor' ? 'Client' : 'Contractor'}</span>
+                  <span>Period</span>
+                  <span className="text-right">Amount</span>
+                  <span>Status</span>
+                  <span>Attachment</span>
+                  <span>Actions</span>
+                </div>
+                {group.invoices.map(inv => {
+                  const lines = inv.contractor_invoice_lines || []
+                  const isExpanded = expandedInvoice === inv.id
+                  const isProcessing = processing === inv.id
+                  // For client grouping show contractor, for contractor grouping show primary client
+                  const secondCol = groupBy === 'contractor'
+                    ? (lines.length > 0 ? clientMap[lines[0].client_id] || '—' : '—')
+                    : (memberMap[inv.team_member_id] || '—')
+                  return (
+                    <div key={inv.id} className="border-b border-white/[0.04] last:border-0">
+                      <div className="grid grid-cols-[1fr_140px_100px_120px_100px_100px_140px] gap-2 px-4 py-3 items-center hover:bg-white/[0.02] transition-colors">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <button onClick={() => setExpandedInvoice(isExpanded ? null : inv.id)} className="text-slate-400 hover:text-white">
+                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          </button>
+                          <div className="min-w-0">
+                            <p className="text-white text-sm font-medium truncate">{inv.invoice_number}</p>
+                            <p className="text-slate-500 text-xs">Submitted {formatDate(inv.submitted_at?.split('T')[0] || inv.invoice_date)}</p>
+                          </div>
+                        </div>
+                        <span className="text-slate-300 text-sm truncate">{secondCol}</span>
+                        <span className="text-slate-400 text-xs">{formatDateCompact(inv.period_start)} – {formatDateCompact(inv.period_end)}</span>
+                        <span className="text-white text-sm font-medium text-right">{formatCurrency(inv.total_amount)}</span>
+                        <StatusBadge status={inv.status} />
+                        <div>
+                          {inv.receipt_url ? (
+                            <a href={`${supabase.storage.from('contractor-uploads').getPublicUrl(inv.receipt_url).data.publicUrl}`} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs">
+                              <Paperclip size={12} /> View
+                            </a>
+                          ) : <span className="text-slate-600 text-xs">None</span>}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {inv.status === 'submitted' && (
+                            <>
+                              <button onClick={() => updateInvoiceStatus(inv.id, 'approved')} disabled={isProcessing}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 text-xs font-medium hover:bg-emerald-500/25 disabled:opacity-50 transition-colors">
+                                {isProcessing ? <Loader2 size={12} className="animate-spin" /> : 'Approve'}
+                              </button>
+                              <button onClick={() => updateInvoiceStatus(inv.id, 'rejected')} disabled={isProcessing}
+                                className="px-2.5 py-1 rounded-lg bg-red-500/10 text-red-400 text-xs font-medium hover:bg-red-500/20 disabled:opacity-50 transition-colors">
+                                Reject
+                              </button>
+                            </>
+                          )}
+                          {inv.status === 'approved' && (
+                            <button onClick={() => updateInvoiceStatus(inv.id, 'paid')} disabled={isProcessing}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 text-xs font-medium hover:bg-emerald-500/25 disabled:opacity-50 transition-colors">
+                              Mark Paid
+                            </button>
+                          )}
+                          {(inv.status === 'paid' || inv.status === 'rejected') && (
+                            <span className="text-slate-600 text-xs">{inv.status === 'paid' ? formatDate(inv.paid_at?.split('T')[0] || '') : 'Rejected'}</span>
+                          )}
+                        </div>
+                      </div>
+                      {isExpanded && lines.length > 0 && (
+                        <div className="bg-slate-800/30 px-6 py-3 border-t border-white/[0.04]">
+                          <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-2">Line Items</p>
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="text-slate-500 text-xs">
+                                <th className="text-left pb-1.5 font-medium">Client</th>
+                                <th className="text-left pb-1.5 font-medium">Description</th>
+                                <th className="text-right pb-1.5 font-medium">Hours</th>
+                                <th className="text-right pb-1.5 font-medium">Rate</th>
+                                <th className="text-right pb-1.5 font-medium">%</th>
+                                <th className="text-right pb-1.5 font-medium">Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {lines.map((line: any, i: number) => (
+                                <tr key={i} className="border-t border-white/[0.04]">
+                                  <td className="py-1.5 text-slate-300">{clientMap[line.client_id] || line.description?.split(' - ')[0] || '—'}</td>
+                                  <td className="py-1.5 text-slate-400">{line.description}</td>
+                                  <td className="py-1.5 text-right text-slate-300">{line.hours ? line.hours.toFixed(1) : '—'}</td>
+                                  <td className="py-1.5 text-right text-slate-400">{line.rate ? formatCurrency(line.rate) : '—'}</td>
+                                  <td className="py-1.5 text-right text-slate-400">{line.allocation_pct ? `${line.allocation_pct}%` : '—'}</td>
+                                  <td className="py-1.5 text-right text-white font-medium">{formatCurrency(line.amount)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {inv.notes && <p className="mt-2 text-xs text-slate-500 italic">Note: {inv.notes}</p>}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </>)}
+            </div>
+          )) : (
+            <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl text-center py-12 text-slate-500`}>
+              <FileText size={32} className="mx-auto mb-3 opacity-40" />
+              <p className="text-sm">No invoices found</p>
+            </div>
+          )}
         </div>
       )}
 
