@@ -211,7 +211,7 @@ function calculateKPIs(data: CompanyData): KPISummary {
   const burnRate = totalExpenses / 3 || 10000
   const runway = burnRate > 0 ? cashOnHand / burnRate : 12
   const totalHours = data.timeEntries?.reduce((sum, t) => sum + (t.hours || 0), 0) || 0
-  const billableHours = data.timeEntries?.filter(t => t.billable || t.is_billable).reduce((sum, t) => sum + (t.hours || t.billable_hours || 0), 0) || 0
+  const billableHours = data.timeEntries?.filter(t => t.billable || t.is_billable).reduce((sum, t) => sum + (t.billable_hours != null ? t.billable_hours : (t.hours || 0)), 0) || 0
   const utilizationRate = totalHours > 0 ? (billableHours / totalHours) * 100 : 75
   const paidInvoices = data.invoices?.filter(inv => inv.status === "paid" && inv.paid_date) || []
   const avgDSO = paidInvoices.length > 0 ? paidInvoices.reduce((sum, inv) => {
@@ -234,14 +234,25 @@ function calculateKPIs(data: CompanyData): KPISummary {
     memberHours[memberId][clientId] = (memberHours[memberId][clientId] || 0) + (t.hours || 0)
   })
 
+  // Also track billable hours for revenue
+  const memberBillableHours: Record<string, Record<string, number>> = {}
+  monthEntries.forEach(t => {
+    const clientId = projectClientMap.get(t.project_id) || ""
+    const memberId = t.contractor_id
+    if (!memberBillableHours[memberId]) memberBillableHours[memberId] = {}
+    const bh = t.billable_hours != null ? t.billable_hours : (t.hours || 0)
+    memberBillableHours[memberId][clientId] = (memberBillableHours[memberId][clientId] || 0) + bh
+  })
+
   Object.entries(memberHours).forEach(([memberId, clientHours]) => {
     const member = data.teamMembers?.find(m => m.id === memberId)
     const totalMemberHours = Object.values(clientHours).reduce((s, h) => s + h, 0)
 
     Object.entries(clientHours).forEach(([clientId, hours]) => {
-      // Revenue from rate card
+      // Revenue from rate card — use BILLABLE hours
       const rc = data.billRates?.find(r => r.team_member_id === memberId && r.client_id === clientId && r.is_active)
-      teamRevenue += hours * (rc?.rate || 0)
+      const billableHrs = memberBillableHours[memberId]?.[clientId] || hours
+      teamRevenue += billableHrs * (rc?.rate || 0)
 
       // Cost: custom or distributed
       if (rc && rc.cost_amount > 0) {
@@ -360,7 +371,7 @@ function buildDataContext(data: CompanyData, kpis: KPISummary): string {
     const name = memberNameMap.get(entry.contractor_id) || "Unknown"
     if (!allTimeByMember[name]) allTimeByMember[name] = { hours: 0, billable: 0 }
     allTimeByMember[name].hours += entry.hours || 0
-    if (entry.billable || entry.is_billable) allTimeByMember[name].billable += entry.hours || entry.billable_hours || 0
+    if (entry.billable || entry.is_billable) allTimeByMember[name].billable += entry.billable_hours != null ? entry.billable_hours : (entry.hours || 0)
   })
 
   // Monthly time breakdown
@@ -383,8 +394,10 @@ function buildDataContext(data: CompanyData, kpis: KPISummary): string {
     const clientName = clientNameMap.get(clientId) || "Unknown"
     const memberName = memberNameMap.get(memberId) || "Unknown"
     const hours = t.hours || 0
+    // Use billable_hours for revenue; fall back to actual hours
+    const billableHrs = t.billable_hours != null ? t.billable_hours : hours
     const rc = data.billRates?.find(r => r.team_member_id === memberId && r.client_id === clientId && r.is_active)
-    const revenue = hours * (rc?.rate || 0)
+    const revenue = billableHrs * (rc?.rate || 0)
 
     if (!clientProfit[clientId]) clientProfit[clientId] = { name: clientName, revenue: 0, cost: 0, hours: 0 }
     clientProfit[clientId].revenue += revenue
