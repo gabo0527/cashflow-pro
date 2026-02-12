@@ -1,418 +1,43 @@
-'use client'
+"use client"
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { 
-  Search, Filter, Download, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
-  Clock, Plus, Edit2, X, Check, Trash2, Calendar, Users, DollarSign, BarChart3,
-  TrendingUp, TrendingDown, Target, PieChart, Activity, Building2, User, Briefcase,
-  CheckCircle, AlertCircle, RefreshCw, Eye, EyeOff, ArrowUpDown, Percent, Layers,
-  Lock, Unlock
-} from 'lucide-react'
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-  PieChart as RechartsPie, Pie, LineChart, Line, Legend, Area, AreaChart
-} from 'recharts'
-import { getCurrentUser } from '@/lib/supabase'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  'https://jmahfgpbtjeomuepfozf.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptYWhmZ3BidGplb211ZXBmb3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0OTAxNzcsImV4cCI6MjA4MTA2NjE3N30.3SVDvWCGIYYHV57BpKjpDJVCZLKzuRv8B_VietQDxUQ'
-)
-
-// ============ TYPES ============
-interface TimeEntry {
-  id: string
-  date: string
-  hours: number           // Actual hours (submitted by contractor) → drives COST
-  billable_hours: number  // Adjusted hours (set by manager) → drives REVENUE
-  is_billable: boolean
-  team_member_id: string
-  team_member_name: string
-  project_id: string
-  project_name: string
-  client_id: string
-  client_name: string
-  bill_rate: number       // Revenue rate (what client pays per hour)
-  cost_rate: number       // Cost rate (adjusted for totals — hours × cost_rate = true fixed cost)
-  display_cost_rate: number // Display rate (monthly ÷ 172 for LS, same as cost_rate for hourly)
-  notes: string | null
-}
-
-interface TeamMember {
-  id: string
-  name: string
-  email: string
-  status: string
-  employment_type: string
-  cost_type?: string
-  cost_amount?: number
-  baseline_hours?: number
-}
-
-interface Project {
-  id: string
-  name: string
-  client: string
-  client_id: string
-  bill_rate?: number
-}
-
-interface Client {
-  id: string
-  name: string
-}
-
-interface ProjectAssignment {
-  id: string
-  team_member_id: string
-  project_id: string
-  payment_type: 'lump_sum' | 'tm'
-  rate: number       // Cost rate
-  bill_rate?: number // Revenue rate
-}
-
-// ============ COST UTILITIES ============
-const normalizeCostType = (t: string) => (t || '').toLowerCase().replace(/\s+/g, '_')
-const STANDARD_MONTHLY_HOURS = 172 // Standard full-time hours for effective hourly conversion
-
-/** Check if a member has a fixed monthly cost (any variant of lump_sum) */
-function isFixedCostMember(m: TeamMember): boolean {
-  const ct = normalizeCostType(m.cost_type || '')
-  return (ct === 'lump_sum' || ct === 'lumpsum' || ct === 'fixed' || ct === 'monthly') && (m.cost_amount || 0) > 0
-}
-
-/** Get effective hourly display rate for fixed cost members */
-function getDisplayCostRate(m: TeamMember): number {
-  if (isFixedCostMember(m)) return (m.cost_amount || 0) / STANDARD_MONTHLY_HOURS
-  if (normalizeCostType(m.cost_type || '') === 'hourly') return m.cost_amount || 0
-  return 0
-}
-
-/**
- * Cap aggregated costs for fixed-cost members.
- * After summing hours × rate, if total exceeds the monthly fixed amount,
- * scale down proportionally so total = fixed × months in period.
- * This is a safety net — adjustEntriesForFixedCosts should handle it at entry level,
- * but this guarantees correctness at the display level.
- */
-function capFixedCostsForMembers(
-  memberCosts: { id: string; totalCost: number; clients?: Record<string, { cost: number }> }[],
-  teamMembers: TeamMember[],
-  billRates: any[],
-  periodStart: string,
-  periodEnd: string
-) {
-  const monthsInPeriod = calcMonthsInPeriod(periodStart, periodEnd)
-  
-  // Build rate-card LS lookup (per member+client fixed costs)
-  const rcLS: Record<string, number> = {}
-  ;(billRates || []).forEach((r: any) => {
-    if (r.is_active && r.cost_amount > 0 && normalizeCostType(r.cost_type) !== 'hourly') {
-      rcLS[`${r.team_member_id}_${r.client_id}`] = r.cost_amount
-    }
-  })
-  
-  memberCosts.forEach(mc => {
-    const tm = teamMembers.find(m => m.id === mc.id)
-    if (!tm || !isFixedCostMember(tm)) return
-    
-    // Check if any rate cards handle this member's costs per-client
-    const hasRateCardLS = Object.keys(rcLS).some(k => k.startsWith(mc.id + '_'))
-    
-    if (!hasRateCardLS) {
-      // Pure member-level LS: cap total cost
-      const maxCost = (tm.cost_amount || 0) * monthsInPeriod
-      if (mc.totalCost > maxCost && mc.totalCost > 0) {
-        const ratio = maxCost / mc.totalCost
-        mc.totalCost = maxCost
-        if (mc.clients) {
-          Object.values(mc.clients).forEach(c => { c.cost = c.cost * ratio })
-        }
-      } else if (mc.totalCost < maxCost) {
-        // Under-billed hours — cost should still be the full fixed amount
-        const ratio = mc.totalCost > 0 ? maxCost / mc.totalCost : 1
-        mc.totalCost = maxCost
-        if (mc.clients) {
-          Object.values(mc.clients).forEach(c => { c.cost = c.cost * ratio })
-        }
-      }
-    }
-  })
-}
-
-/** Calculate fractional months in a date range */
-function calcMonthsInPeriod(periodStart: string, periodEnd: string): number {
-  const start = new Date(periodStart + 'T00:00:00')
-  const end = new Date(periodEnd + 'T23:59:59')
-  let totalFraction = 0
-  const d = new Date(start.getFullYear(), start.getMonth(), 1)
-  while (d <= end) {
-    const monthStart = new Date(d.getFullYear(), d.getMonth(), 1)
-    const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0)
-    const daysInMonth = monthEnd.getDate()
-    const rangeStart = start > monthStart ? start : monthStart
-    const rangeEnd = end < new Date(monthEnd.getFullYear(), monthEnd.getMonth(), monthEnd.getDate(), 23, 59, 59) ? end : monthEnd
-    const daysInRange = Math.floor((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
-    totalFraction += Math.min(daysInRange / daysInMonth, 1)
-    d.setMonth(d.getMonth() + 1)
-  }
-  return Math.max(totalFraction, 0.01)
-}
-
-/**
- * For lump sum cost members, recalculates cost_rate so that
- * total cost across all entries = fixed monthly cost × months in period.
- * Distribution is proportional to hours worked per client/project.
- *
- * Two tiers:
- *   1. Rate-card-level LS (e.g., Julio's GOOGL at $13,525/mo) → cap per member+client
- *   2. Member-level LS (e.g., Travis at $25K/mo, Emily at $35K/mo) → cap across ALL clients
- */
-function adjustEntriesForFixedCosts(
-  entries: TimeEntry[],
-  teamMembers: TeamMember[],
-  billRates: any[],
-  periodStart: string,
-  periodEnd: string
-): TimeEntry[] {
-  if (!entries.length) return entries
-
-  const monthsInPeriod = calcMonthsInPeriod(periodStart, periodEnd)
-
-  // Build lookup of rate cards with LS cost at the rate-card level
-  const lsRateCards: Record<string, number> = {} // key: memberId_clientId → monthly cost
-  ;(billRates || []).forEach((r: any) => {
-    if (r.is_active && r.cost_amount > 0 && normalizeCostType(r.cost_type) !== 'hourly') {
-      lsRateCards[`${r.team_member_id}_${r.client_id}`] = r.cost_amount
-    }
-  })
-
-  // Build lookup of members with LS cost at member level
-  const lsMembers: Record<string, number> = {} // memberId → monthly cost
-  teamMembers.forEach(m => {
-    if (isFixedCostMember(m)) {
-      lsMembers[m.id] = m.cost_amount || 0
-    }
-  })
-
-  // Group entries by member
-  const byMember: Record<string, TimeEntry[]> = {}
-  entries.forEach(e => {
-    if (!byMember[e.team_member_id]) byMember[e.team_member_id] = []
-    byMember[e.team_member_id].push(e)
-  })
-
-  // Build a set of entries that need cost_rate adjustment
-  const adjustedRates: Map<string, number> = new Map() // entry.id → new cost_rate
-
-  Object.entries(byMember).forEach(([memberId, memberEntries]) => {
-    // PRIORITY 1: Member-level LS (e.g., Travis $25K, Emily $35K)
-    // If member has a fixed monthly cost, ALL their entries use it — no exceptions
-    if (lsMembers[memberId]) {
-      const fixedCost = lsMembers[memberId] * monthsInPeriod
-      const totalHours = memberEntries.reduce((s, e) => s + e.hours, 0)
-      if (totalHours > 0) {
-        const adjustedRate = fixedCost / totalHours
-        memberEntries.forEach(e => adjustedRates.set(e.id, adjustedRate))
-      }
-      return // Done with this member — skip rate-card logic
-    }
-
-    // PRIORITY 2: Rate-card-level LS (only for members WITHOUT member-level LS)
-    // e.g., Julio has no member fixed cost, but GOOGL rate card = $13,525/mo
-    const byClient: Record<string, TimeEntry[]> = {}
-    memberEntries.forEach(e => {
-      const rcKey = `${memberId}_${e.client_id}`
-      if (lsRateCards[rcKey]) {
-        if (!byClient[e.client_id]) byClient[e.client_id] = []
-        byClient[e.client_id].push(e)
-      }
-    })
-    Object.entries(byClient).forEach(([clientId, clientEntries]) => {
-      const fixedCost = lsRateCards[`${memberId}_${clientId}`] * monthsInPeriod
-      const totalHours = clientEntries.reduce((s, e) => s + e.hours, 0)
-      if (totalHours > 0) {
-        const adjustedRate = fixedCost / totalHours
-        clientEntries.forEach(e => adjustedRates.set(e.id, adjustedRate))
-      }
-    })
-  })
-
-  // If no adjustments needed, return original
-  if (adjustedRates.size === 0) return entries
-
-  // Return new array with adjusted cost_rates
-  return entries.map(e => {
-    const newRate = adjustedRates.get(e.id)
-    return newRate !== undefined ? { ...e, cost_rate: newRate } : e
-  })
-}
-
-// ============ MARGIN HELPERS ============
-function calcMarginPct(revenue: number, cost: number): number {
-  if (revenue === 0 && cost === 0) return 0
-  if (revenue === 0) return -100
-  return ((revenue - cost) / revenue) * 100
-}
-function formatMarginPct(revenue: number, cost: number): string {
-  const pct = calcMarginPct(revenue, cost)
-  return `${pct.toFixed(1)}%`
-}
-function marginColor(pct: number): string {
-  if (pct >= 30) return 'text-emerald-400'
-  if (pct >= 15) return 'text-amber-400'
-  if (pct >= 0) return 'text-orange-400'
-  return 'text-rose-400'
-}
-function marginBadgeClass(pct: number): string {
-  if (pct >= 30) return 'bg-emerald-500/20 text-emerald-400'
-  if (pct >= 15) return 'bg-amber-500/20 text-amber-400'
-  if (pct >= 0) return 'bg-orange-500/20 text-orange-400'
-  return 'bg-rose-500/20 text-rose-400'
-}
-
-// ============ CONSTANTS ============
-type DatePreset = 'this_week' | 'last_week' | 'mtd' | 'last_month' | 'qtd' | 'ytd' | 'custom'
-
-const DATE_PRESETS: { id: DatePreset; label: string }[] = [
-  { id: 'this_week', label: 'This Week' },
-  { id: 'last_week', label: 'Last Week' },
-  { id: 'mtd', label: 'This Month' },
-  { id: 'last_month', label: 'Last Month' },
-  { id: 'qtd', label: 'This Quarter' },
-  { id: 'ytd', label: 'This Year' },
-  { id: 'custom', label: 'Custom Range' },
-]
-
-type ViewTab = 'trends' | 'byClient' | 'byEmployee' | 'detailed' | 'profitability'
-
-const VIEW_TABS: { id: ViewTab; label: string; icon: React.ReactNode }[] = [
-  { id: 'trends', label: 'Trends', icon: <Activity size={16} /> },
-  { id: 'byClient', label: 'By Client', icon: <Building2 size={16} /> },
-  { id: 'byEmployee', label: 'By Employee', icon: <Users size={16} /> },
-  { id: 'detailed', label: 'Detailed', icon: <Calendar size={16} /> },
-  { id: 'profitability', label: 'Profitability', icon: <BarChart3 size={16} /> },
-]
-
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+import React, { useState, useEffect, useMemo, useCallback } from "react"
+import {
+  Search, Download, Plus, Edit2, X, Users, Mail, Phone,
+  Eye, EyeOff, Briefcase, DollarSign, Trash2, BarChart3,
+  FileText, Building2, MapPin, Upload, Calendar, Clock,
+  CheckCircle, AlertCircle, RefreshCw, ExternalLink, TrendingUp,
+  User, UserCheck, Filter, ChevronDown, ChevronRight, Link2, Lock, Unlock
+} from "lucide-react"
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend
+} from "recharts"
+import { supabase, getCurrentUser } from "@/lib/supabase"
 
 // ============ THEME ============
 const THEME = {
-  glass: 'bg-slate-900/70 backdrop-blur-xl',
-  glassBorder: 'border-white/[0.08]',
-  glassHover: 'hover:bg-white/[0.05] hover:border-white/[0.12]',
-  textPrimary: 'text-white',
-  textSecondary: 'text-slate-300',
-  textMuted: 'text-slate-400',
-  textDim: 'text-slate-500',
-}
-
-// ============ UTILITIES ============
-const formatCurrency = (value: number): string => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value)
-const formatCompactCurrency = (value: number): string => { if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`; if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`; return `$${value.toFixed(0)}` }
-
-const formatDate = (dateStr: string): string => {
-  if (!dateStr) return '—'
-  const [year, month, day] = dateStr.split('-').map(Number)
-  const date = new Date(year, month - 1, day)
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-const formatShortDate = (dateStr: string): string => {
-  if (!dateStr) return '—'
-  const [year, month, day] = dateStr.split('-').map(Number)
-  return `${month}/${day}`
-}
-
-const getDateRange = (preset: DatePreset, customStart?: string, customEnd?: string): { start: string; end: string } => {
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = today.getMonth()
-  const day = today.getDate()
-  let startStr: string, endStr: string
-  switch (preset) {
-    case 'this_week':
-      const thisWeekStart = new Date(year, month, day)
-      const dow = thisWeekStart.getDay()
-      thisWeekStart.setDate(thisWeekStart.getDate() - (dow === 0 ? 6 : dow - 1))
-      const thisWeekEnd = new Date(thisWeekStart); thisWeekEnd.setDate(thisWeekEnd.getDate() + 6)
-      startStr = `${thisWeekStart.getFullYear()}-${String(thisWeekStart.getMonth() + 1).padStart(2, '0')}-${String(thisWeekStart.getDate()).padStart(2, '0')}`
-      endStr = `${thisWeekEnd.getFullYear()}-${String(thisWeekEnd.getMonth() + 1).padStart(2, '0')}-${String(thisWeekEnd.getDate()).padStart(2, '0')}`
-      break
-    case 'last_week':
-      const lastWeekEnd = new Date(year, month, day)
-      const ldow = lastWeekEnd.getDay()
-      lastWeekEnd.setDate(lastWeekEnd.getDate() - (ldow === 0 ? 7 : ldow))
-      const lastWeekStart = new Date(lastWeekEnd); lastWeekStart.setDate(lastWeekStart.getDate() - 6)
-      startStr = `${lastWeekStart.getFullYear()}-${String(lastWeekStart.getMonth() + 1).padStart(2, '0')}-${String(lastWeekStart.getDate()).padStart(2, '0')}`
-      endStr = `${lastWeekEnd.getFullYear()}-${String(lastWeekEnd.getMonth() + 1).padStart(2, '0')}-${String(lastWeekEnd.getDate()).padStart(2, '0')}`
-      break
-    case 'mtd':
-      startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`
-      const lastDay = new Date(year, month + 1, 0).getDate()
-      endStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-      break
-    case 'last_month':
-      const lmYear = month === 0 ? year - 1 : year; const lmMonth = month === 0 ? 12 : month
-      startStr = `${lmYear}-${String(lmMonth).padStart(2, '0')}-01`
-      const lmLastDay = new Date(lmYear, lmMonth, 0).getDate()
-      endStr = `${lmYear}-${String(lmMonth).padStart(2, '0')}-${String(lmLastDay).padStart(2, '0')}`
-      break
-    case 'qtd':
-      const quarter = Math.floor(month / 3); const qStartMonth = quarter * 3
-      startStr = `${year}-${String(qStartMonth + 1).padStart(2, '0')}-01`
-      const qEndMonth = qStartMonth + 2; const qLastDay = new Date(year, qEndMonth + 1, 0).getDate()
-      endStr = `${year}-${String(qEndMonth + 1).padStart(2, '0')}-${String(qLastDay).padStart(2, '0')}`
-      break
-    case 'ytd':
-      startStr = `${year}-01-01`; endStr = `${year}-12-31`; break
-    case 'custom':
-      startStr = customStart || `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-      endStr = customEnd || `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-      break
-    default:
-      startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`
-      endStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-  }
-  return { start: startStr, end: endStr }
-}
-
-const getPriorPeriodRange = (start: string, end: string): { start: string; end: string } => {
-  const startDate = new Date(start); const endDate = new Date(end)
-  const duration = endDate.getTime() - startDate.getTime()
-  const priorEnd = new Date(startDate.getTime() - 1); const priorStart = new Date(priorEnd.getTime() - duration)
-  return { start: priorStart.toISOString().split('T')[0], end: priorEnd.toISOString().split('T')[0] }
-}
-
-const getWeekColumns = (start: string, end: string): { start: string; end: string; label: string }[] => {
-  const weeks: { start: string; end: string; label: string }[] = []
-  const startDate = new Date(start); const endDate = new Date(end)
-  let current = new Date(startDate)
-  const dayOfWeek = current.getDay()
-  if (dayOfWeek !== 0) current.setDate(current.getDate() + (7 - dayOfWeek))
-  while (current <= endDate || (current.getMonth() === endDate.getMonth() && current.getFullYear() === endDate.getFullYear())) {
-    const weekEnd = current.toISOString().split('T')[0]
-    const weekStart = new Date(current); weekStart.setDate(weekStart.getDate() - 6)
-    weeks.push({ start: weekStart.toISOString().split('T')[0], end: weekEnd, label: formatShortDate(weekEnd) })
-    current.setDate(current.getDate() + 7)
-    if (current > endDate) break
-  }
-  return weeks
+  glass: "bg-slate-900/70 backdrop-blur-xl",
+  glassBorder: "border-white/[0.08]",
+  textPrimary: "text-white",
+  textSecondary: "text-slate-300",
+  textMuted: "text-slate-400",
+  textDim: "text-slate-500",
 }
 
 // ============ TOAST ============
-interface Toast { id: number; type: 'success' | 'error' | 'info'; message: string }
+interface Toast { id: number; type: "success" | "error" | "info"; message: string }
+
 function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: number) => void }) {
   return (
     <div className="fixed bottom-4 right-4 z-50 space-y-2">
       {toasts.map(toast => (
         <div key={toast.id} className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg backdrop-blur-xl border ${
-          toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' :
-          toast.type === 'error' ? 'bg-rose-500/20 border-rose-500/30 text-rose-400' : 'bg-blue-500/20 border-blue-500/30 text-blue-400'
+          toast.type === "success" ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400" :
+          toast.type === "error" ? "bg-rose-500/20 border-rose-500/30 text-rose-400" :
+          "bg-blue-500/20 border-blue-500/30 text-blue-400"
         }`}>
-          {toast.type === 'success' && <CheckCircle size={18} />}
-          {toast.type === 'error' && <AlertCircle size={18} />}
+          {toast.type === "success" && <CheckCircle size={18} />}
+          {toast.type === "error" && <AlertCircle size={18} />}
+          {toast.type === "info" && <AlertCircle size={18} />}
           <span className="text-sm font-medium">{toast.message}</span>
           <button onClick={() => onDismiss(toast.id)} className="ml-2 hover:opacity-70"><X size={16} /></button>
         </div>
@@ -421,1084 +46,1801 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
   )
 }
 
-// ============ KPI CARD ============
-function KPICard({ title, value, format = 'number', trend, trendLabel, icon, color = 'blue' }: { 
-  title: string; value: number; format?: 'number' | 'currency' | 'percent' | 'hours'
-  trend?: number; trendLabel?: string; icon?: React.ReactNode; color?: 'blue' | 'emerald' | 'amber' | 'purple' | 'rose' | 'orange'
-}) {
-  const colorClasses: Record<string, string> = { blue: 'text-blue-400', emerald: 'text-emerald-400', amber: 'text-amber-400', purple: 'text-purple-400', rose: 'text-rose-400', orange: 'text-orange-400' }
-  const formatValue = () => {
-    switch (format) {
-      case 'currency': return formatCurrency(value)
-      case 'percent': return `${value.toFixed(1)}%`
-      case 'hours': return `${value.toFixed(1)}`
-      default: return value.toLocaleString()
-    }
+// ============ TYPES ============
+interface TeamMember {
+  id: string; name: string; email: string; phone: string | null; role: string | null
+  status: "active" | "inactive"; employment_type: "employee" | "contractor"
+  start_date: string | null; entity_name: string | null; entity_type: string | null
+  address: string | null; bank_name: string | null; account_type: string | null
+  routing_number: string | null; account_number: string | null; payment_method: string | null
+  cost_type: "hourly" | "lump_sum"; cost_amount: number | null
+}
+
+interface BillRate {
+  id: string; team_member_id: string; client_id: string
+  rate: number; cost_type: "hourly" | "lump_sum"; cost_amount: number; baseline_hours: number
+  is_active: boolean; notes: string | null
+  start_date: string | null; end_date: string | null
+  revenue_type: "hourly" | "lump_sum"; revenue_amount: number
+  team_member_name?: string; client_name?: string
+}
+
+interface CostOverride {
+  id: string; team_member_id: string; client_id: string; month: string
+  fixed_amount: number; notes: string | null
+  team_member_name?: string; client_name?: string
+}
+
+interface Project { id: string; name: string; client_id: string | null; client_name?: string; status: string; budget: number }
+interface Client { id: string; name: string }
+interface TimeEntry { id: string; contractor_id: string; project_id: string; hours: number; billable_hours: number | null; is_billable: boolean; date: string }
+
+// ============ CONSTANTS ============
+const STATUS_OPTIONS = [{ id: "active", label: "Active" }, { id: "inactive", label: "Inactive" }]
+const EMPLOYMENT_TYPES = [
+  { id: "employee", label: "W-2 Employee", icon: UserCheck, color: "blue" },
+  { id: "contractor", label: "1099 Contractor", icon: User, color: "purple" },
+]
+const ENTITY_TYPES = [
+  { id: "individual", label: "Individual" }, { id: "llc", label: "LLC" },
+  { id: "corp", label: "Corporation" }, { id: "s_corp", label: "S-Corp" }, { id: "partnership", label: "Partnership" },
+]
+const COST_TYPES = [
+  { id: "hourly", label: "Hourly (T&M)", description: "Paid per hour worked" },
+  { id: "lump_sum", label: "Monthly Fixed", description: "Fixed amount per month" },
+]
+const ACCOUNT_TYPES = [{ id: "checking", label: "Checking" }, { id: "savings", label: "Savings" }]
+const PAYMENT_METHODS = [
+  { id: "ach", label: "ACH Transfer" }, { id: "wire", label: "Wire Transfer" },
+  { id: "check", label: "Check" }, { id: "zelle", label: "Zelle" },
+]
+const CHART_COLORS = { cost: "#ef4444", revenue: "#10b981", margin: "#3b82f6" }
+
+// ============ UTILITIES ============
+const formatCurrency = (v: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
+const formatCurrencyDecimal = (v: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)
+const formatCompactCurrency = (v: number) => { if (v >= 1e6) return `$${(v/1e6).toFixed(1)}M`; if (v >= 1e3) return `$${(v/1e3).toFixed(0)}k`; return `$${v.toFixed(0)}` }
+const maskNumber = (num: string | null) => num ? "\u2022\u2022\u2022\u2022 " + num.slice(-4) : "\u2014"
+const getStatusStyle = (s: string) => s === "active" ? { bg: "bg-emerald-500/10", text: "text-emerald-400" } : { bg: "bg-slate-500/10", text: "text-slate-400" }
+const getEmploymentStyle = (t: string) => t === "employee" ? { bg: "bg-blue-500/10", text: "text-blue-400" } : { bg: "bg-purple-500/10", text: "text-purple-400" }
+
+const getCurrentMonth = () => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}` }
+const formatMonth = (m: string) => { const [y, mo] = m.split("-"); return new Date(parseInt(y), parseInt(mo)-1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }) }
+
+// Period helpers
+type PeriodType = "month" | "quarter" | "year"
+const getCurrentQuarter = () => { const n = new Date(); return `${n.getFullYear()}-Q${Math.ceil((n.getMonth()+1)/3)}` }
+const getCurrentYear = () => `${new Date().getFullYear()}`
+const formatQuarter = (q: string) => { const [y, qn] = q.split("-Q"); return `Q${qn} ${y}` }
+
+function getMonthsInPeriod(period: string, periodType: PeriodType): string[] {
+  if (periodType === "month") return [period]
+  if (periodType === "quarter") {
+    const [y, qn] = period.split("-Q").map(Number)
+    const sm = (qn - 1) * 3 + 1
+    return [1, 2, 3].map(i => `${y}-${String(sm + i - 1).padStart(2, "0")}`)
   }
+  const y = parseInt(period)
+  return Array.from({ length: 12 }, (_, i) => `${y}-${String(i + 1).padStart(2, "0")}`)
+}
+
+function formatPeriodLabel(period: string, periodType: PeriodType): string {
+  if (periodType === "month") return formatMonth(period)
+  if (periodType === "quarter") return formatQuarter(period)
+  return period
+}
+
+function stepPeriod(period: string, periodType: PeriodType, dir: -1 | 1): string {
+  if (periodType === "month") {
+    const [y, m] = period.split("-").map(Number)
+    const d = new Date(y, m - 1 + dir, 1)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+  }
+  if (periodType === "quarter") {
+    const [y, qn] = period.split("-Q").map(Number)
+    let nq = qn + dir, ny = y
+    if (nq > 4) { nq = 1; ny++ } else if (nq < 1) { nq = 4; ny-- }
+    return `${ny}-Q${nq}`
+  }
+  return `${parseInt(period) + dir}`
+}
+
+function getDefaultPeriod(pt: PeriodType): string {
+  if (pt === "month") return getCurrentMonth()
+  if (pt === "quarter") return getCurrentQuarter()
+  return getCurrentYear()
+}
+
+// ============ MEMBER DETAIL FLYOUT ============
+function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
+  member: TeamMember; billRates: BillRate[]; clients: Client[]; onClose: () => void; onEdit: () => void
+}) {
+  const [showBanking, setShowBanking] = useState(false)
+  const memberRates = billRates.filter(r => r.team_member_id === member.id && r.is_active)
+  const empStyle = getEmploymentStyle(member.employment_type)
+
   return (
-    <div className={`p-4 rounded-xl ${THEME.glass} border ${THEME.glassBorder}`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className={`text-xs font-medium ${THEME.textMuted} uppercase tracking-wide`}>{title}</span>
-        {icon && <span className={THEME.textDim}>{icon}</span>}
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50" onClick={onClose}>
+      <div className={`w-full max-w-xl h-full ${THEME.glass} border-l ${THEME.glassBorder} overflow-y-auto`} onClick={e => e.stopPropagation()}>
+        <div className={`sticky top-0 ${THEME.glass} border-b ${THEME.glassBorder} px-6 py-4 z-10`}>
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className={`text-lg font-semibold ${THEME.textPrimary}`}>{member.name}</h2>
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${empStyle.bg} ${empStyle.text}`}>
+                  {member.employment_type === "employee" ? "W-2" : "1099"}
+                </span>
+              </div>
+              <p className={`text-sm ${THEME.textMuted} mt-0.5`}>{member.role || "No role"}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={onEdit} className="p-2 rounded-lg hover:bg-white/[0.08]"><Edit2 size={16} className={THEME.textMuted} /></button>
+              <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/[0.08]"><X size={18} className={THEME.textMuted} /></button>
+            </div>
+          </div>
+        </div>
+        <div className="p-6 space-y-6">
+          <div className="space-y-3">
+            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Contact</h3>
+            <div className="space-y-2">
+              <a href={`mailto:${member.email}`} className="flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm"><Mail size={14} /> {member.email}</a>
+              {member.phone && <p className={`flex items-center gap-2 text-sm ${THEME.textSecondary}`}><Phone size={14} /> {member.phone}</p>}
+              {member.address && <p className={`flex items-center gap-2 text-sm ${THEME.textMuted}`}><MapPin size={14} /> {member.address}</p>}
+              {member.start_date && <p className={`flex items-center gap-2 text-sm ${THEME.textMuted}`}><Calendar size={14} /> Started {new Date(member.start_date).toLocaleDateString()}</p>}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Default Cost (fallback)</h3>
+            <div className="p-3 rounded-lg bg-white/[0.03]">
+              <div className="flex justify-between">
+                <span className={THEME.textMuted}>{member.cost_type === "hourly" ? "T&M" : "Fixed"}</span>
+                <span className="text-orange-400 font-medium">{member.cost_amount ? (member.cost_type === "hourly" ? `$${member.cost_amount}/hr` : `${formatCurrency(member.cost_amount)}/mo`) : "\u2014"}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Rate Card ({memberRates.length} client{memberRates.length !== 1 ? "s" : ""})</h3>
+            {memberRates.length > 0 ? (
+              <div className="space-y-2">
+                {memberRates.map(r => {
+                  const hasCustomCost = r.cost_amount > 0
+                  const effCost = hasCustomCost ? (r.cost_type === "hourly" ? r.cost_amount : (r.baseline_hours > 0 ? r.cost_amount / r.baseline_hours : 0)) : 0
+                  const isLumpRev = r.revenue_type === "lump_sum"
+                  const revAmt = r.revenue_amount || 0
+                  const mg = isLumpRev
+                    ? (hasCustomCost && revAmt > 0 ? ((revAmt - (r.cost_type === "hourly" ? r.cost_amount * (r.baseline_hours || 172) : r.cost_amount)) / revAmt * 100) : 0)
+                    : (hasCustomCost && r.rate > 0 ? ((r.rate - effCost) / r.rate * 100) : 0)
+                  return (
+                    <div key={r.id} className="p-3 rounded-lg bg-white/[0.03]">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className={`text-sm font-medium ${THEME.textPrimary}`}>{r.client_name}</p>
+                        {hasCustomCost || isLumpRev ? (
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded ${mg >= 20 ? "bg-emerald-500/10 text-emerald-400" : mg >= 0 ? "bg-amber-500/10 text-amber-400" : "bg-rose-500/10 text-rose-400"}`}>{mg.toFixed(0)}% GM</span>
+                        ) : (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded bg-blue-500/10 text-blue-400">Distributed</span>
+                        )}
+                      </div>
+                      <div className="flex gap-4 text-xs">
+                        <span className="text-orange-400">
+                          Cost: {hasCustomCost
+                            ? (r.cost_type === "hourly" ? `$${r.cost_amount}/hr` : `${formatCurrency(r.cost_amount)}/mo (${r.baseline_hours}h)`)
+                            : "From member total"}
+                        </span>
+                        <span className="text-emerald-400">{isLumpRev ? `Rev: ${formatCurrency(revAmt)}/mo` : `Bill: $${r.rate}/hr`}</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : <p className={`text-sm ${THEME.textMuted} text-center py-4`}>No rates configured</p>}
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Banking</h3>
+              {member.bank_name && <button onClick={() => setShowBanking(!showBanking)} className={`text-xs ${THEME.textMuted} hover:text-white flex items-center gap-1`}>
+                {showBanking ? <EyeOff size={14} /> : <Eye size={14} />} {showBanking ? "Hide" : "Show"}
+              </button>}
+            </div>
+            {member.bank_name ? (
+              <div className="p-4 rounded-lg bg-white/[0.03] space-y-2">
+                <div className="flex justify-between"><span className={THEME.textMuted}>Bank</span><span className={THEME.textPrimary}>{member.bank_name}</span></div>
+                <div className="flex justify-between"><span className={THEME.textMuted}>Routing</span><span className="font-mono text-sm">{showBanking?member.routing_number:maskNumber(member.routing_number)}</span></div>
+                <div className="flex justify-between"><span className={THEME.textMuted}>Account</span><span className="font-mono text-sm">{showBanking?member.account_number:maskNumber(member.account_number)}</span></div>
+                <div className="flex justify-between"><span className={THEME.textMuted}>Method</span><span className={THEME.textPrimary}>{PAYMENT_METHODS.find(m=>m.id===member.payment_method)?.label||"\u2014"}</span></div>
+              </div>
+            ) : <p className={`text-sm ${THEME.textMuted} p-4 rounded-lg bg-white/[0.03] text-center`}>No banking info</p>}
+          </div>
+        </div>
       </div>
-      <p className={`text-2xl font-bold ${colorClasses[color] || 'text-blue-400'}`}>{formatValue()}</p>
-      {trend !== undefined && (
-        <div className="flex items-center gap-1 mt-1">
-          {trend >= 0 ? <TrendingUp size={14} className="text-emerald-400" /> : <TrendingDown size={14} className="text-rose-400" />}
-          <span className={`text-xs font-medium ${trend >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{trend >= 0 ? '+' : ''}{trend.toFixed(1)}%</span>
-          {trendLabel && <span className={`text-xs ${THEME.textDim}`}>{trendLabel}</span>}
-        </div>
-      )}
     </div>
   )
 }
 
-// ============ COLLAPSIBLE SECTION ============
-function CollapsibleSection({ title, children, defaultExpanded = true, badge, badgeColor = 'slate', rightContent, icon }: { 
-  title: string; children: React.ReactNode; defaultExpanded?: boolean; badge?: string | number
-  badgeColor?: 'slate' | 'blue' | 'emerald' | 'amber'; rightContent?: React.ReactNode; icon?: React.ReactNode
+// ============ RATE CARD MODAL (Cost + Revenue per client) ============
+function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clients, projects, companyId }: {
+  isOpen: boolean; onClose: () => void; onSave: (data: any) => Promise<void>
+  editingRate: BillRate | null; teamMembers: TeamMember[]; clients: Client[]; projects: Project[]; companyId: string | null
 }) {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded)
-  const badgeColors: Record<string, string> = { slate: 'bg-white/[0.08] text-slate-300', blue: 'bg-blue-500/20 text-blue-400', emerald: 'bg-emerald-500/20 text-emerald-400', amber: 'bg-amber-500/20 text-amber-400' }
+  const [form, setForm] = useState({
+    team_member_id: "", client_id: "", rate: "", notes: "",
+    cost_type: "hourly" as "hourly" | "lump_sum", cost_amount: "", baseline_hours: "172",
+    customCost: false,
+    revenue_type: "hourly" as "hourly" | "lump_sum",
+    revenue_amount: "",
+    start_date: new Date().toISOString().split("T")[0],
+    end_date: "",
+  })
+  const [isSaving, setIsSaving] = useState(false)
+  const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set())
+  const [loadingAssignments, setLoadingAssignments] = useState(false)
+
+  // Get projects for selected client
+  const clientProjects = useMemo(() => 
+    projects.filter(p => p.client_id === form.client_id && p.status === "active"),
+    [projects, form.client_id]
+  )
+
+  // Load existing project assignments when editing or client changes
+  useEffect(() => {
+    const loadAssignments = async () => {
+      if (!form.team_member_id || !form.client_id || !companyId) { setSelectedProjects(new Set()); return }
+      setLoadingAssignments(true)
+      try {
+        const clientProjectIds = projects.filter(p => p.client_id === form.client_id).map(p => p.id)
+        if (clientProjectIds.length === 0) { setSelectedProjects(new Set()); return }
+        const { data } = await supabase.from("team_project_assignments")
+          .select("project_id")
+          .eq("team_member_id", form.team_member_id)
+          .eq("company_id", companyId)
+          .in("project_id", clientProjectIds)
+        if (data && data.length > 0) {
+          setSelectedProjects(new Set(data.map((d: any) => d.project_id)))
+        } else {
+          // No assignments yet — default to all projects for this client
+          setSelectedProjects(new Set(clientProjectIds))
+        }
+      } catch (e) { console.error("Error loading assignments:", e) }
+      finally { setLoadingAssignments(false) }
+    }
+    if (form.client_id && form.team_member_id) loadAssignments()
+  }, [form.client_id, form.team_member_id, companyId])
+
+  useEffect(() => {
+    if (editingRate) {
+      const hasCustomCost = (editingRate.cost_amount || 0) > 0
+      setForm({
+        team_member_id: editingRate.team_member_id, client_id: editingRate.client_id,
+        rate: editingRate.rate.toString(), notes: editingRate.notes || "",
+        cost_type: editingRate.cost_type || "hourly",
+        cost_amount: editingRate.cost_amount?.toString() || "",
+        baseline_hours: editingRate.baseline_hours?.toString() || "172",
+        customCost: hasCustomCost,
+        revenue_type: editingRate.revenue_type || "hourly",
+        revenue_amount: editingRate.revenue_amount?.toString() || "",
+        start_date: editingRate.start_date || "",
+        end_date: editingRate.end_date || "",
+      })
+    } else {
+      setForm({ team_member_id: "", client_id: "", rate: "", notes: "", cost_type: "hourly", cost_amount: "", baseline_hours: "172", customCost: false, revenue_type: "hourly", revenue_amount: "", start_date: new Date().toISOString().split("T")[0], end_date: "" })
+    }
+  }, [editingRate, isOpen])
+
+  const handleMemberChange = (id: string) => {
+    setForm(p => ({ ...p, team_member_id: id }))
+  }
+
+  const selectedMember = teamMembers.find(m => m.id === form.team_member_id)
+  const costAmt = form.customCost ? (parseFloat(form.cost_amount) || 0) : 0
+  const baseHrs = parseFloat(form.baseline_hours) || 172
+  const effCostRate = form.customCost ? (form.cost_type === "hourly" ? costAmt : (baseHrs > 0 ? costAmt / baseHrs : 0)) : 0
+  const billRate = parseFloat(form.rate) || 0
+  const revenueAmount = parseFloat(form.revenue_amount) || 0
+  const isLumpRevenue = form.revenue_type === "lump_sum"
+  const monthlyRevenue = isLumpRevenue ? revenueAmount : 0
+  const monthlyCost = form.customCost ? (form.cost_type === "hourly" ? costAmt * baseHrs : costAmt) : 0
+  const margin = isLumpRevenue
+    ? (monthlyRevenue > 0 && monthlyCost > 0 ? ((monthlyRevenue - monthlyCost) / monthlyRevenue * 100) : 0)
+    : (billRate > 0 && effCostRate > 0 ? ((billRate - effCostRate) / billRate * 100) : 0)
+
+  const handleSave = async () => {
+    const hasRevenue = form.revenue_type === "hourly" ? !!form.rate : !!form.revenue_amount
+    if (!form.team_member_id || !form.client_id || !hasRevenue) return
+    setIsSaving(true)
+    try {
+      await onSave({
+        team_member_id: form.team_member_id, client_id: form.client_id,
+        rate: form.revenue_type === "hourly" ? (parseFloat(form.rate) || 0) : 0,
+        is_active: true, notes: form.notes || null,
+        cost_type: form.customCost ? form.cost_type : "hourly",
+        cost_amount: form.customCost ? (parseFloat(form.cost_amount) || 0) : 0,
+        baseline_hours: form.customCost ? (parseFloat(form.baseline_hours) || 172) : 172,
+        revenue_type: form.revenue_type,
+        revenue_amount: form.revenue_type === "lump_sum" ? (parseFloat(form.revenue_amount) || 0) : 0,
+        start_date: form.start_date || null,
+        end_date: form.end_date || null,
+      })
+
+      // Save project assignments
+      if (companyId && selectedProjects.size > 0) {
+        // Delete existing assignments for this member + client's projects
+        const clientProjectIds = projects.filter(p => p.client_id === form.client_id).map(p => p.id)
+        if (clientProjectIds.length > 0) {
+          await supabase.from("team_project_assignments")
+            .delete()
+            .eq("team_member_id", form.team_member_id)
+            .eq("company_id", companyId)
+            .in("project_id", clientProjectIds)
+        }
+        // Insert selected assignments
+        const rows = Array.from(selectedProjects).map(pid => ({
+          company_id: companyId,
+          team_member_id: form.team_member_id,
+          project_id: pid,
+          service: "General",
+          payment_type: "tm",
+        }))
+        if (rows.length > 0) {
+          await supabase.from("team_project_assignments").insert(rows)
+        }
+      }
+      onClose()
+    } finally { setIsSaving(false) }
+  }
+
+  if (!isOpen) return null
+
   return (
-    <div className={`rounded-xl border ${THEME.glass} ${THEME.glassBorder} overflow-hidden`}>
-      <button onClick={() => setIsExpanded(!isExpanded)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.03] transition-colors">
-        <div className="flex items-center gap-2">
-          {icon && <span className={THEME.textMuted}>{icon}</span>}
-          <h3 className={`text-sm font-medium ${THEME.textPrimary}`}>{title}</h3>
-          {badge !== undefined && <span className={`px-2 py-0.5 text-xs rounded-full ${badgeColors[badgeColor]}`}>{badge}</span>}
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-2xl w-full max-w-lg my-8`}>
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder}`}>
+          <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>{editingRate ? "Edit Rate Card" : "Add Rate Card"}</h3>
+          <button onClick={onClose} className="p-1 hover:bg-white/[0.05] rounded-lg"><X size={20} className={THEME.textMuted} /></button>
         </div>
-        <div className="flex items-center gap-3">
-          {rightContent}
-          {isExpanded ? <ChevronUp size={18} className={THEME.textMuted} /> : <ChevronDown size={18} className={THEME.textMuted} />}
+        <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={`block text-xs ${THEME.textMuted} mb-1`}>Team Member *</label>
+              <select value={form.team_member_id} onChange={e => handleMemberChange(e.target.value)} disabled={!!editingRate}
+                className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white disabled:opacity-50">
+                <option value="">Select...</option>
+                {teamMembers.filter(m=>m.status==="active").map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={`block text-xs ${THEME.textMuted} mb-1`}>Client *</label>
+              <select value={form.client_id} onChange={e => setForm(p=>({...p,client_id:e.target.value}))} disabled={!!editingRate}
+                className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white disabled:opacity-50">
+                <option value="">Select...</option>
+                {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Effective Date Range */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={`block text-xs ${THEME.textMuted} mb-1`}>Start Date *</label>
+              <input type="date" value={form.start_date} onChange={e => setForm(p => ({ ...p, start_date: e.target.value }))}
+                className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" />
+            </div>
+            <div>
+              <label className={`block text-xs ${THEME.textMuted} mb-1`}>End Date <span className={THEME.textDim}>(blank = ongoing)</span></label>
+              <input type="date" value={form.end_date} onChange={e => setForm(p => ({ ...p, end_date: e.target.value }))}
+                className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" />
+            </div>
+          </div>
+
+          {/* Project Assignments */}
+          {form.client_id && form.team_member_id && clientProjects.length > 0 && (
+            <div className="p-4 rounded-lg border border-blue-500/20 bg-blue-500/5">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-blue-400">PROJECT ACCESS &mdash; Timesheet Visibility</p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setSelectedProjects(new Set(clientProjects.map(p => p.id)))}
+                    className="text-[10px] text-blue-400 hover:text-blue-300">All</button>
+                  <span className="text-[10px] text-slate-600">|</span>
+                  <button type="button" onClick={() => setSelectedProjects(new Set())}
+                    className="text-[10px] text-slate-400 hover:text-slate-300">None</button>
+                </div>
+              </div>
+              {loadingAssignments ? (
+                <div className="flex items-center gap-2 py-2"><RefreshCw size={12} className="animate-spin text-blue-400" /><span className="text-xs text-slate-400">Loading...</span></div>
+              ) : (
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {clientProjects.map(p => (
+                    <label key={p.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-white/[0.03] cursor-pointer group">
+                      <input type="checkbox" checked={selectedProjects.has(p.id)}
+                        onChange={() => setSelectedProjects(prev => {
+                          const next = new Set(prev)
+                          next.has(p.id) ? next.delete(p.id) : next.add(p.id)
+                          return next
+                        })}
+                        className="w-3.5 h-3.5 rounded border-white/20 bg-white/[0.05] text-blue-500 focus:ring-blue-500/30" />
+                      <span className={`text-xs ${selectedProjects.has(p.id) ? "text-white" : "text-slate-500"}`}>{p.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              <p className="text-[10px] text-slate-500 mt-2">{selectedProjects.size} of {clientProjects.length} projects &mdash; member will only see selected projects in timesheet</p>
+            </div>
+          )}
+
+          <div className="p-4 rounded-lg border border-orange-500/20 bg-orange-500/5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-orange-400">COST SIDE &mdash; What You Pay</p>
+              <button type="button" onClick={() => setForm(p => ({ ...p, customCost: !p.customCost }))}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                  form.customCost ? "border-orange-500 bg-orange-500/20 text-orange-400" : "border-white/[0.08] text-slate-400 hover:text-white"
+                }`}>
+                {form.customCost ? "Custom cost for this client" : "Distributed from member total"}
+              </button>
+            </div>
+
+            {form.customCost ? (
+              <>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {COST_TYPES.map(t => (
+                    <button key={t.id} type="button" onClick={() => setForm(p=>({...p, cost_type: t.id as any}))}
+                      className={`p-2 rounded-lg border text-left transition-all ${form.cost_type===t.id ? "border-orange-500 bg-orange-500/10" : "border-white/[0.08] hover:border-white/[0.15]"}`}>
+                      <p className={`text-xs font-medium ${form.cost_type===t.id ? "text-orange-400" : THEME.textPrimary}`}>{t.label}</p>
+                    </button>
+                  ))}
+                </div>
+                <div className={form.cost_type === "lump_sum" ? "grid grid-cols-2 gap-3" : ""}>
+                  <div>
+                    <label className={`block text-xs ${THEME.textDim} mb-1`}>{form.cost_type === "hourly" ? "Cost Rate ($/hr)" : "Monthly Amount ($/mo)"}</label>
+                    <input type="number" value={form.cost_amount} onChange={e => setForm(p=>({...p,cost_amount:e.target.value}))}
+                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder={form.cost_type==="hourly"?"35":"13525"} />
+                  </div>
+                  {form.cost_type === "lump_sum" && (
+                    <div>
+                      <label className={`block text-xs ${THEME.textDim} mb-1`}>Baseline Hrs/mo</label>
+                      <input type="number" value={form.baseline_hours} onChange={e => setForm(p=>({...p,baseline_hours:e.target.value}))}
+                        className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="340" />
+                    </div>
+                  )}
+                </div>
+                {form.cost_type === "lump_sum" && costAmt > 0 && (
+                  <p className={`text-xs ${THEME.textDim} mt-2`}>Effective: ~${effCostRate.toFixed(2)}/hr ({formatCurrency(costAmt)} &divide; {baseHrs} hrs)</p>
+                )}
+              </>
+            ) : (
+              <div className="p-3 rounded-lg bg-white/[0.03]">
+                <p className={`text-xs ${THEME.textSecondary}`}>
+                  Cost will be auto-distributed from {selectedMember?.name ? `${selectedMember.name}'s` : "member's"} total
+                  {selectedMember?.cost_amount ? ` (${selectedMember.cost_type === "hourly" ? `$${selectedMember.cost_amount}/hr` : `${formatCurrency(selectedMember.cost_amount)}/mo`})` : ""}
+                  {" "}based on % of hours worked per client.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-emerald-400">REVENUE SIDE &mdash; What You Charge</p>
+              <button type="button" onClick={() => setForm(p => ({ ...p, revenue_type: p.revenue_type === "hourly" ? "lump_sum" : "hourly" }))}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                  form.revenue_type === "lump_sum" ? "border-emerald-500 bg-emerald-500/20 text-emerald-400" : "border-white/[0.08] text-slate-400 hover:text-white"
+                }`}>
+                {form.revenue_type === "lump_sum" ? "Lump Sum (fixed monthly)" : "Hourly (T&M)"}
+              </button>
+            </div>
+            {form.revenue_type === "hourly" ? (
+              <div>
+                <label className={`block text-xs ${THEME.textDim} mb-1`}>Bill Rate ($/hr) *</label>
+                <input type="number" value={form.rate} onChange={e => setForm(p=>({...p,rate:e.target.value}))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="112" />
+              </div>
+            ) : (
+              <div>
+                <label className={`block text-xs ${THEME.textDim} mb-1`}>Monthly Revenue Amount ($/mo) *</label>
+                <input type="number" value={form.revenue_amount} onChange={e => setForm(p=>({...p,revenue_amount:e.target.value}))}
+                  className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="6000" />
+                {revenueAmount > 0 && (
+                  <p className={`text-xs ${THEME.textDim} mt-2`}>Fixed {formatCurrency(revenueAmount)}/mo &mdash; no timesheet required for revenue</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {form.customCost && ((isLumpRevenue ? monthlyCost > 0 && monthlyRevenue > 0 : effCostRate > 0 && billRate > 0)) && (
+            <div className={`p-4 rounded-lg border ${margin >= 20 ? "bg-emerald-500/10 border-emerald-500/20" : margin >= 0 ? "bg-amber-500/10 border-amber-500/20" : "bg-rose-500/10 border-rose-500/20"}`}>
+              {isLumpRevenue ? (
+                <>
+                  <div className="flex justify-between text-sm"><span className={THEME.textSecondary}>Monthly Cost</span><span className="text-orange-400">{formatCurrency(monthlyCost)}/mo</span></div>
+                  <div className="flex justify-between text-sm mt-1"><span className={THEME.textSecondary}>Monthly Revenue</span><span className="text-emerald-400">{formatCurrency(monthlyRevenue)}/mo</span></div>
+                  <div className={`flex justify-between text-sm mt-2 pt-2 border-t ${THEME.glassBorder}`}>
+                    <span className="font-medium text-white">Gross Margin</span>
+                    <span className={`font-semibold ${margin >= 20 ? "text-emerald-400" : margin >= 0 ? "text-amber-400" : "text-rose-400"}`}>
+                      {margin.toFixed(1)}% ({formatCurrency(monthlyRevenue - monthlyCost)}/mo)
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between text-sm"><span className={THEME.textSecondary}>Eff. Cost</span><span className="text-orange-400">${effCostRate.toFixed(2)}/hr</span></div>
+                  <div className="flex justify-between text-sm mt-1"><span className={THEME.textSecondary}>Bill Rate</span><span className="text-emerald-400">${billRate.toFixed(2)}/hr</span></div>
+                  <div className={`flex justify-between text-sm mt-2 pt-2 border-t ${THEME.glassBorder}`}>
+                    <span className="font-medium text-white">Gross Margin</span>
+                    <span className={`font-semibold ${margin >= 20 ? "text-emerald-400" : margin >= 0 ? "text-amber-400" : "text-rose-400"}`}>
+                      {margin.toFixed(1)}% (${(billRate - effCostRate).toFixed(2)}/hr)
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          {!form.customCost && (billRate > 0 || revenueAmount > 0) && (
+            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <p className={`text-xs ${THEME.textSecondary}`}>Margin will be calculated from {isLumpRevenue ? "fixed monthly revenue" : "timesheet hours"} &mdash; member total cost distributed across clients by % of hours worked.</p>
+            </div>
+          )}
+
+          <div>
+            <label className={`block text-xs ${THEME.textMuted} mb-1`}>Notes</label>
+            <input value={form.notes} onChange={e => setForm(p=>({...p,notes:e.target.value}))}
+              className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="e.g. Covers PM + analyst, 2 FTEs..." />
+          </div>
         </div>
-      </button>
-      {isExpanded && <div className="px-4 pb-4 pt-1">{children}</div>}
+        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
+          <button onClick={onClose} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white`}>Cancel</button>
+          <button onClick={handleSave} disabled={!form.team_member_id||!form.client_id||(form.revenue_type === "hourly" ? !form.rate : !form.revenue_amount)||isSaving}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50">
+            {isSaving && <RefreshCw size={14} className="animate-spin" />}{editingRate ? "Save Changes" : "Add Rate"}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
 
-// ============ EDITABLE CELL — for billable_hours only ============
-function EditableBillableCell({ actualHours, billableHours, onSave }: { 
-  actualHours: number; billableHours: number; onSave: (newValue: number) => void 
+// ============ COST OVERRIDE MODAL ============
+function CostOverrideModal({ isOpen, onClose, onSave, billRates, teamMembers, clients, selectedMonth }: {
+  isOpen: boolean; onClose: () => void; onSave: (data: any) => Promise<void>
+  billRates: BillRate[]; teamMembers: TeamMember[]; clients: Client[]; selectedMonth: string
 }) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [editValue, setEditValue] = useState(billableHours.toString())
-  const isAdjusted = billableHours !== actualHours
+  const [form, setForm] = useState({ team_member_id: "", client_id: "", fixed_amount: "", notes: "" })
+  const [isSaving, setIsSaving] = useState(false)
+  useEffect(() => { setForm({ team_member_id: "", client_id: "", fixed_amount: "", notes: "" }) }, [isOpen])
 
-  const handleSave = () => {
-    const newValue = parseFloat(editValue) || 0
-    if (newValue !== billableHours) onSave(newValue)
-    setIsEditing(false)
-  }
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleSave()
-    if (e.key === 'Escape') { setEditValue(billableHours.toString()); setIsEditing(false) }
+  const lumpSumMemberIds = new Set(billRates.filter(r => r.cost_type === "lump_sum" && r.is_active).map(r => r.team_member_id))
+  const eligibleMembers = teamMembers.filter(m => lumpSumMemberIds.has(m.id) && m.status === "active")
+  const eligibleClients = form.team_member_id
+    ? clients.filter(c => billRates.some(r => r.team_member_id === form.team_member_id && r.client_id === c.id && r.cost_type === "lump_sum" && r.is_active))
+    : clients
+
+  const handleSave = async () => {
+    if (!form.team_member_id || !form.client_id || !form.fixed_amount) return
+    setIsSaving(true)
+    try { await onSave({ team_member_id: form.team_member_id, client_id: form.client_id, month: selectedMonth, fixed_amount: parseFloat(form.fixed_amount)||0, notes: form.notes||null }); onClose() } finally { setIsSaving(false) }
   }
 
-  if (isEditing) {
-    return (
-      <input type="number" value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={handleSave} onKeyDown={handleKeyDown}
-        className="w-16 px-1 py-0.5 text-right bg-slate-900/50 border border-orange-500/50 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/30" autoFocus step="0.5" />
-    )
-  }
+  if (!isOpen) return null
+
   return (
-    <button onClick={() => { setEditValue(billableHours.toString()); setIsEditing(true) }}
-      className={`px-1.5 py-0.5 rounded transition-colors flex items-center gap-1 ${
-        isAdjusted ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20' : 'text-slate-300 hover:bg-white/[0.08]'
-      }`} title={isAdjusted ? `Adjusted from ${actualHours.toFixed(1)}` : 'Click to adjust billable hours'}>
-      {billableHours.toFixed(1)}
-      {isAdjusted && <Edit2 size={10} className="text-orange-400" />}
-    </button>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-2xl w-full max-w-lg`}>
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder}`}>
+          <div>
+            <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>Cost Override</h3>
+            <p className={`text-xs ${THEME.textMuted}`}>Override auto-distribution for {formatMonth(selectedMonth)}</p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-white/[0.05] rounded-lg"><X size={20} className={THEME.textMuted} /></button>
+        </div>
+        <div className="p-6 space-y-5">
+          <div>
+            <label className={`block text-xs ${THEME.textMuted} mb-1`}>Team Member (Lump-Sum Only) *</label>
+            <select value={form.team_member_id} onChange={e => setForm(p=>({...p,team_member_id:e.target.value,client_id:""}))}
+              className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white">
+              <option value="">Select...</option>
+              {eligibleMembers.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={`block text-xs ${THEME.textMuted} mb-1`}>Client *</label>
+            <select value={form.client_id} onChange={e => setForm(p=>({...p,client_id:e.target.value}))}
+              className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white">
+              <option value="">Select...</option>
+              {eligibleClients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={`block text-xs ${THEME.textMuted} mb-1`}>Fixed Amount ($) *</label>
+            <input type="number" value={form.fixed_amount} onChange={e => setForm(p=>({...p,fixed_amount:e.target.value}))}
+              className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="20000" />
+            <p className={`text-xs ${THEME.textDim} mt-1`}>Overrides auto-calculated allocation for this month only</p>
+          </div>
+          <div>
+            <label className={`block text-xs ${THEME.textMuted} mb-1`}>Notes</label>
+            <input value={form.notes} onChange={e => setForm(p=>({...p,notes:e.target.value}))}
+              className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="Per CEO request..." />
+          </div>
+        </div>
+        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
+          <button onClick={onClose} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white`}>Cancel</button>
+          <button onClick={handleSave} disabled={!form.team_member_id||!form.client_id||!form.fixed_amount||isSaving}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50">
+            {isSaving && <RefreshCw size={14} className="animate-spin" />}Set Override
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============ MEMBER MODAL ============
+function MemberModal({ isOpen, onClose, onSave, editingMember }: {
+  isOpen: boolean; onClose: () => void; onSave: (data: any) => Promise<void>; editingMember: TeamMember | null
+}) {
+  const [form, setForm] = useState({
+    name: "", email: "", phone: "", role: "", status: "active",
+    employment_type: "contractor", start_date: "",
+    entity_name: "", entity_type: "", address: "",
+    bank_name: "", account_type: "", routing_number: "", account_number: "", payment_method: "",
+    cost_type: "hourly" as "hourly" | "lump_sum", cost_amount: "",
+  })
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    if (editingMember) {
+      setForm({
+        name: editingMember.name||"", email: editingMember.email||"", phone: editingMember.phone||"",
+        role: editingMember.role||"", status: editingMember.status||"active",
+        employment_type: editingMember.employment_type||"contractor", start_date: editingMember.start_date||"",
+        entity_name: editingMember.entity_name||"", entity_type: editingMember.entity_type||"",
+        address: editingMember.address||"", bank_name: editingMember.bank_name||"",
+        account_type: editingMember.account_type||"", routing_number: editingMember.routing_number||"",
+        account_number: editingMember.account_number||"", payment_method: editingMember.payment_method||"",
+        cost_type: editingMember.cost_type||"hourly", cost_amount: editingMember.cost_amount?.toString()||"",
+      })
+    } else {
+      setForm({ name:"",email:"",phone:"",role:"",status:"active",employment_type:"contractor",start_date:"",
+        entity_name:"",entity_type:"",address:"",bank_name:"",account_type:"",routing_number:"",account_number:"",
+        payment_method:"",cost_type:"hourly",cost_amount:"" })
+    }
+  }, [editingMember, isOpen])
+
+  const handleSave = async () => {
+    if (!form.name || !form.email) return
+    setIsSaving(true)
+    try {
+      const payload = {
+        ...form,
+        cost_amount: parseFloat(form.cost_amount) || 0,
+        start_date: form.start_date || null,
+        entity_name: form.entity_name || null,
+        entity_type: form.entity_type || null,
+        address: form.address || null,
+        bank_name: form.bank_name || null,
+        account_type: form.account_type || null,
+        routing_number: form.routing_number || null,
+        account_number: form.account_number || null,
+        payment_method: form.payment_method || null,
+        phone: form.phone || null,
+      }
+      await onSave(payload); onClose()
+    } finally { setIsSaving(false) }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-2xl w-full max-w-2xl my-8 flex flex-col max-h-[90vh]`}>
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder}`}>
+          <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>{editingMember ? "Edit Team Member" : "Add Team Member"}</h3>
+          <button onClick={onClose} className="p-1 hover:bg-white/[0.05] rounded-lg"><X size={20} className={THEME.textMuted} /></button>
+        </div>
+        <div className="p-6 space-y-4 overflow-y-auto flex-1">
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Full Name *</label>
+              <input value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" /></div>
+            <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Email *</label>
+              <input type="email" value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Phone</label>
+              <input value={form.phone} onChange={e=>setForm(p=>({...p,phone:e.target.value}))} className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" /></div>
+            <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Role / Title</label>
+              <input value={form.role} onChange={e=>setForm(p=>({...p,role:e.target.value}))} className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" /></div>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Employment Type</label>
+              <select value={form.employment_type} onChange={e=>setForm(p=>({...p,employment_type:e.target.value}))}
+                className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white">
+                {EMPLOYMENT_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
+              </select></div>
+            <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Status</label>
+              <select value={form.status} onChange={e=>setForm(p=>({...p,status:e.target.value}))}
+                className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white">
+                {STATUS_OPTIONS.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
+              </select></div>
+            <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Start Date</label>
+              <input type="date" value={form.start_date} onChange={e=>setForm(p=>({...p,start_date:e.target.value}))}
+                className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" /></div>
+          </div>
+
+          <div className={`pt-4 border-t ${THEME.glassBorder}`}>
+            <h4 className={`text-sm font-medium ${THEME.textSecondary} mb-3`}>Default Cost (fallback when no rate card entry)</h4>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              {COST_TYPES.map(t=>(
+                <button key={t.id} type="button" onClick={()=>setForm(p=>({...p,cost_type:t.id as any}))}
+                  className={`p-3 rounded-lg border text-left transition-all ${form.cost_type===t.id?"border-orange-500 bg-orange-500/10":"border-white/[0.08] hover:border-white/[0.15]"}`}>
+                  <p className={`text-sm font-medium ${form.cost_type===t.id?"text-orange-400":THEME.textPrimary}`}>{t.label}</p>
+                  <p className={`text-xs ${THEME.textDim} mt-0.5`}>{t.description}</p>
+                </button>
+              ))}
+            </div>
+            <div>
+              <label className={`block text-xs ${THEME.textMuted} mb-1`}>{form.cost_type==="hourly"?"Hourly Rate ($/hr)":"Monthly Amount ($/mo)"}</label>
+              <input type="number" value={form.cost_amount} onChange={e=>setForm(p=>({...p,cost_amount:e.target.value}))}
+                className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white"
+                placeholder={form.cost_type==="hourly"?"75":"35000"} />
+              {form.cost_type==="lump_sum" && form.cost_amount && (
+                <p className={`text-xs ${THEME.textDim} mt-1`}>Effective rate: ~${(parseFloat(form.cost_amount)/172).toFixed(2)}/hr (172 hrs/mo)</p>
+              )}
+            </div>
+          </div>
+
+          {form.employment_type === "contractor" && (
+            <>
+              <div className={`pt-4 border-t ${THEME.glassBorder}`}>
+                <h4 className={`text-sm font-medium ${THEME.textSecondary} mb-3`}>Entity Information</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Entity Name</label>
+                    <input value={form.entity_name} onChange={e=>setForm(p=>({...p,entity_name:e.target.value}))}
+                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" placeholder="LLC or DBA" /></div>
+                  <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Entity Type</label>
+                    <select value={form.entity_type} onChange={e=>setForm(p=>({...p,entity_type:e.target.value}))}
+                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white">
+                      <option value="">Select...</option>{ENTITY_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
+                    </select></div>
+                </div>
+                <div className="mt-4"><label className={`block text-xs ${THEME.textMuted} mb-1`}>Address</label>
+                  <input value={form.address} onChange={e=>setForm(p=>({...p,address:e.target.value}))}
+                    className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" /></div>
+              </div>
+              <div className={`pt-4 border-t ${THEME.glassBorder}`}>
+                <h4 className={`text-sm font-medium ${THEME.textSecondary} mb-3`}>Payment Information</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Bank Name</label>
+                    <input value={form.bank_name} onChange={e=>setForm(p=>({...p,bank_name:e.target.value}))}
+                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white" /></div>
+                  <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Account Type</label>
+                    <select value={form.account_type} onChange={e=>setForm(p=>({...p,account_type:e.target.value}))}
+                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white">
+                      <option value="">Select...</option>{ACCOUNT_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
+                    </select></div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Routing Number</label>
+                    <input value={form.routing_number} onChange={e=>setForm(p=>({...p,routing_number:e.target.value}))}
+                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white font-mono" /></div>
+                  <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Account Number</label>
+                    <input value={form.account_number} onChange={e=>setForm(p=>({...p,account_number:e.target.value}))}
+                      className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white font-mono" /></div>
+                </div>
+                <div className="mt-4"><label className={`block text-xs ${THEME.textMuted} mb-1`}>Payment Method</label>
+                  <select value={form.payment_method} onChange={e=>setForm(p=>({...p,payment_method:e.target.value}))}
+                    className="w-full px-3 py-2 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white">
+                    <option value="">Select...</option>{PAYMENT_METHODS.map(m=><option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select></div>
+              </div>
+            </>
+          )}
+        </div>
+        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
+          <button onClick={onClose} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white`}>Cancel</button>
+          <button onClick={handleSave} disabled={!form.name||!form.email||isSaving}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50">
+            {isSaving && <RefreshCw size={14} className="animate-spin" />}{editingMember ? "Save Changes" : "Add Member"}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
 // ============ MAIN PAGE ============
-export default function TimeTrackingPage() {
+export default function TeamPage() {
   const [loading, setLoading] = useState(true)
-  const [entries, setEntries] = useState<TimeEntry[]>([])
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
-  const [clients, setClients] = useState<Client[]>([])
-  const [assignments, setAssignments] = useState<ProjectAssignment[]>([])
-  const [billRates, setBillRates] = useState<any[]>([])
   const [companyId, setCompanyId] = useState<string | null>(null)
 
-  const [datePreset, setDatePreset] = useState<DatePreset>('mtd')
-  const [customStartDate, setCustomStartDate] = useState('')
-  const [customEndDate, setCustomEndDate] = useState('')
-  const [selectedClient, setSelectedClient] = useState<string>('all')
-  const [selectedEmployee, setSelectedEmployee] = useState<string>('all')
-  const [selectedProject, setSelectedProject] = useState<string>('all')
-  const [showDatePicker, setShowDatePicker] = useState(false)
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [billRates, setBillRates] = useState<BillRate[]>([])
+  const [costOverrides, setCostOverrides] = useState<CostOverride[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [clients, setClients] = useState<Client[]>([])
+  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
 
-  const [activeTab, setActiveTab] = useState<ViewTab>('byClient')
-  const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set())
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
+  const [activeTab, setActiveTab] = useState<"directory" | "rates" | "profitability">("directory")
+  const [rateStatusFilter, setRateStatusFilter] = useState<"active" | "archived" | "all">("active")
+  const [expandedRateMembers, setExpandedRateMembers] = useState<Set<string>>(new Set())
+  const [searchQuery, setSearchQuery] = useState("")
+  const [employmentFilter, setEmploymentFilter] = useState<"all" | "employee" | "contractor">("all")
 
-  const [showEntryModal, setShowEntryModal] = useState(false)
-  const [formData, setFormData] = useState({ date: new Date().toISOString().split('T')[0], team_member_id: '', project_id: '', hours: '', billable_hours: '', notes: '', is_billable: true })
+  // Period state
+  const [periodType, setPeriodType] = useState<PeriodType>("month")
+  const [selectedPeriod, setSelectedPeriod] = useState(getCurrentMonth())
+  const [profitView, setProfitView] = useState<"summary" | "revenue" | "cost">("summary")
 
-  // Toast
   const [toasts, setToasts] = useState<Toast[]>([])
-  const addToast = useCallback((type: Toast['type'], message: string) => {
+  const addToast = useCallback((type: Toast["type"], message: string) => {
     const id = Date.now()
     setToasts(prev => [...prev, { id, type, message }])
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
   }, [])
 
-  const dateRange = useMemo(() => getDateRange(datePreset, customStartDate, customEndDate), [datePreset, customStartDate, customEndDate])
-  const priorPeriod = useMemo(() => getPriorPeriodRange(dateRange.start, dateRange.end), [dateRange])
+  const [showMemberModal, setShowMemberModal] = useState(false)
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
+  const [showRateModal, setShowRateModal] = useState(false)
+  const [editingRate, setEditingRate] = useState<BillRate | null>(null)
+  const [showOverrideModal, setShowOverrideModal] = useState(false)
+  const [selectedMemberDetail, setSelectedMemberDetail] = useState<TeamMember | null>(null)
 
-  // ============ DATA LOADING ============
+  // Reset period value when switching period type
+  const handlePeriodTypeChange = (pt: PeriodType) => {
+    setPeriodType(pt)
+    setSelectedPeriod(getDefaultPeriod(pt))
+  }
+
+  // ---- DATA LOADING ----
   useEffect(() => {
-    const loadData = async () => {
+    async function loadData() {
       try {
         const result = await getCurrentUser()
         const user = result?.user
-        if (!user) return
-        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
+        if (!user) { setLoading(false); return }
+        const { data: profile } = await supabase.from("profiles").select("company_id").eq("id", user.id).single()
         if (!profile?.company_id) { setLoading(false); return }
         setCompanyId(profile.company_id)
 
-        const [teamRes, projRes, clientRes, entriesRes, assignRes, billRatesRes] = await Promise.all([
-          supabase.from('team_members').select('*').eq('company_id', profile.company_id),
-          supabase.from('projects').select('*').eq('company_id', profile.company_id),
-          supabase.from('clients').select('*').eq('company_id', profile.company_id),
-          supabase.from('time_entries').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
-          supabase.from('team_project_assignments').select('*').eq('company_id', profile.company_id),
-          supabase.from('bill_rates').select('*').eq('company_id', profile.company_id),
+        const [membersRes, clientsRes, projectsRes, billRatesRes, costOverridesRes, timeRes] = await Promise.all([
+          supabase.from("team_members").select("*").eq("company_id", profile.company_id).order("name"),
+          supabase.from("clients").select("id, name").eq("company_id", profile.company_id).order("name"),
+          supabase.from("projects").select("id, name, client_id, status, budget").eq("company_id", profile.company_id),
+          supabase.from("bill_rates").select("*").eq("company_id", profile.company_id),
+          supabase.from("cost_overrides").select("*").eq("company_id", profile.company_id),
+          supabase.from("time_entries").select("id, contractor_id, project_id, hours, billable_hours, is_billable, date").eq("company_id", profile.company_id),
         ])
 
-        const projectMap: Record<string, any> = {}; (projRes.data || []).forEach((p: any) => { projectMap[p.id] = p })
-        const clientMap: Record<string, any> = {}; (clientRes.data || []).forEach((c: any) => { clientMap[c.id] = c })
-        const teamMemberMap: Record<string, any> = {}; (teamRes.data || []).forEach((t: any) => { teamMemberMap[t.id] = t })
+        const clientMap = new Map((clientsRes.data || []).map(c => [c.id, c.name]))
+        const memberMap = new Map((membersRes.data || []).map(m => [m.id, m.name]))
 
-        // Build rate card lookup: key = `${team_member_id}_${client_id}`
-        const rateCardLookup: Record<string, any> = {}
-        ;(billRatesRes.data || []).forEach((r: any) => {
-          if (r.is_active) rateCardLookup[`${r.team_member_id}_${r.client_id}`] = r
-        })
-
-        // Build assignment lookup: key = `${team_member_id}_${project_id}`
-        const assignmentLookup: Record<string, ProjectAssignment> = {}
-        ;(assignRes.data || []).forEach((a: any) => {
-          assignmentLookup[`${a.team_member_id}_${a.project_id}`] = a
-        })
-
-        const transformedEntries = (entriesRes.data || []).map((e: any) => {
-          const project = projectMap[e.project_id]
-          const clientId = project?.client_id || ''
-          const clientName = clientId ? clientMap[clientId]?.name || '' : ''
-          const teamMemberId = e.contractor_id || e.user_id || ''
-          const teamMember = teamMemberMap[teamMemberId]
-          
-          // Rate card lookup: member × client (primary source)
-          const rateCard = rateCardLookup[`${teamMemberId}_${clientId}`]
-          // Fallback: project assignment
-          const assignment = assignmentLookup[`${teamMemberId}_${e.project_id}`]
-
-          // BILL RATE (revenue): rate card > assignment > entry stored > 0
-          const billRate = rateCard?.rate || e.bill_rate || assignment?.bill_rate || 0
-
-          // COST RATE (two-tier model):
-          // Tier 1: Rate card has custom cost (cost_amount > 0) → use it
-          // Tier 2: Fall back to team member default cost
-          // For lump sum costs: effective hourly = monthly / 172 (standard full-time hours)
-          let costRate = 0
-          
-          if (rateCard && rateCard.cost_amount > 0) {
-            if (normalizeCostType(rateCard.cost_type) === 'hourly') {
-              costRate = rateCard.cost_amount
-            } else {
-              // Lump sum at rate card level: effective hourly = cost / standard hours
-              costRate = rateCard.cost_amount / STANDARD_MONTHLY_HOURS
-            }
-          } else if (teamMember) {
-            // Tier 2: team member default
-            const memberCostType = normalizeCostType(teamMember.cost_type)
-            if (memberCostType === 'hourly') {
-              costRate = teamMember.cost_amount || 0
-            } else if ((memberCostType === 'lump_sum' || memberCostType === 'lump sum') && teamMember.cost_amount > 0) {
-              // Effective hourly from lump sum: always use standard 172 hours
-              costRate = teamMember.cost_amount / STANDARD_MONTHLY_HOURS
-            }
-          }
-          // Final fallback: assignment rate
-          if (costRate === 0) costRate = assignment?.rate || 0
-          
-          return {
-            id: e.id,
-            date: e.date,
-            hours: e.hours || 0,
-            billable_hours: e.billable_hours != null ? e.billable_hours : (e.hours || 0), // Default to actual if no override
-            is_billable: e.is_billable !== false,
-            team_member_id: teamMemberId,
-            team_member_name: teamMemberMap[teamMemberId]?.name || 'Unknown',
-            project_id: e.project_id,
-            project_name: project?.name || 'Unknown',
-            client_id: clientId,
-            client_name: clientName,
-            bill_rate: billRate,
-            cost_rate: costRate,
-            display_cost_rate: costRate,
-            notes: e.description || null
-          }
-        })
-
-        setTeamMembers((teamRes.data || []).map((t: any) => ({ id: t.id, name: t.name || '', email: t.email || '', status: t.status || 'active', employment_type: t.employment_type || 'contractor', cost_type: t.cost_type || 'hourly', cost_amount: t.cost_amount || 0, baseline_hours: t.baseline_hours || 172 })))
-        setProjects((projRes.data || []).map((p: any) => ({ id: p.id, name: p.name || '', client: p.client || '', client_id: p.client_id || '', bill_rate: p.bill_rate || 0 })))
-        setClients((clientRes.data || []).map((c: any) => ({ id: c.id, name: c.name || '' })))
-        setAssignments(assignRes.data || [])
-        setBillRates(billRatesRes.data || [])
-        setEntries(transformedEntries)
-        if (clientRes.data && clientRes.data.length > 0) setExpandedClients(new Set([clientRes.data[0].id]))
-      } catch (error) { console.error('Error loading data:', error) }
-      finally { setLoading(false) }
+        setTeamMembers(membersRes.data || [])
+        setClients(clientsRes.data || [])
+        setProjects((projectsRes.data || []).map(p => ({ ...p, client_name: clientMap.get(p.client_id) || "" })))
+        setBillRates((billRatesRes.data || []).map(r => ({
+          ...r, team_member_name: memberMap.get(r.team_member_id) || "Unknown", client_name: clientMap.get(r.client_id) || "Unknown",
+        })))
+        setCostOverrides((costOverridesRes.data || []).map(o => ({
+          ...o, team_member_name: memberMap.get(o.team_member_id) || "Unknown", client_name: clientMap.get(o.client_id) || "Unknown",
+        })))
+        setTimeEntries(timeRes.data || [])
+      } catch (error) {
+        console.error("Error loading data:", error)
+        addToast("error", "Failed to load data")
+      } finally {
+        setLoading(false)
+      }
     }
     loadData()
-  }, [])
+  }, [addToast])
 
-  // ============ FILTERS ============
-  const filteredEntries = useMemo(() => entries.filter(entry => {
-    if (entry.date < dateRange.start || entry.date > dateRange.end) return false
-    if (selectedClient !== 'all' && entry.client_id !== selectedClient) return false
-    if (selectedEmployee !== 'all' && entry.team_member_id !== selectedEmployee) return false
-    if (selectedProject !== 'all' && entry.project_id !== selectedProject) return false
-    return true
-  }), [entries, dateRange, selectedClient, selectedEmployee, selectedProject])
-
-  const priorPeriodEntries = useMemo(() => entries.filter(entry => {
-    if (entry.date < priorPeriod.start || entry.date > priorPeriod.end) return false
-    if (selectedClient !== 'all' && entry.client_id !== selectedClient) return false
-    if (selectedEmployee !== 'all' && entry.team_member_id !== selectedEmployee) return false
-    if (selectedProject !== 'all' && entry.project_id !== selectedProject) return false
-    return true
-  }), [entries, priorPeriod, selectedClient, selectedEmployee, selectedProject])
-
-  // ============ FIXED COST ADJUSTMENT ============
-  // Recalculate cost_rate for lump sum members so total cost = fixed monthly amount
-  const costAdjustedEntries = useMemo(() => 
-    adjustEntriesForFixedCosts(filteredEntries, teamMembers, billRates, dateRange.start, dateRange.end),
-    [filteredEntries, teamMembers, billRates, dateRange]
-  )
-  const costAdjustedPriorEntries = useMemo(() => 
-    adjustEntriesForFixedCosts(priorPeriodEntries, teamMembers, billRates, priorPeriod.start, priorPeriod.end),
-    [priorPeriodEntries, teamMembers, billRates, priorPeriod]
-  )
-
-  // ============ KPIs — DUAL LAYER ============
-  const kpis = useMemo(() => {
-    const totalActualHours = costAdjustedEntries.reduce((sum, e) => sum + e.hours, 0)
-    const totalBillableHours = costAdjustedEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours : 0), 0)
-    const totalCost = costAdjustedEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0)
-    const totalRevenue = costAdjustedEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours * e.bill_rate : 0), 0)
-    const grossMargin = totalRevenue - totalCost
-    const marginPct = calcMarginPct(totalRevenue, totalCost)
-    const avgBillRate = totalBillableHours > 0 ? totalRevenue / totalBillableHours : 0
-    const avgCostRate = totalActualHours > 0 ? totalCost / totalActualHours : 0
-
-    const priorHours = costAdjustedPriorEntries.reduce((sum, e) => sum + e.hours, 0)
-    const priorRevenue = costAdjustedPriorEntries.reduce((sum, e) => sum + (e.is_billable ? (e.billable_hours || e.hours) * e.bill_rate : 0), 0)
-    const priorCost = costAdjustedPriorEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0)
-    
-    const activeMembers = teamMembers.filter(m => m.status === 'active')
-    const totalCapacity = activeMembers.length * 160
-    const utilization = totalCapacity > 0 ? (totalActualHours / totalCapacity) * 100 : 0
-
-    const hoursTrend = priorHours > 0 ? ((totalActualHours - priorHours) / priorHours) * 100 : 0
-    const revenueTrend = priorRevenue > 0 ? ((totalRevenue - priorRevenue) / priorRevenue) * 100 : 0
-    const costTrend = priorCost > 0 ? ((totalCost - priorCost) / priorCost) * 100 : 0
-
-    return { totalActualHours, totalBillableHours, totalCost, totalRevenue, grossMargin, marginPct, avgBillRate, avgCostRate, utilization, hoursTrend, revenueTrend, costTrend, uniqueClients: new Set(costAdjustedEntries.map(e => e.client_id).filter(Boolean)).size }
-  }, [costAdjustedEntries, costAdjustedPriorEntries, teamMembers])
-
-  const weekColumns = useMemo(() => getWeekColumns(dateRange.start, dateRange.end), [dateRange])
-
-  // ============ BY CLIENT DATA ============
-  const dataByClient = useMemo(() => {
-    const clientData: Record<string, { id: string; name: string; totalActualHours: number; totalBillableHours: number; totalCost: number; totalRevenue: number
-      projects: Record<string, { id: string; name: string; members: Record<string, { id: string; name: string; billRate: number; costRate: number; weekActualHours: Record<string, number>; weekBillableHours: Record<string, number>; totalActualHours: number; totalBillableHours: number; totalCost: number; totalRevenue: number; weekEntries: Record<string, { id: string; hours: number; billable_hours: number }[]> }>; totalActualHours: number; totalBillableHours: number; totalCost: number; totalRevenue: number }>
-    }> = {}
-
-    costAdjustedEntries.forEach(entry => {
-      const clientId = entry.client_id || 'unassigned'
-      const clientName = entry.client_name || 'Unassigned'
-      if (!clientData[clientId]) clientData[clientId] = { id: clientId, name: clientName, totalActualHours: 0, totalBillableHours: 0, totalCost: 0, totalRevenue: 0, projects: {} }
-      if (!clientData[clientId].projects[entry.project_id]) clientData[clientId].projects[entry.project_id] = { id: entry.project_id, name: entry.project_name, members: {}, totalActualHours: 0, totalBillableHours: 0, totalCost: 0, totalRevenue: 0 }
-      const project = clientData[clientId].projects[entry.project_id]
-      if (!project.members[entry.team_member_id]) project.members[entry.team_member_id] = { id: entry.team_member_id, name: entry.team_member_name, billRate: entry.bill_rate, costRate: entry.display_cost_rate, weekActualHours: {}, weekBillableHours: {}, totalActualHours: 0, totalBillableHours: 0, totalCost: 0, totalRevenue: 0, weekEntries: {} }
-      const member = project.members[entry.team_member_id]
-      
-      const weekCol = weekColumns.find(w => {
-        const entryDate = new Date(entry.date); const weekStart = new Date(w.start); const weekEnd = new Date(w.end); weekEnd.setHours(23, 59, 59)
-        return entryDate >= weekStart && entryDate <= weekEnd
-      })
-      if (weekCol) {
-        member.weekActualHours[weekCol.end] = (member.weekActualHours[weekCol.end] || 0) + entry.hours
-        member.weekBillableHours[weekCol.end] = (member.weekBillableHours[weekCol.end] || 0) + entry.billable_hours
-        if (!member.weekEntries[weekCol.end]) member.weekEntries[weekCol.end] = []
-        member.weekEntries[weekCol.end].push({ id: entry.id, hours: entry.hours, billable_hours: entry.billable_hours })
+  // ---- COMPUTED ----
+  const filteredMembers = useMemo(() => {
+    return teamMembers.filter(m => {
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase()
+        if (!m.name?.toLowerCase().includes(q) && !m.email?.toLowerCase().includes(q)) return false
       }
-      member.totalActualHours += entry.hours
-      member.totalBillableHours += entry.billable_hours
-      member.totalCost += entry.hours * entry.cost_rate
-      member.totalRevenue += entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
-      if (entry.bill_rate > member.billRate) member.billRate = entry.bill_rate
-      if (entry.display_cost_rate > member.costRate) member.costRate = entry.display_cost_rate
+      if (employmentFilter !== "all" && m.employment_type !== employmentFilter) return false
+      return true
     })
+  }, [teamMembers, searchQuery, employmentFilter])
 
-    Object.values(clientData).forEach(client => {
-      Object.values(client.projects).forEach(project => {
-        Object.values(project.members).forEach(member => {
-          project.totalActualHours += member.totalActualHours; project.totalBillableHours += member.totalBillableHours
-          project.totalCost += member.totalCost; project.totalRevenue += member.totalRevenue
-        })
-        client.totalActualHours += project.totalActualHours; client.totalBillableHours += project.totalBillableHours
-        client.totalCost += project.totalCost; client.totalRevenue += project.totalRevenue
-      })
-    })
-    return Object.values(clientData).sort((a, b) => b.totalRevenue - a.totalRevenue)
-  }, [costAdjustedEntries, weekColumns])
-
-  // ============ BY EMPLOYEE DATA ============
-  const dataByEmployee = useMemo(() => {
-    const employeeData: Record<string, { id: string; name: string; empType: string; totalActualHours: number; totalBillableHours: number; totalCost: number; totalRevenue: number; clients: Record<string, { name: string; actualHours: number; billableHours: number; cost: number; revenue: number }> }> = {}
-    costAdjustedEntries.forEach(entry => {
-      if (!employeeData[entry.team_member_id]) {
-        const member = teamMembers.find(m => m.id === entry.team_member_id)
-        employeeData[entry.team_member_id] = { id: entry.team_member_id, name: entry.team_member_name, empType: member?.employment_type || 'contractor', totalActualHours: 0, totalBillableHours: 0, totalCost: 0, totalRevenue: 0, clients: {} }
-      }
-      const emp = employeeData[entry.team_member_id]
-      emp.totalActualHours += entry.hours; emp.totalBillableHours += entry.billable_hours
-      emp.totalCost += entry.hours * entry.cost_rate; emp.totalRevenue += entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
-      const clientKey = entry.client_id || 'unassigned'
-      if (!emp.clients[clientKey]) emp.clients[clientKey] = { name: entry.client_name || 'Unassigned', actualHours: 0, billableHours: 0, cost: 0, revenue: 0 }
-      emp.clients[clientKey].actualHours += entry.hours; emp.clients[clientKey].billableHours += entry.billable_hours
-      emp.clients[clientKey].cost += entry.hours * entry.cost_rate; emp.clients[clientKey].revenue += entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
-    })
-    return Object.values(employeeData).sort((a, b) => b.totalActualHours - a.totalActualHours)
-  }, [costAdjustedEntries, teamMembers])
-
-  // ============ PROFITABILITY DATA ============
-  const profitabilityByProject = useMemo(() => {
-    const projectData: Record<string, { id: string; name: string; clientName: string; actualHours: number; billableHours: number; cost: number; revenue: number; margin: number; marginPct: number }> = {}
-    costAdjustedEntries.forEach(entry => {
-      if (!projectData[entry.project_id]) projectData[entry.project_id] = { id: entry.project_id, name: entry.project_name, clientName: entry.client_name, actualHours: 0, billableHours: 0, cost: 0, revenue: 0, margin: 0, marginPct: 0 }
-      const p = projectData[entry.project_id]
-      p.actualHours += entry.hours; p.billableHours += entry.billable_hours
-      p.cost += entry.hours * entry.cost_rate; p.revenue += entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
-    })
-    return Object.values(projectData).map(p => ({ ...p, margin: p.revenue - p.cost, marginPct: calcMarginPct(p.revenue, p.cost) })).sort((a, b) => b.margin - a.margin)
-  }, [costAdjustedEntries])
-
-  const revenueByClientData = useMemo(() => dataByClient.map((c, i) => ({ name: c.name, value: c.totalRevenue, fill: CHART_COLORS[i % CHART_COLORS.length] })), [dataByClient])
-
-  const weeklyTrendData = useMemo(() => weekColumns.map(week => {
-    const weekEntries = costAdjustedEntries.filter(e => {
-      const entryDate = new Date(e.date); const weekStart = new Date(week.start); const weekEnd = new Date(week.end); weekEnd.setHours(23, 59, 59)
-      return entryDate >= weekStart && entryDate <= weekEnd
-    })
+  const summary = useMemo(() => {
+    const active = teamMembers.filter(m => m.status === "active")
     return {
-      week: week.label,
-      actualHours: weekEntries.reduce((sum, e) => sum + e.hours, 0),
-      billableHours: weekEntries.reduce((sum, e) => sum + e.billable_hours, 0),
-      cost: weekEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0),
-      revenue: weekEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours * e.bill_rate : 0), 0),
+      total: teamMembers.length, active: active.length,
+      employees: teamMembers.filter(m => m.employment_type === "employee").length,
+      contractors: teamMembers.filter(m => m.employment_type === "contractor").length,
+      activeRates: billRates.filter(r => r.is_active).length,
     }
-  }), [weekColumns, costAdjustedEntries])
+  }, [teamMembers, billRates])
 
-  // ============ ACTIONS ============
-  const saveNewEntry = async () => {
-    if (!companyId) { addToast('error', 'No company found — try refreshing'); return }
-    if (!formData.team_member_id) { addToast('error', 'Please select an employee'); return }
-    if (!formData.project_id) { addToast('error', 'Please select a project'); return }
-    if (!formData.hours) { addToast('error', 'Please enter actual hours'); return }
-    try {
-      const project = projects.find(p => p.id === formData.project_id)
-      const teamMember = teamMembers.find(t => t.id === formData.team_member_id)
-      const assignment = assignments.find(a => a.team_member_id === formData.team_member_id && a.project_id === formData.project_id)
-      const clientId = project?.client_id || ''
+  // ---- PROFITABILITY ENGINE (reads from timesheet + rate card) ----
+  const profitabilityData = useMemo(() => {
+    const months = getMonthsInPeriod(selectedPeriod, periodType)
+    const periodEntries = timeEntries.filter(t => {
+      const m = t.date?.substring(0, 7)
+      return months.includes(m)
+    })
+    const projectClientMap = new Map(projects.map(p => [p.id, p.client_id || ""]))
+
+    // Helper: check if a rate card is active for the given period
+    const isRateActiveInPeriod = (r: BillRate) => {
+      if (!r.is_active) return false
+      // Check date overlap: rate card [start_date, end_date] overlaps with period months
+      const periodStart = months[0] + "-01"
+      const periodEnd = months[months.length - 1] + "-28" // approximate month end
+      if (r.start_date && r.start_date > periodEnd) return false
+      if (r.end_date && r.end_date < periodStart) return false
+      return true
+    }
+
+    // Count months active for lump sum calculations
+    const countActiveMonths = (r: BillRate) => {
+      return months.filter(mo => {
+        const moStart = mo + "-01"
+        const moEnd = mo + "-28"
+        if (r.start_date && r.start_date > moEnd) return false
+        if (r.end_date && r.end_date < moStart) return false
+        return true
+      }).length
+    }
+
+    return teamMembers.map(member => {
+      const memberTime = periodEntries.filter(t => t.contractor_id === member.id)
+      const totalHours = memberTime.reduce((sum, t) => sum + (t.hours || 0), 0)
       
-      // Rate card lookup (member × client)
-      const rateCard = billRates.find(r => r.team_member_id === formData.team_member_id && r.client_id === clientId && r.is_active)
-      const billRate = rateCard?.rate || assignment?.bill_rate || project?.bill_rate || 0
+      // Get active rate cards for this member in this period
+      const memberRates = billRates.filter(r => r.team_member_id === member.id && isRateActiveInPeriod(r))
+      const hasLumpSumRevenue = memberRates.some(r => r.revenue_type === "lump_sum" && r.revenue_amount > 0)
       
-      // Cost rate (two-tier) — lump sum uses standard 172h for effective hourly
-      const normCostType = (t: string) => (t || '').toLowerCase().replace(/\s+/g, '_')
-      let costRate = 0
-      if (rateCard && rateCard.cost_amount > 0) {
-        costRate = normCostType(rateCard.cost_type) === 'hourly' ? rateCard.cost_amount : rateCard.cost_amount / STANDARD_MONTHLY_HOURS
-      } else if (teamMember) {
-        const tm = teamMembers.find(t => t.id === formData.team_member_id) as any
-        const tmType = normCostType(tm?.cost_type)
-        if (tmType === 'hourly') costRate = tm.cost_amount || 0
-        else if ((tmType === 'lump_sum' || tmType === 'lump sum') && tm?.cost_amount > 0) costRate = tm.cost_amount / STANDARD_MONTHLY_HOURS
+      // Skip if no hours AND no lump sum revenue
+      if (totalHours === 0 && !hasLumpSumRevenue) return null
+
+      // Group hours by client (actual for cost, billable for revenue)
+      const hoursByClient: Record<string, number> = {}
+      const billableHoursByClient: Record<string, number> = {}
+      memberTime.forEach(t => {
+        const clientId = projectClientMap.get(t.project_id) || "unknown"
+        hoursByClient[clientId] = (hoursByClient[clientId] || 0) + (t.hours || 0)
+        // Use billable_hours for revenue; fall back to actual hours if not set
+        const bh = t.billable_hours != null ? t.billable_hours : (t.hours || 0)
+        billableHoursByClient[clientId] = (billableHoursByClient[clientId] || 0) + bh
+      })
+
+      // REVENUE by client
+      const revenueByClient: Record<string, number> = {}
+      let totalRevenue = 0
+      
+      // Hourly revenue from BILLABLE hours (what client is billed)
+      Object.entries(billableHoursByClient).forEach(([clientId, billableHrs]) => {
+        const rc = memberRates.find(r => r.client_id === clientId && r.revenue_type !== "lump_sum")
+        const rev = billableHrs * (rc?.rate || 0)
+        revenueByClient[clientId] = (revenueByClient[clientId] || 0) + rev
+        totalRevenue += rev
+      })
+      
+      // Lump sum revenue from rate cards (regardless of hours)
+      memberRates.filter(r => r.revenue_type === "lump_sum" && r.revenue_amount > 0).forEach(r => {
+        const activeMonths = countActiveMonths(r)
+        const lsRev = r.revenue_amount * activeMonths
+        revenueByClient[r.client_id] = (revenueByClient[r.client_id] || 0) + lsRev
+        totalRevenue += lsRev
+        // Ensure client appears in hoursByClient even with 0 hours
+        if (!hoursByClient[r.client_id]) hoursByClient[r.client_id] = 0
+        if (!billableHoursByClient[r.client_id]) billableHoursByClient[r.client_id] = 0
+      })
+
+      // COST by client — TWO-TIER:
+      const costByClient: Record<string, number> = {}
+      let totalCost = 0
+      const distributedClients: string[] = []
+
+      Object.keys(hoursByClient).forEach(clientId => {
+        const hours = hoursByClient[clientId] || 0
+        const rc = memberRates.find(r => r.client_id === clientId)
+
+        if (rc && rc.cost_amount > 0) {
+          if (rc.cost_type === "hourly") {
+            costByClient[clientId] = hours * rc.cost_amount
+          } else {
+            let lsCost = 0
+            const activeMonths = countActiveMonths(rc)
+            months.forEach(mo => {
+              // Check if rate is active this month
+              const moStart = mo + "-01"; const moEnd = mo + "-28"
+              if (rc.start_date && rc.start_date > moEnd) return
+              if (rc.end_date && rc.end_date < moStart) return
+              const override = costOverrides.find(o => o.team_member_id === member.id && o.client_id === clientId && o.month === mo)
+              lsCost += override ? override.fixed_amount : rc.cost_amount
+            })
+            costByClient[clientId] = lsCost
+          }
+        } else {
+          distributedClients.push(clientId)
+        }
+      })
+
+      // Second pass: distribute member total cost across distributed clients
+      if (distributedClients.length > 0 && (member.cost_amount || 0) > 0) {
+        if (member.cost_type === "hourly") {
+          distributedClients.forEach(clientId => {
+            costByClient[clientId] = (hoursByClient[clientId] || 0) * (member.cost_amount || 0)
+          })
+        } else {
+          const distHours = distributedClients.reduce((s, cid) => s + (hoursByClient[cid] || 0), 0)
+          distributedClients.forEach(clientId => {
+            let clientCost = 0
+            months.forEach(mo => {
+              const override = costOverrides.find(o => o.team_member_id === member.id && o.client_id === clientId && o.month === mo)
+              if (override) {
+                clientCost += override.fixed_amount
+              } else {
+                const pct = distHours > 0 ? (hoursByClient[clientId] || 0) / distHours : 0
+                clientCost += pct * (member.cost_amount || 0)
+              }
+            })
+            costByClient[clientId] = clientCost
+          })
+        }
       }
-      if (costRate === 0) costRate = assignment?.rate || 0
-      const hours = parseFloat(formData.hours)
-      const billableHours = formData.billable_hours ? parseFloat(formData.billable_hours) : hours
 
-      const { data, error } = await supabase.from('time_entries').insert({
-        company_id: companyId, date: formData.date, contractor_id: formData.team_member_id,
-        project_id: formData.project_id, hours, billable_hours: billableHours,
-        is_billable: formData.is_billable, bill_rate: billRate, description: formData.notes || null
-      }).select().single()
+      totalCost = Object.values(costByClient).reduce((s, v) => s + v, 0)
 
-      if (error) throw error
+      const margin = totalRevenue - totalCost
+      const marginPct = totalRevenue > 0 ? (margin / totalRevenue) * 100 : (totalCost > 0 ? -100 : 0)
 
-      const newEntry: TimeEntry = {
-        id: data.id, date: formData.date, hours, billable_hours: billableHours,
-        is_billable: formData.is_billable, team_member_id: formData.team_member_id,
-        team_member_name: teamMember?.name || 'Unknown', project_id: formData.project_id,
-        project_name: project?.name || 'Unknown', client_id: project?.client_id || '',
-        client_name: clients.find(c => c.id === project?.client_id)?.name || '',
-        bill_rate: billRate, cost_rate: costRate, display_cost_rate: costRate, notes: formData.notes || null
-      }
-      setEntries(prev => [newEntry, ...prev])
-      setShowEntryModal(false)
-      setFormData({ date: new Date().toISOString().split('T')[0], team_member_id: '', project_id: '', hours: '', billable_hours: '', notes: '', is_billable: true })
-      addToast('success', 'Time entry added')
-    } catch (error: any) { console.error('Error saving entry:', error, { companyId, formData }); addToast('error', `Failed to save: ${error.message}`) }
-  }
+      const hasCustom = memberRates.some(r => r.cost_amount > 0)
+      const hasDist = distributedClients.length > 0
+      const costLabel = hasCustom && hasDist ? "Mixed" : hasCustom ? "Custom" : "Distributed"
 
-  const updateBillableHours = async (entryId: string, newBillableHours: number) => {
-    try {
-      const { error } = await supabase.from('time_entries').update({ billable_hours: newBillableHours }).eq('id', entryId)
-      if (error) throw error
-      setEntries(prev => prev.map(e => e.id === entryId ? { ...e, billable_hours: newBillableHours } : e))
-      addToast('success', 'Billable hours updated')
-    } catch (error: any) { console.error('Error updating:', error); addToast('error', `Failed to update: ${error.message}`) }
-  }
+      return { id: member.id, name: member.name, costLabel, hours: totalHours,
+        cost: totalCost, revenue: totalRevenue, margin, marginPct,
+        hoursByClient, revenueByClient, costByClient }
+    }).filter(Boolean) as Array<{
+      id: string; name: string; costLabel: string; hours: number; cost: number; revenue: number
+      margin: number; marginPct: number
+      hoursByClient: Record<string, number>; revenueByClient: Record<string, number>; costByClient: Record<string, number>
+    }>
+  }, [teamMembers, billRates, costOverrides, timeEntries, projects, selectedPeriod, periodType])
 
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
-  
-  const deleteEntry = async (entryId: string) => {
+  const profitClients = useMemo(() => {
+    const ids = new Set<string>()
+    profitabilityData.forEach(m => {
+      Object.keys(m.revenueByClient).forEach(id => ids.add(id))
+      Object.keys(m.costByClient).forEach(id => ids.add(id))
+    })
+    return Array.from(ids).map(id => ({ id, name: clients.find(c => c.id === id)?.name || "Unknown" })).sort((a, b) => a.name.localeCompare(b.name))
+  }, [profitabilityData, clients])
+
+  const profitTotals = useMemo(() => {
+    const c = profitabilityData.reduce((s, m) => s + m.cost, 0)
+    const r = profitabilityData.reduce((s, m) => s + m.revenue, 0)
+    return { cost: c, revenue: r, margin: r - c, marginPct: r > 0 ? ((r - c) / r * 100) : 0,
+      hours: profitabilityData.reduce((s, m) => s + m.hours, 0) }
+  }, [profitabilityData])
+
+  // ---- HANDLERS ----
+  const handleSaveMember = async (data: any) => {
     if (!companyId) return
-    if (pendingDeleteId !== entryId) { setPendingDeleteId(entryId); return }
-    setPendingDeleteId(null)
     try {
-      const { error } = await supabase.from('time_entries').delete().eq('id', entryId)
-      if (error) throw error
-      setEntries(prev => prev.filter(e => e.id !== entryId))
-      addToast('success', 'Entry deleted')
-    } catch (error: any) { console.error('Error deleting:', error); addToast('error', `Failed to delete: ${error.message}`) }
+      if (editingMember) {
+        const { error } = await supabase.from("team_members").update(data).eq("id", editingMember.id)
+        if (error) throw error
+        setTeamMembers(prev => prev.map(m => m.id === editingMember.id ? { ...m, ...data } : m))
+        addToast("success", "Team member updated")
+      } else {
+        const { data: newMember, error } = await supabase.from("team_members").insert({ company_id: companyId, ...data }).select().single()
+        if (error) throw error
+        setTeamMembers(prev => [...prev, newMember])
+        addToast("success", "Team member added")
+      }
+      setEditingMember(null)
+    } catch (error: any) { addToast("error", `Failed to save: ${error.message}`); throw error }
   }
 
-  const toggleClient = (clientId: string) => setExpandedClients(prev => { const next = new Set(prev); if (next.has(clientId)) next.delete(clientId); else next.add(clientId); return next })
-  const toggleProject = (projectId: string) => setExpandedProjects(prev => { const next = new Set(prev); if (next.has(projectId)) next.delete(projectId); else next.add(projectId); return next })
+  const handleSaveRate = async (data: any) => {
+    if (!companyId) return
+    try {
+      const memberName = teamMembers.find(m => m.id === data.team_member_id)?.name
+      const clientName = clients.find(c => c.id === data.client_id)?.name
+      if (editingRate) {
+        const { error } = await supabase.from("bill_rates").update({
+          rate: data.rate, notes: data.notes,
+          cost_type: data.cost_type, cost_amount: data.cost_amount, baseline_hours: data.baseline_hours,
+          revenue_type: data.revenue_type, revenue_amount: data.revenue_amount,
+          start_date: data.start_date, end_date: data.end_date,
+        }).eq("id", editingRate.id)
+        if (error) throw error
+        setBillRates(prev => prev.map(r => r.id === editingRate.id ? { ...r, ...data, team_member_name: memberName, client_name: clientName } : r))
+        addToast("success", "Rate card updated")
+      } else {
+        const { data: newRate, error } = await supabase.from("bill_rates").insert({ company_id: companyId, ...data }).select().single()
+        if (error) throw error
+        setBillRates(prev => [...prev, { ...newRate, team_member_name: memberName, client_name: clientName }])
+        addToast("success", "Rate card added")
+      }
+      setEditingRate(null)
+    } catch (error: any) { addToast("error", `Failed to save: ${error.message}`); throw error }
+  }
+
+  const handleDeleteRate = async (id: string) => {
+    try {
+      const { error } = await supabase.from("bill_rates").update({ is_active: false }).eq("id", id)
+      if (error) throw error
+      setBillRates(prev => prev.map(r => r.id === id ? { ...r, is_active: false } : r))
+      addToast("success", "Rate card archived")
+    } catch (error: any) { addToast("error", `Failed to archive: ${error.message}`) }
+  }
+
+  const handleReactivateRate = async (id: string) => {
+    try {
+      const { error } = await supabase.from("bill_rates").update({ is_active: true }).eq("id", id)
+      if (error) throw error
+      setBillRates(prev => prev.map(r => r.id === id ? { ...r, is_active: true } : r))
+      addToast("success", "Rate card reactivated")
+    } catch (error: any) { addToast("error", `Failed to reactivate: ${error.message}`) }
+  }
+
+  const handleSaveOverride = async (data: any) => {
+    if (!companyId) return
+    try {
+      const { data: newOverride, error } = await supabase.from("cost_overrides")
+        .upsert({ company_id: companyId, ...data }, { onConflict: "company_id,team_member_id,client_id,month" })
+        .select().single()
+      if (error) throw error
+      const memberName = teamMembers.find(m => m.id === data.team_member_id)?.name
+      const clientName = clients.find(c => c.id === data.client_id)?.name
+      setCostOverrides(prev => {
+        const idx = prev.findIndex(o => o.team_member_id === data.team_member_id && o.client_id === data.client_id && o.month === data.month)
+        const enriched = { ...newOverride, team_member_name: memberName, client_name: clientName }
+        if (idx >= 0) { const u = [...prev]; u[idx] = enriched; return u }
+        return [...prev, enriched]
+      })
+      addToast("success", "Cost override saved")
+    } catch (error: any) { addToast("error", `Failed to save: ${error.message}`); throw error }
+  }
+
+  const handleDeleteOverride = async (id: string) => {
+    try {
+      const { error } = await supabase.from("cost_overrides").delete().eq("id", id)
+      if (error) throw error
+      setCostOverrides(prev => prev.filter(o => o.id !== id))
+      addToast("success", "Override removed")
+    } catch (error: any) { addToast("error", `Failed to delete: ${error.message}`) }
+  }
 
   const exportToCSV = () => {
-    const headers = ['Date', 'Employee', 'Client', 'Project', 'Actual Hours', 'Billable Hours', 'Cost Rate', 'Bill Rate', 'Cost', 'Revenue', 'Margin', 'Notes']
-    const rows = costAdjustedEntries.map(e => [
-      e.date, e.team_member_name, e.client_name, e.project_name, e.hours, e.billable_hours,
-      e.display_cost_rate, e.bill_rate, (e.hours * e.cost_rate).toFixed(2), (e.billable_hours * e.bill_rate).toFixed(2),
-      ((e.billable_hours * e.bill_rate) - (e.hours * e.cost_rate)).toFixed(2), e.notes || ''
-    ])
-    const csv = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a'); link.href = URL.createObjectURL(blob)
-    link.download = `time-analytics-${dateRange.start}-to-${dateRange.end}.csv`; link.click()
-    addToast('success', 'Export complete')
+    const headers = ["Name", "Email", "Type", "Entity", "Status", "Role", "Cost Type", "Cost Amount"]
+    const rows = teamMembers.map(m => [m.name, m.email, m.employment_type, m.entity_name, m.status, m.role, m.cost_type, m.cost_amount])
+    const csv = [headers.join(","), ...rows.map(r => r.map(c => `"${c || ""}"`).join(","))].join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a"); a.href = url; a.download = `team-${new Date().toISOString().split("T")[0]}.csv`; a.click()
+    addToast("success", "Export complete")
   }
 
-  const getFilterTitle = () => {
-    if (selectedClient !== 'all') return clients.find(c => c.id === selectedClient)?.name || ''
-    if (selectedEmployee !== 'all') return teamMembers.find(t => t.id === selectedEmployee)?.name || ''
-    return 'All Clients'
-  }
-
-  if (loading) return <div className="flex items-center justify-center h-64"><RefreshCw className="w-8 h-8 text-emerald-500 animate-spin" /></div>
+  if (loading) return (
+    <div className="flex items-center justify-center h-[60vh]">
+      <div className="text-center">
+        <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" />
+        <p className={`text-sm ${THEME.textMuted}`}>Loading team...</p>
+      </div>
+    </div>
+  )
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <ToastContainer toasts={toasts} onDismiss={id => setToasts(prev => prev.filter(t => t.id !== id))} />
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className={`text-2xl font-semibold ${THEME.textPrimary}`}>Time Analytics</h1>
-          <p className={`text-sm mt-1 ${THEME.textMuted}`}>{getFilterTitle()}</p>
+          <h1 className={`text-xl font-semibold ${THEME.textPrimary}`}>Team</h1>
+          <p className={`text-sm ${THEME.textMuted} mt-1`}>Manage team members, rates, and profitability</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={exportToCSV} className={`flex items-center gap-2 px-4 py-2 ${THEME.glass} border ${THEME.glassBorder} hover:bg-white/[0.08] rounded-lg text-sm font-medium text-white transition-colors`}><Download size={18} />Export</button>
-          <button onClick={() => setShowEntryModal(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-emerald-500/20"><Plus size={18} />Add Entry</button>
-        </div>
-      </div>
-
-      {/* Date Range & Filters */}
-      <div className={`p-4 rounded-xl border ${THEME.glass} ${THEME.glassBorder} relative z-20`}>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="relative">
-            <button onClick={() => setShowDatePicker(!showDatePicker)} className={`flex items-center gap-2 px-4 py-2 bg-white/[0.05] border ${THEME.glassBorder} hover:bg-white/[0.08] rounded-lg text-sm font-medium text-white transition-colors`}>
-              <Calendar size={16} />{DATE_PRESETS.find(p => p.id === datePreset)?.label}<ChevronDown size={16} />
+          <button onClick={exportToCSV} className="flex items-center gap-2 px-4 py-2 border border-white/[0.1] rounded-lg text-sm font-medium text-slate-300 hover:bg-white/[0.05]">
+            <Download size={14} /> Export
+          </button>
+          {activeTab === "directory" && (
+            <button onClick={() => { setEditingMember(null); setShowMemberModal(true) }} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 shadow-lg shadow-emerald-500/20">
+              <Plus size={14} /> Add Member
             </button>
-            {showDatePicker && (
-              <div className={`absolute top-full left-0 mt-2 w-64 p-3 ${THEME.glass} border ${THEME.glassBorder} rounded-lg shadow-xl z-[100]`}>
-                <div className="space-y-1">
-                  {DATE_PRESETS.map(preset => (
-                    <button key={preset.id} onClick={() => { setDatePreset(preset.id); if (preset.id !== 'custom') setShowDatePicker(false) }}
-                      className={`w-full text-left px-3 py-2 rounded text-sm ${datePreset === preset.id ? 'bg-emerald-500 text-white' : 'text-slate-300 hover:bg-white/[0.08]'}`}>{preset.label}</button>
-                  ))}
-                </div>
-                {datePreset === 'custom' && (
-                  <div className={`mt-3 pt-3 border-t ${THEME.glassBorder} space-y-2`}>
-                    <div><label className={`text-xs ${THEME.textMuted}`}>Start</label><input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className={`w-full mt-1 px-2 py-1 bg-white/[0.05] border ${THEME.glassBorder} rounded text-sm text-white`} /></div>
-                    <div><label className={`text-xs ${THEME.textMuted}`}>End</label><input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className={`w-full mt-1 px-2 py-1 bg-white/[0.05] border ${THEME.glassBorder} rounded text-sm text-white`} /></div>
-                    <button onClick={() => setShowDatePicker(false)} className="w-full mt-2 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 rounded text-sm font-medium">Apply</button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          <span className={`text-sm ${THEME.textSecondary}`}>{formatDate(dateRange.start)} — {formatDate(dateRange.end)}</span>
-          <div className="h-6 w-px bg-white/[0.08]" />
-          <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className={`px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-sm text-white`}>
-            <option value="all">All Clients</option>
-            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)} className={`px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-sm text-white`}>
-            <option value="all">All Employees</option>
-            {teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-          <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className={`px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-sm text-white`}>
-            <option value="all">All Projects</option>
-            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-          {(selectedClient !== 'all' || selectedEmployee !== 'all' || selectedProject !== 'all') && (
-            <button onClick={() => { setSelectedClient('all'); setSelectedEmployee('all'); setSelectedProject('all') }} className={`flex items-center gap-1 px-3 py-2 text-sm ${THEME.textMuted} hover:text-white`}><X size={14} />Clear</button>
+          )}
+          {activeTab === "rates" && (
+            <button onClick={() => { setEditingRate(null); setShowRateModal(true) }} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 shadow-lg shadow-emerald-500/20">
+              <Plus size={14} /> Add Rate Card
+            </button>
+          )}
+          {activeTab === "profitability" && (
+            <button onClick={() => setShowOverrideModal(true)} className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 shadow-lg shadow-orange-500/20">
+              <Edit2 size={14} /> Cost Override
+            </button>
           )}
         </div>
       </div>
 
-      {/* KPI Cards — 7 metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-7 gap-3 relative z-10">
-        <KPICard title="Actual Hours" value={kpis.totalActualHours} format="hours" trend={kpis.hoursTrend} trendLabel="vs prior" icon={<Clock size={16} />} color="blue" />
-        <KPICard title="Billable Hours" value={kpis.totalBillableHours} format="hours" icon={<Layers size={16} />} color="purple" />
-        <KPICard title="Revenue" value={kpis.totalRevenue} format="currency" trend={kpis.revenueTrend} trendLabel="vs prior" icon={<DollarSign size={16} />} color="emerald" />
-        <KPICard title="Cost" value={kpis.totalCost} format="currency" trend={kpis.costTrend} trendLabel="vs prior" icon={<TrendingDown size={16} />} color="rose" />
-        <KPICard title="Gross Margin" value={kpis.grossMargin} format="currency" icon={<TrendingUp size={16} />} color={kpis.grossMargin >= 0 ? 'emerald' : 'rose'} />
-        <KPICard title="Margin %" value={kpis.marginPct} format="percent" icon={<Percent size={16} />} color={kpis.marginPct >= 20 ? 'emerald' : kpis.marginPct >= 0 ? 'amber' : 'rose'} />
-        <KPICard title="Utilization" value={kpis.utilization} format="percent" icon={<Target size={16} />} color="amber" />
-      </div>
-
-      {/* View Tabs */}
-      <div className={`flex items-center gap-2 border-b ${THEME.glassBorder} pb-2 relative z-10`}>
-        {VIEW_TABS.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-emerald-500 text-white' : `${THEME.glass} border ${THEME.glassBorder} text-slate-300 hover:bg-white/[0.08]`}`}>
-            {tab.icon}{tab.label}
+      {/* Tabs */}
+      <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-1.5 inline-flex gap-1`}>
+        {([
+          { id: "directory" as const, label: "Directory", icon: Users },
+          { id: "rates" as const, label: "Rates", icon: DollarSign },
+          { id: "profitability" as const, label: "Profitability", icon: BarChart3 },
+        ]).map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeTab === tab.id ? "bg-emerald-500/20 text-emerald-400" : `${THEME.textMuted} hover:text-white hover:bg-white/[0.05]`
+            }`}>
+            <tab.icon size={16} /> {tab.label}
           </button>
         ))}
       </div>
 
-      {/* ============ TRENDS VIEW ============ */}
-      {activeTab === 'trends' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <CollapsibleSection title="Revenue by Client" icon={<PieChart size={16} />}>
-            <div className="h-64">
-              {revenueByClientData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsPie>
-                    <Pie data={revenueByClientData} cx="35%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value">
-                      {revenueByClientData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
-                    </Pie>
-                    <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} itemStyle={{ color: '#e2e8f0' }} labelStyle={{ color: '#94a3b8' }} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                    <Legend layout="vertical" align="right" verticalAlign="middle" formatter={(value) => {
-                      const item = revenueByClientData.find(d => d.name === value)
-                      const total = revenueByClientData.reduce((sum, d) => sum + d.value, 0)
-                      const pct = item ? ((item.value / total) * 100).toFixed(0) : 0
-                      return <span className="text-slate-300 text-sm">{value} ({pct}%)</span>
-                    }} />
-                  </RechartsPie>
-                </ResponsiveContainer>
-              ) : <div className="flex items-center justify-center h-full text-slate-500">No data</div>}
-            </div>
-          </CollapsibleSection>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+          <p className={`text-xs ${THEME.textMuted} uppercase tracking-wider`}>Total Members</p>
+          <p className={`text-2xl font-bold ${THEME.textPrimary} mt-1`}>{summary.total}</p>
+          <p className={`text-xs ${THEME.textDim}`}>{summary.active} active</p>
+        </div>
+        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+          <p className={`text-xs ${THEME.textMuted} uppercase tracking-wider`}>W-2 Employees</p>
+          <p className="text-2xl font-bold text-blue-400 mt-1">{summary.employees}</p>
+        </div>
+        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+          <p className={`text-xs ${THEME.textMuted} uppercase tracking-wider`}>1099 Contractors</p>
+          <p className="text-2xl font-bold text-purple-400 mt-1">{summary.contractors}</p>
+        </div>
+        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+          <p className={`text-xs ${THEME.textMuted} uppercase tracking-wider`}>Active Rate Cards</p>
+          <p className="text-2xl font-bold text-emerald-400 mt-1">{summary.activeRates}</p>
+        </div>
+        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+          <p className={`text-xs ${THEME.textMuted} uppercase tracking-wider`}>GM% ({formatPeriodLabel(selectedPeriod, periodType).split(" ")[0]})</p>
+          <p className={`text-2xl font-bold mt-1 ${profitTotals.marginPct >= 20 ? "text-emerald-400" : profitTotals.marginPct >= 0 ? "text-amber-400" : "text-rose-400"}`}>
+            {profitTotals.revenue > 0 ? `${profitTotals.marginPct.toFixed(1)}%` : "\u2014"}
+          </p>
+        </div>
+      </div>
 
-          <CollapsibleSection title="Weekly Cost vs Revenue" icon={<Activity size={16} />}>
-            <div className="h-64">
-              {weeklyTrendData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={weeklyTrendData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis dataKey="week" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => formatCompactCurrency(v)} />
-                    <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} itemStyle={{ color: '#e2e8f0' }} labelStyle={{ color: '#94a3b8' }} cursor={{ fill: 'rgba(255,255,255,0.04)' }} formatter={(value: number, name: string) => [formatCurrency(value), name === 'cost' ? 'Cost' : 'Revenue']} />
-                    <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="#10b981" fillOpacity={0.15} name="Revenue" />
-                    <Area type="monotone" dataKey="cost" stroke="#ef4444" fill="#ef4444" fillOpacity={0.1} name="Cost" />
-                    <Legend wrapperStyle={{ color: '#94a3b8', fontSize: '12px' }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : <div className="flex items-center justify-center h-full text-slate-500">No data</div>}
+      {/* ============ DIRECTORY TAB ============ */}
+      {activeTab === "directory" && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1">
+              <Search size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 ${THEME.textDim}`} />
+              <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search by name or email..."
+                className={`w-full pl-9 pr-4 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-sm text-white placeholder:text-slate-500`} />
             </div>
-          </CollapsibleSection>
+            <div className="flex gap-1">
+              {(["all", "employee", "contractor"] as const).map(f => (
+                <button key={f} onClick={() => setEmploymentFilter(f)}
+                  className={`px-3 py-2 text-xs font-medium rounded-lg transition-all ${employmentFilter === f ? "bg-white/[0.1] text-white" : `${THEME.textDim} hover:text-white`}`}>
+                  {f === "all" ? "All" : f === "employee" ? "W-2" : "1099"}
+                </button>
+              ))}
+            </div>
+          </div>
 
-          <CollapsibleSection title="Hours by Employee" icon={<Users size={16} />}>
-            <div className="h-64">
-              {dataByEmployee.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dataByEmployee.slice(0, 8)} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <YAxis type="category" dataKey="name" width={100} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} itemStyle={{ color: '#e2e8f0' }} labelStyle={{ color: '#94a3b8' }} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                    <Bar dataKey="totalActualHours" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Actual" />
-                    <Bar dataKey="totalBillableHours" fill="#8b5cf6" radius={[0, 4, 4, 0]} name="Billable" />
-                    <Legend wrapperStyle={{ color: '#94a3b8', fontSize: '12px' }} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : <div className="flex items-center justify-center h-full text-slate-500">No data</div>}
-            </div>
-          </CollapsibleSection>
-
-          <CollapsibleSection title="Hours by Project" icon={<Briefcase size={16} />}>
-            <div className="h-64">
-              {costAdjustedEntries.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={Object.values(costAdjustedEntries.reduce((acc, e) => { if (!acc[e.project_id]) acc[e.project_id] = { name: e.project_name.substring(0, 15), hours: 0 }; acc[e.project_id].hours += e.hours; return acc }, {} as Record<string, { name: string; hours: number }>)).sort((a, b) => b.hours - a.hours).slice(0, 8)} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <YAxis type="category" dataKey="name" width={100} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} itemStyle={{ color: '#e2e8f0' }} labelStyle={{ color: '#94a3b8' }} cursor={{ fill: 'rgba(255,255,255,0.04)' }} formatter={(value: number) => [`${value.toFixed(1)} hrs`, 'Hours']} />
-                    <Bar dataKey="hours" fill="#f59e0b" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : <div className="flex items-center justify-center h-full text-slate-500">No data</div>}
-            </div>
-          </CollapsibleSection>
+          <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className={`bg-white/[0.02] border-b ${THEME.glassBorder}`}>
+                  <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Name</th>
+                  <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Type</th>
+                  <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Role</th>
+                  <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Cost</th>
+                  <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium`}>Status</th>
+                  <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium w-20`}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredMembers.map(m => {
+                  const stStyle = getStatusStyle(m.status)
+                  const empStyle = getEmploymentStyle(m.employment_type)
+                  const rateCount = billRates.filter(r => r.team_member_id === m.id && r.is_active).length
+                  return (
+                    <tr key={m.id} className="border-b border-white/[0.05] hover:bg-white/[0.03] cursor-pointer"
+                      onClick={() => setSelectedMemberDetail(m)}>
+                      <td className="px-4 py-3">
+                        <p className={`font-medium ${THEME.textPrimary}`}>{m.name}</p>
+                        <p className={`text-xs ${THEME.textDim}`}>{m.email}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${empStyle.bg} ${empStyle.text}`}>
+                          {m.employment_type === "employee" ? "W-2" : "1099"}
+                        </span>
+                      </td>
+                      <td className={`px-4 py-3 ${THEME.textSecondary}`}>{m.role || "\u2014"}</td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="text-orange-400 font-medium">
+                          {m.cost_amount ? (m.cost_type === "hourly" ? `$${m.cost_amount}/hr` : `${formatCurrency(m.cost_amount)}/mo`) : "\u2014"}
+                        </span>
+                        {rateCount > 0 && <p className={`text-xs ${THEME.textDim}`}>{rateCount} rate card{rateCount > 1 ? "s" : ""}</p>}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${stStyle.bg} ${stStyle.text}`}>{m.status}</span>
+                      </td>
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-center">
+                          <button onClick={() => { setEditingMember(m); setShowMemberModal(true) }} className="p-1.5 rounded hover:bg-white/[0.08] text-slate-500 hover:text-slate-300">
+                            <Edit2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {filteredMembers.length === 0 && (
+                  <tr><td colSpan={6} className={`px-4 py-12 text-center ${THEME.textMuted}`}>No team members found</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
-      {/* ============ BY CLIENT VIEW ============ */}
-      {activeTab === 'byClient' && (
-        <div className="space-y-3">
-          {dataByClient.length > 0 ? dataByClient.map((client, clientIndex) => (
-            <div key={client.id} className={`rounded-xl border ${THEME.glass} ${THEME.glassBorder} overflow-hidden`}>
-              <button onClick={() => toggleClient(client.id)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.03] transition-colors">
-                <div className="flex items-center gap-3">
-                  {expandedClients.has(client.id) ? <ChevronDown size={18} className="text-slate-400" /> : <ChevronRight size={18} className="text-slate-400" />}
-                  <Building2 size={18} style={{ color: CHART_COLORS[clientIndex % CHART_COLORS.length] }} />
-                  <h3 className="text-base font-semibold text-white">{client.name}</h3>
-                </div>
-                <div className="flex items-center gap-6 text-sm">
-                  <div className="text-right">
-                    <span className="text-blue-400">{client.totalActualHours.toFixed(1)} hrs</span>
-                    {client.totalBillableHours !== client.totalActualHours && (
-                      <span className="text-orange-400 ml-2">({client.totalBillableHours.toFixed(1)} billed)</span>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <span className="text-rose-400">{formatCurrency(client.totalCost)}</span>
-                    <span className="text-slate-600 mx-1">/</span>
-                    <span className="text-emerald-400 font-medium">{formatCurrency(client.totalRevenue)}</span>
-                  </div>
-                  {(() => { const mp = calcMarginPct(client.totalRevenue, client.totalCost); return (
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${marginBadgeClass(mp)}`}>
-                      {mp.toFixed(1)}% margin
-                    </span>
-                  ) })()}
-                </div>
-              </button>
-              {expandedClients.has(client.id) && (
-                <div className={`border-t ${THEME.glassBorder}`}>
-                  {Object.values(client.projects).map((project, projectIndex) => (
-                    <div key={project.id} className={`border-b ${THEME.glassBorder} last:border-b-0`}>
-                      <button onClick={() => toggleProject(project.id)} className="w-full flex items-center justify-between px-6 py-2 hover:bg-white/[0.03] transition-colors">
-                        <div className="flex items-center gap-2">
-                          {expandedProjects.has(project.id) ? <ChevronDown size={14} className="text-slate-500" /> : <ChevronRight size={14} className="text-slate-500" />}
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${['bg-blue-500/20 text-blue-400', 'bg-emerald-500/20 text-emerald-400', 'bg-amber-500/20 text-amber-400', 'bg-purple-500/20 text-purple-400', 'bg-rose-500/20 text-rose-400'][projectIndex % 5]}`}>{project.name}</span>
+      {/* ============ RATES TAB ============ */}
+      {activeTab === "rates" && (
+        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
+          <div className={`px-6 py-4 border-b ${THEME.glassBorder} flex items-center justify-between`}>
+            <div>
+              <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Rate Card</h3>
+              <p className={`text-xs ${THEME.textMuted} mt-0.5`}>Cost + Revenue per team member per client</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                <button onClick={() => {
+                  const allIds = new Set(billRates.map(r => r.team_member_id))
+                  setExpandedRateMembers(prev => prev.size === allIds.size ? new Set() : allIds)
+                }} className={`text-[11px] ${THEME.textMuted} hover:text-white transition-colors`}>
+                  {expandedRateMembers.size > 0 ? "Collapse All" : "Expand All"}
+                </button>
+              </div>
+              <div className="flex items-center gap-1 bg-white/[0.03] rounded-lg p-0.5">
+                {(["active", "archived", "all"] as const).map(f => (
+                  <button key={f} onClick={() => setRateStatusFilter(f)}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${rateStatusFilter === f ? "bg-white/[0.1] text-white" : `${THEME.textMuted} hover:text-white`}`}>
+                    {f === "active" ? `Active (${billRates.filter(r => r.is_active).length})` : f === "archived" ? `Archived (${billRates.filter(r => !r.is_active).length})` : `All (${billRates.length})`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          {(() => {
+            const filteredRates = billRates.filter(r => rateStatusFilter === "all" ? true : rateStatusFilter === "active" ? r.is_active : !r.is_active)
+            
+            // Group by team member
+            const grouped = new Map<string, { member: TeamMember | undefined; memberName: string; rates: BillRate[] }>()
+            filteredRates.forEach(r => {
+              if (!grouped.has(r.team_member_id)) {
+                grouped.set(r.team_member_id, {
+                  member: teamMembers.find(m => m.id === r.team_member_id),
+                  memberName: r.team_member_name || "Unknown",
+                  rates: []
+                })
+              }
+              grouped.get(r.team_member_id)!.rates.push(r)
+            })
+            // Sort by member name
+            const groups = Array.from(grouped.entries()).sort((a, b) => a[1].memberName.localeCompare(b[1].memberName))
+
+            return groups.length > 0 ? (
+              <div>
+                {groups.map(([memberId, group]) => {
+                  const isExpanded = expandedRateMembers.has(memberId)
+                  const activeCount = group.rates.filter(r => r.is_active).length
+                  const clientCount = new Set(group.rates.map(r => r.client_name)).size
+                  const member = group.member
+
+                  // Determine member's cost structure label
+                  const costLabel = (() => {
+                    const hasRateCardCosts = group.rates.some(r => r.cost_amount > 0)
+                    if (hasRateCardCosts && group.rates.every(r => r.cost_amount > 0)) return "Per rate card"
+                    if (!hasRateCardCosts && member?.cost_amount && member.cost_amount > 0) {
+                      const mct = (member.cost_type || "").toLowerCase().replace(/\s+/g, "_")
+                      return mct === "lump_sum" ? `${formatCurrency(member.cost_amount)}/mo` : `$${member.cost_amount}/hr`
+                    }
+                    return "Mixed"
+                  })()
+
+                  return (
+                    <div key={memberId}>
+                      {/* Member Header Row */}
+                      <div
+                        onClick={() => setExpandedRateMembers(prev => {
+                          const next = new Set(prev)
+                          next.has(memberId) ? next.delete(memberId) : next.add(memberId)
+                          return next
+                        })}
+                        className={`flex items-center px-4 py-3.5 cursor-pointer hover:bg-white/[0.04] transition-colors border-b border-white/[0.05] ${isExpanded ? "bg-white/[0.03]" : ""}`}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <ChevronRight size={14} className={`${THEME.textDim} transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500/20 to-blue-500/20 border border-white/[0.1] flex items-center justify-center flex-shrink-0">
+                            <span className={`text-xs font-medium ${THEME.textSecondary}`}>{group.memberName.split(" ").map(n => n[0]).join("").slice(0, 2)}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <p className={`text-sm font-medium ${THEME.textPrimary} truncate`}>{group.memberName}</p>
+                            <p className={`text-xs ${THEME.textDim}`}>
+                              {member?.role || "—"} · {clientCount} client{clientCount !== 1 ? "s" : ""} · {activeCount} rate{activeCount !== 1 ? "s" : ""}
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-4 text-xs">
-                          <span className="text-blue-400">{project.totalActualHours.toFixed(1)} hrs</span>
-                          <span className="text-rose-400">{formatCurrency(project.totalCost)}</span>
-                          <span className="text-emerald-400">{formatCurrency(project.totalRevenue)}</span>
+                        <div className="flex items-center gap-4 text-right">
+                          <span className={`text-xs px-2 py-1 rounded-md bg-white/[0.05] ${THEME.textMuted} hidden sm:inline-block`}>
+                            Cost: {costLabel}
+                          </span>
                         </div>
-                      </button>
-                      {expandedProjects.has(project.id) && (
-                        <div className="px-6 pb-3 overflow-x-auto">
+                      </div>
+
+                      {/* Expanded Rate Cards */}
+                      {isExpanded && (
+                        <div className="bg-white/[0.02]">
                           <table className="w-full text-sm">
-                            <thead><tr className={`border-b ${THEME.glassBorder}`}>
-                              <th className={`px-2 py-2 text-left ${THEME.textMuted} font-medium w-32`}>Name</th>
-                              <th className={`px-2 py-2 text-right ${THEME.textMuted} font-medium w-20`}>Cost Rate</th>
-                              <th className={`px-2 py-2 text-right ${THEME.textMuted} font-medium w-20`}>Bill Rate</th>
-                              {weekColumns.map(week => <th key={week.end} className={`px-2 py-2 text-right ${THEME.textMuted} font-medium w-16`}>{week.label}</th>)}
-                              <th className={`px-2 py-2 text-right ${THEME.textMuted} font-medium w-20`}>Actual</th>
-                              <th className={`px-2 py-2 text-right ${THEME.textMuted} font-medium w-20`}>Billed</th>
-                              <th className={`px-2 py-2 text-right ${THEME.textMuted} font-medium w-24`}>Cost</th>
-                              <th className={`px-2 py-2 text-right ${THEME.textMuted} font-medium w-24`}>Revenue</th>
-                            </tr></thead>
+                            <thead>
+                              <tr className={`border-b ${THEME.glassBorder}`}>
+                                <th className={`pl-14 pr-4 py-2 text-left text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Client</th>
+                                <th className={`px-4 py-2 text-center text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Period</th>
+                                <th className={`px-4 py-2 text-right text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Cost</th>
+                                <th className={`px-4 py-2 text-right text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Revenue</th>
+                                <th className={`px-4 py-2 text-right text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Margin</th>
+                                <th className={`px-4 py-2 text-center text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider w-20`}>Actions</th>
+                              </tr>
+                            </thead>
                             <tbody>
-                              {Object.values(project.members).sort((a, b) => b.totalActualHours - a.totalActualHours).map(member => (
-                                <tr key={member.id} className={`border-b ${THEME.glassBorder} border-opacity-30 hover:bg-white/[0.03]`}>
-                                  <td className="px-2 py-2 text-slate-200">{member.name}</td>
-                                  <td className="px-2 py-2 text-right text-rose-400 text-xs">{formatCurrency(member.costRate)}</td>
-                                  <td className="px-2 py-2 text-right text-emerald-400 text-xs">{formatCurrency(member.billRate)}</td>
-                                  {weekColumns.map(week => (
-                                    <td key={week.end} className="px-2 py-2 text-right text-slate-300">
-                                      {(member.weekActualHours[week.end] || 0).toFixed(1)}
-                                      {member.weekBillableHours[week.end] && member.weekBillableHours[week.end] !== member.weekActualHours[week.end] && (
-                                        <span className="text-orange-400 text-xs ml-0.5">({member.weekBillableHours[week.end]?.toFixed(1)})</span>
+                              {group.rates.map(r => {
+                                const hasCustomCost = r.cost_amount > 0
+                                const effCost = hasCustomCost ? (r.cost_type === "hourly" ? r.cost_amount : (r.baseline_hours > 0 ? r.cost_amount / r.baseline_hours : 0)) : 0
+                                const isLumpRev = r.revenue_type === "lump_sum"
+                                const revAmt = r.revenue_amount || 0
+                                const margin = isLumpRev
+                                  ? (hasCustomCost && revAmt > 0 ? ((revAmt - (r.cost_type === "hourly" ? r.cost_amount * (r.baseline_hours || 172) : r.cost_amount)) / revAmt * 100) : 0)
+                                  : (hasCustomCost && r.rate > 0 ? ((r.rate - effCost) / r.rate * 100) : 0)
+                                const spread = isLumpRev ? 0 : (hasCustomCost ? r.rate - effCost : 0)
+                                const startStr = r.start_date ? new Date(r.start_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "2-digit" }) : ""
+                                const endStr = r.end_date ? new Date(r.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "2-digit" }) : "Ongoing"
+                                return (
+                                  <tr key={r.id} className={`border-b border-white/[0.04] hover:bg-white/[0.03] ${!r.is_active ? "opacity-40" : ""}`}>
+                                    <td className={`pl-14 pr-4 py-2.5 ${THEME.textSecondary}`}>
+                                      {r.client_name}
+                                      <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded ${
+                                        hasCustomCost ? (r.cost_type === "lump_sum" ? "bg-purple-500/10 text-purple-400" : "bg-blue-500/10 text-blue-400") : "bg-slate-500/10 text-slate-400"
+                                      }`}>{hasCustomCost ? (r.cost_type === "lump_sum" ? "Fixed" : "T&M") : "Dist"}</span>
+                                    </td>
+                                    <td className="px-4 py-2.5 text-center">
+                                      <span className={`text-xs ${THEME.textMuted}`}>{startStr} → {endStr}</span>
+                                      {!r.is_active && <p className="text-[10px] text-rose-400">Archived</p>}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right">
+                                      {hasCustomCost ? (
+                                        <>
+                                          <span className="text-orange-400 text-xs">{r.cost_type === "hourly" ? `$${r.cost_amount}/hr` : `${formatCurrency(r.cost_amount)}/mo`}</span>
+                                          {r.cost_type === "lump_sum" && <p className={`text-[10px] ${THEME.textDim}`}>~${effCost.toFixed(2)}/hr</p>}
+                                        </>
+                                      ) : (
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400`}>
+                                          From {member?.cost_type === "lump_sum" ? formatCurrency(member?.cost_amount || 0) + "/mo" : `$${member?.cost_amount || 0}/hr`}
+                                        </span>
                                       )}
                                     </td>
-                                  ))}
-                                  <td className="px-2 py-2 text-right text-blue-400 font-medium">{member.totalActualHours.toFixed(1)}</td>
-                                  <td className={`px-2 py-2 text-right font-medium ${member.totalBillableHours !== member.totalActualHours ? 'text-orange-400' : 'text-slate-400'}`}>
-                                    {member.totalBillableHours.toFixed(1)}
-                                  </td>
-                                  <td className="px-2 py-2 text-right text-rose-400">{formatCurrency(member.totalCost)}</td>
-                                  <td className="px-2 py-2 text-right text-emerald-400 font-medium">{formatCurrency(member.totalRevenue)}</td>
-                                </tr>
-                              ))}
-                              <tr className="bg-white/[0.02] font-medium">
-                                <td className="px-2 py-2 text-slate-300" colSpan={3}>PROJECT TOTAL</td>
-                                {weekColumns.map(week => {
-                                  const weekTotal = Object.values(project.members).reduce((sum, m) => sum + (m.weekActualHours[week.end] || 0), 0)
-                                  return <td key={week.end} className="px-2 py-2 text-right text-slate-300">{weekTotal.toFixed(1)}</td>
-                                })}
-                                <td className="px-2 py-2 text-right text-blue-400">{project.totalActualHours.toFixed(1)}</td>
-                                <td className="px-2 py-2 text-right text-orange-400">{project.totalBillableHours.toFixed(1)}</td>
-                                <td className="px-2 py-2 text-right text-rose-400">{formatCurrency(project.totalCost)}</td>
-                                <td className="px-2 py-2 text-right text-emerald-400">{formatCurrency(project.totalRevenue)}</td>
-                              </tr>
+                                    <td className="px-4 py-2.5 text-right">
+                                      {isLumpRev ? (
+                                        <>
+                                          <span className="text-emerald-400 font-medium text-xs">{formatCurrency(revAmt)}/mo</span>
+                                          <p className={`text-[10px] ${THEME.textDim}`}>Lump Sum</p>
+                                        </>
+                                      ) : (
+                                        <span className="text-emerald-400 font-medium text-xs">${r.rate}/hr</span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right">
+                                      {(hasCustomCost || isLumpRev) && margin !== 0 ? (
+                                        <>
+                                          <span className={`text-xs font-medium ${margin >= 20 ? "text-emerald-400" : margin >= 0 ? "text-amber-400" : "text-rose-400"}`}>{margin.toFixed(0)}%</span>
+                                          {!isLumpRev && spread !== 0 && <p className={`text-[10px] ${spread >= 0 ? "text-emerald-400/60" : "text-rose-400/60"}`}>${spread.toFixed(2)}/hr</p>}
+                                        </>
+                                      ) : (
+                                        <span className={`text-[10px] ${THEME.textDim}`}>By hours</span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-2.5">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <button onClick={(e) => { e.stopPropagation(); setEditingRate(r); setShowRateModal(true) }} className="p-1 rounded hover:bg-white/[0.08] text-slate-500 hover:text-slate-300"><Edit2 size={13} /></button>
+                                        {r.is_active ? (
+                                          <button onClick={(e) => { e.stopPropagation(); handleDeleteRate(r.id) }} title="Archive" className="p-1 rounded hover:bg-amber-500/20 text-slate-500 hover:text-amber-400"><Lock size={13} /></button>
+                                        ) : (
+                                          <button onClick={(e) => { e.stopPropagation(); handleReactivateRate(r.id) }} title="Reactivate" className="p-1 rounded hover:bg-emerald-500/20 text-slate-500 hover:text-emerald-400"><Unlock size={13} /></button>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
                             </tbody>
                           </table>
                         </div>
                       )}
                     </div>
-                  ))}
-                </div>
-              )}
+                  )
+                })}
+              </div>
+            ) : (
+            <div className={`px-6 py-12 text-center ${THEME.textMuted}`}>
+              <DollarSign size={48} className="mx-auto text-slate-600 mb-4" />
+              <p>No rate cards configured yet</p>
+              <p className={`text-xs ${THEME.textDim} mt-1`}>Add rate cards to define cost + bill rates per client</p>
+              <button onClick={() => { setEditingRate(null); setShowRateModal(true) }}
+                className="mt-4 px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-lg text-sm font-medium hover:bg-emerald-500/30">
+                Add First Rate Card
+              </button>
             </div>
-          )) : <div className={`text-center py-12 ${THEME.textMuted}`}>No time entries for this period</div>}
-          {dataByClient.length > 0 && (
-            <div className={`p-4 rounded-xl ${THEME.glass} border ${THEME.glassBorder} flex items-center justify-between`}>
-              <span className={`text-lg font-semibold ${THEME.textPrimary}`}>GRAND TOTAL</span>
-              <div className="flex items-center gap-6">
-                <span className="text-lg font-semibold text-blue-400">{kpis.totalActualHours.toFixed(1)} hrs</span>
-                <span className="text-lg text-rose-400">{formatCurrency(kpis.totalCost)}</span>
-                <span className="text-lg font-semibold text-emerald-400">{formatCurrency(kpis.totalRevenue)}</span>
-                <span className={`text-lg font-bold ${kpis.grossMargin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(kpis.grossMargin)}</span>
+          )
+          })()}
+        </div>
+      )}
+
+      {/* ============ PROFITABILITY TAB ============ */}
+      {activeTab === "profitability" && (
+        <div className="space-y-6">
+          {/* Period Selector + View Toggle */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <button onClick={() => setSelectedPeriod(stepPeriod(selectedPeriod, periodType, -1))} className={`p-2 rounded-lg border ${THEME.glassBorder} hover:bg-white/[0.05] ${THEME.textMuted}`}>
+                <ChevronDown size={16} className="rotate-90" />
+              </button>
+              <span className={`text-lg font-semibold ${THEME.textPrimary} min-w-[180px] text-center`}>{formatPeriodLabel(selectedPeriod, periodType)}</span>
+              <button onClick={() => setSelectedPeriod(stepPeriod(selectedPeriod, periodType, 1))} className={`p-2 rounded-lg border ${THEME.glassBorder} hover:bg-white/[0.05] ${THEME.textMuted}`}>
+                <ChevronDown size={16} className="-rotate-90" />
+              </button>
+
+              {/* Period Type Selector */}
+              <div className="flex gap-1 bg-white/[0.03] rounded-lg p-1 ml-2">
+                {(["month", "quarter", "year"] as PeriodType[]).map(pt => (
+                  <button key={pt} onClick={() => handlePeriodTypeChange(pt)}
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${periodType === pt ? "bg-white/[0.1] text-white" : `${THEME.textDim} hover:text-white`}`}>
+                    {pt === "month" ? "Month" : pt === "quarter" ? "Quarter" : "Year"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-1 bg-white/[0.03] rounded-lg p-1">
+              {([
+                { id: "summary" as const, label: "Summary", color: "text-emerald-400" },
+                { id: "revenue" as const, label: "Revenue", color: "text-blue-400" },
+                { id: "cost" as const, label: "Cost", color: "text-orange-400" },
+              ]).map(v => (
+                <button key={v.id} onClick={() => setProfitView(v.id)}
+                  className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${profitView === v.id ? `bg-white/[0.1] ${v.color}` : `${THEME.textDim} hover:text-white`}`}>
+                  {v.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Period Totals Bar */}
+          {profitabilityData.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+                <p className={`text-xs ${THEME.textDim}`}>Hours</p>
+                <p className={`text-xl font-bold ${THEME.textPrimary}`}>{profitTotals.hours.toFixed(1)}</p>
+              </div>
+              <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+                <p className={`text-xs ${THEME.textDim}`}>Revenue</p>
+                <p className="text-xl font-bold text-blue-400">{formatCurrency(profitTotals.revenue)}</p>
+              </div>
+              <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+                <p className={`text-xs ${THEME.textDim}`}>Cost</p>
+                <p className="text-xl font-bold text-orange-400">{formatCurrency(profitTotals.cost)}</p>
+              </div>
+              <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+                <p className={`text-xs ${THEME.textDim}`}>Margin</p>
+                <p className={`text-xl font-bold ${profitTotals.margin >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{formatCurrency(profitTotals.margin)}</p>
+              </div>
+              <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+                <p className={`text-xs ${THEME.textDim}`}>GM%</p>
+                <p className={`text-xl font-bold ${profitTotals.marginPct >= 20 ? "text-emerald-400" : profitTotals.marginPct >= 0 ? "text-amber-400" : "text-rose-400"}`}>{profitTotals.marginPct.toFixed(1)}%</p>
               </div>
             </div>
           )}
-        </div>
-      )}
 
-      {/* ============ BY EMPLOYEE VIEW ============ */}
-      {activeTab === 'byEmployee' && (
-        <div className="space-y-3">
-          {dataByEmployee.map((employee, index) => (
-            <CollapsibleSection
-              key={employee.id}
-              title={employee.name}
-              icon={<User size={16} style={{ color: CHART_COLORS[index % CHART_COLORS.length] }} />}
-              badge={`${employee.totalActualHours.toFixed(1)} hrs`}
-              badgeColor="blue"
-              rightContent={
-                <div className="flex items-center gap-4 mr-4">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${employee.empType === 'employee' ? 'bg-blue-500/10 text-blue-400' : 'bg-purple-500/10 text-purple-400'}`}>
-                    {employee.empType === 'employee' ? 'W-2' : '1099'}
-                  </span>
-                  <span className="text-rose-400 text-sm">{formatCurrency(employee.totalCost)}</span>
-                  <span className="text-emerald-400 font-medium text-sm">{formatCurrency(employee.totalRevenue)}</span>
-                  {(() => { const mp = calcMarginPct(employee.totalRevenue, employee.totalCost); return (
-                    <span className={`text-xs font-medium ${marginColor(mp)}`}>
-                      {mp.toFixed(1)}%
-                    </span>
-                  ) })()}
-                </div>
-              }
-              defaultExpanded={index === 0}
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h4 className="text-xs font-medium text-slate-400 uppercase mb-2">By Client</h4>
-                  <div className="space-y-2">
-                    {Object.entries(employee.clients).sort((a, b) => b[1].actualHours - a[1].actualHours).map(([clientId, data], i) => (
-                      <div key={clientId} className="flex items-center justify-between p-2 rounded bg-white/[0.03]">
-                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} /><span className="text-sm text-slate-200">{data.name}</span></div>
-                        <div className="flex items-center gap-3 text-xs">
-                          <span className="text-blue-400">{data.actualHours.toFixed(1)} hrs</span>
-                          {data.billableHours !== data.actualHours && <span className="text-orange-400">({data.billableHours.toFixed(1)} billed)</span>}
-                          <span className="text-rose-400">{formatCurrency(data.cost)}</span>
-                          <span className="text-emerald-400">{formatCurrency(data.revenue)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <h4 className="text-xs font-medium text-slate-400 uppercase mb-2">Distribution</h4>
-                  <div className="h-32">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RechartsPie><Pie data={Object.entries(employee.clients).map(([id, data], i) => ({ name: data.name, value: data.actualHours, fill: CHART_COLORS[i % CHART_COLORS.length] }))} cx="50%" cy="50%" innerRadius={30} outerRadius={50} dataKey="value">
-                        {Object.entries(employee.clients).map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                      </Pie><Tooltip formatter={(value: number) => `${value.toFixed(1)} hrs`} /></RechartsPie>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
-            </CollapsibleSection>
-          ))}
-        </div>
-      )}
-
-      {/* ============ DETAILED VIEW ============ */}
-      {activeTab === 'detailed' && (
-        <CollapsibleSection title="Time Entries" badge={costAdjustedEntries.length} icon={<Calendar size={16} />}>
-          {/* Inline Filter Bar */}
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1.5 text-xs text-slate-500">
-              <Filter size={14} />
-              <span className="font-medium text-slate-400">Filter:</span>
-            </div>
-            <select
-              value={selectedEmployee}
-              onChange={(e) => setSelectedEmployee(e.target.value)}
-              className={`px-3 py-1.5 bg-white/[0.05] border ${selectedEmployee !== 'all' ? 'border-blue-500/40 ring-1 ring-blue-500/20' : THEME.glassBorder} rounded-lg text-xs text-white transition-colors hover:bg-white/[0.08]`}
-            >
-              <option value="all">All Employees</option>
-              {teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-            <select
-              value={selectedClient}
-              onChange={(e) => setSelectedClient(e.target.value)}
-              className={`px-3 py-1.5 bg-white/[0.05] border ${selectedClient !== 'all' ? 'border-emerald-500/40 ring-1 ring-emerald-500/20' : THEME.glassBorder} rounded-lg text-xs text-white transition-colors hover:bg-white/[0.08]`}
-            >
-              <option value="all">All Clients</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <select
-              value={selectedProject}
-              onChange={(e) => setSelectedProject(e.target.value)}
-              className={`px-3 py-1.5 bg-white/[0.05] border ${selectedProject !== 'all' ? 'border-purple-500/40 ring-1 ring-purple-500/20' : THEME.glassBorder} rounded-lg text-xs text-white transition-colors hover:bg-white/[0.08]`}
-            >
-              <option value="all">All Projects</option>
-              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            {(selectedClient !== 'all' || selectedEmployee !== 'all' || selectedProject !== 'all') && (
-              <>
-                <button onClick={() => { setSelectedClient('all'); setSelectedEmployee('all'); setSelectedProject('all') }} className="flex items-center gap-1 px-2 py-1 text-xs text-slate-400 hover:text-white transition-colors">
-                  <X size={12} />Clear all
-                </button>
-                <div className="h-4 w-px bg-white/[0.08]" />
-                <div className="flex items-center gap-1.5">
-                  {selectedEmployee !== 'all' && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/15 text-blue-400 rounded text-xs">
-                      <User size={10} />{teamMembers.find(t => t.id === selectedEmployee)?.name}
-                      <button onClick={() => setSelectedEmployee('all')} className="ml-0.5 hover:text-white"><X size={10} /></button>
-                    </span>
-                  )}
-                  {selectedClient !== 'all' && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/15 text-emerald-400 rounded text-xs">
-                      <Building2 size={10} />{clients.find(c => c.id === selectedClient)?.name}
-                      <button onClick={() => setSelectedClient('all')} className="ml-0.5 hover:text-white"><X size={10} /></button>
-                    </span>
-                  )}
-                  {selectedProject !== 'all' && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-500/15 text-purple-400 rounded text-xs">
-                      <Briefcase size={10} />{projects.find(p => p.id === selectedProject)?.name}
-                      <button onClick={() => setSelectedProject('all')} className="ml-0.5 hover:text-white"><X size={10} /></button>
-                    </span>
-                  )}
-                </div>
-              </>
-            )}
-            <div className="ml-auto text-xs text-slate-500">
-              {costAdjustedEntries.length} {costAdjustedEntries.length !== entries.filter(e => e.date >= dateRange.start && e.date <= dateRange.end).length ? `of ${entries.filter(e => e.date >= dateRange.start && e.date <= dateRange.end).length} ` : ''}entries
-            </div>
-          </div>
-          {/* Legend */}
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <div className="flex items-center gap-1"><Lock size={12} /><span>Actual Hours = cost (contractor submitted)</span></div>
-              <span className="text-slate-600">|</span>
-              <div className="flex items-center gap-1"><Edit2 size={12} className="text-orange-400" /><span className="text-orange-400">Billable Hours = revenue (click to adjust)</span></div>
-            </div>
-          </div>
-          <div className={`overflow-x-auto rounded-lg border ${THEME.glassBorder}`}>
-            <table className="w-full text-sm">
-              <thead><tr className="bg-white/[0.02]">
-                <th className={`px-3 py-3 text-left font-medium ${THEME.textMuted}`}>Date</th>
-                <th className={`px-3 py-3 text-left font-medium ${THEME.textMuted}`}>Employee</th>
-                <th className={`px-3 py-3 text-left font-medium ${THEME.textMuted}`}>Client</th>
-                <th className={`px-3 py-3 text-left font-medium ${THEME.textMuted}`}>Project</th>
-                <th className={`px-3 py-3 text-right font-medium text-blue-400`}>Actual Hrs</th>
-                <th className={`px-3 py-3 text-right font-medium text-orange-400`}>Billable Hrs</th>
-                <th className={`px-3 py-3 text-right font-medium text-rose-400`}>Cost Rate</th>
-                <th className={`px-3 py-3 text-right font-medium text-emerald-400`}>Bill Rate</th>
-                <th className={`px-3 py-3 text-right font-medium text-rose-400`}>Cost</th>
-                <th className={`px-3 py-3 text-right font-medium text-emerald-400`}>Revenue</th>
-                <th className={`px-3 py-3 text-right font-medium ${THEME.textMuted}`}>Margin</th>
-                <th className={`px-3 py-3 text-left font-medium ${THEME.textMuted}`}>Notes</th>
-                <th className={`px-3 py-3 text-center font-medium ${THEME.textMuted}`}>⚡</th>
-              </tr></thead>
-              <tbody>
-                {costAdjustedEntries.length > 0 ? costAdjustedEntries.slice(0, 100).map((entry) => {
-                  const cost = entry.hours * entry.cost_rate
-                  const revenue = entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
-                  const margin = revenue - cost
-                  return (
-                    <tr key={entry.id} className={`border-t ${THEME.glassBorder} hover:bg-white/[0.03]`}>
-                      <td className={`px-3 py-2.5 ${THEME.textSecondary} whitespace-nowrap text-xs`}>{formatDate(entry.date)}</td>
-                      <td className={`px-3 py-2.5 ${THEME.textPrimary}`}>{entry.team_member_name}</td>
-                      <td className={`px-3 py-2.5 ${THEME.textMuted} text-xs`}>{entry.client_name || '—'}</td>
-                      <td className={`px-3 py-2.5 ${THEME.textPrimary} text-xs`}>{entry.project_name}</td>
-                      <td className="px-3 py-2.5 text-right">
-                        <span className="text-blue-400 flex items-center justify-end gap-1">
-                          <Lock size={10} className="text-slate-600" />{entry.hours.toFixed(1)}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 text-right">
-                        <EditableBillableCell
-                          actualHours={entry.hours}
-                          billableHours={entry.billable_hours}
-                          onSave={(newValue) => updateBillableHours(entry.id, newValue)}
-                        />
-                      </td>
-                      <td className={`px-3 py-2.5 text-right text-xs ${THEME.textMuted}`}>{formatCurrency(entry.display_cost_rate)}</td>
-                      <td className={`px-3 py-2.5 text-right text-xs ${THEME.textMuted}`}>{formatCurrency(entry.bill_rate)}</td>
-                      <td className="px-3 py-2.5 text-right text-rose-400 text-xs">{formatCurrency(cost)}</td>
-                      <td className="px-3 py-2.5 text-right text-emerald-400 text-xs">{formatCurrency(revenue)}</td>
-                      <td className={`px-3 py-2.5 text-right text-xs font-medium ${margin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(margin)}</td>
-                      <td className={`px-3 py-2.5 ${THEME.textMuted} text-xs max-w-[120px] truncate`}>{entry.notes || '—'}</td>
-                      <td className="px-3 py-2.5">
-                        {pendingDeleteId === entry.id ? (
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => deleteEntry(entry.id)} className="p-1.5 rounded bg-rose-500/30 text-rose-300 hover:bg-rose-500/50 transition-colors" title="Confirm delete">
-                              <Check size={14} />
-                            </button>
-                            <button onClick={() => setPendingDeleteId(null)} className="p-1.5 rounded bg-white/[0.05] text-slate-400 hover:bg-white/[0.08] transition-colors" title="Cancel">
-                              <X size={14} />
-                            </button>
-                          </div>
-                        ) : (
-                          <button onClick={() => deleteEntry(entry.id)} className="p-1.5 rounded bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-colors" title="Delete">
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                }) : <tr><td colSpan={13} className={`px-4 py-12 text-center ${THEME.textMuted}`}>No time entries found</td></tr>}
-              </tbody>
-            </table>
-          </div>
-          {costAdjustedEntries.length > 100 && <p className="text-center text-sm text-slate-400 mt-2">Showing first 100 of {costAdjustedEntries.length} entries</p>}
-        </CollapsibleSection>
-      )}
-
-      {/* ============ PROFITABILITY VIEW ============ */}
-      {activeTab === 'profitability' && (
-        <div className="space-y-6">
-          {/* Margin Chart */}
-          <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-6`}>
-            <h3 className={`text-sm font-semibold ${THEME.textPrimary} mb-4`}>Profitability by Project</h3>
-            {profitabilityByProject.length > 0 ? (
+          {/* Chart */}
+          {profitabilityData.length > 0 && (
+            <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-6`}>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={profitabilityByProject.slice(0, 10)} margin={{ left: 20, right: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} angle={-20} textAnchor="end" height={60} />
-                    <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={v => formatCompactCurrency(v)} />
-                    <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} itemStyle={{ color: '#e2e8f0' }} labelStyle={{ color: '#94a3b8' }} cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                      formatter={(value: number, name: string) => [formatCurrency(value), name]} />
-                    <Legend wrapperStyle={{ color: '#94a3b8', fontSize: '12px' }} />
-                    <Bar dataKey="cost" name="Cost" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="revenue" name="Revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <BarChart data={profitabilityData} margin={{ left: 20, right: 20 }}>
+                    <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => formatCompactCurrency(v)} />
+                    <Tooltip contentStyle={{ backgroundColor: "#1e293b", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px" }} labelStyle={{ color: "#fff" }}
+                      formatter={(value: number, name: string) => [formatCurrency(value), name.toLowerCase() === "cost" ? "Cost" : "Revenue"]} cursor={false} />
+                    <Legend wrapperStyle={{ paddingTop: "10px" }} />
+                    <Bar dataKey="cost" name="Cost" fill={CHART_COLORS.cost} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="revenue" name="Revenue" fill={CHART_COLORS.revenue} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-            ) : <div className={`text-center py-12 ${THEME.textMuted}`}><BarChart3 size={48} className="mx-auto text-slate-600 mb-4" /><p>No profitability data yet</p></div>}
-          </div>
+            </div>
+          )}
 
-          {/* Margin Table */}
-          {profitabilityByProject.length > 0 && (
+          {/* SUMMARY VIEW */}
+          {profitView === "summary" && profitabilityData.length > 0 && (
             <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
-              <div className={`px-6 py-4 border-b ${THEME.glassBorder}`}>
-                <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Margin Detail by Project</h3>
+              <div className={`px-6 py-4 border-b ${THEME.glassBorder} flex items-center gap-2`}>
+                <div className="w-3 h-3 rounded bg-emerald-400" />
+                <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Direct Cost Analysis &mdash; {formatPeriodLabel(selectedPeriod, periodType)}</h3>
               </div>
               <table className="w-full text-sm">
-                <thead><tr className="bg-white/[0.02]">
-                  <th className={`px-4 py-3 text-left font-medium ${THEME.textMuted}`}>Project</th>
-                  <th className={`px-4 py-3 text-left font-medium ${THEME.textMuted}`}>Client</th>
-                  <th className={`px-4 py-3 text-right font-medium text-blue-400`}>Actual Hrs</th>
-                  <th className={`px-4 py-3 text-right font-medium text-orange-400`}>Billed Hrs</th>
-                  <th className={`px-4 py-3 text-right font-medium text-rose-400`}>Cost</th>
-                  <th className={`px-4 py-3 text-right font-medium text-emerald-400`}>Revenue</th>
-                  <th className={`px-4 py-3 text-right font-medium ${THEME.textMuted}`}>Margin</th>
-                  <th className={`px-4 py-3 text-right font-medium ${THEME.textMuted}`}>Margin %</th>
-                </tr></thead>
+                <thead>
+                  <tr className={`bg-white/[0.02] border-b ${THEME.glassBorder}`}>
+                    <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Name</th>
+                    <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Hours</th>
+                    <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Total Cost</th>
+                    <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Total Rev</th>
+                    <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Delta</th>
+                    <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>GM %</th>
+                  </tr>
+                </thead>
                 <tbody>
-                  {profitabilityByProject.map(row => (
-                    <tr key={row.id} className={`border-t ${THEME.glassBorder} hover:bg-white/[0.03]`}>
-                      <td className={`px-4 py-3 font-medium ${THEME.textPrimary}`}>{row.name}</td>
-                      <td className={`px-4 py-3 ${THEME.textMuted}`}>{row.clientName || '—'}</td>
-                      <td className="px-4 py-3 text-right text-blue-400">{row.actualHours.toFixed(1)}</td>
-                      <td className={`px-4 py-3 text-right ${row.billableHours !== row.actualHours ? 'text-orange-400' : THEME.textSecondary}`}>{row.billableHours.toFixed(1)}</td>
-                      <td className="px-4 py-3 text-right text-rose-400">{formatCurrency(row.cost)}</td>
-                      <td className="px-4 py-3 text-right text-emerald-400">{formatCurrency(row.revenue)}</td>
-                      <td className={`px-4 py-3 text-right font-medium ${row.margin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(row.margin)}</td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${marginBadgeClass(row.marginPct)}`}>
-                          {row.marginPct.toFixed(1)}%
-                        </span>
+                  {profitabilityData.map(row => (
+                    <tr key={row.id} className="border-b border-white/[0.05]">
+                      <td className={`px-4 py-3 font-medium ${THEME.textPrimary}`}>
+                        {row.name}
+                        <span className={`ml-2 text-xs ${THEME.textDim}`}>{row.costLabel}</span>
                       </td>
+                      <td className={`px-4 py-3 text-right ${THEME.textSecondary}`}>{row.hours.toFixed(1)}</td>
+                      <td className="px-4 py-3 text-right text-orange-400">{formatCurrencyDecimal(row.cost)}</td>
+                      <td className="px-4 py-3 text-right text-blue-400">{formatCurrencyDecimal(row.revenue)}</td>
+                      <td className={`px-4 py-3 text-right font-medium ${row.margin >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{formatCurrencyDecimal(row.margin)}</td>
+                      <td className={`px-4 py-3 text-right font-semibold ${row.marginPct >= 20 ? "text-emerald-400" : row.marginPct >= 0 ? "text-amber-400" : "text-rose-400"}`}>{row.marginPct.toFixed(1)}%</td>
                     </tr>
                   ))}
-                  <tr className="bg-white/[0.03] font-medium">
-                    <td className={`px-4 py-3 ${THEME.textPrimary}`} colSpan={2}>TOTAL</td>
-                    <td className="px-4 py-3 text-right text-blue-400">{kpis.totalActualHours.toFixed(1)}</td>
-                    <td className="px-4 py-3 text-right text-orange-400">{kpis.totalBillableHours.toFixed(1)}</td>
-                    <td className="px-4 py-3 text-right text-rose-400">{formatCurrency(kpis.totalCost)}</td>
-                    <td className="px-4 py-3 text-right text-emerald-400">{formatCurrency(kpis.totalRevenue)}</td>
-                    <td className={`px-4 py-3 text-right font-bold ${kpis.grossMargin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(kpis.grossMargin)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={`px-2 py-1 rounded text-sm font-bold ${kpis.marginPct >= 20 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                        {kpis.marginPct.toFixed(1)}%
-                      </span>
-                    </td>
+                  <tr className={`bg-white/[0.03] border-t-2 ${THEME.glassBorder} font-bold`}>
+                    <td className={`px-4 py-3 ${THEME.textPrimary}`}>Total</td>
+                    <td className={`px-4 py-3 text-right ${THEME.textSecondary}`}>{profitTotals.hours.toFixed(1)}</td>
+                    <td className="px-4 py-3 text-right text-orange-400">{formatCurrencyDecimal(profitTotals.cost)}</td>
+                    <td className="px-4 py-3 text-right text-blue-400">{formatCurrencyDecimal(profitTotals.revenue)}</td>
+                    <td className={`px-4 py-3 text-right ${profitTotals.margin >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{formatCurrencyDecimal(profitTotals.margin)}</td>
+                    <td className={`px-4 py-3 text-right ${profitTotals.marginPct >= 20 ? "text-emerald-400" : "text-amber-400"}`}>{profitTotals.marginPct.toFixed(1)}%</td>
                   </tr>
                 </tbody>
               </table>
             </div>
           )}
+
+          {/* REVENUE VIEW */}
+          {profitView === "revenue" && profitabilityData.length > 0 && (
+            <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
+              <div className={`px-6 py-4 border-b ${THEME.glassBorder} flex items-center gap-2`}>
+                <div className="w-3 h-3 rounded bg-blue-400" />
+                <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Revenue by Client &mdash; {formatPeriodLabel(selectedPeriod, periodType)}</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className={`bg-white/[0.02] border-b ${THEME.glassBorder}`}>
+                      <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium sticky left-0 bg-slate-900/95 z-10`}>Name</th>
+                      {profitClients.map(c => (
+                        <th key={c.id} className={`px-4 py-3 text-right ${THEME.textDim} font-medium whitespace-nowrap`}>{c.name}</th>
+                      ))}
+                      <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {profitabilityData.map(row => (
+                      <tr key={row.id} className="border-b border-white/[0.05]">
+                        <td className={`px-4 py-3 font-medium ${THEME.textPrimary} sticky left-0 bg-slate-900/95 z-10`}>{row.name}</td>
+                        {profitClients.map(c => {
+                          const val = row.revenueByClient[c.id] || 0
+                          return <td key={c.id} className={`px-4 py-3 text-right ${val > 0 ? "text-blue-400" : THEME.textDim}`}>{val > 0 ? formatCurrencyDecimal(val) : "\u2014"}</td>
+                        })}
+                        <td className="px-4 py-3 text-right text-blue-400 font-medium">{formatCurrencyDecimal(row.revenue)}</td>
+                      </tr>
+                    ))}
+                    <tr className={`bg-white/[0.03] border-t-2 ${THEME.glassBorder} font-bold`}>
+                      <td className={`px-4 py-3 ${THEME.textPrimary} sticky left-0 bg-slate-900/95 z-10`}>Total</td>
+                      {profitClients.map(c => {
+                        const total = profitabilityData.reduce((s, m) => s + (m.revenueByClient[c.id] || 0), 0)
+                        return <td key={c.id} className="px-4 py-3 text-right text-blue-400">{formatCurrencyDecimal(total)}</td>
+                      })}
+                      <td className="px-4 py-3 text-right text-blue-400 font-bold">{formatCurrencyDecimal(profitTotals.revenue)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* COST VIEW */}
+          {profitView === "cost" && profitabilityData.length > 0 && (
+            <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
+              <div className={`px-6 py-4 border-b ${THEME.glassBorder} flex items-center gap-2`}>
+                <div className="w-3 h-3 rounded bg-orange-400" />
+                <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Cost by Client &mdash; {formatPeriodLabel(selectedPeriod, periodType)}</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className={`bg-white/[0.02] border-b ${THEME.glassBorder}`}>
+                      <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium sticky left-0 bg-slate-900/95 z-10`}>Name</th>
+                      {profitClients.map(c => (
+                        <th key={c.id} className={`px-4 py-3 text-right ${THEME.textDim} font-medium whitespace-nowrap`}>{c.name}</th>
+                      ))}
+                      <th className={`px-4 py-3 text-right ${THEME.textDim} font-medium`}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {profitabilityData.map(row => (
+                      <tr key={row.id} className="border-b border-white/[0.05]">
+                        <td className={`px-4 py-3 font-medium ${THEME.textPrimary} sticky left-0 bg-slate-900/95 z-10`}>{row.name}</td>
+                        {profitClients.map(c => {
+                          const val = row.costByClient[c.id] || 0
+                          const months = getMonthsInPeriod(selectedPeriod, periodType)
+                          const hasOverride = months.some(mo => costOverrides.some(o => o.team_member_id === row.id && o.client_id === c.id && o.month === mo))
+                          return (
+                            <td key={c.id} className={`px-4 py-3 text-right ${val > 0 ? "text-orange-400" : THEME.textDim}`}>
+                              {val > 0 ? formatCurrencyDecimal(val) : "\u2014"}
+                              {hasOverride && <span className="ml-1 text-amber-500 text-xs" title="Manual override">&#9889;</span>}
+                            </td>
+                          )
+                        })}
+                        <td className="px-4 py-3 text-right text-orange-400 font-medium">{formatCurrencyDecimal(row.cost)}</td>
+                      </tr>
+                    ))}
+                    <tr className={`bg-white/[0.03] border-t-2 ${THEME.glassBorder} font-bold`}>
+                      <td className={`px-4 py-3 ${THEME.textPrimary} sticky left-0 bg-slate-900/95 z-10`}>Total</td>
+                      {profitClients.map(c => {
+                        const total = profitabilityData.reduce((s, m) => s + (m.costByClient[c.id] || 0), 0)
+                        return <td key={c.id} className="px-4 py-3 text-right text-orange-400">{formatCurrencyDecimal(total)}</td>
+                      })}
+                      <td className="px-4 py-3 text-right text-orange-400 font-bold">{formatCurrencyDecimal(profitTotals.cost)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Active overrides list */}
+              {(() => {
+                const months = getMonthsInPeriod(selectedPeriod, periodType)
+                const activeOverrides = costOverrides.filter(o => months.includes(o.month))
+                if (activeOverrides.length === 0) return null
+                return (
+                  <div className={`px-6 py-4 border-t ${THEME.glassBorder}`}>
+                    <p className={`text-xs font-medium ${THEME.textMuted} mb-2`}>&#9889; Active Overrides</p>
+                    <div className="flex flex-wrap gap-2">
+                      {activeOverrides.map(o => (
+                        <div key={o.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                          <span className="text-xs text-amber-400">{o.team_member_name} &rarr; {o.client_name} ({o.month}): {formatCurrency(o.fixed_amount)}</span>
+                          <button onClick={() => handleDeleteOverride(o.id)} className="text-amber-500/50 hover:text-rose-400"><X size={12} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          )}
+
+          {profitabilityData.length === 0 && (
+            <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-12 text-center`}>
+              <BarChart3 size={48} className="mx-auto text-slate-600 mb-4" />
+              <p className={THEME.textMuted}>No timesheet data for {formatPeriodLabel(selectedPeriod, periodType)}</p>
+              <p className={`text-xs ${THEME.textDim} mt-1`}>Time entries and rate cards needed to calculate profitability</p>
+            </div>
+          )}
         </div>
       )}
 
-      {/* ============ ENTRY MODAL ============ */}
-      {showEntryModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-6 w-full max-w-lg shadow-2xl`}>
-            <h3 className={`text-lg font-semibold ${THEME.textPrimary} mb-4`}>Add Time Entry</h3>
-            <div className="space-y-4">
-              <div><label className={`block text-sm ${THEME.textMuted} mb-1`}>Date *</label><input type="date" value={formData.date} onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))} className={`w-full px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white`} /></div>
-              <div><label className={`block text-sm ${THEME.textMuted} mb-1`}>Employee *</label><select value={formData.team_member_id} onChange={(e) => setFormData(prev => ({ ...prev, team_member_id: e.target.value }))} className={`w-full px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white`}><option value="">Select...</option>{teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-              <div><label className={`block text-sm ${THEME.textMuted} mb-1`}>Project *</label><select value={formData.project_id} onChange={(e) => setFormData(prev => ({ ...prev, project_id: e.target.value }))} className={`w-full px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white`}><option value="">Select...</option>{projects.map(p => <option key={p.id} value={p.id}>{p.client ? `${p.client} - ` : ''}{p.name}</option>)}</select></div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={`block text-sm ${THEME.textMuted} mb-1`}>Actual Hours *</label>
-                  <input type="number" value={formData.hours} onChange={(e) => setFormData(prev => ({ ...prev, hours: e.target.value }))} className={`w-full px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white`} placeholder="8" step="0.5" />
-                  <p className="text-xs text-slate-500 mt-1">What contractor worked</p>
-                </div>
-                <div>
-                  <label className={`block text-sm text-orange-400 mb-1`}>Billable Hours</label>
-                  <input type="number" value={formData.billable_hours} onChange={(e) => setFormData(prev => ({ ...prev, billable_hours: e.target.value }))} className={`w-full px-3 py-2 bg-white/[0.05] border border-orange-500/20 rounded-lg text-white`} placeholder="Same as actual" step="0.5" />
-                  <p className="text-xs text-slate-500 mt-1">What you bill client (optional)</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" checked={formData.is_billable} onChange={(e) => setFormData(prev => ({ ...prev, is_billable: e.target.checked }))} className="rounded bg-white/[0.05] border-white/[0.1]" />
-                <label className={`text-sm ${THEME.textMuted}`}>Billable</label>
-              </div>
-              <div><label className={`block text-sm ${THEME.textMuted} mb-1`}>Notes</label><textarea value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} className={`w-full px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white resize-none`} rows={2} placeholder="Description..." /></div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowEntryModal(false)} className={`flex-1 px-4 py-2 bg-white/[0.05] hover:bg-white/[0.08] border ${THEME.glassBorder} rounded-lg text-sm font-medium`}>Cancel</button>
-              <button onClick={saveNewEntry} className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm font-medium shadow-lg shadow-emerald-500/20">Add Entry</button>
-            </div>
-          </div>
-        </div>
+      {/* ============ MODALS ============ */}
+      <MemberModal isOpen={showMemberModal} onClose={() => { setShowMemberModal(false); setEditingMember(null) }}
+        onSave={handleSaveMember} editingMember={editingMember} />
+      <RateCardModal isOpen={showRateModal} onClose={() => { setShowRateModal(false); setEditingRate(null) }}
+        onSave={handleSaveRate} editingRate={editingRate} teamMembers={teamMembers} clients={clients} projects={projects} companyId={companyId} />
+      <CostOverrideModal isOpen={showOverrideModal} onClose={() => setShowOverrideModal(false)}
+        onSave={handleSaveOverride} billRates={billRates} teamMembers={teamMembers} clients={clients} selectedMonth={selectedPeriod.includes("-Q") ? getMonthsInPeriod(selectedPeriod, periodType)[0] : selectedPeriod.length === 4 ? getCurrentMonth() : selectedPeriod} />
+      {selectedMemberDetail && (
+        <MemberDetailFlyout member={selectedMemberDetail} billRates={billRates} clients={clients}
+          onClose={() => setSelectedMemberDetail(null)}
+          onEdit={() => { setEditingMember(selectedMemberDetail); setShowMemberModal(true); setSelectedMemberDetail(null) }} />
       )}
     </div>
   )
