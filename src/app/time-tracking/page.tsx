@@ -34,7 +34,8 @@ interface TimeEntry {
   client_id: string
   client_name: string
   bill_rate: number       // Revenue rate (what client pays per hour)
-  cost_rate: number       // Cost rate (what you pay contractor per hour)
+  cost_rate: number       // Cost rate (adjusted for totals — hours × cost_rate = true fixed cost)
+  display_cost_rate: number // Display rate (monthly ÷ 172 for LS, same as cost_rate for hourly)
   notes: string | null
 }
 
@@ -75,6 +76,90 @@ interface ProjectAssignment {
 const normalizeCostType = (t: string) => (t || '').toLowerCase().replace(/\s+/g, '_')
 const STANDARD_MONTHLY_HOURS = 172 // Standard full-time hours for effective hourly conversion
 
+/** Check if a member has a fixed monthly cost (any variant of lump_sum) */
+function isFixedCostMember(m: TeamMember): boolean {
+  const ct = normalizeCostType(m.cost_type || '')
+  return (ct === 'lump_sum' || ct === 'lumpsum' || ct === 'fixed' || ct === 'monthly') && (m.cost_amount || 0) > 0
+}
+
+/** Get effective hourly display rate for fixed cost members */
+function getDisplayCostRate(m: TeamMember): number {
+  if (isFixedCostMember(m)) return m.cost_amount / STANDARD_MONTHLY_HOURS
+  if (normalizeCostType(m.cost_type || '') === 'hourly') return m.cost_amount || 0
+  return 0
+}
+
+/**
+ * Cap aggregated costs for fixed-cost members.
+ * After summing hours × rate, if total exceeds the monthly fixed amount,
+ * scale down proportionally so total = fixed × months in period.
+ * This is a safety net — adjustEntriesForFixedCosts should handle it at entry level,
+ * but this guarantees correctness at the display level.
+ */
+function capFixedCostsForMembers(
+  memberCosts: { id: string; totalCost: number; clients?: Record<string, { cost: number }> }[],
+  teamMembers: TeamMember[],
+  billRates: any[],
+  periodStart: string,
+  periodEnd: string
+) {
+  const monthsInPeriod = calcMonthsInPeriod(periodStart, periodEnd)
+  
+  // Build rate-card LS lookup (per member+client fixed costs)
+  const rcLS: Record<string, number> = {}
+  ;(billRates || []).forEach((r: any) => {
+    if (r.is_active && r.cost_amount > 0 && normalizeCostType(r.cost_type) !== 'hourly') {
+      rcLS[`${r.team_member_id}_${r.client_id}`] = r.cost_amount
+    }
+  })
+  
+  memberCosts.forEach(mc => {
+    const tm = teamMembers.find(m => m.id === mc.id)
+    if (!tm || !isFixedCostMember(tm)) return
+    
+    // Check if any rate cards handle this member's costs per-client
+    const hasRateCardLS = Object.keys(rcLS).some(k => k.startsWith(mc.id + '_'))
+    
+    if (!hasRateCardLS) {
+      // Pure member-level LS: cap total cost
+      const maxCost = tm.cost_amount * monthsInPeriod
+      if (mc.totalCost > maxCost && mc.totalCost > 0) {
+        const ratio = maxCost / mc.totalCost
+        mc.totalCost = maxCost
+        if (mc.clients) {
+          Object.values(mc.clients).forEach(c => { c.cost = c.cost * ratio })
+        }
+      } else if (mc.totalCost < maxCost) {
+        // Under-billed hours — cost should still be the full fixed amount
+        const ratio = mc.totalCost > 0 ? maxCost / mc.totalCost : 1
+        mc.totalCost = maxCost
+        if (mc.clients) {
+          Object.values(mc.clients).forEach(c => { c.cost = c.cost * ratio })
+        }
+      }
+    }
+  })
+}
+
+/** Calculate fractional months in a date range */
+function calcMonthsInPeriod(periodStart: string, periodEnd: string): number {
+  const start = new Date(periodStart + 'T00:00:00')
+  const end = new Date(periodEnd + 'T23:59:59')
+  let totalFraction = 0
+  const d = new Date(start.getFullYear(), start.getMonth(), 1)
+  while (d <= end) {
+    const monthStart = new Date(d.getFullYear(), d.getMonth(), 1)
+    const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0)
+    const daysInMonth = monthEnd.getDate()
+    const rangeStart = start > monthStart ? start : monthStart
+    const rangeEnd = end < new Date(monthEnd.getFullYear(), monthEnd.getMonth(), monthEnd.getDate(), 23, 59, 59) ? end : monthEnd
+    const daysInRange = Math.floor((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+    totalFraction += Math.min(daysInRange / daysInMonth, 1)
+    d.setMonth(d.getMonth() + 1)
+  }
+  return Math.max(totalFraction, 0.01)
+}
+
 /**
  * For lump sum cost members, recalculates cost_rate so that
  * total cost across all entries = fixed monthly cost × months in period.
@@ -93,19 +178,7 @@ function adjustEntriesForFixedCosts(
 ): TimeEntry[] {
   if (!entries.length) return entries
 
-  // Count distinct calendar months in the period
-  const monthsInPeriod = (() => {
-    const start = new Date(periodStart + 'T00:00:00')
-    const end = new Date(periodEnd + 'T23:59:59')
-    const months = new Set<string>()
-    const d = new Date(start)
-    while (d <= end) {
-      months.add(`${d.getFullYear()}-${d.getMonth()}`)
-      d.setMonth(d.getMonth() + 1)
-      d.setDate(1)
-    }
-    return Math.max(months.size, 1)
-  })()
+  const monthsInPeriod = calcMonthsInPeriod(periodStart, periodEnd)
 
   // Build lookup of rate cards with LS cost at the rate-card level
   const lsRateCards: Record<string, number> = {} // key: memberId_clientId → monthly cost
@@ -118,8 +191,7 @@ function adjustEntriesForFixedCosts(
   // Build lookup of members with LS cost at member level
   const lsMembers: Record<string, number> = {} // memberId → monthly cost
   teamMembers.forEach(m => {
-    const ct = normalizeCostType(m.cost_type || '')
-    if ((ct === 'lump_sum' || ct === 'lump sum') && (m.cost_amount || 0) > 0) {
+    if (isFixedCostMember(m)) {
       lsMembers[m.id] = m.cost_amount!
     }
   })
@@ -135,25 +207,27 @@ function adjustEntriesForFixedCosts(
   const adjustedRates: Map<string, number> = new Map() // entry.id → new cost_rate
 
   Object.entries(byMember).forEach(([memberId, memberEntries]) => {
-    // Check which entries have rate-card-level LS vs member-level LS
-    const rateCardLSEntries: TimeEntry[] = []
-    const memberLSEntries: TimeEntry[] = []
-    const handledByRateCard = new Set<string>() // entry ids handled by rate card LS
+    // PRIORITY 1: Member-level LS (e.g., Travis $25K, Emily $35K)
+    // If member has a fixed monthly cost, ALL their entries use it — no exceptions
+    if (lsMembers[memberId]) {
+      const fixedCost = lsMembers[memberId] * monthsInPeriod
+      const totalHours = memberEntries.reduce((s, e) => s + e.hours, 0)
+      if (totalHours > 0) {
+        const adjustedRate = fixedCost / totalHours
+        memberEntries.forEach(e => adjustedRates.set(e.id, adjustedRate))
+      }
+      return // Done with this member — skip rate-card logic
+    }
 
-    // First pass: identify rate-card-level LS entries
+    // PRIORITY 2: Rate-card-level LS (only for members WITHOUT member-level LS)
+    // e.g., Julio has no member fixed cost, but GOOGL rate card = $13,525/mo
+    const byClient: Record<string, TimeEntry[]> = {}
     memberEntries.forEach(e => {
       const rcKey = `${memberId}_${e.client_id}`
       if (lsRateCards[rcKey]) {
-        rateCardLSEntries.push(e)
-        handledByRateCard.add(e.id)
+        if (!byClient[e.client_id]) byClient[e.client_id] = []
+        byClient[e.client_id].push(e)
       }
-    })
-
-    // Rate-card-level LS: group by client, distribute per-client fixed cost by hours
-    const byClient: Record<string, TimeEntry[]> = {}
-    rateCardLSEntries.forEach(e => {
-      if (!byClient[e.client_id]) byClient[e.client_id] = []
-      byClient[e.client_id].push(e)
     })
     Object.entries(byClient).forEach(([clientId, clientEntries]) => {
       const fixedCost = lsRateCards[`${memberId}_${clientId}`] * monthsInPeriod
@@ -163,26 +237,6 @@ function adjustEntriesForFixedCosts(
         clientEntries.forEach(e => adjustedRates.set(e.id, adjustedRate))
       }
     })
-
-    // Second pass: member-level LS for entries NOT handled by rate-card LS
-    if (lsMembers[memberId]) {
-      const remainingEntries = memberEntries.filter(e => !handledByRateCard.has(e.id))
-      
-      // Check if ALL entries for this member are unhandled (pure member-level LS like Travis/Emily)
-      // vs mixed (some rate-card LS, some member-level fallback)
-      if (remainingEntries.length > 0) {
-        // If there are rate-card LS entries too, the member LS cost should only cover remaining
-        // But typically if member has LS cost, all their rate cards are "Distributed" (no cost)
-        const fixedCost = lsMembers[memberId] * monthsInPeriod
-        const totalHours = remainingEntries.reduce((s, e) => s + e.hours, 0)
-        if (totalHours > 0) {
-          const adjustedRate = fixedCost / totalHours
-          remainingEntries.forEach(e => adjustedRates.set(e.id, adjustedRate))
-        }
-      } else if (rateCardLSEntries.length === 0) {
-        // Member has LS cost but zero hours → no entries to adjust (cost is still $X but no distribution)
-      }
-    }
   })
 
   // If no adjustments needed, return original
@@ -193,6 +247,29 @@ function adjustEntriesForFixedCosts(
     const newRate = adjustedRates.get(e.id)
     return newRate !== undefined ? { ...e, cost_rate: newRate } : e
   })
+}
+
+// ============ MARGIN HELPERS ============
+function calcMarginPct(revenue: number, cost: number): number {
+  if (revenue === 0 && cost === 0) return 0
+  if (revenue === 0) return -100
+  return ((revenue - cost) / revenue) * 100
+}
+function formatMarginPct(revenue: number, cost: number): string {
+  const pct = calcMarginPct(revenue, cost)
+  return `${pct.toFixed(1)}%`
+}
+function marginColor(pct: number): string {
+  if (pct >= 30) return 'text-emerald-400'
+  if (pct >= 15) return 'text-amber-400'
+  if (pct >= 0) return 'text-orange-400'
+  return 'text-rose-400'
+}
+function marginBadgeClass(pct: number): string {
+  if (pct >= 30) return 'bg-emerald-500/20 text-emerald-400'
+  if (pct >= 15) return 'bg-amber-500/20 text-amber-400'
+  if (pct >= 0) return 'bg-orange-500/20 text-orange-400'
+  return 'bg-rose-500/20 text-rose-400'
 }
 
 // ============ CONSTANTS ============
@@ -564,6 +641,7 @@ export default function TimeTrackingPage() {
             client_name: clientName,
             bill_rate: billRate,
             cost_rate: costRate,
+            display_cost_rate: costRate,
             notes: e.description || null
           }
         })
@@ -598,27 +676,31 @@ export default function TimeTrackingPage() {
     return true
   }), [entries, priorPeriod, selectedClient, selectedEmployee, selectedProject])
 
-  // ============ FIXED COST ADJUSTMENT (Profitability tab only) ============
+  // ============ FIXED COST ADJUSTMENT ============
   // Recalculate cost_rate for lump sum members so total cost = fixed monthly amount
   const costAdjustedEntries = useMemo(() => 
     adjustEntriesForFixedCosts(filteredEntries, teamMembers, billRates, dateRange.start, dateRange.end),
     [filteredEntries, teamMembers, billRates, dateRange]
   )
+  const costAdjustedPriorEntries = useMemo(() => 
+    adjustEntriesForFixedCosts(priorPeriodEntries, teamMembers, billRates, priorPeriod.start, priorPeriod.end),
+    [priorPeriodEntries, teamMembers, billRates, priorPeriod]
+  )
 
   // ============ KPIs — DUAL LAYER ============
   const kpis = useMemo(() => {
-    const totalActualHours = filteredEntries.reduce((sum, e) => sum + e.hours, 0)
-    const totalBillableHours = filteredEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours : 0), 0)
-    const totalCost = filteredEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0)
-    const totalRevenue = filteredEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours * e.bill_rate : 0), 0)
+    const totalActualHours = costAdjustedEntries.reduce((sum, e) => sum + e.hours, 0)
+    const totalBillableHours = costAdjustedEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours : 0), 0)
+    const totalCost = costAdjustedEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0)
+    const totalRevenue = costAdjustedEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours * e.bill_rate : 0), 0)
     const grossMargin = totalRevenue - totalCost
-    const marginPct = totalRevenue > 0 ? (grossMargin / totalRevenue) * 100 : 0
+    const marginPct = calcMarginPct(totalRevenue, totalCost)
     const avgBillRate = totalBillableHours > 0 ? totalRevenue / totalBillableHours : 0
     const avgCostRate = totalActualHours > 0 ? totalCost / totalActualHours : 0
 
-    const priorHours = priorPeriodEntries.reduce((sum, e) => sum + e.hours, 0)
-    const priorRevenue = priorPeriodEntries.reduce((sum, e) => sum + (e.is_billable ? (e.billable_hours || e.hours) * e.bill_rate : 0), 0)
-    const priorCost = priorPeriodEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0)
+    const priorHours = costAdjustedPriorEntries.reduce((sum, e) => sum + e.hours, 0)
+    const priorRevenue = costAdjustedPriorEntries.reduce((sum, e) => sum + (e.is_billable ? (e.billable_hours || e.hours) * e.bill_rate : 0), 0)
+    const priorCost = costAdjustedPriorEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0)
     
     const activeMembers = teamMembers.filter(m => m.status === 'active')
     const totalCapacity = activeMembers.length * 160
@@ -628,8 +710,8 @@ export default function TimeTrackingPage() {
     const revenueTrend = priorRevenue > 0 ? ((totalRevenue - priorRevenue) / priorRevenue) * 100 : 0
     const costTrend = priorCost > 0 ? ((totalCost - priorCost) / priorCost) * 100 : 0
 
-    return { totalActualHours, totalBillableHours, totalCost, totalRevenue, grossMargin, marginPct, avgBillRate, avgCostRate, utilization, hoursTrend, revenueTrend, costTrend, uniqueClients: new Set(filteredEntries.map(e => e.client_id).filter(Boolean)).size }
-  }, [filteredEntries, priorPeriodEntries, teamMembers])
+    return { totalActualHours, totalBillableHours, totalCost, totalRevenue, grossMargin, marginPct, avgBillRate, avgCostRate, utilization, hoursTrend, revenueTrend, costTrend, uniqueClients: new Set(costAdjustedEntries.map(e => e.client_id).filter(Boolean)).size }
+  }, [costAdjustedEntries, costAdjustedPriorEntries, teamMembers])
 
   const weekColumns = useMemo(() => getWeekColumns(dateRange.start, dateRange.end), [dateRange])
 
@@ -639,13 +721,13 @@ export default function TimeTrackingPage() {
       projects: Record<string, { id: string; name: string; members: Record<string, { id: string; name: string; billRate: number; costRate: number; weekActualHours: Record<string, number>; weekBillableHours: Record<string, number>; totalActualHours: number; totalBillableHours: number; totalCost: number; totalRevenue: number; weekEntries: Record<string, { id: string; hours: number; billable_hours: number }[]> }>; totalActualHours: number; totalBillableHours: number; totalCost: number; totalRevenue: number }>
     }> = {}
 
-    filteredEntries.forEach(entry => {
+    costAdjustedEntries.forEach(entry => {
       const clientId = entry.client_id || 'unassigned'
       const clientName = entry.client_name || 'Unassigned'
       if (!clientData[clientId]) clientData[clientId] = { id: clientId, name: clientName, totalActualHours: 0, totalBillableHours: 0, totalCost: 0, totalRevenue: 0, projects: {} }
       if (!clientData[clientId].projects[entry.project_id]) clientData[clientId].projects[entry.project_id] = { id: entry.project_id, name: entry.project_name, members: {}, totalActualHours: 0, totalBillableHours: 0, totalCost: 0, totalRevenue: 0 }
       const project = clientData[clientId].projects[entry.project_id]
-      if (!project.members[entry.team_member_id]) project.members[entry.team_member_id] = { id: entry.team_member_id, name: entry.team_member_name, billRate: entry.bill_rate, costRate: entry.cost_rate, weekActualHours: {}, weekBillableHours: {}, totalActualHours: 0, totalBillableHours: 0, totalCost: 0, totalRevenue: 0, weekEntries: {} }
+      if (!project.members[entry.team_member_id]) project.members[entry.team_member_id] = { id: entry.team_member_id, name: entry.team_member_name, billRate: entry.bill_rate, costRate: entry.display_cost_rate, weekActualHours: {}, weekBillableHours: {}, totalActualHours: 0, totalBillableHours: 0, totalCost: 0, totalRevenue: 0, weekEntries: {} }
       const member = project.members[entry.team_member_id]
       
       const weekCol = weekColumns.find(w => {
@@ -663,7 +745,7 @@ export default function TimeTrackingPage() {
       member.totalCost += entry.hours * entry.cost_rate
       member.totalRevenue += entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
       if (entry.bill_rate > member.billRate) member.billRate = entry.bill_rate
-      if (entry.cost_rate > member.costRate) member.costRate = entry.cost_rate
+      if (entry.display_cost_rate > member.costRate) member.costRate = entry.display_cost_rate
     })
 
     Object.values(clientData).forEach(client => {
@@ -677,12 +759,12 @@ export default function TimeTrackingPage() {
       })
     })
     return Object.values(clientData).sort((a, b) => b.totalRevenue - a.totalRevenue)
-  }, [filteredEntries, weekColumns])
+  }, [costAdjustedEntries, weekColumns])
 
   // ============ BY EMPLOYEE DATA ============
   const dataByEmployee = useMemo(() => {
     const employeeData: Record<string, { id: string; name: string; empType: string; totalActualHours: number; totalBillableHours: number; totalCost: number; totalRevenue: number; clients: Record<string, { name: string; actualHours: number; billableHours: number; cost: number; revenue: number }> }> = {}
-    filteredEntries.forEach(entry => {
+    costAdjustedEntries.forEach(entry => {
       if (!employeeData[entry.team_member_id]) {
         const member = teamMembers.find(m => m.id === entry.team_member_id)
         employeeData[entry.team_member_id] = { id: entry.team_member_id, name: entry.team_member_name, empType: member?.employment_type || 'contractor', totalActualHours: 0, totalBillableHours: 0, totalCost: 0, totalRevenue: 0, clients: {} }
@@ -696,7 +778,7 @@ export default function TimeTrackingPage() {
       emp.clients[clientKey].cost += entry.hours * entry.cost_rate; emp.clients[clientKey].revenue += entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
     })
     return Object.values(employeeData).sort((a, b) => b.totalActualHours - a.totalActualHours)
-  }, [filteredEntries, teamMembers])
+  }, [costAdjustedEntries, teamMembers])
 
   // ============ PROFITABILITY DATA ============
   const profitabilityByProject = useMemo(() => {
@@ -707,13 +789,13 @@ export default function TimeTrackingPage() {
       p.actualHours += entry.hours; p.billableHours += entry.billable_hours
       p.cost += entry.hours * entry.cost_rate; p.revenue += entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
     })
-    return Object.values(projectData).map(p => ({ ...p, margin: p.revenue - p.cost, marginPct: p.revenue > 0 ? ((p.revenue - p.cost) / p.revenue) * 100 : 0 })).sort((a, b) => b.margin - a.margin)
+    return Object.values(projectData).map(p => ({ ...p, margin: p.revenue - p.cost, marginPct: calcMarginPct(p.revenue, p.cost) })).sort((a, b) => b.margin - a.margin)
   }, [costAdjustedEntries])
 
   const revenueByClientData = useMemo(() => dataByClient.map((c, i) => ({ name: c.name, value: c.totalRevenue, fill: CHART_COLORS[i % CHART_COLORS.length] })), [dataByClient])
 
   const weeklyTrendData = useMemo(() => weekColumns.map(week => {
-    const weekEntries = filteredEntries.filter(e => {
+    const weekEntries = costAdjustedEntries.filter(e => {
       const entryDate = new Date(e.date); const weekStart = new Date(week.start); const weekEnd = new Date(week.end); weekEnd.setHours(23, 59, 59)
       return entryDate >= weekStart && entryDate <= weekEnd
     })
@@ -724,7 +806,7 @@ export default function TimeTrackingPage() {
       cost: weekEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0),
       revenue: weekEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours * e.bill_rate : 0), 0),
     }
-  }), [weekColumns, filteredEntries])
+  }), [weekColumns, costAdjustedEntries])
 
   // ============ ACTIONS ============
   const saveNewEntry = async () => {
@@ -768,7 +850,7 @@ export default function TimeTrackingPage() {
         team_member_name: teamMember?.name || 'Unknown', project_id: formData.project_id,
         project_name: project?.name || 'Unknown', client_id: project?.client_id || '',
         client_name: clients.find(c => c.id === project?.client_id)?.name || '',
-        bill_rate: billRate, cost_rate: costRate, notes: formData.notes || null
+        bill_rate: billRate, cost_rate: costRate, display_cost_rate: costRate, notes: formData.notes || null
       }
       setEntries(prev => [newEntry, ...prev])
       setShowEntryModal(false)
@@ -802,9 +884,9 @@ export default function TimeTrackingPage() {
 
   const exportToCSV = () => {
     const headers = ['Date', 'Employee', 'Client', 'Project', 'Actual Hours', 'Billable Hours', 'Cost Rate', 'Bill Rate', 'Cost', 'Revenue', 'Margin', 'Notes']
-    const rows = filteredEntries.map(e => [
+    const rows = costAdjustedEntries.map(e => [
       e.date, e.team_member_name, e.client_name, e.project_name, e.hours, e.billable_hours,
-      e.cost_rate, e.bill_rate, (e.hours * e.cost_rate).toFixed(2), (e.billable_hours * e.bill_rate).toFixed(2),
+      e.display_cost_rate, e.bill_rate, (e.hours * e.cost_rate).toFixed(2), (e.billable_hours * e.bill_rate).toFixed(2),
       ((e.billable_hours * e.bill_rate) - (e.hours * e.cost_rate)).toFixed(2), e.notes || ''
     ])
     const csv = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n')
@@ -965,9 +1047,9 @@ export default function TimeTrackingPage() {
 
           <CollapsibleSection title="Hours by Project" icon={<Briefcase size={16} />}>
             <div className="h-64">
-              {filteredEntries.length > 0 ? (
+              {costAdjustedEntries.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={Object.values(filteredEntries.reduce((acc, e) => { if (!acc[e.project_id]) acc[e.project_id] = { name: e.project_name.substring(0, 15), hours: 0 }; acc[e.project_id].hours += e.hours; return acc }, {} as Record<string, { name: string; hours: number }>)).sort((a, b) => b.hours - a.hours).slice(0, 8)} layout="vertical">
+                  <BarChart data={Object.values(costAdjustedEntries.reduce((acc, e) => { if (!acc[e.project_id]) acc[e.project_id] = { name: e.project_name.substring(0, 15), hours: 0 }; acc[e.project_id].hours += e.hours; return acc }, {} as Record<string, { name: string; hours: number }>)).sort((a, b) => b.hours - a.hours).slice(0, 8)} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                     <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
                     <YAxis type="category" dataKey="name" width={100} tick={{ fill: '#94a3b8', fontSize: 11 }} />
@@ -1004,14 +1086,11 @@ export default function TimeTrackingPage() {
                     <span className="text-slate-600 mx-1">/</span>
                     <span className="text-emerald-400 font-medium">{formatCurrency(client.totalRevenue)}</span>
                   </div>
-                  {client.totalRevenue > 0 && (
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                      (((client.totalRevenue - client.totalCost) / client.totalRevenue) * 100) >= 20
-                        ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
-                    }`}>
-                      {(((client.totalRevenue - client.totalCost) / client.totalRevenue) * 100).toFixed(0)}% margin
+                  {(() => { const mp = calcMarginPct(client.totalRevenue, client.totalCost); return (
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${marginBadgeClass(mp)}`}>
+                      {mp.toFixed(1)}% margin
                     </span>
-                  )}
+                  ) })()}
                 </div>
               </button>
               {expandedClients.has(client.id) && (
@@ -1116,11 +1195,11 @@ export default function TimeTrackingPage() {
                   </span>
                   <span className="text-rose-400 text-sm">{formatCurrency(employee.totalCost)}</span>
                   <span className="text-emerald-400 font-medium text-sm">{formatCurrency(employee.totalRevenue)}</span>
-                  {employee.totalRevenue > 0 && (
-                    <span className={`text-xs font-medium ${((employee.totalRevenue - employee.totalCost) / employee.totalRevenue * 100) >= 20 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                      {((employee.totalRevenue - employee.totalCost) / employee.totalRevenue * 100).toFixed(0)}%
+                  {(() => { const mp = calcMarginPct(employee.totalRevenue, employee.totalCost); return (
+                    <span className={`text-xs font-medium ${marginColor(mp)}`}>
+                      {mp.toFixed(1)}%
                     </span>
-                  )}
+                  ) })()}
                 </div>
               }
               defaultExpanded={index === 0}
@@ -1160,7 +1239,7 @@ export default function TimeTrackingPage() {
 
       {/* ============ DETAILED VIEW ============ */}
       {activeTab === 'detailed' && (
-        <CollapsibleSection title="Time Entries" badge={filteredEntries.length} icon={<Calendar size={16} />}>
+        <CollapsibleSection title="Time Entries" badge={costAdjustedEntries.length} icon={<Calendar size={16} />}>
           <div className="mb-3 flex items-center gap-2">
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <div className="flex items-center gap-1"><Lock size={12} /><span>Actual Hours = cost (contractor submitted)</span></div>
@@ -1186,7 +1265,7 @@ export default function TimeTrackingPage() {
                 <th className={`px-3 py-3 text-center font-medium ${THEME.textMuted}`}>⚡</th>
               </tr></thead>
               <tbody>
-                {filteredEntries.length > 0 ? filteredEntries.slice(0, 100).map((entry) => {
+                {costAdjustedEntries.length > 0 ? costAdjustedEntries.slice(0, 100).map((entry) => {
                   const cost = entry.hours * entry.cost_rate
                   const revenue = entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
                   const margin = revenue - cost
@@ -1208,7 +1287,7 @@ export default function TimeTrackingPage() {
                           onSave={(newValue) => updateBillableHours(entry.id, newValue)}
                         />
                       </td>
-                      <td className={`px-3 py-2.5 text-right text-xs ${THEME.textMuted}`}>{formatCurrency(entry.cost_rate)}</td>
+                      <td className={`px-3 py-2.5 text-right text-xs ${THEME.textMuted}`}>{formatCurrency(entry.display_cost_rate)}</td>
                       <td className={`px-3 py-2.5 text-right text-xs ${THEME.textMuted}`}>{formatCurrency(entry.bill_rate)}</td>
                       <td className="px-3 py-2.5 text-right text-rose-400 text-xs">{formatCurrency(cost)}</td>
                       <td className="px-3 py-2.5 text-right text-emerald-400 text-xs">{formatCurrency(revenue)}</td>
@@ -1225,7 +1304,7 @@ export default function TimeTrackingPage() {
               </tbody>
             </table>
           </div>
-          {filteredEntries.length > 100 && <p className="text-center text-sm text-slate-400 mt-2">Showing first 100 of {filteredEntries.length} entries</p>}
+          {costAdjustedEntries.length > 100 && <p className="text-center text-sm text-slate-400 mt-2">Showing first 100 of {costAdjustedEntries.length} entries</p>}
         </CollapsibleSection>
       )}
 
@@ -1281,39 +1360,25 @@ export default function TimeTrackingPage() {
                       <td className="px-4 py-3 text-right text-emerald-400">{formatCurrency(row.revenue)}</td>
                       <td className={`px-4 py-3 text-right font-medium ${row.margin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(row.margin)}</td>
                       <td className="px-4 py-3 text-right">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          row.marginPct >= 30 ? 'bg-emerald-500/20 text-emerald-400' :
-                          row.marginPct >= 15 ? 'bg-amber-500/20 text-amber-400' :
-                          row.marginPct >= 0 ? 'bg-orange-500/20 text-orange-400' : 'bg-rose-500/20 text-rose-400'
-                        }`}>
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${marginBadgeClass(row.marginPct)}`}>
                           {row.marginPct.toFixed(1)}%
                         </span>
                       </td>
                     </tr>
                   ))}
-                  {(() => {
-                    const tHrs = profitabilityByProject.reduce((s, r) => s + r.actualHours, 0)
-                    const bHrs = profitabilityByProject.reduce((s, r) => s + r.billableHours, 0)
-                    const tCost = profitabilityByProject.reduce((s, r) => s + r.cost, 0)
-                    const tRev = profitabilityByProject.reduce((s, r) => s + r.revenue, 0)
-                    const gm = tRev - tCost
-                    const mp = tRev > 0 ? (gm / tRev) * 100 : 0
-                    return (
                   <tr className="bg-white/[0.03] font-medium">
                     <td className={`px-4 py-3 ${THEME.textPrimary}`} colSpan={2}>TOTAL</td>
-                    <td className="px-4 py-3 text-right text-blue-400">{tHrs.toFixed(1)}</td>
-                    <td className="px-4 py-3 text-right text-orange-400">{bHrs.toFixed(1)}</td>
-                    <td className="px-4 py-3 text-right text-rose-400">{formatCurrency(tCost)}</td>
-                    <td className="px-4 py-3 text-right text-emerald-400">{formatCurrency(tRev)}</td>
-                    <td className={`px-4 py-3 text-right font-bold ${gm >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(gm)}</td>
+                    <td className="px-4 py-3 text-right text-blue-400">{kpis.totalActualHours.toFixed(1)}</td>
+                    <td className="px-4 py-3 text-right text-orange-400">{kpis.totalBillableHours.toFixed(1)}</td>
+                    <td className="px-4 py-3 text-right text-rose-400">{formatCurrency(kpis.totalCost)}</td>
+                    <td className="px-4 py-3 text-right text-emerald-400">{formatCurrency(kpis.totalRevenue)}</td>
+                    <td className={`px-4 py-3 text-right font-bold ${kpis.grossMargin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(kpis.grossMargin)}</td>
                     <td className="px-4 py-3 text-right">
-                      <span className={`px-2 py-1 rounded text-sm font-bold ${mp >= 20 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                        {mp.toFixed(1)}%
+                      <span className={`px-2 py-1 rounded text-sm font-bold ${kpis.marginPct >= 20 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                        {kpis.marginPct.toFixed(1)}%
                       </span>
                     </td>
                   </tr>
-                    )
-                  })()}
                 </tbody>
               </table>
             </div>
