@@ -84,7 +84,7 @@ function isFixedCostMember(m: TeamMember): boolean {
 
 /** Get effective hourly display rate for fixed cost members */
 function getDisplayCostRate(m: TeamMember): number {
-  if (isFixedCostMember(m)) return m.cost_amount / STANDARD_MONTHLY_HOURS
+  if (isFixedCostMember(m)) return (m.cost_amount || 0) / STANDARD_MONTHLY_HOURS
   if (normalizeCostType(m.cost_type || '') === 'hourly') return m.cost_amount || 0
   return 0
 }
@@ -122,7 +122,7 @@ function capFixedCostsForMembers(
     
     if (!hasRateCardLS) {
       // Pure member-level LS: cap total cost
-      const maxCost = tm.cost_amount * monthsInPeriod
+      const maxCost = (tm.cost_amount || 0) * monthsInPeriod
       if (mc.totalCost > maxCost && mc.totalCost > 0) {
         const ratio = maxCost / mc.totalCost
         mc.totalCost = maxCost
@@ -192,7 +192,7 @@ function adjustEntriesForFixedCosts(
   const lsMembers: Record<string, number> = {} // memberId → monthly cost
   teamMembers.forEach(m => {
     if (isFixedCostMember(m)) {
-      lsMembers[m.id] = m.cost_amount!
+      lsMembers[m.id] = m.cost_amount || 0
     }
   })
 
