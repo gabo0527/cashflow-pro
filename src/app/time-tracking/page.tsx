@@ -1240,6 +1240,69 @@ export default function TimeTrackingPage() {
       {/* ============ DETAILED VIEW ============ */}
       {activeTab === 'detailed' && (
         <CollapsibleSection title="Time Entries" badge={costAdjustedEntries.length} icon={<Calendar size={16} />}>
+          {/* Inline Filter Bar */}
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <Filter size={14} />
+              <span className="font-medium text-slate-400">Filter:</span>
+            </div>
+            <select
+              value={selectedEmployee}
+              onChange={(e) => setSelectedEmployee(e.target.value)}
+              className={`px-3 py-1.5 bg-white/[0.05] border ${selectedEmployee !== 'all' ? 'border-blue-500/40 ring-1 ring-blue-500/20' : THEME.glassBorder} rounded-lg text-xs text-white transition-colors hover:bg-white/[0.08]`}
+            >
+              <option value="all">All Employees</option>
+              {teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+            <select
+              value={selectedClient}
+              onChange={(e) => setSelectedClient(e.target.value)}
+              className={`px-3 py-1.5 bg-white/[0.05] border ${selectedClient !== 'all' ? 'border-emerald-500/40 ring-1 ring-emerald-500/20' : THEME.glassBorder} rounded-lg text-xs text-white transition-colors hover:bg-white/[0.08]`}
+            >
+              <option value="all">All Clients</option>
+              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <select
+              value={selectedProject}
+              onChange={(e) => setSelectedProject(e.target.value)}
+              className={`px-3 py-1.5 bg-white/[0.05] border ${selectedProject !== 'all' ? 'border-purple-500/40 ring-1 ring-purple-500/20' : THEME.glassBorder} rounded-lg text-xs text-white transition-colors hover:bg-white/[0.08]`}
+            >
+              <option value="all">All Projects</option>
+              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            {(selectedClient !== 'all' || selectedEmployee !== 'all' || selectedProject !== 'all') && (
+              <>
+                <button onClick={() => { setSelectedClient('all'); setSelectedEmployee('all'); setSelectedProject('all') }} className="flex items-center gap-1 px-2 py-1 text-xs text-slate-400 hover:text-white transition-colors">
+                  <X size={12} />Clear all
+                </button>
+                <div className="h-4 w-px bg-white/[0.08]" />
+                <div className="flex items-center gap-1.5">
+                  {selectedEmployee !== 'all' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/15 text-blue-400 rounded text-xs">
+                      <User size={10} />{teamMembers.find(t => t.id === selectedEmployee)?.name}
+                      <button onClick={() => setSelectedEmployee('all')} className="ml-0.5 hover:text-white"><X size={10} /></button>
+                    </span>
+                  )}
+                  {selectedClient !== 'all' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/15 text-emerald-400 rounded text-xs">
+                      <Building2 size={10} />{clients.find(c => c.id === selectedClient)?.name}
+                      <button onClick={() => setSelectedClient('all')} className="ml-0.5 hover:text-white"><X size={10} /></button>
+                    </span>
+                  )}
+                  {selectedProject !== 'all' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-500/15 text-purple-400 rounded text-xs">
+                      <Briefcase size={10} />{projects.find(p => p.id === selectedProject)?.name}
+                      <button onClick={() => setSelectedProject('all')} className="ml-0.5 hover:text-white"><X size={10} /></button>
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
+            <div className="ml-auto text-xs text-slate-500">
+              {costAdjustedEntries.length} {costAdjustedEntries.length !== entries.filter(e => e.date >= dateRange.start && e.date <= dateRange.end).length ? `of ${entries.filter(e => e.date >= dateRange.start && e.date <= dateRange.end).length} ` : ''}entries
+            </div>
+          </div>
+          {/* Legend */}
           <div className="mb-3 flex items-center gap-2">
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <div className="flex items-center gap-1"><Lock size={12} /><span>Actual Hours = cost (contractor submitted)</span></div>
