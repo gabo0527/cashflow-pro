@@ -994,21 +994,25 @@ export default function TeamPage() {
       // Skip if no hours AND no lump sum revenue
       if (totalHours === 0 && !hasLumpSumRevenue) return null
 
-      // Group hours by client
+      // Group hours by client (actual for cost, billable for revenue)
       const hoursByClient: Record<string, number> = {}
+      const billableHoursByClient: Record<string, number> = {}
       memberTime.forEach(t => {
         const clientId = projectClientMap.get(t.project_id) || "unknown"
         hoursByClient[clientId] = (hoursByClient[clientId] || 0) + (t.hours || 0)
+        // Use billable_hours for revenue; fall back to actual hours if not set
+        const bh = t.billable_hours != null ? t.billable_hours : (t.hours || 0)
+        billableHoursByClient[clientId] = (billableHoursByClient[clientId] || 0) + bh
       })
 
       // REVENUE by client
       const revenueByClient: Record<string, number> = {}
       let totalRevenue = 0
       
-      // Hourly revenue from timesheet hours
-      Object.entries(hoursByClient).forEach(([clientId, hours]) => {
+      // Hourly revenue from BILLABLE hours (what client is billed)
+      Object.entries(billableHoursByClient).forEach(([clientId, billableHrs]) => {
         const rc = memberRates.find(r => r.client_id === clientId && r.revenue_type !== "lump_sum")
-        const rev = hours * (rc?.rate || 0)
+        const rev = billableHrs * (rc?.rate || 0)
         revenueByClient[clientId] = (revenueByClient[clientId] || 0) + rev
         totalRevenue += rev
       })
@@ -1021,6 +1025,7 @@ export default function TeamPage() {
         totalRevenue += lsRev
         // Ensure client appears in hoursByClient even with 0 hours
         if (!hoursByClient[r.client_id]) hoursByClient[r.client_id] = 0
+        if (!billableHoursByClient[r.client_id]) billableHoursByClient[r.client_id] = 0
       })
 
       // COST by client — TWO-TIER:
