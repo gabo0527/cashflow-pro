@@ -590,10 +590,7 @@ export default function ContractorPortal() {
                     </button>
                     {!collapsed && (
                       <div className="px-5 pb-4 space-y-2">
-                        {projects.map(p => {
-                          const hours = parseFloat(timeEntries[p.project_id]?.hours || '0')
-                          const hasNotes = !!timeEntries[p.project_id]?.notes
-                          return (
+                        {projects.map(p => (
                             <div key={p.project_id} className="bg-white/[0.03] border border-white/[0.04] rounded-xl p-3.5 transition-all duration-200 hover:border-white/[0.08]">
                               <div className="flex items-center gap-4">
                                 <span className="text-slate-300 text-sm flex-1 min-w-0 truncate">{p.project_name}</span>
@@ -605,15 +602,12 @@ export default function ContractorPortal() {
                                   <span className="text-slate-600 text-xs font-medium w-6">hrs</span>
                                 </div>
                               </div>
-                              {(hours > 0 || hasNotes) && (
-                                <input type="text" placeholder="Add a note..." 
-                                  value={timeEntries[p.project_id]?.notes || ''} 
-                                  onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], notes: e.target.value } }))}
-                                  className="w-full mt-3 px-3.5 py-2 bg-white/[0.02] border border-white/[0.05] rounded-lg text-slate-400 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500/30 transition-all" />
-                              )}
+                              <input type="text" placeholder="What did you work on?" 
+                                value={timeEntries[p.project_id]?.notes || ''} 
+                                onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], notes: e.target.value } }))}
+                                className="w-full mt-3 px-3.5 py-2 bg-white/[0.02] border border-white/[0.05] rounded-lg text-slate-400 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500/30 transition-all" />
                             </div>
-                          )
-                        })}
+                          ))}
                       </div>
                     )}
                   </div>
