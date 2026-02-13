@@ -272,21 +272,25 @@ export default function ContractorPortal() {
     if (!email.trim()) { setError('Please enter your email'); return }
     setLoading(true); setError(null)
     try {
-      const { data: md, error: me } = await supabase.from('team_members').select('id, name, email, cost_type, cost_amount, company_id').ilike('email', email.trim()).single()
-      if (me || !md) { setError('Email not found. Please contact your manager.'); setLoading(false); return }
-      setMember(md)
-
-      const { data: clientsData } = await supabase.from('clients').select('id, name')
-      const cMap: Record<string, string> = {}; (clientsData || []).forEach((c: any) => { cMap[c.id] = c.name })
+      const { data: md, error: me } = await supabase.from('team_members').select('id, name, email, cost_type, cost_amount, company_id').eq('email', email.trim().toLowerCase()).eq('status', 'active').single()
+      if (me || !md) { setError('Email not found. Contact your administrator.'); setLoading(false); return }
 
       const { data: rcData } = await supabase.from('bill_rates').select('team_member_id, client_id, rate, cost_type, cost_amount').eq('team_member_id', md.id).eq('is_active', true)
+      const { data: clientsData } = await supabase.from('clients').select('id, name')
+      const cMap: Record<string, string> = {}; (clientsData || []).forEach((c: any) => { cMap[c.id] = c.name })
       setRateCards((rcData || []).map((r: any) => ({ team_member_id: r.team_member_id, client_id: r.client_id, client_name: cMap[r.client_id] || 'Unknown', cost_type: r.cost_type || 'hourly', cost_amount: r.cost_amount || 0, rate: r.rate || 0 })))
 
+      const { data: pa } = await supabase.from('team_project_assignments').select('project_id, payment_type, rate, bill_rate').eq('team_member_id', md.id).eq('is_active', true)
       const { data: projects } = await supabase.from('projects').select('id, name, client_id, company_id').eq('status', 'active')
       const pMap: Record<string, any> = {}; (projects || []).forEach((p: any) => { pMap[p.id] = p })
-      const { data: pa } = await supabase.from('project_assignments').select('project_id, team_member_id, bill_rate, payment_type, rate').eq('team_member_id', md.id)
       const assigns: Assignment[] = (pa || []).map((a: any) => { const p = pMap[a.project_id]; return { project_id: a.project_id, project_name: p?.name || 'Unknown', client_id: p?.client_id || '', client_name: p?.client_id ? cMap[p.client_id] || '' : '', payment_type: a.payment_type || 'tm', rate: a.bill_rate || a.rate || 0 } }).filter((a: Assignment) => a.project_name !== 'Unknown')
-      setAssignments(assigns)
+
+      // Ensure company_id — fallback to project's company_id if member record is missing it
+      if (!md.company_id && projects && projects.length > 0) {
+        const projectWithCompany = projects.find((p: any) => p.company_id)
+        if (projectWithCompany) md.company_id = projectWithCompany.company_id
+      }
+      setMember(md); setAssignments(assigns)
 
       const init: Record<string, TimeEntryForm> = {}; assigns.forEach(a => { init[a.project_id] = { project_id: a.project_id, hours: '', notes: '' } }); setTimeEntries(init)
 
