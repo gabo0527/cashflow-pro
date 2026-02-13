@@ -39,9 +39,9 @@ const getMonthRange = (date: Date) => {
 }
 
 const EXPENSE_CATEGORIES = [
-  { id: 'travel', label: 'Travel', icon: '✈️' }, { id: 'materials', label: 'Materials', icon: '📦' },
-  { id: 'software', label: 'Software', icon: '💻' }, { id: 'meals', label: 'Meals', icon: '🍽️' },
-  { id: 'equipment', label: 'Equipment', icon: '🔧' }, { id: 'other', label: 'Other', icon: '📋' },
+  { id: 'travel', label: 'Travel' }, { id: 'hotel', label: 'Hotel' },
+  { id: 'meal', label: 'Meal' }, { id: 'transportation', label: 'Transportation' },
+  { id: 'software_equipment', label: 'Software / Equipment' }, { id: 'other', label: 'Other' },
 ]
 const PAYMENT_TERMS = [
   { id: 'DUE_ON_RECEIPT', label: 'Due on Receipt' }, { id: 'NET30', label: 'Net 30' },
@@ -132,6 +132,74 @@ function DropZone({ file, onFile, onRemove, uploading, label, accept }: {
   )
 }
 
+/** Multi-file drop zone for receipts */
+function MultiDropZone({ files, onAddFiles, onRemoveFile, uploading, label, accept }: { 
+  files: File[]; onAddFiles: (f: File[]) => void; onRemoveFile: (i: number) => void; uploading?: boolean; label: string; accept: string 
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [dragging, setDragging] = useState(false)
+
+  const handleDrag = useCallback((e: React.DragEvent) => { e.preventDefault(); e.stopPropagation() }, [])
+  const handleDragIn = useCallback((e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); if (e.dataTransfer.items?.length > 0) setDragging(true) }, [])
+  const handleDragOut = useCallback((e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setDragging(false) }, [])
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation(); setDragging(false)
+    const dropped = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf' || f.type.startsWith('image/'))
+    if (dropped.length > 0) onAddFiles(dropped)
+  }, [onAddFiles])
+
+  return (
+    <div className="space-y-2">
+      <div
+        onDragEnter={handleDragIn} onDragLeave={handleDragOut} onDragOver={handleDrag} onDrop={handleDrop}
+        onClick={() => inputRef.current?.click()}
+        className={`relative cursor-pointer rounded-lg border-2 border-dashed transition-all duration-150 ${
+          dragging ? 'border-emerald-500 bg-emerald-500/10' : 'border-slate-700 bg-slate-800/50 hover:border-slate-500 hover:bg-slate-800'
+        }`}
+      >
+        <div className="flex flex-col items-center justify-center py-4 px-3">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 transition-colors ${dragging ? 'bg-emerald-500/20' : 'bg-slate-700/50'}`}>
+            <Upload size={16} className={dragging ? 'text-emerald-400' : 'text-slate-400'} />
+          </div>
+          <p className={`text-sm font-medium ${dragging ? 'text-emerald-400' : 'text-slate-400'}`}>
+            {dragging ? 'Drop files here' : label}
+          </p>
+          <p className="text-xs text-slate-600 mt-0.5">PDF, JPEG, PNG — multiple files allowed</p>
+        </div>
+        <input ref={inputRef} type="file" accept={accept} multiple className="hidden" onChange={e => {
+          if (e.target.files) {
+            const added = Array.from(e.target.files).filter(f => f.type === 'application/pdf' || f.type.startsWith('image/'))
+            if (added.length > 0) onAddFiles(added)
+          }
+          e.target.value = ''
+        }} />
+      </div>
+      {files.length > 0 && files.map((file, i) => (
+        <div key={i} className="flex items-center gap-3 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg">
+          {file.type.startsWith('image/') ? (
+            <img src={URL.createObjectURL(file)} alt="" className="w-8 h-8 rounded object-cover border border-slate-600" />
+          ) : (
+            <div className="w-8 h-8 rounded bg-rose-500/15 flex items-center justify-center shrink-0">
+              <FileText size={14} className="text-rose-400" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-white text-xs truncate">{file.name}</p>
+            <p className="text-slate-500 text-xs">{file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}</p>
+          </div>
+          {uploading ? (
+            <Loader2 size={14} className="text-emerald-400 animate-spin shrink-0" />
+          ) : (
+            <button onClick={(e) => { e.stopPropagation(); onRemoveFile(i) }} className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-slate-700 transition-colors shrink-0">
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ============ MAIN COMPONENT ============
 export default function ContractorPortal() {
   const [step, setStep] = useState<'email' | 'portal'>('email')
@@ -156,7 +224,7 @@ export default function ContractorPortal() {
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [showExpenseForm, setShowExpenseForm] = useState(false)
   const [expenseForm, setExpenseForm] = useState({ date: new Date().toISOString().split('T')[0], category: 'travel', description: '', amount: '', project_id: '', client_id: '' })
-  const [expenseFile, setExpenseFile] = useState<File | null>(null)
+  const [expenseFiles, setExpenseFiles] = useState<File[]>([])
   const [submittingExpense, setSubmittingExpense] = useState(false)
 
   // Invoices
@@ -232,9 +300,14 @@ export default function ContractorPortal() {
       const cMap: Record<string, string> = {}; (clients || []).forEach((c: any) => { cMap[c.id] = c.name })
       setRateCards((rcData || []).map((r: any) => ({ team_member_id: r.team_member_id, client_id: r.client_id, client_name: cMap[r.client_id] || 'Unknown', cost_type: r.cost_type || 'hourly', cost_amount: r.cost_amount || 0, rate: r.rate || 0 })))
       const { data: pa } = await supabase.from('team_project_assignments').select('project_id, payment_type, rate, bill_rate').eq('team_member_id', md.id).eq('is_active', true)
-      const { data: projects } = await supabase.from('projects').select('id, name, client_id').eq('status', 'active')
+      const { data: projects } = await supabase.from('projects').select('id, name, client_id, company_id').eq('status', 'active')
       const pMap: Record<string, any> = {}; (projects || []).forEach((p: any) => { pMap[p.id] = p })
       const assigns: Assignment[] = (pa || []).map((a: any) => { const p = pMap[a.project_id]; return { project_id: a.project_id, project_name: p?.name || 'Unknown', client_id: p?.client_id || '', client_name: p?.client_id ? cMap[p.client_id] || '' : '', payment_type: a.payment_type || 'tm', rate: a.bill_rate || a.rate || 0 } }).filter((a: Assignment) => a.project_name !== 'Unknown')
+      // Ensure company_id — fallback to project's company_id if member record is missing it
+      if (!md.company_id && projects && projects.length > 0) {
+        const projectWithCompany = projects.find((p: any) => p.company_id)
+        if (projectWithCompany) md.company_id = projectWithCompany.company_id
+      }
       setMember(md); setAssignments(assigns)
       const init: Record<string, TimeEntryForm> = {}; assigns.forEach(a => { init[a.project_id] = { project_id: a.project_id, hours: '', notes: '' } }); setTimeEntries(init)
       setStep('portal')
@@ -276,10 +349,15 @@ export default function ContractorPortal() {
     if (!member) return; setSubmittingExpense(true); setError(null)
     try {
       let receiptUrl: string | null = null
-      if (expenseFile) receiptUrl = await uploadFile(expenseFile, 'expenses', member.id)
-      const { error: ie } = await supabase.from('contractor_expenses').insert({ team_member_id: member.id, date: expenseForm.date, category: expenseForm.category, description: expenseForm.description, amount: parseFloat(expenseForm.amount), project_id: expenseForm.project_id || null, client_id: expenseForm.client_id || null, receipt_url: receiptUrl, status: 'pending' })
+      const receiptUrls: string[] = []
+      for (const f of expenseFiles) {
+        const url = await uploadFile(f, 'expenses', member.id)
+        if (url) receiptUrls.push(url)
+      }
+      if (receiptUrls.length > 0) receiptUrl = receiptUrls.join(',')
+      const { error: ie } = await supabase.from('contractor_expenses').insert({ team_member_id: member.id, date: expenseForm.date, category: expenseForm.category, description: expenseForm.description, amount: parseFloat(expenseForm.amount), project_id: expenseForm.project_id || null, client_id: expenseForm.client_id || null, receipt_url: receiptUrl, is_billable: !!expenseForm.client_id, status: 'pending' })
       if (ie) throw ie
-      setShowExpenseForm(false); setExpenseForm({ date: new Date().toISOString().split('T')[0], category: 'travel', description: '', amount: '', project_id: '', client_id: '' }); setExpenseFile(null)
+      setShowExpenseForm(false); setExpenseForm({ date: new Date().toISOString().split('T')[0], category: 'travel', description: '', amount: '', project_id: '', client_id: '' }); setExpenseFiles([])
       const { data } = await supabase.from('contractor_expenses').select('*').eq('team_member_id', member.id).order('date', { ascending: false }).limit(50); setExpenses(data || [])
     } catch (err: any) { setError(err.message || 'Failed to submit expense') } finally { setSubmittingExpense(false) }
   }
@@ -507,16 +585,22 @@ export default function ContractorPortal() {
               </div>
               {showExpenseForm && (
                 <div className="bg-slate-900 border border-emerald-500/30 rounded-xl p-5 mb-6">
-                  <div className="flex items-center justify-between mb-4"><h2 className="text-white font-medium">New Expense</h2><button onClick={() => { setShowExpenseForm(false); setExpenseFile(null) }} className="text-slate-400 hover:text-white"><X size={18} /></button></div>
+                  <div className="flex items-center justify-between mb-4"><h2 className="text-white font-medium">New Expense</h2><button onClick={() => { setShowExpenseForm(false); setExpenseFiles([]) }} className="text-slate-400 hover:text-white"><X size={18} /></button></div>
                   <div className="grid grid-cols-2 gap-4">
                     <div><label className="block text-xs text-slate-400 mb-1">Date</label><input type="date" value={expenseForm.date} onChange={e => setExpenseForm(p => ({ ...p, date: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div>
-                    <div><label className="block text-xs text-slate-400 mb-1">Category</label><select value={expenseForm.category} onChange={e => setExpenseForm(p => ({ ...p, category: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">{EXPENSE_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}</select></div>
+                    <div><label className="block text-xs text-slate-400 mb-1">Category</label><select value={expenseForm.category} onChange={e => setExpenseForm(p => ({ ...p, category: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">{EXPENSE_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></div>
                     <div><label className="block text-xs text-slate-400 mb-1">Amount</label><input type="number" placeholder="0.00" step="0.01" min="0" value={expenseForm.amount} onChange={e => setExpenseForm(p => ({ ...p, amount: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div>
-                    <div><label className="block text-xs text-slate-400 mb-1">Client</label><select value={expenseForm.client_id} onChange={e => setExpenseForm(p => ({ ...p, client_id: e.target.value, project_id: '' }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"><option value="">Select client</option>{Object.entries(assignmentsByClient).map(([cid, { clientName }]) => <option key={cid} value={cid}>{clientName}</option>)}</select></div>
+                    <div><label className="block text-xs text-slate-400 mb-1">Client</label><select value={expenseForm.client_id} onChange={e => setExpenseForm(p => ({ ...p, client_id: e.target.value, project_id: '' }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"><option value="">No client (general)</option>{Object.entries(assignmentsByClient).map(([cid, { clientName }]) => <option key={cid} value={cid}>{clientName}</option>)}</select></div>
+                    {expenseForm.client_id && (
+                      <div className="col-span-2 flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                        <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                        <span className="text-xs text-emerald-400 font-medium">Billable — this expense will be billed to the client at cost</span>
+                      </div>
+                    )}
                     <div className="col-span-2"><label className="block text-xs text-slate-400 mb-1">Description</label><input type="text" placeholder="What was this expense for?" value={expenseForm.description} onChange={e => setExpenseForm(p => ({ ...p, description: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div>
                     <div className="col-span-2">
-                      <label className="block text-xs text-slate-400 mb-1">Receipt (optional)</label>
-                      <DropZone file={expenseFile} onFile={setExpenseFile} onRemove={() => setExpenseFile(null)} uploading={submittingExpense} label="Drop receipt here" accept="image/*,.pdf" />
+                      <label className="block text-xs text-slate-400 mb-1">Receipts / Documents</label>
+                      <MultiDropZone files={expenseFiles} onAddFiles={(newFiles) => setExpenseFiles(prev => [...prev, ...newFiles])} onRemoveFile={(i) => setExpenseFiles(prev => prev.filter((_, idx) => idx !== i))} uploading={submittingExpense} label="Drop receipts here" accept="image/*,.pdf" />
                     </div>
                   </div>
                   <button onClick={submitExpense} disabled={submittingExpense || !expenseForm.description || !expenseForm.amount} className="w-full mt-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 rounded-xl text-white text-sm font-medium flex items-center justify-center gap-2">
@@ -528,7 +612,7 @@ export default function ContractorPortal() {
                 const cat = EXPENSE_CATEGORIES.find(c => c.id === exp.category); const st = STATUS_STYLES[exp.status] || STATUS_STYLES.pending
                 return (
                   <div key={exp.id} className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 flex items-center gap-3">
-                    <span className="text-lg">{cat?.icon || '📋'}</span>
+                    <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center shrink-0"><Receipt size={14} className="text-slate-400" /></div>
                     <div className="flex-1 min-w-0"><p className="text-white text-sm font-medium truncate">{exp.description}</p><div className="flex items-center gap-2 text-slate-500 text-xs"><span>{formatDate(exp.date)}</span><span>·</span><span>{cat?.label || exp.category}</span>{exp.receipt_url && <><span>·</span><Paperclip size={10} className="text-blue-400" /></>}</div></div>
                     <span className="text-white font-medium text-sm">{formatCurrency(exp.amount)}</span>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${st.bg} ${st.text}`}>{exp.status}</span>
@@ -597,7 +681,7 @@ export default function ContractorPortal() {
                   {/* Timesheet reference */}
                   {invoiceDistribution.length > 0 ? (
                     <div className="mb-4">
-                      <p className="text-xs text-slate-500 mb-2">📋 Timesheet reference for {billingMonth.label}:</p>
+                      <p className="text-xs text-slate-500 mb-2">Timesheet reference for {billingMonth.label}:</p>
                       <div className="bg-slate-800/30 rounded-lg overflow-hidden">
                         <table className="w-full text-sm">
                           <thead><tr className="text-slate-600 text-xs">
