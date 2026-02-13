@@ -1,9 +1,15 @@
 'use client'
 
 import React, { useState, useMemo, forwardRef, useImperativeHandle } from 'react'
+import { createClient } from '@supabase/supabase-js'
 import {
   Search, ChevronDown, ChevronUp, Trash2, Receipt, Plus, X
 } from 'lucide-react'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://jmahfgpbtjeomuepfozf.supabase.co',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptYWhmZ3BidGplb211ZXBmb3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0OTAxNzcsImV4cCI6MjA4MTA2NjE3N30.3SVDvWCGIYYHV57BpKjpDJVCZLKzuRv8B_VietQDxUQ'
+)
 import {
   THEME, EXPENSE_CATEGORIES, getCategoryConfig, getSubcategoryConfig,
   formatCurrency, formatDateShort, 
@@ -332,6 +338,16 @@ const ExpensesSection = forwardRef<ExpensesSectionHandle, ExpensesSectionProps>(
 ExpensesSection.displayName = 'ExpensesSection'
 export default ExpensesSection
 
+// Simplified expense types for quick entry
+const QUICK_EXPENSE_TYPES = [
+  { id: 'travel', label: 'Travel', category: 'overhead', subcategory: 'travel' },
+  { id: 'hotel', label: 'Hotel', category: 'overhead', subcategory: 'travel' },
+  { id: 'meal', label: 'Meal', category: 'personal', subcategory: 'meals' },
+  { id: 'transportation', label: 'Transportation', category: 'personal', subcategory: 'vehicle' },
+  { id: 'software_equipment', label: 'Software / Equipment', category: 'overhead', subcategory: 'software' },
+  { id: 'other', label: 'Other', category: 'overhead', subcategory: 'otherOverhead' },
+] as const
+
 // Add Expense Modal
 function AddExpenseModal({ onClose, projects, teamMembers, onSave }: {
   onClose: () => void
@@ -339,139 +355,204 @@ function AddExpenseModal({ onClose, projects, teamMembers, onSave }: {
   teamMembers: any[]
   onSave: (expense: any) => void
 }) {
-  const [category, setCategory] = useState<keyof typeof EXPENSE_CATEGORIES>('overhead')
-  const [subcategory, setSubcategory] = useState('software')
+  const [expenseType, setExpenseType] = useState('travel')
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [description, setDescription] = useState('')
   const [vendor, setVendor] = useState('')
   const [projectId, setProjectId] = useState('')
   const [status, setStatus] = useState<'paid' | 'pending'>('paid')
+  const [files, setFiles] = useState<File[]>([])
+  const [uploading, setUploading] = useState(false)
 
-  const handleCategoryChange = (newCategory: string) => {
-    const cat = newCategory as keyof typeof EXPENSE_CATEGORIES
-    setCategory(cat)
-    setSubcategory(EXPENSE_CATEGORIES[cat].subcategories[0].id)
+  const selectedType = QUICK_EXPENSE_TYPES.find(t => t.id === expenseType) || QUICK_EXPENSE_TYPES[0]
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files).filter(f => 
+        f.type === 'application/pdf' || f.type.startsWith('image/')
+      )
+      setFiles(prev => [...prev, ...newFiles])
+    }
+    // Reset input so same file can be selected again
+    e.target.value = ''
   }
 
-  const handleSave = () => {
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    const droppedFiles = Array.from(e.dataTransfer.files).filter(f => 
+      f.type === 'application/pdf' || f.type.startsWith('image/')
+    )
+    setFiles(prev => [...prev, ...droppedFiles])
+  }
+
+  const removeFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  const handleSave = async () => {
+    if (!amount || (!description && expenseType !== 'other')) return
+
+    setUploading(true)
+    
+    // Upload files to Supabase storage if any
+    const uploadedUrls: string[] = []
+    for (const file of files) {
+      try {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${fileExt}`
+        const filePath = `expenses/${fileName}`
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('Receipts')
+          .upload(filePath, file)
+        
+        if (!uploadError && uploadData) {
+          uploadedUrls.push(filePath)
+        }
+      } catch (err) {
+        console.error('File upload error:', err)
+      }
+    }
+
     onSave({
-      category,
-      subcategory,
+      category: selectedType.category,
+      subcategory: selectedType.subcategory,
+      expense_type: expenseType,
       amount: parseFloat(amount) || 0,
       date,
-      description,
+      description: expenseType === 'other' ? description : description,
       vendor,
       project_id: projectId || null,
-      status
+      status,
+      receipt_urls: uploadedUrls.length > 0 ? uploadedUrls : null,
     })
+    setUploading(false)
     onClose()
   }
 
-  const currentCategory = EXPENSE_CATEGORIES[category]
-
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-2xl w-full max-w-lg mx-4 overflow-hidden shadow-2xl`}>
-        <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder}`}>
+      <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-2xl w-full max-w-lg mx-4 overflow-hidden shadow-2xl max-h-[90vh] flex flex-col`}>
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder} shrink-0`}>
           <div>
-            <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>Add Expense</h3>
-            <p className={`text-xs ${THEME.textDim} mt-0.5`}>Track business and personal expenses</p>
+            <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>New Expense</h3>
+            <p className={`text-xs ${THEME.textDim} mt-0.5`}>Submit and track expense reports</p>
           </div>
           <button onClick={onClose} className="p-1.5 hover:bg-white/[0.05] rounded-lg transition-colors">
             <X size={20} className={THEME.textMuted} />
           </button>
         </div>
 
-        <div className="p-6 space-y-5">
-          {/* Category Selection */}
-          <div>
-            <label className={`block text-sm font-medium ${THEME.textMuted} mb-2`}>Category</label>
-            <div className="grid grid-cols-4 gap-2">
-              {Object.values(EXPENSE_CATEGORIES).map(cat => (
-                <button 
-                  key={cat.id}
-                  onClick={() => handleCategoryChange(cat.id)}
-                  className={`py-2.5 px-3 rounded-lg text-xs font-medium transition-colors ${
-                    category === cat.id 
-                      ? `${cat.bgClass} ${cat.textClass} border ${cat.borderClass}` 
-                      : 'bg-white/[0.05] text-slate-400 border border-transparent hover:bg-white/[0.08]'
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-            <p className={`text-xs ${THEME.textDim} mt-2`}>{currentCategory.description}</p>
-          </div>
-
-          {/* Subcategory */}
-          <div>
-            <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Type</label>
-            <select 
-              value={subcategory} 
-              onChange={(e) => setSubcategory(e.target.value)}
-              className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
-            >
-              {currentCategory.subcategories.map(sub => (
-                <option key={sub.id} value={sub.id} className="bg-slate-900">{sub.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Amount & Date */}
+        <div className="p-6 space-y-5 overflow-y-auto flex-1">
+          {/* Date & Category Row */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Amount <span className="text-rose-400">*</span></label>
-              <div className="relative">
-                <span className={`absolute left-3 top-1/2 -translate-y-1/2 ${THEME.textDim}`}>$</span>
-                <input 
-                  type="number" 
-                  value={amount} 
-                  onChange={(e) => setAmount(e.target.value)} 
-                  placeholder="0.00"
-                  className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg pl-7 pr-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30" 
-                />
-              </div>
-            </div>
             <div>
               <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Date</label>
               <input 
                 type="date" 
                 value={date} 
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer" 
+                className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30" 
+              />
+            </div>
+            <div>
+              <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Category</label>
+              <select 
+                value={expenseType} 
+                onChange={(e) => setExpenseType(e.target.value)}
+                className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
+              >
+                {QUICK_EXPENSE_TYPES.map(t => (
+                  <option key={t.id} value={t.id} className="bg-slate-900">{t.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Amount */}
+          <div>
+            <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Amount <span className="text-rose-400">*</span></label>
+            <div className="relative">
+              <span className={`absolute left-3 top-1/2 -translate-y-1/2 ${THEME.textDim}`}>$</span>
+              <input 
+                type="number" 
+                value={amount} 
+                onChange={(e) => setAmount(e.target.value)} 
+                placeholder="0.00"
+                className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg pl-7 pr-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30" 
               />
             </div>
           </div>
 
           {/* Description */}
           <div>
-            <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Description <span className="text-rose-400">*</span></label>
+            <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>
+              Description {expenseType === 'other' && <span className="text-rose-400">*</span>}
+            </label>
             <input 
               type="text" 
               value={description} 
               onChange={(e) => setDescription(e.target.value)} 
-              placeholder="What was this expense for?"
+              placeholder={expenseType === 'other' ? 'Describe the expense...' : 'What was this expense for?'}
               className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30" 
             />
           </div>
 
-          {/* Vendor */}
+          {/* File Upload — Multi-file (PDF, JPEG, PNG) */}
           <div>
-            <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Vendor / Payee</label>
-            <input 
-              type="text" 
-              value={vendor} 
-              onChange={(e) => setVendor(e.target.value)} 
-              placeholder="Who did you pay?"
-              className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30" 
-            />
+            <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Receipts / Documents</label>
+            <div 
+              onDrop={handleDrop}
+              onDragOver={(e) => e.preventDefault()}
+              className={`border-2 border-dashed ${files.length > 0 ? 'border-emerald-500/30' : 'border-white/[0.1]'} rounded-lg p-4 text-center transition-colors hover:border-white/[0.2]`}
+            >
+              <input 
+                type="file" 
+                id="receipt-upload"
+                onChange={handleFileChange}
+                accept=".pdf,.jpg,.jpeg,.png"
+                multiple
+                className="hidden"
+              />
+              <label htmlFor="receipt-upload" className="cursor-pointer">
+                <Receipt size={24} className={`mx-auto ${THEME.textDim} mb-2`} />
+                <p className={`text-sm ${THEME.textMuted}`}>Drop files here or <span className="text-emerald-400 hover:underline">browse</span></p>
+                <p className={`text-xs ${THEME.textDim} mt-1`}>PDF, JPEG, PNG — multiple files allowed</p>
+              </label>
+            </div>
+            {/* File List */}
+            {files.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                {files.map((file, i) => (
+                  <div key={i} className="flex items-center justify-between py-1.5 px-3 bg-white/[0.03] rounded-lg">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                        file.type === 'application/pdf' ? 'bg-rose-500/15 text-rose-400' : 'bg-blue-500/15 text-blue-400'
+                      }`}>
+                        {file.type === 'application/pdf' ? 'PDF' : 'IMG'}
+                      </span>
+                      <span className={`text-sm ${THEME.textSecondary} truncate`}>{file.name}</span>
+                      <span className={`text-xs ${THEME.textDim} shrink-0`}>{formatFileSize(file.size)}</span>
+                    </div>
+                    <button onClick={() => removeFile(i)} className="p-1 hover:bg-white/[0.05] rounded transition-colors shrink-0">
+                      <X size={14} className={THEME.textDim} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Project */}
+          {/* Project (optional) */}
           <div>
-            <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Project</label>
+            <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Project <span className={THEME.textDim}>(optional)</span></label>
             <select 
               value={projectId} 
               onChange={(e) => setProjectId(e.target.value)}
@@ -480,7 +561,6 @@ function AddExpenseModal({ onClose, projects, teamMembers, onSave }: {
               <option value="" className="bg-slate-900">No project (general expense)</option>
               {projects.map(p => <option key={p.id} value={p.id} className="bg-slate-900">{p.name}</option>)}
             </select>
-            <p className={`text-xs ${THEME.textDim} mt-1.5`}>Project-linked expenses auto-associate with the client</p>
           </div>
 
           {/* Status */}
@@ -507,16 +587,16 @@ function AddExpenseModal({ onClose, projects, teamMembers, onSave }: {
           </div>
         </div>
 
-        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
+        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-white/[0.02] shrink-0`}>
           <button onClick={onClose} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white transition-colors`}>
             Cancel
           </button>
           <button 
             onClick={handleSave}
-            disabled={!amount || !description}
+            disabled={!amount || (expenseType === 'other' && !description) || uploading}
             className="px-5 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-emerald-500/20"
           >
-            Add Expense
+            {uploading ? 'Uploading...' : 'Submit Expense'}
           </button>
         </div>
       </div>
