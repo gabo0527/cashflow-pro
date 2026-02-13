@@ -559,11 +559,17 @@ export default function ContractorPortal() {
                         <div className="flex items-center gap-3"><span className="text-slate-400 text-sm">{ch > 0 ? `${ch}h` : ''}</span>{collapsed ? <ChevronDown size={16} className="text-slate-500" /> : <ChevronUp size={16} className="text-slate-500" />}</div>
                       </button>
                       {!collapsed && <div className="px-4 pb-3 space-y-2">{projects.map(p => (
-                        <div key={p.project_id} className="flex items-center gap-3 bg-slate-800/50 rounded-lg px-3 py-2.5">
-                          <span className="text-slate-300 text-sm flex-1 min-w-0 truncate">{p.project_name}</span>
-                          <input type="number" placeholder="0" min="0" step="0.5" value={timeEntries[p.project_id]?.hours || ''} onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], hours: e.target.value } }))}
-                            className="w-20 px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                          <span className="text-slate-500 text-xs w-6">hrs</span>
+                        <div key={p.project_id} className="bg-slate-800/50 rounded-lg px-3 py-2.5">
+                          <div className="flex items-center gap-3">
+                            <span className="text-slate-300 text-sm flex-1 min-w-0 truncate">{p.project_name}</span>
+                            <input type="number" placeholder="0" min="0" step="0.5" value={timeEntries[p.project_id]?.hours || ''} onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], hours: e.target.value } }))}
+                              className="w-20 px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                            <span className="text-slate-500 text-xs w-6">hrs</span>
+                          </div>
+                          {(parseFloat(timeEntries[p.project_id]?.hours || '0') > 0 || timeEntries[p.project_id]?.notes) && (
+                            <input type="text" placeholder="Notes (optional)" value={timeEntries[p.project_id]?.notes || ''} onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], notes: e.target.value } }))}
+                              className="w-full mt-2 px-3 py-1.5 bg-slate-700/50 border border-slate-600/50 rounded-lg text-slate-300 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                          )}
                         </div>
                       ))}</div>}
                     </div>
