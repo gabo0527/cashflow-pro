@@ -327,7 +327,9 @@ const ExpensesSection = forwardRef<ExpensesSectionHandle, ExpensesSectionProps>(
         <AddExpenseModal 
           onClose={() => setShowAddModal(false)} 
           projects={projects}
+          clients={clients}
           teamMembers={teamMembers}
+          companyId={companyId}
           onSave={onAddExpense} 
         />
       )}
@@ -359,10 +361,12 @@ const TYPE_TO_SUBCATEGORY: Record<string, { direct: string; overhead: string }> 
 }
 
 // Add Expense Modal
-function AddExpenseModal({ onClose, projects, teamMembers, onSave }: {
+function AddExpenseModal({ onClose, projects, clients, teamMembers, companyId, onSave }: {
   onClose: () => void
   projects: any[]
+  clients: any[]
   teamMembers: any[]
+  companyId: string | null
   onSave: (expense: any) => void
 }) {
   const [expenseType, setExpenseType] = useState('travel')
@@ -376,11 +380,29 @@ function AddExpenseModal({ onClose, projects, teamMembers, onSave }: {
   const [files, setFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
 
-  // Auto-toggle billable when project is selected/cleared
+  // Find the internal/company client (Mano CG)
+  const getClientForProject = (pid: string) => {
+    const project = projects.find((p: any) => p.id === pid)
+    if (!project) return null
+    return clients.find((c: any) => c.id === project.client_id) || null
+  }
+
+  const isInternalClient = (client: any) => {
+    if (!client) return false
+    const name = (client.name || '').toLowerCase()
+    // Match company's own entity — Mano CG, Mano Consulting, etc.
+    return name.includes('mano') || name.includes('internal') || name.includes('overhead')
+  }
+
+  const selectedClient = projectId ? getClientForProject(projectId) : null
+
+  // Auto-toggle billable when project changes
   const handleProjectChange = (val: string) => {
     setProjectId(val)
-    if (val) setBillable(true)
-    else setBillable(false)
+    if (!val) { setBillable(false); return }
+    const client = getClientForProject(val)
+    // Internal client (Mano CG) → overhead, external client → billable
+    setBillable(!isInternalClient(client))
   }
 
   // Derive accounting category from billable flag
@@ -578,33 +600,50 @@ function AddExpenseModal({ onClose, projects, teamMembers, onSave }: {
 
           {/* Project & Billable */}
           <div>
-            <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Project <span className={THEME.textDim}>(optional)</span></label>
+            <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Project</label>
             <select 
               value={projectId} 
               onChange={(e) => handleProjectChange(e.target.value)}
               className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
             >
-              <option value="" className="bg-slate-900">No project (general expense)</option>
-              {projects.map(p => <option key={p.id} value={p.id} className="bg-slate-900">{p.name}</option>)}
+              <option value="" className="bg-slate-900">No project</option>
+              {projects.map(p => {
+                const cl = clients.find((c: any) => c.id === p.client_id)
+                return <option key={p.id} value={p.id} className="bg-slate-900">{p.name}{cl ? ` (${cl.name})` : ''}</option>
+              })}
             </select>
           </div>
 
-          {/* Billable Toggle */}
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-sm font-medium ${THEME.textMuted}`}>Billable to client</p>
-              <p className={`text-xs ${THEME.textDim} mt-0.5`}>
-                {billable ? 'Direct Cost — hits Gross Margin' : 'Overhead — general operating expense'}
-              </p>
+          {/* Billable Indicator — auto-derived from client */}
+          {projectId && (
+            <div className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${
+              billable 
+                ? 'bg-emerald-500/10 border-emerald-500/20' 
+                : 'bg-amber-500/10 border-amber-500/20'
+            }`}>
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${billable ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                <div>
+                  <span className={`text-xs font-medium ${billable ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {billable ? 'Direct Cost' : 'Overhead'} — {selectedClient?.name || 'Unknown'}
+                  </span>
+                  <p className={`text-xs ${THEME.textDim} mt-0.5`}>
+                    {billable ? 'Billable to client at cost → hits Gross Margin' : 'Company expense → Operating Costs'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setBillable(!billable)}
+                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                  billable 
+                    ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30' 
+                    : 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'
+                }`}
+              >
+                Override
+              </button>
             </div>
-            <button
-              onClick={() => setBillable(!billable)}
-              className={`relative w-11 h-6 rounded-full transition-colors ${billable ? 'bg-emerald-500' : 'bg-white/[0.1]'}`}
-            >
-              <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${billable ? 'translate-x-5.5 left-auto right-0.5' : 'left-0.5'}`} 
-                style={{ transform: billable ? 'translateX(22px)' : 'translateX(0)' }} />
-            </button>
-          </div>
+          )}
 
           {/* Status */}
           <div>
