@@ -355,7 +355,10 @@ export default function ContractorPortal() {
         if (url) receiptUrls.push(url)
       }
       if (receiptUrls.length > 0) receiptUrl = receiptUrls.join(',')
-      const { error: ie } = await supabase.from('contractor_expenses').insert({ team_member_id: member.id, date: expenseForm.date, category: expenseForm.category, description: expenseForm.description, amount: parseFloat(expenseForm.amount), project_id: expenseForm.project_id || null, client_id: expenseForm.client_id || null, receipt_url: receiptUrl, is_billable: !!expenseForm.client_id, status: 'pending' })
+      const clientName = expenseForm.client_id ? (assignmentsByClient[expenseForm.client_id]?.clientName || '') : ''
+      const isInternal = clientName.toLowerCase().includes('mano') || clientName.toLowerCase().includes('internal') || clientName.toLowerCase().includes('overhead')
+      const isBillable = !!expenseForm.client_id && !isInternal
+      const { error: ie } = await supabase.from('contractor_expenses').insert({ team_member_id: member.id, date: expenseForm.date, category: expenseForm.category, description: expenseForm.description, amount: parseFloat(expenseForm.amount), project_id: expenseForm.project_id || null, client_id: expenseForm.client_id || null, receipt_url: receiptUrl, is_billable: isBillable, status: 'pending' })
       if (ie) throw ie
       setShowExpenseForm(false); setExpenseForm({ date: new Date().toISOString().split('T')[0], category: 'travel', description: '', amount: '', project_id: '', client_id: '' }); setExpenseFiles([])
       const { data } = await supabase.from('contractor_expenses').select('*').eq('team_member_id', member.id).order('date', { ascending: false }).limit(50); setExpenses(data || [])
@@ -591,12 +594,18 @@ export default function ContractorPortal() {
                     <div><label className="block text-xs text-slate-400 mb-1">Category</label><select value={expenseForm.category} onChange={e => setExpenseForm(p => ({ ...p, category: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">{EXPENSE_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></div>
                     <div><label className="block text-xs text-slate-400 mb-1">Amount</label><input type="number" placeholder="0.00" step="0.01" min="0" value={expenseForm.amount} onChange={e => setExpenseForm(p => ({ ...p, amount: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div>
                     <div><label className="block text-xs text-slate-400 mb-1">Client</label><select value={expenseForm.client_id} onChange={e => setExpenseForm(p => ({ ...p, client_id: e.target.value, project_id: '' }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"><option value="">No client (general)</option>{Object.entries(assignmentsByClient).map(([cid, { clientName }]) => <option key={cid} value={cid}>{clientName}</option>)}</select></div>
-                    {expenseForm.client_id && (
-                      <div className="col-span-2 flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                        <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                        <span className="text-xs text-emerald-400 font-medium">Billable — this expense will be billed to the client at cost</span>
-                      </div>
-                    )}
+                    {expenseForm.client_id && (() => {
+                      const cName = assignmentsByClient[expenseForm.client_id]?.clientName || ''
+                      const isInternal = cName.toLowerCase().includes('mano') || cName.toLowerCase().includes('internal') || cName.toLowerCase().includes('overhead')
+                      return (
+                        <div className={`col-span-2 flex items-center gap-2 px-3 py-2 rounded-lg border ${isInternal ? 'bg-amber-500/10 border-amber-500/20' : 'bg-emerald-500/10 border-emerald-500/20'}`}>
+                          <div className={`w-2 h-2 rounded-full ${isInternal ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+                          <span className={`text-xs font-medium ${isInternal ? 'text-amber-400' : 'text-emerald-400'}`}>
+                            {isInternal ? 'Overhead — company operating expense' : 'Billable — this expense will be billed to the client at cost'}
+                          </span>
+                        </div>
+                      )
+                    })()}
                     <div className="col-span-2"><label className="block text-xs text-slate-400 mb-1">Description</label><input type="text" placeholder="What was this expense for?" value={expenseForm.description} onChange={e => setExpenseForm(p => ({ ...p, description: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div>
                     <div className="col-span-2">
                       <label className="block text-xs text-slate-400 mb-1">Receipts / Documents</label>
