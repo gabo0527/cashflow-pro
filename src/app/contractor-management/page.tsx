@@ -90,13 +90,17 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; i
   paid: { label: 'Paid', bg: 'bg-emerald-500/15', text: 'text-emerald-300', icon: DollarSign },
 }
 
-const EXPENSE_CATEGORIES: Record<string, { label: string; icon: string }> = {
-  travel: { label: 'Travel', icon: '✈️' },
-  materials: { label: 'Materials', icon: '📦' },
-  software: { label: 'Software', icon: '💻' },
-  meals: { label: 'Meals', icon: '🍽️' },
-  equipment: { label: 'Equipment', icon: '🔧' },
-  other: { label: 'Other', icon: '📋' },
+const EXPENSE_CATEGORIES: Record<string, { label: string }> = {
+  travel: { label: 'Travel' },
+  hotel: { label: 'Hotel' },
+  meal: { label: 'Meal' },
+  transportation: { label: 'Transportation' },
+  software_equipment: { label: 'Software / Equipment' },
+  materials: { label: 'Materials' },
+  software: { label: 'Software' },
+  meals: { label: 'Meals' },
+  equipment: { label: 'Equipment' },
+  other: { label: 'Other' },
 }
 
 // ============ STATUS BADGE ============
@@ -337,9 +341,21 @@ export default function ContractorManagement() {
     setProcessing(null)
   }
 
-  const openPreview = (path: string) => {
-    const { data } = supabase.storage.from('contractor-uploads').getPublicUrl(path)
-    if (data?.publicUrl) setPreviewUrl(data.publicUrl)
+  const openPreview = async (path: string) => {
+    // Handle comma-separated paths from multi-file uploads — show first file
+    const firstPath = path.split(',')[0].trim()
+    // Try signed URL first (works for both public and private buckets)
+    const { data, error } = await supabase.storage.from('contractor-uploads').createSignedUrl(firstPath, 3600)
+    if (data?.signedUrl) { setPreviewUrl(data.signedUrl); return }
+    // Fallback: try public bucket
+    const { data: d2, error: e2 } = await supabase.storage.from('public').createSignedUrl(firstPath, 3600)
+    if (d2?.signedUrl) { setPreviewUrl(d2.signedUrl); return }
+    // Fallback: try Receipts bucket
+    const { data: d3 } = await supabase.storage.from('Receipts').createSignedUrl(firstPath, 3600)
+    if (d3?.signedUrl) { setPreviewUrl(d3.signedUrl); return }
+    // Last resort: getPublicUrl
+    const { data: d4 } = supabase.storage.from('contractor-uploads').getPublicUrl(firstPath)
+    if (d4?.publicUrl) setPreviewUrl(d4.publicUrl)
   }
 
   // ============ RENDER ============
@@ -641,14 +657,19 @@ export default function ContractorManagement() {
                   </div>
                   <span className="text-slate-300 text-sm truncate">{memberMap[exp.team_member_id] || '—'}</span>
                   <span className="text-slate-400 text-xs">{formatDate(exp.date)}</span>
-                  <span className="text-xs">{cat.icon} {cat.label}</span>
+                  <span className="text-xs text-slate-400">{cat.label}</span>
                   <span className="text-white text-sm font-medium text-right">{formatCurrency(exp.amount)}</span>
                   <StatusBadge status={exp.status} />
                   <div className="flex items-center gap-1.5">
-                    {exp.receipt_url && (
-                      <button onClick={() => openPreview(exp.receipt_url!)}
-                        className="p-1 rounded text-blue-400 hover:text-blue-300"><Eye size={12} /></button>
-                    )}
+                    {exp.receipt_url && (() => {
+                      const files = exp.receipt_url!.split(',').filter(Boolean)
+                      return (
+                        <button onClick={() => openPreview(exp.receipt_url!)}
+                          className="p-1 rounded text-blue-400 hover:text-blue-300 flex items-center gap-1">
+                          <Eye size={12} />{files.length > 1 && <span className="text-xs">{files.length}</span>}
+                        </button>
+                      )
+                    })()}
                     {exp.status === 'pending' && (
                       <>
                         <button onClick={() => updateExpenseStatus(exp.id, 'approved')} disabled={isProcessing}
