@@ -338,15 +338,25 @@ const ExpensesSection = forwardRef<ExpensesSectionHandle, ExpensesSectionProps>(
 ExpensesSection.displayName = 'ExpensesSection'
 export default ExpensesSection
 
-// Simplified expense types for quick entry
+// Simplified expense types — "what" the expense is
 const QUICK_EXPENSE_TYPES = [
-  { id: 'travel', label: 'Travel', category: 'overhead', subcategory: 'travel' },
-  { id: 'hotel', label: 'Hotel', category: 'overhead', subcategory: 'travel' },
-  { id: 'meal', label: 'Meal', category: 'personal', subcategory: 'meals' },
-  { id: 'transportation', label: 'Transportation', category: 'personal', subcategory: 'vehicle' },
-  { id: 'software_equipment', label: 'Software / Equipment', category: 'overhead', subcategory: 'software' },
-  { id: 'other', label: 'Other', category: 'overhead', subcategory: 'otherOverhead' },
+  { id: 'travel', label: 'Travel' },
+  { id: 'hotel', label: 'Hotel' },
+  { id: 'meal', label: 'Meal' },
+  { id: 'transportation', label: 'Transportation' },
+  { id: 'software_equipment', label: 'Software / Equipment' },
+  { id: 'other', label: 'Other' },
 ] as const
+
+// Map expense type → accounting subcategory (for P&L)
+const TYPE_TO_SUBCATEGORY: Record<string, { direct: string; overhead: string }> = {
+  travel: { direct: 'projectExpense', overhead: 'travel' },
+  hotel: { direct: 'projectExpense', overhead: 'travel' },
+  meal: { direct: 'projectExpense', overhead: 'travel' },
+  transportation: { direct: 'projectExpense', overhead: 'travel' },
+  software_equipment: { direct: 'equipment', overhead: 'software' },
+  other: { direct: 'projectExpense', overhead: 'otherOverhead' },
+}
 
 // Add Expense Modal
 function AddExpenseModal({ onClose, projects, teamMembers, onSave }: {
@@ -361,11 +371,24 @@ function AddExpenseModal({ onClose, projects, teamMembers, onSave }: {
   const [description, setDescription] = useState('')
   const [vendor, setVendor] = useState('')
   const [projectId, setProjectId] = useState('')
+  const [billable, setBillable] = useState(false)
   const [status, setStatus] = useState<'paid' | 'pending'>('paid')
   const [files, setFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
 
-  const selectedType = QUICK_EXPENSE_TYPES.find(t => t.id === expenseType) || QUICK_EXPENSE_TYPES[0]
+  // Auto-toggle billable when project is selected/cleared
+  const handleProjectChange = (val: string) => {
+    setProjectId(val)
+    if (val) setBillable(true)
+    else setBillable(false)
+  }
+
+  // Derive accounting category from billable flag
+  const getAccountingCategory = () => {
+    const sub = TYPE_TO_SUBCATEGORY[expenseType] || TYPE_TO_SUBCATEGORY.other
+    if (billable) return { category: 'directCosts', subcategory: sub.direct }
+    return { category: 'overhead', subcategory: sub.overhead }
+  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -421,15 +444,18 @@ function AddExpenseModal({ onClose, projects, teamMembers, onSave }: {
       }
     }
 
+    const { category, subcategory } = getAccountingCategory()
+
     onSave({
-      category: selectedType.category,
-      subcategory: selectedType.subcategory,
+      category,
+      subcategory,
       expense_type: expenseType,
       amount: parseFloat(amount) || 0,
       date,
-      description: expenseType === 'other' ? description : description,
+      description,
       vendor,
       project_id: projectId || null,
+      is_billable: billable,
       status,
       receipt_urls: uploadedUrls.length > 0 ? uploadedUrls : null,
     })
@@ -550,17 +576,34 @@ function AddExpenseModal({ onClose, projects, teamMembers, onSave }: {
             )}
           </div>
 
-          {/* Project (optional) */}
+          {/* Project & Billable */}
           <div>
             <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Project <span className={THEME.textDim}>(optional)</span></label>
             <select 
               value={projectId} 
-              onChange={(e) => setProjectId(e.target.value)}
+              onChange={(e) => handleProjectChange(e.target.value)}
               className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
             >
               <option value="" className="bg-slate-900">No project (general expense)</option>
               {projects.map(p => <option key={p.id} value={p.id} className="bg-slate-900">{p.name}</option>)}
             </select>
+          </div>
+
+          {/* Billable Toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className={`text-sm font-medium ${THEME.textMuted}`}>Billable to client</p>
+              <p className={`text-xs ${THEME.textDim} mt-0.5`}>
+                {billable ? 'Direct Cost — hits Gross Margin' : 'Overhead — general operating expense'}
+              </p>
+            </div>
+            <button
+              onClick={() => setBillable(!billable)}
+              className={`relative w-11 h-6 rounded-full transition-colors ${billable ? 'bg-emerald-500' : 'bg-white/[0.1]'}`}
+            >
+              <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${billable ? 'translate-x-5.5 left-auto right-0.5' : 'left-0.5'}`} 
+                style={{ transform: billable ? 'translateX(22px)' : 'translateX(0)' }} />
+            </button>
           </div>
 
           {/* Status */}
