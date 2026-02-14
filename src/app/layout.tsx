@@ -7,8 +7,19 @@ import { headers } from 'next/headers'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Vantage | Financial Analytics',
+  title: 'VantageFP | Financial Operations',
   description: 'Financial operating system for project-based businesses',
+  metadataBase: new URL('https://vantagefp.co'),
+  openGraph: {
+    title: 'VantageFP | Financial Operations',
+    description: 'Financial operating system for project-based businesses',
+    url: 'https://vantagefp.co',
+    siteName: 'VantageFP',
+    type: 'website',
+  },
+  icons: {
+    icon: '/favicon.ico',
+  },
 }
 
 export default async function RootLayout({
