@@ -18,11 +18,15 @@ const supabase = createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptYWhmZ3BidGplb211ZXBmb3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0OTAxNzcsImV4cCI6MjA4MTA2NjE3N30.3SVDvWCGIYYHV57BpKjpDJVCZLKzuRv8B_VietQDxUQ'
 )
 
-// ============ THEME (matching existing pages) ============
+// ============ THEME (institutional — matches Time Tracking) ============
 const THEME = {
-  glass: 'bg-slate-900/70 backdrop-blur-xl',
-  glassBorder: 'border-white/[0.08]',
-  glassHover: 'hover:bg-white/[0.05] hover:border-white/[0.12]',
+  card: 'bg-[#111827] border-slate-800/80',
+  cardHover: 'hover:bg-slate-800/40',
+  border: 'border-slate-800/80',
+  textPrimary: 'text-white',
+  textSecondary: 'text-slate-300',
+  textMuted: 'text-slate-400',
+  textDim: 'text-slate-500',
 }
 
 // ============ TYPES ============
@@ -35,7 +39,7 @@ interface ContractorInvoice {
   period_start: string
   period_end: string
   total_amount: number
-  status: string // submitted, approved, rejected, paid
+  status: string
   payment_terms: string
   receipt_url: string | null
   notes: string | null
@@ -67,7 +71,7 @@ interface ContractorExpense {
   description: string
   amount: number
   receipt_url: string | null
-  status: string // pending, approved, rejected, paid
+  status: string
   submitted_at: string
   reviewed_at: string | null
   notes: string | null
@@ -82,12 +86,12 @@ const formatCurrency = (v: number) => new Intl.NumberFormat('en-US', { style: 'c
 const formatDate = (d: string) => { if (!d) return '—'; return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
 const formatDateCompact = (d: string) => { if (!d) return '—'; return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }
 
-const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; icon: any }> = {
-  submitted: { label: 'Submitted', bg: 'bg-blue-500/10', text: 'text-blue-400', icon: Clock },
-  pending: { label: 'Pending', bg: 'bg-amber-500/10', text: 'text-amber-400', icon: Clock },
-  approved: { label: 'Approved', bg: 'bg-emerald-500/10', text: 'text-emerald-400', icon: CheckCircle },
-  rejected: { label: 'Rejected', bg: 'bg-red-500/10', text: 'text-red-400', icon: XCircle },
-  paid: { label: 'Paid', bg: 'bg-emerald-500/15', text: 'text-emerald-300', icon: DollarSign },
+const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string; icon: any }> = {
+  submitted: { label: 'Submitted', bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20', icon: Clock },
+  pending: { label: 'Pending', bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', icon: Clock },
+  approved: { label: 'Approved', bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', icon: CheckCircle },
+  rejected: { label: 'Rejected', bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/20', icon: XCircle },
+  paid: { label: 'Paid', bg: 'bg-emerald-500/10', text: 'text-emerald-300', border: 'border-emerald-500/20', icon: DollarSign },
 }
 
 const EXPENSE_CATEGORIES: Record<string, { label: string }> = {
@@ -107,32 +111,34 @@ const EXPENSE_CATEGORIES: Record<string, { label: string }> = {
 function StatusBadge({ status }: { status: string }) {
   const config = STATUS_CONFIG[status] || STATUS_CONFIG.pending
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${config.bg} ${config.text} ${config.border}`}>
       <config.icon size={10} />
       {config.label}
     </span>
   )
 }
 
-// ============ METRIC CARD ============
-function MetricCard({ label, value, sub, icon: Icon, color = 'emerald' }: { label: string; value: string; sub?: string; icon: any; color?: string }) {
-  const colors: Record<string, string> = {
-    emerald: 'from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 text-emerald-400',
-    blue: 'from-blue-500/10 to-blue-500/5 border-blue-500/20 text-blue-400',
-    amber: 'from-amber-500/10 to-amber-500/5 border-amber-500/20 text-amber-400',
-    red: 'from-red-500/10 to-red-500/5 border-red-500/20 text-red-400',
-  }
+// ============ METRIC CARD — Institutional left-accent-bar ============
+function MetricCard({ label, value, sub, icon: Icon, accentColor = '#0d9488' }: { label: string; value: string; sub?: string; icon: any; accentColor?: string }) {
   return (
-    <div className={`bg-gradient-to-br ${colors[color]} border rounded-xl p-4`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-slate-400 font-medium">{label}</span>
-        <Icon size={16} className={colors[color].split(' ').pop()} />
+    <div className={`relative p-4 rounded-xl ${THEME.card} border overflow-hidden`}>
+      <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full" style={{ backgroundColor: accentColor }} />
+      <div className="pl-2">
+        <div className="flex items-center justify-between mb-2">
+          <span className={`text-[11px] font-semibold ${THEME.textDim} uppercase tracking-wider`}>{label}</span>
+          <Icon size={15} className={THEME.textDim} />
+        </div>
+        <p className="text-xl font-semibold text-white tabular-nums">{value}</p>
+        {sub && <p className={`text-xs ${THEME.textDim} mt-0.5`}>{sub}</p>}
       </div>
-      <p className="text-xl font-bold text-white">{value}</p>
-      {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
     </div>
   )
 }
+
+// ============ SHARED STYLES ============
+const selectClass = `px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-slate-300 text-sm focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 transition-colors`
+const invoiceGridCols = 'grid-cols-[1fr_140px_100px_120px_100px_100px_170px]'
+const expenseGridCols = 'grid-cols-[1fr_130px_100px_80px_100px_80px_180px]'
 
 // ============ MAIN COMPONENT ============
 export default function ContractorManagement() {
@@ -160,7 +166,7 @@ export default function ContractorManagement() {
   // Invoice detail
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null)
 
-  // Attachment preview — supports multi-file navigation
+  // Attachment preview — multi-file navigation
   const [previewFiles, setPreviewFiles] = useState<string[]>([])
   const [previewIndex, setPreviewIndex] = useState(0)
   const previewUrl = previewFiles.length > 0 ? previewFiles[previewIndex] : null
@@ -225,7 +231,6 @@ export default function ContractorManagement() {
   // ============ FILTERED INVOICES ============
   const filteredInvoices = useMemo(() => {
     let result = [...invoices]
-    // Date filter on period
     if (dateRange !== 'all') {
       result = result.filter(inv => inv.period_start >= dateFilter.start && inv.period_end <= dateFilter.end)
     }
@@ -256,7 +261,6 @@ export default function ContractorManagement() {
         groups[key].invoices.push(inv)
         groups[key].total += inv.total_amount
       } else {
-        // Group by client — an invoice can span multiple clients via line items
         const lines = inv.contractor_invoice_lines || []
         if (lines.length === 0) {
           const key = '_unassigned'
@@ -264,7 +268,6 @@ export default function ContractorManagement() {
           if (!groups[key].invoices.find(i => i.id === inv.id)) groups[key].invoices.push(inv)
           groups[key].total += inv.total_amount
         } else {
-          // Dedupe: assign invoice to the client with the largest line amount
           const clientTotals: Record<string, number> = {}
           lines.forEach((l: any) => { clientTotals[l.client_id] = (clientTotals[l.client_id] || 0) + l.amount })
           const primaryClient = Object.entries(clientTotals).sort((a, b) => b[1] - a[1])[0]?.[0] || '_unassigned'
@@ -343,7 +346,7 @@ export default function ContractorManagement() {
     setProcessing(null)
   }
 
-  /** Resolve signed URLs for ALL files in a comma-separated receipt_url, then open modal */
+  /** Resolve signed URLs for ALL files in a comma-separated receipt_url */
   const openPreview = async (path: string) => {
     const paths = path.split(',').map(p => p.trim()).filter(Boolean)
     const resolvedUrls: string[] = []
@@ -379,40 +382,40 @@ export default function ContractorManagement() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 size={24} className="text-emerald-400 animate-spin" />
+        <Loader2 size={22} className="text-teal-500 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Contractor Management</h1>
-          <p className="text-slate-400 text-sm mt-0.5">AP invoices and expenses from your team</p>
+          <h1 className="text-xl font-semibold text-white tracking-tight">Contractor Management</h1>
+          <p className={`text-sm mt-0.5 ${THEME.textDim}`}>AP invoices and expenses from your team</p>
         </div>
         <a href="/timesheet" target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-slate-300 text-sm transition-colors">
+          className={`flex items-center gap-2 px-4 py-2 ${THEME.card} border hover:bg-slate-800/60 rounded-lg text-slate-300 text-sm transition-colors`}>
           <ExternalLink size={14} /> Contractor Portal
         </a>
       </div>
 
       {/* Tabs + Date Range */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1 p-1 bg-slate-800/50 rounded-xl">
+        <div className={`flex items-center gap-0 border-b ${THEME.border}`}>
           {[
             { id: 'invoices' as const, label: 'AP Invoices', icon: FileText, count: invoiceMetrics.pendingCount },
             { id: 'expenses' as const, label: 'Expenses', icon: Receipt, count: expenseMetrics.pendingCount },
           ].map(tab => (
             <button key={tab.id} onClick={() => { setActiveTab(tab.id); setSearchQuery(''); setFilterStatus('all'); setFilterMember('all'); setFilterClient('all') }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeTab === tab.id ? 'bg-emerald-500/15 text-emerald-400' : 'text-slate-400 hover:text-white'
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                activeTab === tab.id ? 'border-teal-400 text-teal-400' : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
               }`}>
-              <tab.icon size={16} />
+              <tab.icon size={15} />
               {tab.label}
               {tab.count > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400">{tab.count}</span>
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">{tab.count}</span>
               )}
             </button>
           ))}
@@ -420,7 +423,7 @@ export default function ContractorManagement() {
 
         {/* Date range selector */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 p-0.5 bg-slate-800/50 rounded-lg">
+          <div className="flex items-center gap-0.5 p-0.5 bg-slate-800/50 rounded-lg border border-slate-800/80">
             {['month', 'quarter', 'year', 'all'].map(r => (
               <button key={r} onClick={() => setDateRange(r as any)}
                 className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${dateRange === r ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}>
@@ -430,9 +433,9 @@ export default function ContractorManagement() {
           </div>
           {dateRange !== 'all' && (
             <div className="flex items-center gap-1">
-              <button onClick={() => navigateDate(-1)} className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400"><ChevronLeft size={14} /></button>
-              <span className="text-white text-sm font-medium px-3 py-1 bg-slate-800 rounded-lg min-w-[120px] text-center">{dateFilter.label}</span>
-              <button onClick={() => navigateDate(1)} className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400"><ChevronRight size={14} /></button>
+              <button onClick={() => navigateDate(-1)} className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-slate-800/60 text-slate-400 transition-colors`}><ChevronLeft size={14} /></button>
+              <span className={`text-white text-sm font-medium px-3 py-1.5 ${THEME.card} border rounded-lg min-w-[120px] text-center tabular-nums`}>{dateFilter.label}</span>
+              <button onClick={() => navigateDate(1)} className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-slate-800/60 text-slate-400 transition-colors`}><ChevronRight size={14} /></button>
             </div>
           )}
         </div>
@@ -442,43 +445,40 @@ export default function ContractorManagement() {
       {activeTab === 'invoices' && (
         <div className="space-y-4">
           {/* Metrics */}
-          <div className="grid grid-cols-4 gap-4">
-            <MetricCard label="Total AP" value={formatCurrency(invoiceMetrics.total)} icon={DollarSign} color="blue" sub={`${filteredInvoices.length} invoices`} />
-            <MetricCard label="Pending Review" value={formatCurrency(invoiceMetrics.pendingAmt)} icon={Clock} color="amber" sub={`${invoiceMetrics.pendingCount} awaiting`} />
-            <MetricCard label="Approved" value={formatCurrency(invoiceMetrics.approvedAmt)} icon={CheckCircle} color="emerald" />
-            <MetricCard label="Paid" value={formatCurrency(invoiceMetrics.paidAmt)} icon={CreditCard} color="emerald" />
+          <div className="grid grid-cols-4 gap-3">
+            <MetricCard label="Total AP" value={formatCurrency(invoiceMetrics.total)} icon={DollarSign} accentColor="#2563eb" sub={`${filteredInvoices.length} invoices`} />
+            <MetricCard label="Pending Review" value={formatCurrency(invoiceMetrics.pendingAmt)} icon={Clock} accentColor="#d97706" sub={`${invoiceMetrics.pendingCount} awaiting`} />
+            <MetricCard label="Approved" value={formatCurrency(invoiceMetrics.approvedAmt)} icon={CheckCircle} accentColor="#059669" />
+            <MetricCard label="Paid" value={formatCurrency(invoiceMetrics.paidAmt)} icon={CreditCard} accentColor="#0d9488" />
           </div>
 
           {/* Filters + Group By */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 flex-1">
               <div className="relative flex-1 max-w-xs">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input type="text" placeholder="Search invoices..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                  className={`w-full pl-9 pr-3 py-2 bg-slate-800/60 border ${THEME.border} rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-teal-500/30`} />
               </div>
-              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-                className="px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={selectClass}>
                 <option value="all">All Statuses</option>
                 <option value="submitted">Submitted</option>
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
                 <option value="paid">Paid</option>
               </select>
-              <select value={filterMember} onChange={e => setFilterMember(e.target.value)}
-                className="px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+              <select value={filterMember} onChange={e => setFilterMember(e.target.value)} className={selectClass}>
                 <option value="all">All Contractors</option>
                 {teamMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
-              <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
-                className="px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+              <select value={filterClient} onChange={e => setFilterClient(e.target.value)} className={selectClass}>
                 <option value="all">All Clients</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             {/* Group by toggle */}
-            <div className="flex items-center gap-1 p-0.5 bg-slate-800/50 rounded-lg shrink-0">
-              <span className="text-[10px] text-slate-500 px-1.5">Group:</span>
+            <div className="flex items-center gap-0.5 p-0.5 bg-slate-800/50 rounded-lg border border-slate-800/80 shrink-0">
+              <span className="text-[10px] text-slate-500 px-1.5 uppercase tracking-wider">Group:</span>
               {[{ id: 'none' as const, label: 'None' }, { id: 'contractor' as const, label: 'Contractor' }, { id: 'client' as const, label: 'Client' }].map(g => (
                 <button key={g.id} onClick={() => { setGroupBy(g.id); setCollapsedGroups(new Set()) }}
                   className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${groupBy === g.id ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}>
@@ -490,92 +490,89 @@ export default function ContractorManagement() {
 
           {/* Invoice List (grouped) */}
           {filteredInvoices.length > 0 ? groupedInvoices.map(group => (
-            <div key={group.key} className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
-              {/* Group header (only if grouping is active) */}
+            <div key={group.key} className={`${THEME.card} border rounded-xl overflow-hidden`}>
               {groupBy !== 'none' && (
                 <button onClick={() => toggleGroup(group.key)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-slate-800/40 hover:bg-slate-800/60 transition-colors border-b border-white/[0.06]">
+                  className={`w-full flex items-center justify-between px-5 py-3 bg-slate-800/40 ${THEME.cardHover} transition-colors border-b ${THEME.border}`}>
                   <div className="flex items-center gap-3">
-                    {collapsedGroups.has(group.key) ? <ChevronRight size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+                    {collapsedGroups.has(group.key) ? <ChevronRight size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
                     <span className="text-white text-sm font-semibold">{group.label}</span>
-                    <span className="text-slate-500 text-xs">{group.invoices.length} invoice{group.invoices.length !== 1 ? 's' : ''}</span>
+                    <span className={`${THEME.textDim} text-xs`}>{group.invoices.length} invoice{group.invoices.length !== 1 ? 's' : ''}</span>
                   </div>
-                  <span className="text-white text-sm font-bold">{formatCurrency(group.total)}</span>
+                  <span className="text-white text-sm font-semibold tabular-nums">{formatCurrency(group.total)}</span>
                 </button>
               )}
-              {/* Table header + rows */}
               {!collapsedGroups.has(group.key) && (<>
-                <div className="grid grid-cols-[1fr_140px_100px_120px_100px_100px_170px] gap-2 px-4 py-2.5 border-b border-white/[0.06] text-xs text-slate-500 font-medium uppercase tracking-wider">
-                  <span>Invoice</span>
-                  <span>{groupBy === 'contractor' ? 'Client' : 'Contractor'}</span>
-                  <span>Period</span>
-                  <span className="text-right">Amount</span>
-                  <span>Status</span>
-                  <span>Attachment</span>
-                  <span>Actions</span>
+                <div className={`grid ${invoiceGridCols} gap-2 px-5 py-2.5 border-b ${THEME.border} bg-slate-800/30`}>
+                  <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Invoice</span>
+                  <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>{groupBy === 'contractor' ? 'Client' : 'Contractor'}</span>
+                  <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Period</span>
+                  <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider text-right`}>Amount</span>
+                  <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Status</span>
+                  <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Attachment</span>
+                  <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Actions</span>
                 </div>
                 {group.invoices.map(inv => {
                   const lines = inv.contractor_invoice_lines || []
                   const isExpanded = expandedInvoice === inv.id
                   const isProcessing = processing === inv.id
-                  // For client grouping show contractor, for contractor grouping show primary client
                   const secondCol = groupBy === 'contractor'
                     ? (lines.length > 0 ? clientMap[lines[0].client_id] || '—' : '—')
                     : (memberMap[inv.team_member_id] || '—')
                   return (
-                    <div key={inv.id} className="border-b border-white/[0.04] last:border-0">
-                      <div className="grid grid-cols-[1fr_140px_100px_120px_100px_100px_170px] gap-2 px-4 py-3 items-center hover:bg-white/[0.02] transition-colors">
+                    <div key={inv.id} className={`border-b ${THEME.border} border-opacity-40 last:border-0`}>
+                      <div className={`grid ${invoiceGridCols} gap-2 px-5 py-3 items-center ${THEME.cardHover} transition-colors`}>
                         <div className="flex items-center gap-3 min-w-0">
-                          <button onClick={() => setExpandedInvoice(isExpanded ? null : inv.id)} className="text-slate-400 hover:text-white">
+                          <button onClick={() => setExpandedInvoice(isExpanded ? null : inv.id)} className="text-slate-500 hover:text-white transition-colors">
                             {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                           </button>
                           <div className="min-w-0">
                             <p className="text-white text-sm font-medium truncate">{inv.invoice_number}</p>
-                            <p className="text-slate-500 text-xs">Submitted {formatDate(inv.submitted_at?.split('T')[0] || inv.invoice_date)}</p>
+                            <p className={`${THEME.textDim} text-xs`}>Submitted {formatDate(inv.submitted_at?.split('T')[0] || inv.invoice_date)}</p>
                           </div>
                         </div>
                         <span className="text-slate-300 text-sm truncate">{secondCol}</span>
-                        <span className="text-slate-400 text-xs">{formatDateCompact(inv.period_start)} – {formatDateCompact(inv.period_end)}</span>
-                        <span className="text-white text-sm font-medium text-right">{formatCurrency(inv.total_amount)}</span>
+                        <span className={`${THEME.textDim} text-xs tabular-nums`}>{formatDateCompact(inv.period_start)} – {formatDateCompact(inv.period_end)}</span>
+                        <span className="text-white text-sm font-medium text-right tabular-nums">{formatCurrency(inv.total_amount)}</span>
                         <StatusBadge status={inv.status} />
                         <div>
                           {inv.receipt_url ? (
                             <button onClick={() => openPreview(inv.receipt_url!)}
-                              className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs">
+                              className="inline-flex items-center gap-1 text-teal-400 hover:text-teal-300 text-xs transition-colors">
                               <Eye size={12} /> View
                             </button>
-                          ) : <span className="text-slate-600 text-xs">None</span>}
+                          ) : <span className={`${THEME.textDim} text-xs`}>None</span>}
                         </div>
                         <div className="flex items-center gap-1.5">
                           {inv.status === 'submitted' && (
                             <>
                               <button onClick={() => updateInvoiceStatus(inv.id, 'approved')} disabled={isProcessing}
-                                className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 text-xs font-medium hover:bg-emerald-500/25 disabled:opacity-50 transition-colors">
+                                className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 border border-emerald-500/20 disabled:opacity-50 transition-colors">
                                 {isProcessing ? <Loader2 size={12} className="animate-spin" /> : 'Approve'}
                               </button>
                               <button onClick={() => updateInvoiceStatus(inv.id, 'rejected')} disabled={isProcessing}
-                                className="px-2.5 py-1 rounded-lg bg-red-500/10 text-red-400 text-xs font-medium hover:bg-red-500/20 disabled:opacity-50 transition-colors">
+                                className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 text-xs font-medium hover:text-red-400 hover:bg-red-500/10 border border-slate-700 disabled:opacity-50 transition-colors">
                                 Reject
                               </button>
                             </>
                           )}
                           {inv.status === 'approved' && (
                             <button onClick={() => updateInvoiceStatus(inv.id, 'paid')} disabled={isProcessing}
-                              className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 text-xs font-medium hover:bg-emerald-500/25 disabled:opacity-50 transition-colors">
+                              className="px-2.5 py-1 rounded-lg bg-teal-500/10 text-teal-400 text-xs font-medium hover:bg-teal-500/20 border border-teal-500/20 disabled:opacity-50 transition-colors">
                               Mark Paid
                             </button>
                           )}
                           {(inv.status === 'paid' || inv.status === 'rejected') && (
-                            <span className="text-slate-600 text-xs">{inv.status === 'paid' ? formatDate(inv.paid_at?.split('T')[0] || '') : 'Rejected'}</span>
+                            <span className={`${THEME.textDim} text-xs`}>{inv.status === 'paid' ? formatDate(inv.paid_at?.split('T')[0] || '') : 'Rejected'}</span>
                           )}
                         </div>
                       </div>
                       {isExpanded && lines.length > 0 && (
-                        <div className="bg-slate-800/30 px-6 py-3 border-t border-white/[0.04]">
-                          <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-2">Line Items</p>
+                        <div className={`bg-slate-800/20 px-6 py-3 border-t ${THEME.border}`}>
+                          <p className={`text-[11px] ${THEME.textDim} font-semibold uppercase tracking-wider mb-2`}>Line Items</p>
                           <table className="w-full text-sm">
                             <thead>
-                              <tr className="text-slate-500 text-xs">
+                              <tr className={`${THEME.textDim} text-xs`}>
                                 <th className="text-left pb-1.5 font-medium">Client</th>
                                 <th className="text-left pb-1.5 font-medium">Description</th>
                                 <th className="text-right pb-1.5 font-medium">Hours</th>
@@ -586,18 +583,18 @@ export default function ContractorManagement() {
                             </thead>
                             <tbody>
                               {lines.map((line: any, i: number) => (
-                                <tr key={i} className="border-t border-white/[0.04]">
+                                <tr key={i} className={`border-t ${THEME.border} border-opacity-40`}>
                                   <td className="py-1.5 text-slate-300">{clientMap[line.client_id] || line.description?.split(' - ')[0] || '—'}</td>
-                                  <td className="py-1.5 text-slate-400">{line.description}</td>
-                                  <td className="py-1.5 text-right text-slate-300">{line.hours ? line.hours.toFixed(1) : '—'}</td>
-                                  <td className="py-1.5 text-right text-slate-400">{line.rate ? formatCurrency(line.rate) : '—'}</td>
-                                  <td className="py-1.5 text-right text-slate-400">{line.allocation_pct ? `${line.allocation_pct}%` : '—'}</td>
-                                  <td className="py-1.5 text-right text-white font-medium">{formatCurrency(line.amount)}</td>
+                                  <td className={`py-1.5 ${THEME.textMuted}`}>{line.description}</td>
+                                  <td className="py-1.5 text-right text-slate-300 tabular-nums">{line.hours ? line.hours.toFixed(1) : '—'}</td>
+                                  <td className={`py-1.5 text-right ${THEME.textMuted} tabular-nums`}>{line.rate ? formatCurrency(line.rate) : '—'}</td>
+                                  <td className={`py-1.5 text-right ${THEME.textMuted} tabular-nums`}>{line.allocation_pct ? `${line.allocation_pct}%` : '—'}</td>
+                                  <td className="py-1.5 text-right text-white font-medium tabular-nums">{formatCurrency(line.amount)}</td>
                                 </tr>
                               ))}
                             </tbody>
                           </table>
-                          {inv.notes && <p className="mt-2 text-xs text-slate-500 italic">Note: {inv.notes}</p>}
+                          {inv.notes && <p className={`mt-2 text-xs ${THEME.textDim} italic`}>Note: {inv.notes}</p>}
                         </div>
                       )}
                     </div>
@@ -606,7 +603,7 @@ export default function ContractorManagement() {
               </>)}
             </div>
           )) : (
-            <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl text-center py-12 text-slate-500`}>
+            <div className={`${THEME.card} border rounded-xl text-center py-12 ${THEME.textDim}`}>
               <FileText size={32} className="mx-auto mb-3 opacity-40" />
               <p className="text-sm">No invoices found</p>
             </div>
@@ -618,71 +615,68 @@ export default function ContractorManagement() {
       {activeTab === 'expenses' && (
         <div className="space-y-4">
           {/* Metrics */}
-          <div className="grid grid-cols-4 gap-4">
-            <MetricCard label="Total Expenses" value={formatCurrency(expenseMetrics.total)} icon={Receipt} color="blue" sub={`${filteredExpenses.length} items`} />
-            <MetricCard label="Pending Review" value={formatCurrency(expenseMetrics.pendingAmt)} icon={Clock} color="amber" sub={`${expenseMetrics.pendingCount} awaiting`} />
-            <MetricCard label="Approved" value={formatCurrency(expenseMetrics.approvedAmt)} icon={CheckCircle} color="emerald" />
-            <MetricCard label="Billable" value={formatCurrency(filteredExpenses.filter(e => e.client_id && e.status === 'approved').reduce((s, e) => s + e.amount, 0))} icon={TrendingUp} color="emerald" sub="Tagged to a client" />
+          <div className="grid grid-cols-4 gap-3">
+            <MetricCard label="Total Expenses" value={formatCurrency(expenseMetrics.total)} icon={Receipt} accentColor="#2563eb" sub={`${filteredExpenses.length} items`} />
+            <MetricCard label="Pending Review" value={formatCurrency(expenseMetrics.pendingAmt)} icon={Clock} accentColor="#d97706" sub={`${expenseMetrics.pendingCount} awaiting`} />
+            <MetricCard label="Approved" value={formatCurrency(expenseMetrics.approvedAmt)} icon={CheckCircle} accentColor="#059669" />
+            <MetricCard label="Billable" value={formatCurrency(filteredExpenses.filter(e => e.client_id && e.status === 'approved').reduce((s, e) => s + e.amount, 0))} icon={TrendingUp} accentColor="#0d9488" sub="Tagged to a client" />
           </div>
 
           {/* Filters */}
           <div className="flex items-center gap-3">
             <div className="relative flex-1 max-w-xs">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
               <input type="text" placeholder="Search expenses..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                className={`w-full pl-9 pr-3 py-2 bg-slate-800/60 border ${THEME.border} rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-teal-500/30`} />
             </div>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-              className="px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={selectClass}>
               <option value="all">All Statuses</option>
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="rejected">Rejected</option>
             </select>
-            <select value={filterMember} onChange={e => setFilterMember(e.target.value)}
-              className="px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+            <select value={filterMember} onChange={e => setFilterMember(e.target.value)} className={selectClass}>
               <option value="all">All Contractors</option>
               {teamMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
-            <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
-              className="px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+            <select value={filterClient} onChange={e => setFilterClient(e.target.value)} className={selectClass}>
               <option value="all">All Clients</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
 
           {/* Expense List */}
-          <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
-            <div className="grid grid-cols-[1fr_130px_100px_80px_100px_80px_180px] gap-2 px-4 py-2.5 border-b border-white/[0.06] text-xs text-slate-500 font-medium uppercase tracking-wider">
-              <span>Description</span>
-              <span>Contractor</span>
-              <span>Date</span>
-              <span>Category</span>
-              <span className="text-right">Amount</span>
-              <span>Status</span>
-              <span>Actions</span>
+          <div className={`${THEME.card} border rounded-xl overflow-hidden`}>
+            <div className={`grid ${expenseGridCols} gap-2 px-5 py-2.5 border-b ${THEME.border} bg-slate-800/30`}>
+              <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Description</span>
+              <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Contractor</span>
+              <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Date</span>
+              <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Category</span>
+              <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider text-right`}>Amount</span>
+              <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Status</span>
+              <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Actions</span>
             </div>
 
             {filteredExpenses.length > 0 ? filteredExpenses.map(exp => {
               const cat = EXPENSE_CATEGORIES[exp.category] || EXPENSE_CATEGORIES.other
               const isProcessing = processing === exp.id
               return (
-                <div key={exp.id} className="grid grid-cols-[1fr_130px_100px_80px_100px_80px_180px] gap-2 px-4 py-3 items-center border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors">
+                <div key={exp.id} className={`grid ${expenseGridCols} gap-2 px-5 py-3 items-center border-b ${THEME.border} border-opacity-40 last:border-0 ${THEME.cardHover} transition-colors`}>
                   <div className="min-w-0">
                     <p className="text-white text-sm truncate">{exp.description}</p>
-                    {exp.client_id && <p className="text-slate-500 text-xs">{clientMap[exp.client_id] || '—'}</p>}
+                    {exp.client_id && <p className={`${THEME.textDim} text-xs`}>{clientMap[exp.client_id] || '—'}</p>}
                   </div>
                   <span className="text-slate-300 text-sm truncate">{memberMap[exp.team_member_id] || '—'}</span>
-                  <span className="text-slate-400 text-xs">{formatDate(exp.date)}</span>
-                  <span className="text-xs text-slate-400">{cat.label}</span>
-                  <span className="text-white text-sm font-medium text-right">{formatCurrency(exp.amount)}</span>
+                  <span className={`${THEME.textDim} text-xs tabular-nums`}>{formatDate(exp.date)}</span>
+                  <span className={`text-xs ${THEME.textMuted}`}>{cat.label}</span>
+                  <span className="text-white text-sm font-medium text-right tabular-nums">{formatCurrency(exp.amount)}</span>
                   <StatusBadge status={exp.status} />
                   <div className="flex items-center gap-1.5">
                     {exp.receipt_url && (() => {
                       const files = exp.receipt_url!.split(',').filter(Boolean)
                       return (
                         <button onClick={() => openPreview(exp.receipt_url!)}
-                          className="p-1 rounded text-blue-400 hover:text-blue-300 flex items-center gap-1">
+                          className="p-1 rounded text-teal-400 hover:text-teal-300 flex items-center gap-1 transition-colors">
                           <Eye size={12} />{files.length > 1 && <span className="text-xs">{files.length}</span>}
                         </button>
                       )
@@ -690,23 +684,23 @@ export default function ContractorManagement() {
                     {exp.status === 'pending' && (
                       <>
                         <button onClick={() => updateExpenseStatus(exp.id, 'approved')} disabled={isProcessing}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 text-xs font-medium hover:bg-emerald-500/25 disabled:opacity-50 transition-colors">
+                          className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 border border-emerald-500/20 disabled:opacity-50 transition-colors">
                           {isProcessing ? <Loader2 size={12} className="animate-spin" /> : 'Approve'}
                         </button>
                         <button onClick={() => updateExpenseStatus(exp.id, 'rejected')} disabled={isProcessing}
-                          className="px-2.5 py-1 rounded-lg bg-red-500/10 text-red-400 text-xs font-medium hover:bg-red-500/20 disabled:opacity-50 transition-colors">
+                          className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 text-xs font-medium hover:text-red-400 hover:bg-red-500/10 border border-slate-700 disabled:opacity-50 transition-colors">
                           Reject
                         </button>
                       </>
                     )}
                     {exp.status === 'approved' && (
-                      <span className="text-emerald-500/60 text-xs">Approved</span>
+                      <span className={`${THEME.textDim} text-xs`}>Approved</span>
                     )}
                   </div>
                 </div>
               )
             }) : (
-              <div className="text-center py-12 text-slate-500">
+              <div className={`text-center py-12 ${THEME.textDim}`}>
                 <Receipt size={32} className="mx-auto mb-3 opacity-40" />
                 <p className="text-sm">No expenses found</p>
               </div>
@@ -718,32 +712,32 @@ export default function ContractorManagement() {
       {/* ===================== ATTACHMENT PREVIEW MODAL — Multi-file ===================== */}
       {previewUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={closePreview}>
-          <div className="relative bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl flex flex-col" style={{ width: '80vw', height: '85vh', maxWidth: '1200px' }} onClick={e => e.stopPropagation()}>
+          <div className={`relative bg-[#111827] border ${THEME.border} rounded-xl overflow-hidden shadow-2xl flex flex-col`} style={{ width: '80vw', height: '85vh', maxWidth: '1200px' }} onClick={e => e.stopPropagation()}>
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+            <div className={`flex items-center justify-between px-5 py-3 border-b ${THEME.border}`}>
               <div className="flex items-center gap-3">
                 <span className="text-white text-sm font-medium">Attachment Preview</span>
                 {previewFiles.length > 1 && (
-                  <span className="text-xs text-slate-500 tabular-nums">{previewIndex + 1} of {previewFiles.length}</span>
+                  <span className={`text-xs ${THEME.textDim} tabular-nums`}>{previewIndex + 1} of {previewFiles.length}</span>
                 )}
               </div>
               <div className="flex items-center gap-2">
                 {previewFiles.length > 1 && (
                   <div className="flex items-center gap-1 mr-2">
                     <button onClick={() => setPreviewIndex(i => Math.max(0, i - 1))} disabled={previewIndex === 0}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 transition-colors disabled:opacity-30">
+                      className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-slate-800/60 text-slate-400 transition-colors disabled:opacity-30`}>
                       <ChevronLeft size={14} />
                     </button>
                     <button onClick={() => setPreviewIndex(i => Math.min(previewFiles.length - 1, i + 1))} disabled={previewIndex === previewFiles.length - 1}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 transition-colors disabled:opacity-30">
+                      className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-slate-800/60 text-slate-400 transition-colors disabled:opacity-30`}>
                       <ChevronRight size={14} />
                     </button>
                   </div>
                 )}
-                <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 text-xs flex items-center gap-1.5 transition-colors">
+                <a href={previewUrl} target="_blank" rel="noopener noreferrer" className={`px-3 py-1.5 ${THEME.card} border hover:bg-slate-800/60 rounded-lg text-slate-300 text-xs flex items-center gap-1.5 transition-colors`}>
                   <ExternalLink size={12} /> Open
                 </a>
-                <a href={previewUrl} download className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 text-xs flex items-center gap-1.5 transition-colors">
+                <a href={previewUrl} download className={`px-3 py-1.5 ${THEME.card} border hover:bg-slate-800/60 rounded-lg text-slate-300 text-xs flex items-center gap-1.5 transition-colors`}>
                   <Download size={12} /> Download
                 </a>
                 <button onClick={closePreview} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
@@ -760,7 +754,7 @@ export default function ContractorManagement() {
               ) : (
                 <iframe src={previewUrl} className="w-full h-full" title="Document preview" />
               )}
-              {/* Overlay arrows for multi-file */}
+              {/* Overlay arrows */}
               {previewFiles.length > 1 && previewIndex > 0 && (
                 <button onClick={() => setPreviewIndex(i => i - 1)}
                   className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors">
@@ -776,11 +770,11 @@ export default function ContractorManagement() {
             </div>
             {/* Thumbnail strip */}
             {previewFiles.length > 1 && (
-              <div className="flex items-center gap-2 px-4 py-2.5 border-t border-slate-700 bg-slate-900/80 overflow-x-auto">
+              <div className={`flex items-center gap-2 px-5 py-2.5 border-t ${THEME.border} bg-slate-900/50 overflow-x-auto`}>
                 {previewFiles.map((_, i) => (
                   <button key={i} onClick={() => setPreviewIndex(i)}
                     className={`flex-shrink-0 w-9 h-9 rounded-lg border-2 flex items-center justify-center text-xs font-medium transition-colors ${
-                      i === previewIndex ? 'border-emerald-400 bg-emerald-500/10 text-emerald-400' : 'border-slate-700 bg-slate-800 text-slate-500 hover:text-slate-300'
+                      i === previewIndex ? 'border-teal-400 bg-teal-500/10 text-teal-400' : `${THEME.border} bg-slate-800/40 text-slate-500 hover:text-slate-300`
                     }`}>
                     {i + 1}
                   </button>
