@@ -41,7 +41,7 @@ export default function Header({
     <header
       className={cn(
         'fixed top-0 right-0 h-16 z-30 flex items-center justify-between px-6 transition-all duration-300',
-        'bg-slate-900/60 backdrop-blur-xl border-b border-white/[0.08]',
+        'bg-[#0B1120]/80 backdrop-blur-xl border-b border-slate-800/80',
         sidebarCollapsed ? 'left-16' : 'left-60'
       )}
     >
@@ -49,7 +49,7 @@ export default function Header({
       <div className="flex items-center gap-4 flex-1 max-w-md">
         <div className={cn(
           'relative flex-1 transition-all duration-200',
-          searchFocused && 'scale-[1.02]'
+          searchFocused && 'scale-[1.01]'
         )}>
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
@@ -59,10 +59,10 @@ export default function Header({
             onBlur={() => setSearchFocused(false)}
             className={cn(
               'w-full pl-10 pr-4 py-2 rounded-lg text-sm transition-all duration-200',
-              'bg-white/[0.05] border border-white/[0.08] text-slate-200',
+              'bg-white/[0.04] border border-slate-800/80 text-slate-200',
               'placeholder:text-slate-500',
-              'focus:outline-none focus:bg-white/[0.08] focus:border-emerald-500/50',
-              'focus:ring-2 focus:ring-emerald-500/20'
+              'focus:outline-none focus:bg-white/[0.06] focus:border-teal-500/40',
+              'focus:ring-1 focus:ring-teal-500/20'
             )}
           />
         </div>
@@ -74,53 +74,52 @@ export default function Header({
         <button
           onClick={onOpenChat}
           className={cn(
-            'p-2.5 rounded-lg transition-all duration-200',
-            'text-slate-400 hover:text-emerald-400',
-            'hover:bg-white/[0.05]'
+            'p-2.5 rounded-lg transition-all duration-150',
+            'text-slate-400 hover:text-teal-400',
+            'hover:bg-white/[0.04]'
           )}
           title="Open Sage AI"
         >
-          <MessageSquare size={20} />
+          <MessageSquare size={18} />
         </button>
 
         {/* Notifications */}
         <button
           className={cn(
-            'p-2.5 rounded-lg transition-all duration-200 relative',
-            'text-slate-400 hover:text-white',
-            'hover:bg-white/[0.05]'
+            'p-2.5 rounded-lg transition-all duration-150 relative',
+            'text-slate-400 hover:text-slate-200',
+            'hover:bg-white/[0.04]'
           )}
           title="Notifications"
         >
-          <Bell size={20} />
+          <Bell size={18} />
         </button>
 
         {/* Divider */}
-        <div className="w-px h-8 bg-white/[0.08] mx-2" />
+        <div className="w-px h-7 bg-slate-800/80 mx-2" />
 
         {/* User Menu */}
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setUserMenuOpen(!userMenuOpen)}
             className={cn(
-              'flex items-center gap-2.5 pl-1 pr-3 py-1.5 rounded-lg transition-all duration-200',
-              'hover:bg-white/[0.05]',
-              userMenuOpen && 'bg-white/[0.05]'
+              'flex items-center gap-2.5 pl-1 pr-3 py-1.5 rounded-lg transition-all duration-150',
+              'hover:bg-white/[0.04]',
+              userMenuOpen && 'bg-white/[0.04]'
             )}
           >
-            {/* Avatar with gradient */}
+            {/* Avatar */}
             <div className={cn(
-              'w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold',
-              'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white',
-              'ring-2 ring-emerald-500/20'
+              'w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold',
+              'bg-teal-600 text-white'
             )}>
               {initials}
             </div>
-            <span className="text-sm font-medium text-slate-200 hidden sm:block">
+            <span className="text-sm font-medium text-slate-300 hidden sm:block">
               {displayName}
             </span>
             <ChevronDown 
-              size={16} 
+              size={14} 
               className={cn(
                 'text-slate-500 transition-transform duration-200',
                 userMenuOpen && 'rotate-180'
@@ -132,12 +131,11 @@ export default function Header({
           {userMenuOpen && (
             <div className={cn(
               'absolute right-0 top-full mt-2 w-56 rounded-xl overflow-hidden',
-              'bg-slate-900/95 backdrop-blur-xl border border-white/[0.1]',
-              'shadow-xl shadow-black/20',
-              'animate-fade-in'
+              'bg-[#0F172A] border border-slate-800/80',
+              'shadow-xl shadow-black/30'
             )}>
               {/* User info */}
-              <div className="px-4 py-3 border-b border-white/[0.08]">
+              <div className="px-4 py-3 border-b border-slate-800/80">
                 <p className="text-sm font-medium text-white">{displayName}</p>
                 {userEmail && (
                   <p className="text-xs text-slate-500 mt-0.5">{userEmail}</p>
@@ -150,10 +148,10 @@ export default function Header({
                   href="/settings"
                   className={cn(
                     'flex items-center gap-3 px-4 py-2.5 text-sm transition-colors',
-                    'text-slate-300 hover:text-white hover:bg-white/[0.05]'
+                    'text-slate-300 hover:text-white hover:bg-white/[0.04]'
                   )}
                 >
-                  <Settings size={16} className="text-slate-500" />
+                  <Settings size={15} className="text-slate-500" />
                   Account Settings
                 </a>
                 {onSignOut && (
@@ -161,10 +159,10 @@ export default function Header({
                     onClick={onSignOut}
                     className={cn(
                       'w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors',
-                      'text-slate-300 hover:text-white hover:bg-white/[0.05]'
+                      'text-slate-300 hover:text-white hover:bg-white/[0.04]'
                     )}
                   >
-                    <LogOut size={16} className="text-slate-500" />
+                    <LogOut size={15} className="text-slate-500" />
                     Sign Out
                   </button>
                 )}
