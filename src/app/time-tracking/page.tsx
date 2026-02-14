@@ -266,10 +266,10 @@ function marginColor(pct: number): string {
   return 'text-rose-400'
 }
 function marginBadgeClass(pct: number): string {
-  if (pct >= 30) return 'bg-emerald-500/20 text-emerald-400'
-  if (pct >= 15) return 'bg-amber-500/20 text-amber-400'
-  if (pct >= 0) return 'bg-orange-500/20 text-orange-400'
-  return 'bg-rose-500/20 text-rose-400'
+  if (pct >= 30) return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+  if (pct >= 15) return 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+  if (pct >= 0) return 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
+  return 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
 }
 
 // ============ CONSTANTS ============
@@ -288,24 +288,33 @@ const DATE_PRESETS: { id: DatePreset; label: string }[] = [
 type ViewTab = 'trends' | 'byClient' | 'byEmployee' | 'detailed' | 'profitability'
 
 const VIEW_TABS: { id: ViewTab; label: string; icon: React.ReactNode }[] = [
-  { id: 'trends', label: 'Trends', icon: <Activity size={16} /> },
-  { id: 'byClient', label: 'By Client', icon: <Building2 size={16} /> },
-  { id: 'byEmployee', label: 'By Employee', icon: <Users size={16} /> },
-  { id: 'detailed', label: 'Detailed', icon: <Calendar size={16} /> },
-  { id: 'profitability', label: 'Profitability', icon: <BarChart3 size={16} /> },
+  { id: 'trends', label: 'Trends', icon: <Activity size={15} /> },
+  { id: 'byClient', label: 'By Client', icon: <Building2 size={15} /> },
+  { id: 'byEmployee', label: 'By Employee', icon: <Users size={15} /> },
+  { id: 'detailed', label: 'Detailed', icon: <Calendar size={15} /> },
+  { id: 'profitability', label: 'Profitability', icon: <BarChart3 size={15} /> },
 ]
 
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+// Teal-based monochrome chart palette
+const CHART_COLORS = ['#0d9488', '#0891b2', '#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '#64748b']
 
 // ============ THEME ============
 const THEME = {
-  glass: 'bg-slate-900/70 backdrop-blur-xl',
-  glassBorder: 'border-white/[0.08]',
-  glassHover: 'hover:bg-white/[0.05] hover:border-white/[0.12]',
+  card: 'bg-[#111827] border-slate-800/80',
+  cardHover: 'hover:bg-slate-800/40',
   textPrimary: 'text-white',
   textSecondary: 'text-slate-300',
   textMuted: 'text-slate-400',
   textDim: 'text-slate-500',
+  border: 'border-slate-800/80',
+}
+
+// Shared tooltip style for all charts
+const TOOLTIP_STYLE = {
+  contentStyle: { backgroundColor: '#1e293b', border: '1px solid rgba(148,163,184,0.2)', borderRadius: '8px' },
+  itemStyle: { color: '#e2e8f0' },
+  labelStyle: { color: '#94a3b8' },
+  cursor: { fill: 'rgba(255,255,255,0.03)' },
 }
 
 // ============ UTILITIES ============
@@ -407,26 +416,25 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
   return (
     <div className="fixed bottom-4 right-4 z-50 space-y-2">
       {toasts.map(toast => (
-        <div key={toast.id} className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg backdrop-blur-xl border ${
-          toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' :
-          toast.type === 'error' ? 'bg-rose-500/20 border-rose-500/30 text-rose-400' : 'bg-blue-500/20 border-blue-500/30 text-blue-400'
+        <div key={toast.id} className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border ${
+          toast.type === 'success' ? 'bg-emerald-950/80 border-emerald-800/60 text-emerald-400' :
+          toast.type === 'error' ? 'bg-rose-950/80 border-rose-800/60 text-rose-400' : 'bg-blue-950/80 border-blue-800/60 text-blue-400'
         }`}>
-          {toast.type === 'success' && <CheckCircle size={18} />}
-          {toast.type === 'error' && <AlertCircle size={18} />}
+          {toast.type === 'success' && <CheckCircle size={16} />}
+          {toast.type === 'error' && <AlertCircle size={16} />}
           <span className="text-sm font-medium">{toast.message}</span>
-          <button onClick={() => onDismiss(toast.id)} className="ml-2 hover:opacity-70"><X size={16} /></button>
+          <button onClick={() => onDismiss(toast.id)} className="ml-2 hover:opacity-70"><X size={14} /></button>
         </div>
       ))}
     </div>
   )
 }
 
-// ============ KPI CARD ============
-function KPICard({ title, value, format = 'number', trend, trendLabel, icon, color = 'blue' }: { 
+// ============ KPI CARD — Premium Institutional ============
+function KPICard({ title, value, format = 'number', trend, trendLabel, icon, accentColor = '#0d9488' }: { 
   title: string; value: number; format?: 'number' | 'currency' | 'percent' | 'hours'
-  trend?: number; trendLabel?: string; icon?: React.ReactNode; color?: 'blue' | 'emerald' | 'amber' | 'purple' | 'rose' | 'orange'
+  trend?: number; trendLabel?: string; icon?: React.ReactNode; accentColor?: string
 }) {
-  const colorClasses: Record<string, string> = { blue: 'text-blue-400', emerald: 'text-emerald-400', amber: 'text-amber-400', purple: 'text-purple-400', rose: 'text-rose-400', orange: 'text-orange-400' }
   const formatValue = () => {
     switch (format) {
       case 'currency': return formatCurrency(value)
@@ -435,45 +443,52 @@ function KPICard({ title, value, format = 'number', trend, trendLabel, icon, col
       default: return value.toLocaleString()
     }
   }
+  // Determine value color based on context
+  const isNegative = value < 0
+  const valueColor = isNegative ? 'text-rose-400' : 'text-white'
+
   return (
-    <div className={`p-4 rounded-xl ${THEME.glass} border ${THEME.glassBorder}`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className={`text-xs font-medium ${THEME.textMuted} uppercase tracking-wide`}>{title}</span>
-        {icon && <span className={THEME.textDim}>{icon}</span>}
-      </div>
-      <p className={`text-2xl font-bold ${colorClasses[color] || 'text-blue-400'}`}>{formatValue()}</p>
-      {trend !== undefined && (
-        <div className="flex items-center gap-1 mt-1">
-          {trend >= 0 ? <TrendingUp size={14} className="text-emerald-400" /> : <TrendingDown size={14} className="text-rose-400" />}
-          <span className={`text-xs font-medium ${trend >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{trend >= 0 ? '+' : ''}{trend.toFixed(1)}%</span>
-          {trendLabel && <span className={`text-xs ${THEME.textDim}`}>{trendLabel}</span>}
+    <div className={`relative p-4 rounded-xl ${THEME.card} border overflow-hidden`}>
+      {/* Left accent bar */}
+      <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full" style={{ backgroundColor: accentColor }} />
+      <div className="pl-2">
+        <div className="flex items-center justify-between mb-2">
+          <span className={`text-[11px] font-semibold ${THEME.textDim} uppercase tracking-wider`}>{title}</span>
+          {icon && <span className={THEME.textDim}>{icon}</span>}
         </div>
-      )}
+        <p className={`text-2xl font-semibold ${valueColor} tabular-nums tracking-tight`}>{formatValue()}</p>
+        {trend !== undefined && (
+          <div className="flex items-center gap-1.5 mt-1.5">
+            {trend >= 0 ? <TrendingUp size={12} className="text-emerald-400" /> : <TrendingDown size={12} className="text-rose-400" />}
+            <span className={`text-xs font-medium tabular-nums ${trend >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{trend >= 0 ? '+' : ''}{trend.toFixed(1)}%</span>
+            {trendLabel && <span className={`text-xs ${THEME.textDim}`}>{trendLabel}</span>}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
 // ============ COLLAPSIBLE SECTION ============
-function CollapsibleSection({ title, children, defaultExpanded = true, badge, badgeColor = 'slate', rightContent, icon }: { 
+function CollapsibleSection({ title, children, defaultExpanded = true, badge, rightContent, icon }: { 
   title: string; children: React.ReactNode; defaultExpanded?: boolean; badge?: string | number
-  badgeColor?: 'slate' | 'blue' | 'emerald' | 'amber'; rightContent?: React.ReactNode; icon?: React.ReactNode
+  rightContent?: React.ReactNode; icon?: React.ReactNode
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
-  const badgeColors: Record<string, string> = { slate: 'bg-white/[0.08] text-slate-300', blue: 'bg-blue-500/20 text-blue-400', emerald: 'bg-emerald-500/20 text-emerald-400', amber: 'bg-amber-500/20 text-amber-400' }
   return (
-    <div className={`rounded-xl border ${THEME.glass} ${THEME.glassBorder} overflow-hidden`}>
-      <button onClick={() => setIsExpanded(!isExpanded)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.03] transition-colors">
-        <div className="flex items-center gap-2">
-          {icon && <span className={THEME.textMuted}>{icon}</span>}
-          <h3 className={`text-sm font-medium ${THEME.textPrimary}`}>{title}</h3>
-          {badge !== undefined && <span className={`px-2 py-0.5 text-xs rounded-full ${badgeColors[badgeColor]}`}>{badge}</span>}
+    <div className={`rounded-xl ${THEME.card} border overflow-hidden`}>
+      <button onClick={() => setIsExpanded(!isExpanded)} className={`w-full flex items-center justify-between px-5 py-3.5 ${THEME.cardHover} transition-colors`}>
+        <div className="flex items-center gap-2.5">
+          {icon && <span className={THEME.textDim}>{icon}</span>}
+          <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>{title}</h3>
+          {badge !== undefined && <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-slate-800 text-slate-400 border border-slate-700/60">{badge}</span>}
         </div>
         <div className="flex items-center gap-3">
           {rightContent}
-          {isExpanded ? <ChevronUp size={18} className={THEME.textMuted} /> : <ChevronDown size={18} className={THEME.textMuted} />}
+          {isExpanded ? <ChevronUp size={16} className={THEME.textDim} /> : <ChevronDown size={16} className={THEME.textDim} />}
         </div>
       </button>
-      {isExpanded && <div className="px-4 pb-4 pt-1">{children}</div>}
+      {isExpanded && <div className="px-5 pb-4 pt-1">{children}</div>}
     </div>
   )
 }
@@ -499,16 +514,16 @@ function EditableBillableCell({ actualHours, billableHours, onSave }: {
   if (isEditing) {
     return (
       <input type="number" value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={handleSave} onKeyDown={handleKeyDown}
-        className="w-16 px-1 py-0.5 text-right bg-slate-900/50 border border-orange-500/50 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/30" autoFocus step="0.5" />
+        className="w-16 px-1 py-0.5 text-right bg-slate-900 border border-amber-500/50 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-amber-500/30" autoFocus step="0.5" />
     )
   }
   return (
     <button onClick={() => { setEditValue(billableHours.toString()); setIsEditing(true) }}
       className={`px-1.5 py-0.5 rounded transition-colors flex items-center gap-1 ${
-        isAdjusted ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20' : 'text-slate-300 hover:bg-white/[0.08]'
+        isAdjusted ? 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/15' : 'text-slate-300 hover:bg-white/[0.06]'
       }`} title={isAdjusted ? `Adjusted from ${actualHours.toFixed(1)}` : 'Click to adjust billable hours'}>
       {billableHours.toFixed(1)}
-      {isAdjusted && <Edit2 size={10} className="text-orange-400" />}
+      {isAdjusted && <Edit2 size={10} className="text-amber-400" />}
     </button>
   )
 }
@@ -902,84 +917,91 @@ export default function TimeTrackingPage() {
     return 'All Clients'
   }
 
-  if (loading) return <div className="flex items-center justify-center h-64"><RefreshCw className="w-8 h-8 text-emerald-500 animate-spin" /></div>
+  if (loading) return <div className="flex items-center justify-center h-64"><RefreshCw className="w-6 h-6 text-teal-500 animate-spin" /></div>
+
+  // ============ SELECT STYLING ============
+  const selectClass = `px-3 py-2 bg-slate-800/60 border ${THEME.border} rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 transition-colors`
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <ToastContainer toasts={toasts} onDismiss={id => setToasts(prev => prev.filter(t => t.id !== id))} />
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-2xl font-semibold ${THEME.textPrimary}`}>Time Analytics</h1>
-          <p className={`text-sm mt-1 ${THEME.textMuted}`}>{getFilterTitle()}</p>
+          <h1 className="text-xl font-semibold text-white tracking-tight">Time Analytics</h1>
+          <p className={`text-sm mt-0.5 ${THEME.textDim}`}>{getFilterTitle()}</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={exportToCSV} className={`flex items-center gap-2 px-4 py-2 ${THEME.glass} border ${THEME.glassBorder} hover:bg-white/[0.08] rounded-lg text-sm font-medium text-white transition-colors`}><Download size={18} />Export</button>
-          <button onClick={() => setShowEntryModal(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-emerald-500/20"><Plus size={18} />Add Entry</button>
+          <button onClick={exportToCSV} className={`flex items-center gap-2 px-4 py-2 ${THEME.card} border hover:bg-slate-800/60 rounded-lg text-sm font-medium text-slate-300 transition-colors`}><Download size={16} />Export</button>
+          <button onClick={() => setShowEntryModal(true)} className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm font-medium text-white transition-colors"><Plus size={16} />Add Entry</button>
         </div>
       </div>
 
       {/* Date Range & Filters */}
-      <div className={`p-4 rounded-xl border ${THEME.glass} ${THEME.glassBorder} relative z-20`}>
-        <div className="flex flex-wrap items-center gap-4">
+      <div className={`p-4 rounded-xl ${THEME.card} border relative z-20`}>
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
-            <button onClick={() => setShowDatePicker(!showDatePicker)} className={`flex items-center gap-2 px-4 py-2 bg-white/[0.05] border ${THEME.glassBorder} hover:bg-white/[0.08] rounded-lg text-sm font-medium text-white transition-colors`}>
-              <Calendar size={16} />{DATE_PRESETS.find(p => p.id === datePreset)?.label}<ChevronDown size={16} />
+            <button onClick={() => setShowDatePicker(!showDatePicker)} className={`flex items-center gap-2 px-3 py-2 bg-slate-800/60 border ${THEME.border} hover:bg-slate-700/60 rounded-lg text-sm font-medium text-white transition-colors`}>
+              <Calendar size={14} className="text-teal-400" />{DATE_PRESETS.find(p => p.id === datePreset)?.label}<ChevronDown size={14} className="text-slate-500" />
             </button>
             {showDatePicker && (
-              <div className={`absolute top-full left-0 mt-2 w-64 p-3 ${THEME.glass} border ${THEME.glassBorder} rounded-lg shadow-xl z-[100]`}>
-                <div className="space-y-1">
+              <div className={`absolute top-full left-0 mt-2 w-56 p-2 bg-[#1e293b] border ${THEME.border} rounded-xl shadow-xl z-[100]`}>
+                <div className="space-y-0.5">
                   {DATE_PRESETS.map(preset => (
                     <button key={preset.id} onClick={() => { setDatePreset(preset.id); if (preset.id !== 'custom') setShowDatePicker(false) }}
-                      className={`w-full text-left px-3 py-2 rounded text-sm ${datePreset === preset.id ? 'bg-emerald-500 text-white' : 'text-slate-300 hover:bg-white/[0.08]'}`}>{preset.label}</button>
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${datePreset === preset.id ? 'bg-teal-600 text-white' : 'text-slate-300 hover:bg-slate-700/60'}`}>{preset.label}</button>
                   ))}
                 </div>
                 {datePreset === 'custom' && (
-                  <div className={`mt-3 pt-3 border-t ${THEME.glassBorder} space-y-2`}>
-                    <div><label className={`text-xs ${THEME.textMuted}`}>Start</label><input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className={`w-full mt-1 px-2 py-1 bg-white/[0.05] border ${THEME.glassBorder} rounded text-sm text-white`} /></div>
-                    <div><label className={`text-xs ${THEME.textMuted}`}>End</label><input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className={`w-full mt-1 px-2 py-1 bg-white/[0.05] border ${THEME.glassBorder} rounded text-sm text-white`} /></div>
-                    <button onClick={() => setShowDatePicker(false)} className="w-full mt-2 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 rounded text-sm font-medium">Apply</button>
+                  <div className={`mt-2 pt-2 border-t ${THEME.border} space-y-2`}>
+                    <div><label className={`text-xs ${THEME.textDim}`}>Start</label><input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className={`w-full mt-1 px-2 py-1.5 bg-slate-800/60 border ${THEME.border} rounded-lg text-sm text-white`} /></div>
+                    <div><label className={`text-xs ${THEME.textDim}`}>End</label><input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className={`w-full mt-1 px-2 py-1.5 bg-slate-800/60 border ${THEME.border} rounded-lg text-sm text-white`} /></div>
+                    <button onClick={() => setShowDatePicker(false)} className="w-full mt-2 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm font-medium text-white">Apply</button>
                   </div>
                 )}
               </div>
             )}
           </div>
-          <span className={`text-sm ${THEME.textSecondary}`}>{formatDate(dateRange.start)} — {formatDate(dateRange.end)}</span>
-          <div className="h-6 w-px bg-white/[0.08]" />
-          <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className={`px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-sm text-white`}>
+          <span className={`text-sm ${THEME.textMuted} tabular-nums`}>{formatDate(dateRange.start)} — {formatDate(dateRange.end)}</span>
+          <div className="h-5 w-px bg-slate-800" />
+          <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className={selectClass}>
             <option value="all">All Clients</option>
             {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)} className={`px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-sm text-white`}>
+          <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)} className={selectClass}>
             <option value="all">All Employees</option>
             {teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
-          <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className={`px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-sm text-white`}>
+          <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className={selectClass}>
             <option value="all">All Projects</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
           {(selectedClient !== 'all' || selectedEmployee !== 'all' || selectedProject !== 'all') && (
-            <button onClick={() => { setSelectedClient('all'); setSelectedEmployee('all'); setSelectedProject('all') }} className={`flex items-center gap-1 px-3 py-2 text-sm ${THEME.textMuted} hover:text-white`}><X size={14} />Clear</button>
+            <button onClick={() => { setSelectedClient('all'); setSelectedEmployee('all'); setSelectedProject('all') }} className={`flex items-center gap-1 px-3 py-2 text-sm ${THEME.textMuted} hover:text-white transition-colors`}><X size={14} />Clear</button>
           )}
         </div>
       </div>
 
       {/* KPI Cards — 7 metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-7 gap-3 relative z-10">
-        <KPICard title="Actual Hours" value={kpis.totalActualHours} format="hours" trend={kpis.hoursTrend} trendLabel="vs prior" icon={<Clock size={16} />} color="blue" />
-        <KPICard title="Billable Hours" value={kpis.totalBillableHours} format="hours" icon={<Layers size={16} />} color="purple" />
-        <KPICard title="Revenue" value={kpis.totalRevenue} format="currency" trend={kpis.revenueTrend} trendLabel="vs prior" icon={<DollarSign size={16} />} color="emerald" />
-        <KPICard title="Cost" value={kpis.totalCost} format="currency" trend={kpis.costTrend} trendLabel="vs prior" icon={<TrendingDown size={16} />} color="rose" />
-        <KPICard title="Gross Margin" value={kpis.grossMargin} format="currency" icon={<TrendingUp size={16} />} color={kpis.grossMargin >= 0 ? 'emerald' : 'rose'} />
-        <KPICard title="Margin %" value={kpis.marginPct} format="percent" icon={<Percent size={16} />} color={kpis.marginPct >= 20 ? 'emerald' : kpis.marginPct >= 0 ? 'amber' : 'rose'} />
-        <KPICard title="Utilization" value={kpis.utilization} format="percent" icon={<Target size={16} />} color="amber" />
+        <KPICard title="Actual Hours" value={kpis.totalActualHours} format="hours" trend={kpis.hoursTrend} trendLabel="vs prior" icon={<Clock size={15} />} accentColor="#0d9488" />
+        <KPICard title="Billable Hours" value={kpis.totalBillableHours} format="hours" icon={<Layers size={15} />} accentColor="#0891b2" />
+        <KPICard title="Revenue" value={kpis.totalRevenue} format="currency" trend={kpis.revenueTrend} trendLabel="vs prior" icon={<DollarSign size={15} />} accentColor="#059669" />
+        <KPICard title="Cost" value={kpis.totalCost} format="currency" trend={kpis.costTrend} trendLabel="vs prior" icon={<TrendingDown size={15} />} accentColor="#64748b" />
+        <KPICard title="Gross Margin" value={kpis.grossMargin} format="currency" icon={<TrendingUp size={15} />} accentColor={kpis.grossMargin >= 0 ? '#059669' : '#dc2626'} />
+        <KPICard title="Margin %" value={kpis.marginPct} format="percent" icon={<Percent size={15} />} accentColor={kpis.marginPct >= 20 ? '#059669' : kpis.marginPct >= 0 ? '#d97706' : '#dc2626'} />
+        <KPICard title="Utilization" value={kpis.utilization} format="percent" icon={<Target size={15} />} accentColor="#d97706" />
       </div>
 
       {/* View Tabs */}
-      <div className={`flex items-center gap-2 border-b ${THEME.glassBorder} pb-2 relative z-10`}>
+      <div className={`flex items-center gap-1 border-b ${THEME.border} pb-0 relative z-10`}>
         {VIEW_TABS.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-emerald-500 text-white' : `${THEME.glass} border ${THEME.glassBorder} text-slate-300 hover:bg-white/[0.08]`}`}>
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            activeTab === tab.id 
+              ? 'border-teal-400 text-teal-400' 
+              : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
+          }`}>
             {tab.icon}{tab.label}
           </button>
         ))}
@@ -988,7 +1010,7 @@ export default function TimeTrackingPage() {
       {/* ============ TRENDS VIEW ============ */}
       {activeTab === 'trends' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <CollapsibleSection title="Revenue by Client" icon={<PieChart size={16} />}>
+          <CollapsibleSection title="Revenue by Client" icon={<PieChart size={15} />}>
             <div className="h-64">
               {revenueByClientData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -996,7 +1018,7 @@ export default function TimeTrackingPage() {
                     <Pie data={revenueByClientData} cx="35%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value">
                       {revenueByClientData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
                     </Pie>
-                    <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} itemStyle={{ color: '#e2e8f0' }} labelStyle={{ color: '#94a3b8' }} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                    <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => formatCurrency(value)} />
                     <Legend layout="vertical" align="right" verticalAlign="middle" formatter={(value) => {
                       const item = revenueByClientData.find(d => d.name === value)
                       const total = revenueByClientData.reduce((sum, d) => sum + d.value, 0)
@@ -1009,17 +1031,17 @@ export default function TimeTrackingPage() {
             </div>
           </CollapsibleSection>
 
-          <CollapsibleSection title="Weekly Cost vs Revenue" icon={<Activity size={16} />}>
+          <CollapsibleSection title="Weekly Cost vs Revenue" icon={<Activity size={15} />}>
             <div className="h-64">
               {weeklyTrendData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={weeklyTrendData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" />
                     <XAxis dataKey="week" tick={{ fill: '#94a3b8', fontSize: 11 }} />
                     <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => formatCompactCurrency(v)} />
-                    <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} itemStyle={{ color: '#e2e8f0' }} labelStyle={{ color: '#94a3b8' }} cursor={{ fill: 'rgba(255,255,255,0.04)' }} formatter={(value: number, name: string) => [formatCurrency(value), name === 'cost' ? 'Cost' : 'Revenue']} />
-                    <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="#10b981" fillOpacity={0.15} name="Revenue" />
-                    <Area type="monotone" dataKey="cost" stroke="#ef4444" fill="#ef4444" fillOpacity={0.1} name="Cost" />
+                    <Tooltip {...TOOLTIP_STYLE} formatter={(value: number, name: string) => [formatCurrency(value), name === 'cost' ? 'Cost' : 'Revenue']} />
+                    <Area type="monotone" dataKey="revenue" stroke="#0d9488" fill="#0d9488" fillOpacity={0.12} name="Revenue" />
+                    <Area type="monotone" dataKey="cost" stroke="#64748b" fill="#64748b" fillOpacity={0.08} name="Cost" />
                     <Legend wrapperStyle={{ color: '#94a3b8', fontSize: '12px' }} />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -1027,17 +1049,17 @@ export default function TimeTrackingPage() {
             </div>
           </CollapsibleSection>
 
-          <CollapsibleSection title="Hours by Employee" icon={<Users size={16} />}>
+          <CollapsibleSection title="Hours by Employee" icon={<Users size={15} />}>
             <div className="h-64">
               {dataByEmployee.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={dataByEmployee.slice(0, 8)} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" />
                     <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
                     <YAxis type="category" dataKey="name" width={100} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} itemStyle={{ color: '#e2e8f0' }} labelStyle={{ color: '#94a3b8' }} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                    <Bar dataKey="totalActualHours" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Actual" />
-                    <Bar dataKey="totalBillableHours" fill="#8b5cf6" radius={[0, 4, 4, 0]} name="Billable" />
+                    <Tooltip {...TOOLTIP_STYLE} />
+                    <Bar dataKey="totalActualHours" fill="#0d9488" radius={[0, 4, 4, 0]} name="Actual" />
+                    <Bar dataKey="totalBillableHours" fill="#0d948866" radius={[0, 4, 4, 0]} name="Billable" />
                     <Legend wrapperStyle={{ color: '#94a3b8', fontSize: '12px' }} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -1045,16 +1067,16 @@ export default function TimeTrackingPage() {
             </div>
           </CollapsibleSection>
 
-          <CollapsibleSection title="Hours by Project" icon={<Briefcase size={16} />}>
+          <CollapsibleSection title="Hours by Project" icon={<Briefcase size={15} />}>
             <div className="h-64">
               {costAdjustedEntries.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={Object.values(costAdjustedEntries.reduce((acc, e) => { if (!acc[e.project_id]) acc[e.project_id] = { name: e.project_name.substring(0, 15), hours: 0 }; acc[e.project_id].hours += e.hours; return acc }, {} as Record<string, { name: string; hours: number }>)).sort((a, b) => b.hours - a.hours).slice(0, 8)} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" />
                     <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} />
                     <YAxis type="category" dataKey="name" width={100} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} itemStyle={{ color: '#e2e8f0' }} labelStyle={{ color: '#94a3b8' }} cursor={{ fill: 'rgba(255,255,255,0.04)' }} formatter={(value: number) => [`${value.toFixed(1)} hrs`, 'Hours']} />
-                    <Bar dataKey="hours" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                    <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => [`${value.toFixed(1)} hrs`, 'Hours']} />
+                    <Bar dataKey="hours" fill="#0891b2" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : <div className="flex items-center justify-center h-full text-slate-500">No data</div>}
@@ -1067,92 +1089,92 @@ export default function TimeTrackingPage() {
       {activeTab === 'byClient' && (
         <div className="space-y-3">
           {dataByClient.length > 0 ? dataByClient.map((client, clientIndex) => (
-            <div key={client.id} className={`rounded-xl border ${THEME.glass} ${THEME.glassBorder} overflow-hidden`}>
-              <button onClick={() => toggleClient(client.id)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.03] transition-colors">
+            <div key={client.id} className={`rounded-xl ${THEME.card} border overflow-hidden`}>
+              <button onClick={() => toggleClient(client.id)} className={`w-full flex items-center justify-between px-5 py-3.5 ${THEME.cardHover} transition-colors`}>
                 <div className="flex items-center gap-3">
-                  {expandedClients.has(client.id) ? <ChevronDown size={18} className="text-slate-400" /> : <ChevronRight size={18} className="text-slate-400" />}
-                  <Building2 size={18} style={{ color: CHART_COLORS[clientIndex % CHART_COLORS.length] }} />
-                  <h3 className="text-base font-semibold text-white">{client.name}</h3>
+                  {expandedClients.has(client.id) ? <ChevronDown size={16} className="text-slate-500" /> : <ChevronRight size={16} className="text-slate-500" />}
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS[clientIndex % CHART_COLORS.length] }} />
+                  <h3 className="text-sm font-semibold text-white">{client.name}</h3>
                 </div>
                 <div className="flex items-center gap-6 text-sm">
-                  <div className="text-right">
-                    <span className="text-blue-400">{client.totalActualHours.toFixed(1)} hrs</span>
+                  <div className="text-right tabular-nums">
+                    <span className="text-slate-300">{client.totalActualHours.toFixed(1)} hrs</span>
                     {client.totalBillableHours !== client.totalActualHours && (
-                      <span className="text-orange-400 ml-2">({client.totalBillableHours.toFixed(1)} billed)</span>
+                      <span className="text-amber-400 ml-2 text-xs">({client.totalBillableHours.toFixed(1)} billed)</span>
                     )}
                   </div>
-                  <div className="text-right">
-                    <span className="text-rose-400">{formatCurrency(client.totalCost)}</span>
+                  <div className="text-right tabular-nums">
+                    <span className="text-slate-400">{formatCurrency(client.totalCost)}</span>
                     <span className="text-slate-600 mx-1">/</span>
-                    <span className="text-emerald-400 font-medium">{formatCurrency(client.totalRevenue)}</span>
+                    <span className="text-white font-medium">{formatCurrency(client.totalRevenue)}</span>
                   </div>
                   {(() => { const mp = calcMarginPct(client.totalRevenue, client.totalCost); return (
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${marginBadgeClass(mp)}`}>
-                      {mp.toFixed(1)}% margin
+                      {mp.toFixed(1)}%
                     </span>
                   ) })()}
                 </div>
               </button>
               {expandedClients.has(client.id) && (
-                <div className={`border-t ${THEME.glassBorder}`}>
+                <div className={`border-t ${THEME.border}`}>
                   {Object.values(client.projects).map((project, projectIndex) => (
-                    <div key={project.id} className={`border-b ${THEME.glassBorder} last:border-b-0`}>
-                      <button onClick={() => toggleProject(project.id)} className="w-full flex items-center justify-between px-6 py-2 hover:bg-white/[0.03] transition-colors">
+                    <div key={project.id} className={`border-b ${THEME.border} last:border-b-0`}>
+                      <button onClick={() => toggleProject(project.id)} className={`w-full flex items-center justify-between px-6 py-2.5 ${THEME.cardHover} transition-colors`}>
                         <div className="flex items-center gap-2">
-                          {expandedProjects.has(project.id) ? <ChevronDown size={14} className="text-slate-500" /> : <ChevronRight size={14} className="text-slate-500" />}
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${['bg-blue-500/20 text-blue-400', 'bg-emerald-500/20 text-emerald-400', 'bg-amber-500/20 text-amber-400', 'bg-purple-500/20 text-purple-400', 'bg-rose-500/20 text-rose-400'][projectIndex % 5]}`}>{project.name}</span>
+                          {expandedProjects.has(project.id) ? <ChevronDown size={13} className="text-slate-500" /> : <ChevronRight size={13} className="text-slate-500" />}
+                          <span className="text-sm font-medium text-slate-200">{project.name}</span>
                         </div>
-                        <div className="flex items-center gap-4 text-xs">
-                          <span className="text-blue-400">{project.totalActualHours.toFixed(1)} hrs</span>
-                          <span className="text-rose-400">{formatCurrency(project.totalCost)}</span>
-                          <span className="text-emerald-400">{formatCurrency(project.totalRevenue)}</span>
+                        <div className="flex items-center gap-5 text-xs tabular-nums">
+                          <span className="text-slate-400">{project.totalActualHours.toFixed(1)} hrs</span>
+                          <span className="text-slate-400">{formatCurrency(project.totalCost)}</span>
+                          <span className="text-slate-200">{formatCurrency(project.totalRevenue)}</span>
                         </div>
                       </button>
                       {expandedProjects.has(project.id) && (
                         <div className="px-6 pb-3 overflow-x-auto">
                           <table className="w-full text-sm">
-                            <thead><tr className={`border-b ${THEME.glassBorder}`}>
-                              <th className={`px-2 py-2 text-left ${THEME.textMuted} font-medium w-32`}>Name</th>
-                              <th className={`px-2 py-2 text-right ${THEME.textMuted} font-medium w-20`}>Cost Rate</th>
-                              <th className={`px-2 py-2 text-right ${THEME.textMuted} font-medium w-20`}>Bill Rate</th>
-                              {weekColumns.map(week => <th key={week.end} className={`px-2 py-2 text-right ${THEME.textMuted} font-medium w-16`}>{week.label}</th>)}
-                              <th className={`px-2 py-2 text-right ${THEME.textMuted} font-medium w-20`}>Actual</th>
-                              <th className={`px-2 py-2 text-right ${THEME.textMuted} font-medium w-20`}>Billed</th>
-                              <th className={`px-2 py-2 text-right ${THEME.textMuted} font-medium w-24`}>Cost</th>
-                              <th className={`px-2 py-2 text-right ${THEME.textMuted} font-medium w-24`}>Revenue</th>
+                            <thead><tr className={`border-b ${THEME.border}`}>
+                              <th className={`px-2 py-2 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-32`}>Name</th>
+                              <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-20`}>Cost</th>
+                              <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-20`}>Bill</th>
+                              {weekColumns.map(week => <th key={week.end} className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} w-16`}>{week.label}</th>)}
+                              <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-20`}>Actual</th>
+                              <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-20`}>Billed</th>
+                              <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-24`}>Cost</th>
+                              <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-24`}>Revenue</th>
                             </tr></thead>
                             <tbody>
                               {Object.values(project.members).sort((a, b) => b.totalActualHours - a.totalActualHours).map(member => (
-                                <tr key={member.id} className={`border-b ${THEME.glassBorder} border-opacity-30 hover:bg-white/[0.03]`}>
-                                  <td className="px-2 py-2 text-slate-200">{member.name}</td>
-                                  <td className="px-2 py-2 text-right text-rose-400 text-xs">{formatCurrency(member.costRate)}</td>
-                                  <td className="px-2 py-2 text-right text-emerald-400 text-xs">{formatCurrency(member.billRate)}</td>
+                                <tr key={member.id} className={`border-b ${THEME.border} border-opacity-30 hover:bg-slate-800/30`}>
+                                  <td className="px-2 py-2 text-slate-200 text-sm">{member.name}</td>
+                                  <td className="px-2 py-2 text-right text-slate-400 text-xs tabular-nums">{formatCurrency(member.costRate)}</td>
+                                  <td className="px-2 py-2 text-right text-slate-300 text-xs tabular-nums">{formatCurrency(member.billRate)}</td>
                                   {weekColumns.map(week => (
-                                    <td key={week.end} className="px-2 py-2 text-right text-slate-300">
+                                    <td key={week.end} className="px-2 py-2 text-right text-slate-300 tabular-nums">
                                       {(member.weekActualHours[week.end] || 0).toFixed(1)}
                                       {member.weekBillableHours[week.end] && member.weekBillableHours[week.end] !== member.weekActualHours[week.end] && (
-                                        <span className="text-orange-400 text-xs ml-0.5">({member.weekBillableHours[week.end]?.toFixed(1)})</span>
+                                        <span className="text-amber-400 text-xs ml-0.5">({member.weekBillableHours[week.end]?.toFixed(1)})</span>
                                       )}
                                     </td>
                                   ))}
-                                  <td className="px-2 py-2 text-right text-blue-400 font-medium">{member.totalActualHours.toFixed(1)}</td>
-                                  <td className={`px-2 py-2 text-right font-medium ${member.totalBillableHours !== member.totalActualHours ? 'text-orange-400' : 'text-slate-400'}`}>
+                                  <td className="px-2 py-2 text-right text-white font-medium tabular-nums">{member.totalActualHours.toFixed(1)}</td>
+                                  <td className={`px-2 py-2 text-right font-medium tabular-nums ${member.totalBillableHours !== member.totalActualHours ? 'text-amber-400' : 'text-slate-400'}`}>
                                     {member.totalBillableHours.toFixed(1)}
                                   </td>
-                                  <td className="px-2 py-2 text-right text-rose-400">{formatCurrency(member.totalCost)}</td>
-                                  <td className="px-2 py-2 text-right text-emerald-400 font-medium">{formatCurrency(member.totalRevenue)}</td>
+                                  <td className="px-2 py-2 text-right text-slate-400 tabular-nums">{formatCurrency(member.totalCost)}</td>
+                                  <td className="px-2 py-2 text-right text-white font-medium tabular-nums">{formatCurrency(member.totalRevenue)}</td>
                                 </tr>
                               ))}
-                              <tr className="bg-white/[0.02] font-medium">
-                                <td className="px-2 py-2 text-slate-300" colSpan={3}>PROJECT TOTAL</td>
+                              <tr className="bg-slate-800/30 font-medium">
+                                <td className="px-2 py-2 text-slate-300 text-xs uppercase tracking-wider" colSpan={3}>Project Total</td>
                                 {weekColumns.map(week => {
                                   const weekTotal = Object.values(project.members).reduce((sum, m) => sum + (m.weekActualHours[week.end] || 0), 0)
-                                  return <td key={week.end} className="px-2 py-2 text-right text-slate-300">{weekTotal.toFixed(1)}</td>
+                                  return <td key={week.end} className="px-2 py-2 text-right text-slate-300 tabular-nums">{weekTotal.toFixed(1)}</td>
                                 })}
-                                <td className="px-2 py-2 text-right text-blue-400">{project.totalActualHours.toFixed(1)}</td>
-                                <td className="px-2 py-2 text-right text-orange-400">{project.totalBillableHours.toFixed(1)}</td>
-                                <td className="px-2 py-2 text-right text-rose-400">{formatCurrency(project.totalCost)}</td>
-                                <td className="px-2 py-2 text-right text-emerald-400">{formatCurrency(project.totalRevenue)}</td>
+                                <td className="px-2 py-2 text-right text-white tabular-nums">{project.totalActualHours.toFixed(1)}</td>
+                                <td className="px-2 py-2 text-right text-amber-400 tabular-nums">{project.totalBillableHours.toFixed(1)}</td>
+                                <td className="px-2 py-2 text-right text-slate-400 tabular-nums">{formatCurrency(project.totalCost)}</td>
+                                <td className="px-2 py-2 text-right text-white tabular-nums">{formatCurrency(project.totalRevenue)}</td>
                               </tr>
                             </tbody>
                           </table>
@@ -1163,15 +1185,15 @@ export default function TimeTrackingPage() {
                 </div>
               )}
             </div>
-          )) : <div className={`text-center py-12 ${THEME.textMuted}`}>No time entries for this period</div>}
+          )) : <div className={`text-center py-12 ${THEME.textDim}`}>No time entries for this period</div>}
           {dataByClient.length > 0 && (
-            <div className={`p-4 rounded-xl ${THEME.glass} border ${THEME.glassBorder} flex items-center justify-between`}>
-              <span className={`text-lg font-semibold ${THEME.textPrimary}`}>GRAND TOTAL</span>
-              <div className="flex items-center gap-6">
-                <span className="text-lg font-semibold text-blue-400">{kpis.totalActualHours.toFixed(1)} hrs</span>
-                <span className="text-lg text-rose-400">{formatCurrency(kpis.totalCost)}</span>
-                <span className="text-lg font-semibold text-emerald-400">{formatCurrency(kpis.totalRevenue)}</span>
-                <span className={`text-lg font-bold ${kpis.grossMargin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(kpis.grossMargin)}</span>
+            <div className={`p-4 rounded-xl ${THEME.card} border flex items-center justify-between`}>
+              <span className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Grand Total</span>
+              <div className="flex items-center gap-6 tabular-nums">
+                <span className="text-sm font-semibold text-white">{kpis.totalActualHours.toFixed(1)} hrs</span>
+                <span className="text-sm text-slate-400">{formatCurrency(kpis.totalCost)}</span>
+                <span className="text-sm font-semibold text-white">{formatCurrency(kpis.totalRevenue)}</span>
+                <span className={`text-sm font-bold ${kpis.grossMargin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(kpis.grossMargin)}</span>
               </div>
             </div>
           )}
@@ -1185,16 +1207,15 @@ export default function TimeTrackingPage() {
             <CollapsibleSection
               key={employee.id}
               title={employee.name}
-              icon={<User size={16} style={{ color: CHART_COLORS[index % CHART_COLORS.length] }} />}
+              icon={<User size={15} style={{ color: CHART_COLORS[index % CHART_COLORS.length] }} />}
               badge={`${employee.totalActualHours.toFixed(1)} hrs`}
-              badgeColor="blue"
               rightContent={
                 <div className="flex items-center gap-4 mr-4">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${employee.empType === 'employee' ? 'bg-blue-500/10 text-blue-400' : 'bg-purple-500/10 text-purple-400'}`}>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${employee.empType === 'employee' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-slate-700/60 text-slate-300 border border-slate-600/40'}`}>
                     {employee.empType === 'employee' ? 'W-2' : '1099'}
                   </span>
-                  <span className="text-rose-400 text-sm">{formatCurrency(employee.totalCost)}</span>
-                  <span className="text-emerald-400 font-medium text-sm">{formatCurrency(employee.totalRevenue)}</span>
+                  <span className="text-slate-400 text-sm tabular-nums">{formatCurrency(employee.totalCost)}</span>
+                  <span className="text-white font-medium text-sm tabular-nums">{formatCurrency(employee.totalRevenue)}</span>
                   {(() => { const mp = calcMarginPct(employee.totalRevenue, employee.totalCost); return (
                     <span className={`text-xs font-medium ${marginColor(mp)}`}>
                       {mp.toFixed(1)}%
@@ -1206,23 +1227,23 @@ export default function TimeTrackingPage() {
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <h4 className="text-xs font-medium text-slate-400 uppercase mb-2">By Client</h4>
-                  <div className="space-y-2">
+                  <h4 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">By Client</h4>
+                  <div className="space-y-1.5">
                     {Object.entries(employee.clients).sort((a, b) => b[1].actualHours - a[1].actualHours).map(([clientId, data], i) => (
-                      <div key={clientId} className="flex items-center justify-between p-2 rounded bg-white/[0.03]">
+                      <div key={clientId} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-800/30">
                         <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} /><span className="text-sm text-slate-200">{data.name}</span></div>
-                        <div className="flex items-center gap-3 text-xs">
-                          <span className="text-blue-400">{data.actualHours.toFixed(1)} hrs</span>
-                          {data.billableHours !== data.actualHours && <span className="text-orange-400">({data.billableHours.toFixed(1)} billed)</span>}
-                          <span className="text-rose-400">{formatCurrency(data.cost)}</span>
-                          <span className="text-emerald-400">{formatCurrency(data.revenue)}</span>
+                        <div className="flex items-center gap-3 text-xs tabular-nums">
+                          <span className="text-slate-300">{data.actualHours.toFixed(1)} hrs</span>
+                          {data.billableHours !== data.actualHours && <span className="text-amber-400">({data.billableHours.toFixed(1)} billed)</span>}
+                          <span className="text-slate-400">{formatCurrency(data.cost)}</span>
+                          <span className="text-white">{formatCurrency(data.revenue)}</span>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <h4 className="text-xs font-medium text-slate-400 uppercase mb-2">Distribution</h4>
+                  <h4 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Distribution</h4>
                   <div className="h-32">
                     <ResponsiveContainer width="100%" height="100%">
                       <RechartsPie><Pie data={Object.entries(employee.clients).map(([id, data], i) => ({ name: data.name, value: data.actualHours, fill: CHART_COLORS[i % CHART_COLORS.length] }))} cx="50%" cy="50%" innerRadius={30} outerRadius={50} dataKey="value">
@@ -1239,34 +1260,25 @@ export default function TimeTrackingPage() {
 
       {/* ============ DETAILED VIEW ============ */}
       {activeTab === 'detailed' && (
-        <CollapsibleSection title="Time Entries" badge={costAdjustedEntries.length} icon={<Calendar size={16} />}>
+        <CollapsibleSection title="Time Entries" badge={costAdjustedEntries.length} icon={<Calendar size={15} />}>
           {/* Inline Filter Bar */}
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-1.5 text-xs text-slate-500">
-              <Filter size={14} />
+              <Filter size={13} />
               <span className="font-medium text-slate-400">Filter:</span>
             </div>
-            <select
-              value={selectedEmployee}
-              onChange={(e) => setSelectedEmployee(e.target.value)}
-              className={`px-3 py-1.5 bg-white/[0.05] border ${selectedEmployee !== 'all' ? 'border-blue-500/40 ring-1 ring-blue-500/20' : THEME.glassBorder} rounded-lg text-xs text-white transition-colors hover:bg-white/[0.08]`}
-            >
+            <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)}
+              className={`px-3 py-1.5 bg-slate-800/60 border ${selectedEmployee !== 'all' ? 'border-teal-500/40 ring-1 ring-teal-500/20' : THEME.border} rounded-lg text-xs text-white transition-colors hover:bg-slate-700/60`}>
               <option value="all">All Employees</option>
               {teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
-            <select
-              value={selectedClient}
-              onChange={(e) => setSelectedClient(e.target.value)}
-              className={`px-3 py-1.5 bg-white/[0.05] border ${selectedClient !== 'all' ? 'border-emerald-500/40 ring-1 ring-emerald-500/20' : THEME.glassBorder} rounded-lg text-xs text-white transition-colors hover:bg-white/[0.08]`}
-            >
+            <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)}
+              className={`px-3 py-1.5 bg-slate-800/60 border ${selectedClient !== 'all' ? 'border-teal-500/40 ring-1 ring-teal-500/20' : THEME.border} rounded-lg text-xs text-white transition-colors hover:bg-slate-700/60`}>
               <option value="all">All Clients</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            <select
-              value={selectedProject}
-              onChange={(e) => setSelectedProject(e.target.value)}
-              className={`px-3 py-1.5 bg-white/[0.05] border ${selectedProject !== 'all' ? 'border-purple-500/40 ring-1 ring-purple-500/20' : THEME.glassBorder} rounded-lg text-xs text-white transition-colors hover:bg-white/[0.08]`}
-            >
+            <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)}
+              className={`px-3 py-1.5 bg-slate-800/60 border ${selectedProject !== 'all' ? 'border-teal-500/40 ring-1 ring-teal-500/20' : THEME.border} rounded-lg text-xs text-white transition-colors hover:bg-slate-700/60`}>
               <option value="all">All Projects</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
@@ -1275,22 +1287,22 @@ export default function TimeTrackingPage() {
                 <button onClick={() => { setSelectedClient('all'); setSelectedEmployee('all'); setSelectedProject('all') }} className="flex items-center gap-1 px-2 py-1 text-xs text-slate-400 hover:text-white transition-colors">
                   <X size={12} />Clear all
                 </button>
-                <div className="h-4 w-px bg-white/[0.08]" />
+                <div className="h-4 w-px bg-slate-800" />
                 <div className="flex items-center gap-1.5">
                   {selectedEmployee !== 'all' && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/15 text-blue-400 rounded text-xs">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-teal-500/10 text-teal-400 rounded text-xs border border-teal-500/20">
                       <User size={10} />{teamMembers.find(t => t.id === selectedEmployee)?.name}
                       <button onClick={() => setSelectedEmployee('all')} className="ml-0.5 hover:text-white"><X size={10} /></button>
                     </span>
                   )}
                   {selectedClient !== 'all' && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/15 text-emerald-400 rounded text-xs">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-teal-500/10 text-teal-400 rounded text-xs border border-teal-500/20">
                       <Building2 size={10} />{clients.find(c => c.id === selectedClient)?.name}
                       <button onClick={() => setSelectedClient('all')} className="ml-0.5 hover:text-white"><X size={10} /></button>
                     </span>
                   )}
                   {selectedProject !== 'all' && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-500/15 text-purple-400 rounded text-xs">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-teal-500/10 text-teal-400 rounded text-xs border border-teal-500/20">
                       <Briefcase size={10} />{projects.find(p => p.id === selectedProject)?.name}
                       <button onClick={() => setSelectedProject('all')} className="ml-0.5 hover:text-white"><X size={10} /></button>
                     </span>
@@ -1298,34 +1310,34 @@ export default function TimeTrackingPage() {
                 </div>
               </>
             )}
-            <div className="ml-auto text-xs text-slate-500">
+            <div className="ml-auto text-xs text-slate-500 tabular-nums">
               {costAdjustedEntries.length} {costAdjustedEntries.length !== entries.filter(e => e.date >= dateRange.start && e.date <= dateRange.end).length ? `of ${entries.filter(e => e.date >= dateRange.start && e.date <= dateRange.end).length} ` : ''}entries
             </div>
           </div>
           {/* Legend */}
           <div className="mb-3 flex items-center gap-2">
             <div className="flex items-center gap-2 text-xs text-slate-500">
-              <div className="flex items-center gap-1"><Lock size={12} /><span>Actual Hours = cost (contractor submitted)</span></div>
-              <span className="text-slate-600">|</span>
-              <div className="flex items-center gap-1"><Edit2 size={12} className="text-orange-400" /><span className="text-orange-400">Billable Hours = revenue (click to adjust)</span></div>
+              <div className="flex items-center gap-1"><Lock size={11} /><span>Actual Hours = cost (contractor submitted)</span></div>
+              <span className="text-slate-700">|</span>
+              <div className="flex items-center gap-1"><Edit2 size={11} className="text-amber-400" /><span className="text-amber-400">Billable Hours = revenue (click to adjust)</span></div>
             </div>
           </div>
-          <div className={`overflow-x-auto rounded-lg border ${THEME.glassBorder}`}>
+          <div className={`overflow-x-auto rounded-lg border ${THEME.border}`}>
             <table className="w-full text-sm">
-              <thead><tr className="bg-white/[0.02]">
-                <th className={`px-3 py-3 text-left font-medium ${THEME.textMuted}`}>Date</th>
-                <th className={`px-3 py-3 text-left font-medium ${THEME.textMuted}`}>Employee</th>
-                <th className={`px-3 py-3 text-left font-medium ${THEME.textMuted}`}>Client</th>
-                <th className={`px-3 py-3 text-left font-medium ${THEME.textMuted}`}>Project</th>
-                <th className={`px-3 py-3 text-right font-medium text-blue-400`}>Actual Hrs</th>
-                <th className={`px-3 py-3 text-right font-medium text-orange-400`}>Billable Hrs</th>
-                <th className={`px-3 py-3 text-right font-medium text-rose-400`}>Cost Rate</th>
-                <th className={`px-3 py-3 text-right font-medium text-emerald-400`}>Bill Rate</th>
-                <th className={`px-3 py-3 text-right font-medium text-rose-400`}>Cost</th>
-                <th className={`px-3 py-3 text-right font-medium text-emerald-400`}>Revenue</th>
-                <th className={`px-3 py-3 text-right font-medium ${THEME.textMuted}`}>Margin</th>
-                <th className={`px-3 py-3 text-left font-medium ${THEME.textMuted}`}>Notes</th>
-                <th className={`px-3 py-3 text-center font-medium ${THEME.textMuted}`}>⚡</th>
+              <thead><tr className="bg-slate-800/40">
+                <th className={`px-3 py-3 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Date</th>
+                <th className={`px-3 py-3 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Employee</th>
+                <th className={`px-3 py-3 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Client</th>
+                <th className={`px-3 py-3 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Project</th>
+                <th className={`px-3 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Actual</th>
+                <th className={`px-3 py-3 text-right text-xs font-medium text-amber-500/80 uppercase tracking-wider`}>Billable</th>
+                <th className={`px-3 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Cost Rate</th>
+                <th className={`px-3 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Bill Rate</th>
+                <th className={`px-3 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Cost</th>
+                <th className={`px-3 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Revenue</th>
+                <th className={`px-3 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Margin</th>
+                <th className={`px-3 py-3 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Notes</th>
+                <th className={`px-3 py-3 text-center text-xs font-medium ${THEME.textDim}`}></th>
               </tr></thead>
               <tbody>
                 {costAdjustedEntries.length > 0 ? costAdjustedEntries.slice(0, 100).map((entry) => {
@@ -1333,13 +1345,13 @@ export default function TimeTrackingPage() {
                   const revenue = entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
                   const margin = revenue - cost
                   return (
-                    <tr key={entry.id} className={`border-t ${THEME.glassBorder} hover:bg-white/[0.03]`}>
-                      <td className={`px-3 py-2.5 ${THEME.textSecondary} whitespace-nowrap text-xs`}>{formatDate(entry.date)}</td>
-                      <td className={`px-3 py-2.5 ${THEME.textPrimary}`}>{entry.team_member_name}</td>
-                      <td className={`px-3 py-2.5 ${THEME.textMuted} text-xs`}>{entry.client_name || '—'}</td>
-                      <td className={`px-3 py-2.5 ${THEME.textPrimary} text-xs`}>{entry.project_name}</td>
+                    <tr key={entry.id} className={`border-t ${THEME.border} hover:bg-slate-800/30`}>
+                      <td className={`px-3 py-2.5 ${THEME.textMuted} whitespace-nowrap text-xs tabular-nums`}>{formatDate(entry.date)}</td>
+                      <td className={`px-3 py-2.5 text-white text-sm`}>{entry.team_member_name}</td>
+                      <td className={`px-3 py-2.5 ${THEME.textDim} text-xs`}>{entry.client_name || '—'}</td>
+                      <td className={`px-3 py-2.5 text-slate-300 text-xs`}>{entry.project_name}</td>
                       <td className="px-3 py-2.5 text-right">
-                        <span className="text-blue-400 flex items-center justify-end gap-1">
+                        <span className="text-slate-300 flex items-center justify-end gap-1 tabular-nums">
                           <Lock size={10} className="text-slate-600" />{entry.hours.toFixed(1)}
                         </span>
                       </td>
@@ -1350,24 +1362,24 @@ export default function TimeTrackingPage() {
                           onSave={(newValue) => updateBillableHours(entry.id, newValue)}
                         />
                       </td>
-                      <td className={`px-3 py-2.5 text-right text-xs ${THEME.textMuted}`}>{formatCurrency(entry.display_cost_rate)}</td>
-                      <td className={`px-3 py-2.5 text-right text-xs ${THEME.textMuted}`}>{formatCurrency(entry.bill_rate)}</td>
-                      <td className="px-3 py-2.5 text-right text-rose-400 text-xs">{formatCurrency(cost)}</td>
-                      <td className="px-3 py-2.5 text-right text-emerald-400 text-xs">{formatCurrency(revenue)}</td>
-                      <td className={`px-3 py-2.5 text-right text-xs font-medium ${margin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(margin)}</td>
-                      <td className={`px-3 py-2.5 ${THEME.textMuted} text-xs max-w-[120px] truncate`}>{entry.notes || '—'}</td>
+                      <td className={`px-3 py-2.5 text-right text-xs ${THEME.textDim} tabular-nums`}>{formatCurrency(entry.display_cost_rate)}</td>
+                      <td className={`px-3 py-2.5 text-right text-xs ${THEME.textDim} tabular-nums`}>{formatCurrency(entry.bill_rate)}</td>
+                      <td className="px-3 py-2.5 text-right text-slate-400 text-xs tabular-nums">{formatCurrency(cost)}</td>
+                      <td className="px-3 py-2.5 text-right text-white text-xs tabular-nums">{formatCurrency(revenue)}</td>
+                      <td className={`px-3 py-2.5 text-right text-xs font-medium tabular-nums ${margin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(margin)}</td>
+                      <td className={`px-3 py-2.5 ${THEME.textDim} text-xs max-w-[120px] truncate`}>{entry.notes || '—'}</td>
                       <td className="px-3 py-2.5">
-                        <button onClick={() => deleteEntry(entry.id)} className="p-1.5 rounded bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-colors" title="Delete">
-                          <Trash2 size={14} />
+                        <button onClick={() => deleteEntry(entry.id)} className="p-1.5 rounded bg-slate-800 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors" title="Delete">
+                          <Trash2 size={13} />
                         </button>
                       </td>
                     </tr>
                   )
-                }) : <tr><td colSpan={13} className={`px-4 py-12 text-center ${THEME.textMuted}`}>No time entries found</td></tr>}
+                }) : <tr><td colSpan={13} className={`px-4 py-12 text-center ${THEME.textDim}`}>No time entries found</td></tr>}
               </tbody>
             </table>
           </div>
-          {costAdjustedEntries.length > 100 && <p className="text-center text-sm text-slate-400 mt-2">Showing first 100 of {costAdjustedEntries.length} entries</p>}
+          {costAdjustedEntries.length > 100 && <p className="text-center text-sm text-slate-500 mt-2">Showing first 100 of {costAdjustedEntries.length} entries</p>}
         </CollapsibleSection>
       )}
 
@@ -1375,53 +1387,52 @@ export default function TimeTrackingPage() {
       {activeTab === 'profitability' && (
         <div className="space-y-6">
           {/* Margin Chart */}
-          <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-6`}>
-            <h3 className={`text-sm font-semibold ${THEME.textPrimary} mb-4`}>Profitability by Project</h3>
+          <div className={`${THEME.card} border rounded-xl p-6`}>
+            <h3 className="text-sm font-semibold text-white mb-4">Profitability by Project</h3>
             {profitabilityByProject.length > 0 ? (
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={profitabilityByProject.slice(0, 10)} margin={{ left: 20, right: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" />
                     <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} angle={-20} textAnchor="end" height={60} />
                     <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={v => formatCompactCurrency(v)} />
-                    <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} itemStyle={{ color: '#e2e8f0' }} labelStyle={{ color: '#94a3b8' }} cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                      formatter={(value: number, name: string) => [formatCurrency(value), name]} />
+                    <Tooltip {...TOOLTIP_STYLE} formatter={(value: number, name: string) => [formatCurrency(value), name]} />
                     <Legend wrapperStyle={{ color: '#94a3b8', fontSize: '12px' }} />
-                    <Bar dataKey="cost" name="Cost" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="revenue" name="Revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="cost" name="Cost" fill="#64748b" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="revenue" name="Revenue" fill="#0d9488" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-            ) : <div className={`text-center py-12 ${THEME.textMuted}`}><BarChart3 size={48} className="mx-auto text-slate-600 mb-4" /><p>No profitability data yet</p></div>}
+            ) : <div className={`text-center py-12 ${THEME.textDim}`}><BarChart3 size={48} className="mx-auto text-slate-700 mb-4" /><p>No profitability data yet</p></div>}
           </div>
 
           {/* Margin Table */}
           {profitabilityByProject.length > 0 && (
-            <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
-              <div className={`px-6 py-4 border-b ${THEME.glassBorder}`}>
-                <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Margin Detail by Project</h3>
+            <div className={`${THEME.card} border rounded-xl overflow-hidden`}>
+              <div className={`px-6 py-4 border-b ${THEME.border}`}>
+                <h3 className="text-sm font-semibold text-white">Margin Detail by Project</h3>
               </div>
               <table className="w-full text-sm">
-                <thead><tr className="bg-white/[0.02]">
-                  <th className={`px-4 py-3 text-left font-medium ${THEME.textMuted}`}>Project</th>
-                  <th className={`px-4 py-3 text-left font-medium ${THEME.textMuted}`}>Client</th>
-                  <th className={`px-4 py-3 text-right font-medium text-blue-400`}>Actual Hrs</th>
-                  <th className={`px-4 py-3 text-right font-medium text-orange-400`}>Billed Hrs</th>
-                  <th className={`px-4 py-3 text-right font-medium text-rose-400`}>Cost</th>
-                  <th className={`px-4 py-3 text-right font-medium text-emerald-400`}>Revenue</th>
-                  <th className={`px-4 py-3 text-right font-medium ${THEME.textMuted}`}>Margin</th>
-                  <th className={`px-4 py-3 text-right font-medium ${THEME.textMuted}`}>Margin %</th>
+                <thead><tr className="bg-slate-800/40">
+                  <th className={`px-4 py-3 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Project</th>
+                  <th className={`px-4 py-3 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Client</th>
+                  <th className={`px-4 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Actual Hrs</th>
+                  <th className={`px-4 py-3 text-right text-xs font-medium text-amber-500/80 uppercase tracking-wider`}>Billed Hrs</th>
+                  <th className={`px-4 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Cost</th>
+                  <th className={`px-4 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Revenue</th>
+                  <th className={`px-4 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Margin</th>
+                  <th className={`px-4 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Margin %</th>
                 </tr></thead>
                 <tbody>
                   {profitabilityByProject.map(row => (
-                    <tr key={row.id} className={`border-t ${THEME.glassBorder} hover:bg-white/[0.03]`}>
-                      <td className={`px-4 py-3 font-medium ${THEME.textPrimary}`}>{row.name}</td>
-                      <td className={`px-4 py-3 ${THEME.textMuted}`}>{row.clientName || '—'}</td>
-                      <td className="px-4 py-3 text-right text-blue-400">{row.actualHours.toFixed(1)}</td>
-                      <td className={`px-4 py-3 text-right ${row.billableHours !== row.actualHours ? 'text-orange-400' : THEME.textSecondary}`}>{row.billableHours.toFixed(1)}</td>
-                      <td className="px-4 py-3 text-right text-rose-400">{formatCurrency(row.cost)}</td>
-                      <td className="px-4 py-3 text-right text-emerald-400">{formatCurrency(row.revenue)}</td>
-                      <td className={`px-4 py-3 text-right font-medium ${row.margin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(row.margin)}</td>
+                    <tr key={row.id} className={`border-t ${THEME.border} hover:bg-slate-800/30`}>
+                      <td className="px-4 py-3 font-medium text-white">{row.name}</td>
+                      <td className={`px-4 py-3 ${THEME.textDim}`}>{row.clientName || '—'}</td>
+                      <td className="px-4 py-3 text-right text-slate-300 tabular-nums">{row.actualHours.toFixed(1)}</td>
+                      <td className={`px-4 py-3 text-right tabular-nums ${row.billableHours !== row.actualHours ? 'text-amber-400' : THEME.textMuted}`}>{row.billableHours.toFixed(1)}</td>
+                      <td className="px-4 py-3 text-right text-slate-400 tabular-nums">{formatCurrency(row.cost)}</td>
+                      <td className="px-4 py-3 text-right text-white tabular-nums">{formatCurrency(row.revenue)}</td>
+                      <td className={`px-4 py-3 text-right font-medium tabular-nums ${row.margin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(row.margin)}</td>
                       <td className="px-4 py-3 text-right">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${marginBadgeClass(row.marginPct)}`}>
                           {row.marginPct.toFixed(1)}%
@@ -1429,15 +1440,15 @@ export default function TimeTrackingPage() {
                       </td>
                     </tr>
                   ))}
-                  <tr className="bg-white/[0.03] font-medium">
-                    <td className={`px-4 py-3 ${THEME.textPrimary}`} colSpan={2}>TOTAL</td>
-                    <td className="px-4 py-3 text-right text-blue-400">{kpis.totalActualHours.toFixed(1)}</td>
-                    <td className="px-4 py-3 text-right text-orange-400">{kpis.totalBillableHours.toFixed(1)}</td>
-                    <td className="px-4 py-3 text-right text-rose-400">{formatCurrency(kpis.totalCost)}</td>
-                    <td className="px-4 py-3 text-right text-emerald-400">{formatCurrency(kpis.totalRevenue)}</td>
-                    <td className={`px-4 py-3 text-right font-bold ${kpis.grossMargin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(kpis.grossMargin)}</td>
+                  <tr className="bg-slate-800/30 font-medium">
+                    <td className="px-4 py-3 text-slate-300 text-xs uppercase tracking-wider" colSpan={2}>Total</td>
+                    <td className="px-4 py-3 text-right text-white tabular-nums">{kpis.totalActualHours.toFixed(1)}</td>
+                    <td className="px-4 py-3 text-right text-amber-400 tabular-nums">{kpis.totalBillableHours.toFixed(1)}</td>
+                    <td className="px-4 py-3 text-right text-slate-400 tabular-nums">{formatCurrency(kpis.totalCost)}</td>
+                    <td className="px-4 py-3 text-right text-white tabular-nums">{formatCurrency(kpis.totalRevenue)}</td>
+                    <td className={`px-4 py-3 text-right font-bold tabular-nums ${kpis.grossMargin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(kpis.grossMargin)}</td>
                     <td className="px-4 py-3 text-right">
-                      <span className={`px-2 py-1 rounded text-sm font-bold ${kpis.marginPct >= 20 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                      <span className={`px-2 py-1 rounded text-sm font-bold ${kpis.marginPct >= 20 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
                         {kpis.marginPct.toFixed(1)}%
                       </span>
                     </td>
@@ -1452,33 +1463,33 @@ export default function TimeTrackingPage() {
       {/* ============ ENTRY MODAL ============ */}
       {showEntryModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-6 w-full max-w-lg shadow-2xl`}>
-            <h3 className={`text-lg font-semibold ${THEME.textPrimary} mb-4`}>Add Time Entry</h3>
+          <div className={`${THEME.card} border rounded-xl p-6 w-full max-w-lg shadow-2xl`}>
+            <h3 className="text-lg font-semibold text-white mb-4">Add Time Entry</h3>
             <div className="space-y-4">
-              <div><label className={`block text-sm ${THEME.textMuted} mb-1`}>Date *</label><input type="date" value={formData.date} onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))} className={`w-full px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white`} /></div>
-              <div><label className={`block text-sm ${THEME.textMuted} mb-1`}>Employee *</label><select value={formData.team_member_id} onChange={(e) => setFormData(prev => ({ ...prev, team_member_id: e.target.value }))} className={`w-full px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white`}><option value="">Select...</option>{teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-              <div><label className={`block text-sm ${THEME.textMuted} mb-1`}>Project *</label><select value={formData.project_id} onChange={(e) => setFormData(prev => ({ ...prev, project_id: e.target.value }))} className={`w-full px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white`}><option value="">Select...</option>{projects.map(p => <option key={p.id} value={p.id}>{p.client ? `${p.client} - ` : ''}{p.name}</option>)}</select></div>
+              <div><label className={`block text-xs font-medium ${THEME.textDim} uppercase tracking-wider mb-1.5`}>Date *</label><input type="date" value={formData.date} onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))} className={`w-full px-3 py-2.5 bg-slate-800/60 border ${THEME.border} rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-teal-500/30`} /></div>
+              <div><label className={`block text-xs font-medium ${THEME.textDim} uppercase tracking-wider mb-1.5`}>Employee *</label><select value={formData.team_member_id} onChange={(e) => setFormData(prev => ({ ...prev, team_member_id: e.target.value }))} className={`w-full px-3 py-2.5 bg-slate-800/60 border ${THEME.border} rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-teal-500/30`}><option value="">Select...</option>{teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+              <div><label className={`block text-xs font-medium ${THEME.textDim} uppercase tracking-wider mb-1.5`}>Project *</label><select value={formData.project_id} onChange={(e) => setFormData(prev => ({ ...prev, project_id: e.target.value }))} className={`w-full px-3 py-2.5 bg-slate-800/60 border ${THEME.border} rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-teal-500/30`}><option value="">Select...</option>{projects.map(p => <option key={p.id} value={p.id}>{p.client ? `${p.client} - ` : ''}{p.name}</option>)}</select></div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={`block text-sm ${THEME.textMuted} mb-1`}>Actual Hours *</label>
-                  <input type="number" value={formData.hours} onChange={(e) => setFormData(prev => ({ ...prev, hours: e.target.value }))} className={`w-full px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white`} placeholder="8" step="0.5" />
-                  <p className="text-xs text-slate-500 mt-1">What contractor worked</p>
+                  <label className={`block text-xs font-medium ${THEME.textDim} uppercase tracking-wider mb-1.5`}>Actual Hours *</label>
+                  <input type="number" value={formData.hours} onChange={(e) => setFormData(prev => ({ ...prev, hours: e.target.value }))} className={`w-full px-3 py-2.5 bg-slate-800/60 border ${THEME.border} rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-teal-500/30`} placeholder="8" step="0.5" />
+                  <p className="text-[11px] text-slate-500 mt-1">What contractor worked</p>
                 </div>
                 <div>
-                  <label className={`block text-sm text-orange-400 mb-1`}>Billable Hours</label>
-                  <input type="number" value={formData.billable_hours} onChange={(e) => setFormData(prev => ({ ...prev, billable_hours: e.target.value }))} className={`w-full px-3 py-2 bg-white/[0.05] border border-orange-500/20 rounded-lg text-white`} placeholder="Same as actual" step="0.5" />
-                  <p className="text-xs text-slate-500 mt-1">What you bill client (optional)</p>
+                  <label className="block text-xs font-medium text-amber-500/80 uppercase tracking-wider mb-1.5">Billable Hours</label>
+                  <input type="number" value={formData.billable_hours} onChange={(e) => setFormData(prev => ({ ...prev, billable_hours: e.target.value }))} className={`w-full px-3 py-2.5 bg-slate-800/60 border border-amber-500/20 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-amber-500/30`} placeholder="Same as actual" step="0.5" />
+                  <p className="text-[11px] text-slate-500 mt-1">What you bill client (optional)</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <input type="checkbox" checked={formData.is_billable} onChange={(e) => setFormData(prev => ({ ...prev, is_billable: e.target.checked }))} className="rounded bg-white/[0.05] border-white/[0.1]" />
+                <input type="checkbox" checked={formData.is_billable} onChange={(e) => setFormData(prev => ({ ...prev, is_billable: e.target.checked }))} className="rounded bg-slate-800/60 border-slate-700 text-teal-600 focus:ring-teal-500/30" />
                 <label className={`text-sm ${THEME.textMuted}`}>Billable</label>
               </div>
-              <div><label className={`block text-sm ${THEME.textMuted} mb-1`}>Notes</label><textarea value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} className={`w-full px-3 py-2 bg-white/[0.05] border ${THEME.glassBorder} rounded-lg text-white resize-none`} rows={2} placeholder="Description..." /></div>
+              <div><label className={`block text-xs font-medium ${THEME.textDim} uppercase tracking-wider mb-1.5`}>Notes</label><textarea value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} className={`w-full px-3 py-2.5 bg-slate-800/60 border ${THEME.border} rounded-lg text-white resize-none focus:outline-none focus:ring-1 focus:ring-teal-500/30`} rows={2} placeholder="Description..." /></textarea></div>
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowEntryModal(false)} className={`flex-1 px-4 py-2 bg-white/[0.05] hover:bg-white/[0.08] border ${THEME.glassBorder} rounded-lg text-sm font-medium`}>Cancel</button>
-              <button onClick={saveNewEntry} className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm font-medium shadow-lg shadow-emerald-500/20">Add Entry</button>
+              <button onClick={() => setShowEntryModal(false)} className={`flex-1 px-4 py-2.5 bg-slate-800/60 hover:bg-slate-700/60 border ${THEME.border} rounded-lg text-sm font-medium text-slate-300 transition-colors`}>Cancel</button>
+              <button onClick={saveNewEntry} className="flex-1 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm font-medium text-white transition-colors">Add Entry</button>
             </div>
           </div>
         </div>
