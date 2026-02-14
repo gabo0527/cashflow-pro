@@ -1485,7 +1485,7 @@ export default function TimeTrackingPage() {
                 <input type="checkbox" checked={formData.is_billable} onChange={(e) => setFormData(prev => ({ ...prev, is_billable: e.target.checked }))} className="rounded bg-slate-800/60 border-slate-700 text-teal-600 focus:ring-teal-500/30" />
                 <label className={`text-sm ${THEME.textMuted}`}>Billable</label>
               </div>
-              <div><label className={`block text-xs font-medium ${THEME.textDim} uppercase tracking-wider mb-1.5`}>Notes</label><textarea value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} className={`w-full px-3 py-2.5 bg-slate-800/60 border ${THEME.border} rounded-lg text-white resize-none focus:outline-none focus:ring-1 focus:ring-teal-500/30`} rows={2} placeholder="Description..." /></textarea></div>
+              <div><label className={`block text-xs font-medium ${THEME.textDim} uppercase tracking-wider mb-1.5`}>Notes</label><textarea value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} className={`w-full px-3 py-2.5 bg-slate-800/60 border ${THEME.border} rounded-lg text-white resize-none focus:outline-none focus:ring-1 focus:ring-teal-500/30`} rows={2} placeholder="Description..." /></div>
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={() => setShowEntryModal(false)} className={`flex-1 px-4 py-2.5 bg-slate-800/60 hover:bg-slate-700/60 border ${THEME.border} rounded-lg text-sm font-medium text-slate-300 transition-colors`}>Cancel</button>
