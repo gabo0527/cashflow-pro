@@ -5,7 +5,7 @@ import {
   Clock, Receipt, FileText, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   AlertCircle, CheckCircle, Loader2, Upload, X, Plus, Trash2, Calendar,
   DollarSign, Send, Eye, Building2, User, FileUp, LogOut, Paperclip, File,
-  ArrowRight, CircleDot, Briefcase, Timer, CreditCard, Hash
+  ArrowRight, CircleDot, Briefcase, Timer, CreditCard, Hash, History
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 
@@ -214,7 +214,7 @@ export default function ContractorPortal() {
   const [rateCards, setRateCards] = useState<RateCard[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'time' | 'expenses' | 'invoices'>('time')
+  const [activeTab, setActiveTab] = useState<'time' | 'expenses' | 'invoices' | 'history'>('time')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   // Time
@@ -240,6 +240,14 @@ export default function ContractorPortal() {
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null)
   const [invoiceDistribution, setInvoiceDistribution] = useState<InvoiceLine[]>([])
   const [submittingInvoice, setSubmittingInvoice] = useState(false)
+
+  // History
+  const [historyMonth, setHistoryMonth] = useState(new Date())
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'time' | 'expenses' | 'invoices'>('all')
+  const [historyTime, setHistoryTime] = useState<any[]>([])
+  const [historyExpenses, setHistoryExpenses] = useState<Expense[]>([])
+  const [historyInvoices, setHistoryInvoices] = useState<ContractorInvoice[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
 
   const week = useMemo(() => getWeekRange(weekDate), [weekDate])
   const billingMonth = useMemo(() => getMonthRange(invoiceMonth), [invoiceMonth])
@@ -426,10 +434,85 @@ export default function ContractorPortal() {
     } catch (err: any) { setError(err.message || 'Failed to delete') }
   }
 
+  // ============ LOAD HISTORY ============
+  const historyRange = useMemo(() => getMonthRange(historyMonth), [historyMonth])
+
+  useEffect(() => {
+    if (!member || activeTab !== 'history') return
+    const load = async () => {
+      setHistoryLoading(true)
+      try {
+        // Time entries for the selected month
+        const { data: timeData } = await supabase
+          .from('time_entries')
+          .select('id, project_id, hours, billable_hours, description, date, created_at')
+          .eq('contractor_id', member.id)
+          .gte('date', historyRange.start)
+          .lte('date', historyRange.end)
+          .order('date', { ascending: false })
+
+        // Expenses for the selected month
+        const { data: expData } = await supabase
+          .from('contractor_expenses')
+          .select('*')
+          .eq('team_member_id', member.id)
+          .gte('date', historyRange.start)
+          .lte('date', historyRange.end)
+          .order('date', { ascending: false })
+
+        // Invoices where period overlaps the selected month
+        const { data: invData } = await supabase
+          .from('contractor_invoices')
+          .select('*, contractor_invoice_lines(*)')
+          .eq('team_member_id', member.id)
+          .lte('period_start', historyRange.end)
+          .gte('period_end', historyRange.start)
+          .order('invoice_date', { ascending: false })
+
+        setHistoryTime(timeData || [])
+        setHistoryExpenses(expData || [])
+        setHistoryInvoices(invData || [])
+      } catch (err) { console.error('History load error:', err) }
+      finally { setHistoryLoading(false) }
+    }
+    load()
+  }, [member, activeTab, historyRange.start, historyRange.end])
+
+  // History computed totals
+  const historyTotals = useMemo(() => {
+    const totalHours = historyTime.reduce((s: number, e: any) => s + (e.hours || 0), 0)
+    const totalExpenses = historyExpenses.reduce((s, e) => s + (e.amount || 0), 0)
+    const totalInvoiced = historyInvoices.reduce((s, inv) => s + (inv.total_amount || 0), 0)
+    return { totalHours, totalExpenses, totalInvoiced }
+  }, [historyTime, historyExpenses, historyInvoices])
+
+  // Group time entries by week for history display
+  const historyTimeByWeek = useMemo(() => {
+    const weeks: Record<string, { label: string; entries: any[]; totalHours: number }> = {}
+    historyTime.forEach((e: any) => {
+      const d = new Date(e.date + 'T00:00:00')
+      const day = d.getDay()
+      const weekStart = new Date(d); weekStart.setDate(d.getDate() - day)
+      const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6)
+      const key = weekStart.toISOString().split('T')[0]
+      if (!weeks[key]) {
+        weeks[key] = {
+          label: `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+          entries: [],
+          totalHours: 0
+        }
+      }
+      weeks[key].entries.push(e)
+      weeks[key].totalHours += e.hours || 0
+    })
+    return Object.entries(weeks).sort(([a], [b]) => b.localeCompare(a))
+  }, [historyTime])
+
   const navItems = [
     { id: 'time' as const, label: 'Timesheet', icon: Timer, desc: 'Log hours' },
     { id: 'expenses' as const, label: 'Expenses', icon: CreditCard, desc: 'Track costs' },
-    { id: 'invoices' as const, label: 'Invoices', icon: FileText, desc: 'Bill clients' }
+    { id: 'invoices' as const, label: 'Invoices', icon: FileText, desc: 'Bill clients' },
+    { id: 'history' as const, label: 'History', icon: History, desc: 'Past records' }
   ]
   const totalTimeHours = Object.values(timeEntries).reduce((s, e) => s + parseFloat(e.hours || '0'), 0)
 
@@ -904,6 +987,239 @@ export default function ContractorPortal() {
                 </div>
                 <p className="text-slate-500 text-sm">No invoices submitted yet</p>
                 <p className="text-slate-700 text-xs mt-1">Click "New Invoice" to get started</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ====== HISTORY ====== */}
+        {activeTab === 'history' && (
+          <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-xl font-bold tracking-tight">History</h1>
+                <p className="text-slate-500 text-sm mt-1">Review your submitted timesheets, expenses, and invoices</p>
+              </div>
+            </div>
+
+            {/* Month Navigator + Filter */}
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className={`${cardClass} p-1 inline-flex items-center gap-1`}>
+                <button onClick={() => { const d = new Date(historyMonth); d.setMonth(d.getMonth() - 1); setHistoryMonth(d) }}
+                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors">
+                  <ChevronLeft size={16} />
+                </button>
+                <div className="flex items-center gap-2.5 px-4 py-1.5">
+                  <Calendar size={14} className="text-teal-400" />
+                  <span className="text-sm font-medium text-white">{historyRange.label}</span>
+                </div>
+                <button onClick={() => { const d = new Date(historyMonth); d.setMonth(d.getMonth() + 1); setHistoryMonth(d) }}
+                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors">
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+
+              <div className="inline-flex items-center bg-slate-800/50 border border-slate-800/80 rounded-lg p-0.5">
+                {([['all', 'All'], ['time', 'Time'], ['expenses', 'Expenses'], ['invoices', 'Invoices']] as const).map(([key, label]) => (
+                  <button key={key} onClick={() => setHistoryFilter(key)}
+                    className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      historyFilter === key ? 'bg-slate-700 text-teal-400' : 'text-slate-500 hover:text-slate-300'
+                    }`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className={`${cardClass} p-4 flex items-start gap-3`}>
+                <div className="w-1 h-10 rounded-r-full bg-teal-500 shrink-0 -ml-4" />
+                <div className="pl-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Hours Logged</p>
+                  <p className="text-xl font-semibold text-white tabular-nums mt-1">{historyTotals.totalHours.toFixed(1)}</p>
+                </div>
+              </div>
+              <div className={`${cardClass} p-4 flex items-start gap-3`}>
+                <div className="w-1 h-10 rounded-r-full bg-amber-500 shrink-0 -ml-4" />
+                <div className="pl-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Expenses</p>
+                  <p className="text-xl font-semibold text-white tabular-nums mt-1">{formatCurrency(historyTotals.totalExpenses)}</p>
+                </div>
+              </div>
+              <div className={`${cardClass} p-4 flex items-start gap-3`}>
+                <div className="w-1 h-10 rounded-r-full bg-sky-500 shrink-0 -ml-4" />
+                <div className="pl-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Invoiced</p>
+                  <p className="text-xl font-semibold text-white tabular-nums mt-1">{formatCurrency(historyTotals.totalInvoiced)}</p>
+                </div>
+              </div>
+            </div>
+
+            {historyLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 size={24} className="text-teal-500 animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* TIME ENTRIES */}
+                {(historyFilter === 'all' || historyFilter === 'time') && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Timer size={14} className="text-teal-400" />
+                      <h2 className="text-sm font-semibold text-white">Timesheet Entries</h2>
+                      <span className="text-[11px] text-slate-500 ml-1">{historyTotals.totalHours.toFixed(1)}h total</span>
+                    </div>
+                    {historyTimeByWeek.length > 0 ? (
+                      <div className="space-y-3">
+                        {historyTimeByWeek.map(([weekKey, week]) => (
+                          <div key={weekKey} className={`${cardClass} overflow-hidden`}>
+                            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800/60">
+                              <span className="text-xs font-medium text-slate-400">{week.label}</span>
+                              <span className="text-xs font-semibold text-teal-400 tabular-nums">{week.totalHours.toFixed(1)}h</span>
+                            </div>
+                            <div className="divide-y divide-slate-800/40">
+                              {week.entries.map((e: any) => {
+                                const a = assignments.find(a => a.project_id === e.project_id)
+                                return (
+                                  <div key={e.id} className="px-5 py-3 flex items-center gap-4">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm text-white truncate">{a?.project_name || 'Unknown Project'}</p>
+                                      <p className="text-xs text-slate-500 mt-0.5">{a?.client_name || ''}{e.description ? ` — ${e.description}` : ''}</p>
+                                    </div>
+                                    <span className="text-sm font-medium text-slate-300 tabular-nums">{e.hours}h</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className={`${cardClass} text-center py-10`}>
+                        <p className="text-slate-600 text-sm">No timesheet entries for {historyRange.label}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* EXPENSES */}
+                {(historyFilter === 'all' || historyFilter === 'expenses') && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <CreditCard size={14} className="text-amber-400" />
+                      <h2 className="text-sm font-semibold text-white">Expenses</h2>
+                      <span className="text-[11px] text-slate-500 ml-1">{historyExpenses.length} item{historyExpenses.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    {historyExpenses.length > 0 ? (
+                      <div className="space-y-2">
+                        {historyExpenses.map(exp => {
+                          const cat = EXPENSE_CATEGORIES.find(c => c.id === exp.category)
+                          return (
+                            <div key={exp.id} className={`${cardClass} px-5 py-4 flex items-center gap-4`}>
+                              <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                                <Receipt size={16} className="text-amber-400" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-white text-sm font-medium truncate">{exp.description}</p>
+                                <div className="flex items-center gap-2 text-slate-500 text-xs mt-1">
+                                  <span>{formatDate(exp.date)}</span>
+                                  <span className="w-1 h-1 rounded-full bg-slate-700" />
+                                  <span>{cat?.label || exp.category}</span>
+                                  {exp.receipt_url && <><span className="w-1 h-1 rounded-full bg-slate-700" /><Paperclip size={10} className="text-sky-400" /></>}
+                                </div>
+                              </div>
+                              <span className="text-white font-semibold text-sm tabular-nums">{formatCurrency(exp.amount)}</span>
+                              <StatusPill status={exp.status} />
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className={`${cardClass} text-center py-10`}>
+                        <p className="text-slate-600 text-sm">No expenses for {historyRange.label}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* INVOICES */}
+                {(historyFilter === 'all' || historyFilter === 'invoices') && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <FileText size={14} className="text-sky-400" />
+                      <h2 className="text-sm font-semibold text-white">Invoices</h2>
+                      <span className="text-[11px] text-slate-500 ml-1">{historyInvoices.length} invoice{historyInvoices.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    {historyInvoices.length > 0 ? (
+                      <div className="space-y-2">
+                        {historyInvoices.map(inv => {
+                          const lines = inv.contractor_invoice_lines || inv.lines || []
+                          return (
+                            <div key={inv.id} className={`${cardClass} overflow-hidden`}>
+                              <div className="px-5 py-4 flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-lg bg-sky-500/10 flex items-center justify-center shrink-0">
+                                  <FileText size={16} className="text-sky-400" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-white text-sm font-medium">{inv.invoice_number}</p>
+                                    {inv.receipt_url && <Paperclip size={11} className="text-sky-400" />}
+                                  </div>
+                                  <p className="text-slate-500 text-xs mt-0.5">{formatDate(inv.period_start)} – {formatDate(inv.period_end)}</p>
+                                </div>
+                                <span className="text-white font-semibold text-sm tabular-nums">{formatCurrency(inv.total_amount)}</span>
+                                <StatusPill status={inv.status} />
+                              </div>
+                              {lines.length > 0 && (
+                                <div className="px-5 pb-4 pt-0">
+                                  <div className="border-t border-slate-800/60 pt-3">
+                                    <table className="w-full text-xs">
+                                      <thead>
+                                        <tr className="text-[11px] text-slate-600 font-semibold uppercase tracking-wider">
+                                          <th className="text-left pb-2">Description</th>
+                                          <th className="text-right pb-2">Hours</th>
+                                          <th className="text-right pb-2">Allocation</th>
+                                          <th className="text-right pb-2">Amount</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-800/40">
+                                        {lines.map((l: any, i: number) => (
+                                          <tr key={i}>
+                                            <td className="py-2 text-slate-400">{l.description}</td>
+                                            <td className="py-2 text-right text-slate-500 tabular-nums">{l.hours ? `${Number(l.hours).toFixed(1)}h` : '—'}</td>
+                                            <td className="py-2 text-right text-slate-500 tabular-nums">{l.allocation_pct ? `${l.allocation_pct}%` : '—'}</td>
+                                            <td className="py-2 text-right text-slate-300 font-medium tabular-nums">{l.amount ? formatCurrency(l.amount) : '—'}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className={`${cardClass} text-center py-10`}>
+                        <p className="text-slate-600 text-sm">No invoices for {historyRange.label}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Empty state when all filtered sections are empty */}
+                {historyFilter === 'all' && historyTime.length === 0 && historyExpenses.length === 0 && historyInvoices.length === 0 && (
+                  <div className={`${cardClass} text-center py-16`}>
+                    <div className="w-14 h-14 rounded-xl bg-slate-800/40 flex items-center justify-center mx-auto mb-4">
+                      <History size={24} className="text-slate-600" />
+                    </div>
+                    <p className="text-slate-500 text-sm">No submissions for {historyRange.label}</p>
+                    <p className="text-slate-700 text-xs mt-1">Try navigating to a different month</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
