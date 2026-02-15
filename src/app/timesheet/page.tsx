@@ -72,12 +72,12 @@ async function uploadFile(file: File, folder: string, memberId: string): Promise
   } catch (err) { console.error('Upload error:', err); return null }
 }
 
-// ============ STYLED INPUT ============
-const inputClass = "w-full px-3.5 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500/40 transition-all duration-200"
-const selectClass = "w-full px-3.5 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500/40 transition-all duration-200 cursor-pointer"
+// ============ STYLED INPUT (institutional — matches admin pages) ============
+const inputClass = "w-full px-3.5 py-2.5 bg-slate-800/60 border border-slate-800/80 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 transition-colors"
+const selectClass = "w-full px-3.5 py-2.5 bg-slate-800/60 border border-slate-800/80 rounded-lg text-white text-sm focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 transition-colors cursor-pointer"
 const labelClass = "block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2"
-const btnPrimary = "px-5 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white text-sm font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-teal-500/20 hover:shadow-teal-500/30 disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2"
-const cardClass = "bg-white/[0.03] border border-white/[0.06] rounded-2xl backdrop-blur-sm"
+const btnPrimary = "px-5 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+const cardClass = "bg-[#111827] border border-slate-800/80 rounded-xl"
 
 // ============ STATUS PILL ============
 function StatusPill({ status }: { status: string }) {
@@ -108,9 +108,9 @@ function DropZone({ file, onFile, onRemove, uploading, label, accept }: {
   if (file) {
     const isImage = file.type.startsWith('image/')
     return (
-      <div className="flex items-center gap-3 px-4 py-3 bg-white/[0.04] border border-white/[0.08] rounded-xl">
+      <div className="flex items-center gap-3 px-4 py-3 bg-slate-800/40 border border-slate-800/80 rounded-lg">
         {isImage ? (
-          <img src={URL.createObjectURL(file)} alt="" className="w-10 h-10 rounded-lg object-cover border border-white/[0.1]" />
+          <img src={URL.createObjectURL(file)} alt="" className="w-10 h-10 rounded-lg object-cover border border-slate-800" />
         ) : (
           <div className="w-10 h-10 rounded-lg bg-rose-500/10 flex items-center justify-center shrink-0">
             <FileText size={16} className="text-rose-400" />
@@ -121,7 +121,7 @@ function DropZone({ file, onFile, onRemove, uploading, label, accept }: {
           <p className="text-slate-500 text-xs">{file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}</p>
         </div>
         {uploading ? <Loader2 size={16} className="text-teal-400 animate-spin shrink-0" /> : (
-          <button onClick={onRemove} className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-white/[0.05] transition-colors shrink-0"><X size={14} /></button>
+          <button onClick={onRemove} className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800/50 transition-colors shrink-0"><X size={14} /></button>
         )}
       </div>
     )
@@ -131,10 +131,10 @@ function DropZone({ file, onFile, onRemove, uploading, label, accept }: {
     <div onDragEnter={handleDragIn} onDragLeave={handleDragOut} onDragOver={handleDrag} onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
       className={`relative cursor-pointer rounded-xl border-2 border-dashed transition-all duration-200 group ${
-        dragging ? 'border-teal-500/60 bg-teal-500/5' : 'border-white/[0.08] bg-white/[0.02] hover:border-white/[0.15] hover:bg-white/[0.04]'
+        dragging ? 'border-teal-500/40 bg-teal-500/5' : 'border-slate-800/80 bg-slate-800/30 hover:border-slate-700 hover:bg-slate-800/40'
       }`}>
       <div className="flex flex-col items-center justify-center py-6 px-4">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition-colors ${dragging ? 'bg-teal-500/15' : 'bg-white/[0.06] group-hover:bg-white/[0.08]'}`}>
+        <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${dragging ? 'bg-teal-500/15' : 'bg-slate-800/50 group-hover:bg-slate-800/60'}`}>
           <Upload size={18} className={dragging ? 'text-teal-400' : 'text-slate-400'} />
         </div>
         <p className={`text-sm font-medium ${dragging ? 'text-teal-400' : 'text-slate-400'}`}>{dragging ? 'Drop file here' : label}</p>
@@ -166,10 +166,10 @@ function MultiDropZone({ files, onAddFiles, onRemoveFile, uploading, label, acce
       <div onDragEnter={handleDragIn} onDragLeave={handleDragOut} onDragOver={handleDrag} onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
         className={`relative cursor-pointer rounded-xl border-2 border-dashed transition-all duration-200 group ${
-          dragging ? 'border-teal-500/60 bg-teal-500/5' : 'border-white/[0.08] bg-white/[0.02] hover:border-white/[0.15] hover:bg-white/[0.04]'
+          dragging ? 'border-teal-500/40 bg-teal-500/5' : 'border-slate-800/80 bg-slate-800/30 hover:border-slate-700 hover:bg-slate-800/40'
         }`}>
         <div className="flex flex-col items-center justify-center py-5 px-4">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition-colors ${dragging ? 'bg-teal-500/15' : 'bg-white/[0.06] group-hover:bg-white/[0.08]'}`}>
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${dragging ? 'bg-teal-500/15' : 'bg-slate-800/50 group-hover:bg-slate-800/60'}`}>
             <Upload size={18} className={dragging ? 'text-teal-400' : 'text-slate-400'} />
           </div>
           <p className={`text-sm font-medium ${dragging ? 'text-teal-400' : 'text-slate-400'}`}>{dragging ? 'Drop files here' : label}</p>
@@ -184,9 +184,9 @@ function MultiDropZone({ files, onAddFiles, onRemoveFile, uploading, label, acce
         }} />
       </div>
       {files.map((file, i) => (
-        <div key={i} className="flex items-center gap-3 px-3.5 py-2.5 bg-white/[0.04] border border-white/[0.06] rounded-xl">
+        <div key={i} className="flex items-center gap-3 px-3.5 py-2.5 bg-slate-800/40 border border-slate-800/80 rounded-xl">
           {file.type.startsWith('image/') ? (
-            <img src={URL.createObjectURL(file)} alt="" className="w-8 h-8 rounded-lg object-cover border border-white/[0.1]" />
+            <img src={URL.createObjectURL(file)} alt="" className="w-8 h-8 rounded-lg object-cover border border-slate-800" />
           ) : (
             <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center shrink-0">
               <FileText size={14} className="text-rose-400" />
@@ -197,7 +197,7 @@ function MultiDropZone({ files, onAddFiles, onRemoveFile, uploading, label, acce
             <p className="text-slate-500 text-[11px]">{file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}</p>
           </div>
           {uploading ? <Loader2 size={14} className="text-teal-400 animate-spin shrink-0" /> : (
-            <button onClick={(e) => { e.stopPropagation(); onRemoveFile(i) }} className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-white/[0.05] transition-colors shrink-0"><X size={12} /></button>
+            <button onClick={(e) => { e.stopPropagation(); onRemoveFile(i) }} className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800/50 transition-colors shrink-0"><X size={12} /></button>
           )}
         </div>
       ))}
@@ -436,12 +436,8 @@ export default function ContractorPortal() {
   // ============ LOGIN SCREEN ============
   if (step === 'email') {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4 relative overflow-hidden">
-        {/* Ambient glow */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-teal-500/[0.04] rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 w-[300px] h-[300px] bg-emerald-500/[0.03] rounded-full blur-[100px] pointer-events-none" />
-        
-        <div className="w-full max-w-sm relative z-10">
+      <div className="min-h-screen bg-[#0B0F19] flex items-center justify-center p-4">
+        <div className="w-full max-w-sm">
           <div className="text-center mb-10">
             <div className="inline-flex items-center justify-center w-14 h-14 mb-5">
               <svg width={40} height={40} viewBox="0 0 40 40" fill="none">
@@ -462,7 +458,7 @@ export default function ContractorPortal() {
               className={`${inputClass} mb-4`} 
             />
             {error && (
-              <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2.5 text-rose-400 text-sm">
+              <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg flex items-center gap-2.5 text-rose-400 text-sm">
                 <AlertCircle size={15} className="shrink-0" /> {error}
               </div>
             )}
@@ -479,9 +475,9 @@ export default function ContractorPortal() {
 
   // ============ PORTAL ============
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="min-h-screen bg-[#0B0F19] text-white">
       {/* Top Bar */}
-      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#0a0a0f]/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-[#0B0F19]/95">
         <div className="max-w-5xl mx-auto px-6">
           <div className="flex items-center justify-between h-16">
             {/* Logo + Name */}
@@ -490,20 +486,20 @@ export default function ContractorPortal() {
                 <defs><linearGradient id="vS" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#2dd4bf" /><stop offset="100%" stopColor="#10b981" /></linearGradient></defs>
                 <path d="M8 8L20 32L32 8" stroke="url(#vS)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
               </svg>
-              <div className="h-5 w-px bg-white/[0.1]" />
+              <div className="h-5 w-px bg-slate-700" />
               <span className="text-sm text-slate-400">{member?.name}</span>
             </div>
 
-            {/* Nav */}
-            <nav className="flex items-center gap-1">
+            {/* Nav — underline tabs */}
+            <nav className="flex items-center gap-0">
               {navItems.map(item => (
                 <button key={item.id} onClick={() => { setActiveTab(item.id); setError(null) }}
-                  className={`relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  className={`relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 ${
                     activeTab === item.id 
-                      ? 'text-white bg-white/[0.08]' 
-                      : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04]'
+                      ? 'text-teal-400 border-teal-400' 
+                      : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'
                   }`}>
-                  <item.icon size={16} />
+                  <item.icon size={15} />
                   <span>{item.label}</span>
                 </button>
               ))}
@@ -511,7 +507,7 @@ export default function ContractorPortal() {
 
             {/* Sign out */}
             <button onClick={() => { setStep('email'); setMember(null); setAssignments([]); setRateCards([]); setEmail('') }}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-slate-600 hover:text-rose-400 hover:bg-white/[0.04] transition-all duration-200">
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-slate-600 hover:text-rose-400 hover:bg-slate-800/40 transition-all duration-200">
               <LogOut size={15} />
             </button>
           </div>
@@ -522,10 +518,10 @@ export default function ContractorPortal() {
       <main className="max-w-5xl mx-auto px-6 py-8">
         {/* Error Banner */}
         {error && (
-          <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-center gap-3 text-rose-400 text-sm animate-in slide-in-from-top-2">
+          <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-lg flex items-center gap-3 text-rose-400 text-sm animate-in slide-in-from-top-2">
             <AlertCircle size={16} className="shrink-0" />
             <span className="flex-1">{error}</span>
-            <button onClick={() => setError(null)} className="p-1 hover:bg-white/[0.05] rounded-lg transition-colors"><X size={14} /></button>
+            <button onClick={() => setError(null)} className="p-1 hover:bg-slate-800/50 rounded-lg transition-colors"><X size={14} /></button>
           </div>
         )}
 
@@ -550,7 +546,7 @@ export default function ContractorPortal() {
             {/* Week Navigator */}
             <div className={`${cardClass} p-1.5 inline-flex items-center gap-1`}>
               <button onClick={() => { const d = new Date(weekDate); d.setDate(d.getDate() - 7); setWeekDate(d) }}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all duration-200">
+                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-200">
                 <ChevronLeft size={16} />
               </button>
               <div className="flex items-center gap-2.5 px-4 py-1.5">
@@ -558,7 +554,7 @@ export default function ContractorPortal() {
                 <span className="text-sm font-medium text-white">{week.label}</span>
               </div>
               <button onClick={() => { const d = new Date(weekDate); d.setDate(d.getDate() + 7); setWeekDate(d) }}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all duration-200">
+                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-200">
                 <ChevronRight size={16} />
               </button>
             </div>
@@ -571,7 +567,7 @@ export default function ContractorPortal() {
                 return (
                   <div key={cid} className={`${cardClass} overflow-hidden`}>
                     <button onClick={() => { const n = new Set(collapsedClients); collapsed ? n.delete(cid) : n.add(cid); setCollapsedClients(n) }}
-                      className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors">
+                      className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-800/30 transition-colors">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
                           <Briefcase size={14} className="text-teal-400" />
@@ -591,21 +587,21 @@ export default function ContractorPortal() {
                     {!collapsed && (
                       <div className="px-5 pb-4 space-y-2">
                         {projects.map(p => (
-                            <div key={p.project_id} className="bg-white/[0.03] border border-white/[0.04] rounded-xl p-3.5 transition-all duration-200 hover:border-white/[0.08]">
+                            <div key={p.project_id} className="bg-slate-800/30 border border-slate-800/60 rounded-xl p-3.5 transition-all duration-200 hover:border-slate-700">
                               <div className="flex items-center gap-4">
                                 <span className="text-slate-300 text-sm flex-1 min-w-0 truncate">{p.project_name}</span>
                                 <div className="flex items-center gap-2">
                                   <input type="number" placeholder="0" min="0" step="0.5" 
                                     value={timeEntries[p.project_id]?.hours || ''} 
                                     onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], hours: e.target.value } }))}
-                                    className="w-20 px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500/40 transition-all" />
+                                    className="w-20 px-3 py-2 bg-slate-800/40 border border-slate-800/80 rounded-lg text-white text-sm text-right focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 transition-all" />
                                   <span className="text-slate-600 text-xs font-medium w-6">hrs</span>
                                 </div>
                               </div>
                               <input type="text" placeholder="What did you work on?" 
                                 value={timeEntries[p.project_id]?.notes || ''} 
                                 onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], notes: e.target.value } }))}
-                                className="w-full mt-3 px-3.5 py-2 bg-white/[0.02] border border-white/[0.05] rounded-lg text-slate-400 text-xs placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500/30 transition-all" />
+                                className="w-full mt-3 px-3.5 py-2 bg-slate-800/30 border border-slate-800/60 rounded-lg text-slate-400 text-xs placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 transition-all" />
                             </div>
                           ))}
                       </div>
@@ -646,7 +642,7 @@ export default function ContractorPortal() {
               <div className={`${cardClass} p-6 border-teal-500/20`}>
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-white font-semibold">New Expense</h2>
-                  <button onClick={() => { setShowExpenseForm(false); setExpenseFiles([]) }} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.05] transition-colors"><X size={16} /></button>
+                  <button onClick={() => { setShowExpenseForm(false); setExpenseFiles([]) }} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800/50 transition-colors"><X size={16} /></button>
                 </div>
                 <div className="grid grid-cols-2 gap-5">
                   <div>
@@ -710,8 +706,8 @@ export default function ContractorPortal() {
                   const cat = EXPENSE_CATEGORIES.find(c => c.id === exp.category)
                   const st = STATUS_CONFIG[exp.status] || STATUS_CONFIG.pending
                   return (
-                    <div key={exp.id} className={`${cardClass} px-5 py-4 flex items-center gap-4 hover:bg-white/[0.02] transition-all duration-200`}>
-                      <div className="w-10 h-10 rounded-xl bg-white/[0.04] flex items-center justify-center shrink-0">
+                    <div key={exp.id} className={`${cardClass} px-5 py-4 flex items-center gap-4 hover:bg-slate-800/30 transition-all duration-200`}>
+                      <div className="w-10 h-10 rounded-xl bg-slate-800/40 flex items-center justify-center shrink-0">
                         <Receipt size={16} className="text-slate-400" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -731,7 +727,7 @@ export default function ContractorPortal() {
               </div>
             ) : (
               <div className={`${cardClass} text-center py-16`}>
-                <div className="w-14 h-14 rounded-2xl bg-white/[0.04] flex items-center justify-center mx-auto mb-4">
+                <div className="w-14 h-14 rounded-xl bg-slate-800/40 flex items-center justify-center mx-auto mb-4">
                   <Receipt size={24} className="text-slate-600" />
                 </div>
                 <p className="text-slate-500 text-sm">No expenses submitted yet</p>
@@ -763,7 +759,7 @@ export default function ContractorPortal() {
               <div className={`${cardClass} p-6 border-teal-500/20`}>
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-white font-semibold">Submit Invoice</h2>
-                  <button onClick={() => { setShowInvoiceForm(false); setInvoiceFile(null) }} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.05] transition-colors"><X size={16} /></button>
+                  <button onClick={() => { setShowInvoiceForm(false); setInvoiceFile(null) }} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800/50 transition-colors"><X size={16} /></button>
                 </div>
 
                 {/* Row 1 */}
@@ -778,7 +774,7 @@ export default function ContractorPortal() {
                   {contractorType === 'pure_ls' ? (
                     <div>
                       <label className={labelClass}>Invoice For</label>
-                      <div className={`${inputClass} bg-white/[0.02] text-slate-400`}>All Clients (distributed by effort)</div>
+                      <div className={`${inputClass} bg-slate-800/30 text-slate-400`}>All Clients (distributed by effort)</div>
                     </div>
                   ) : (
                     <div>
@@ -797,9 +793,9 @@ export default function ContractorPortal() {
                   <div>
                     <label className={labelClass}>Billing Period</label>
                     <div className={`${cardClass} p-1 inline-flex items-center gap-1 w-full`}>
-                      <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() - 1); setInvoiceMonth(d) }} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors"><ChevronLeft size={14} /></button>
+                      <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() - 1); setInvoiceMonth(d) }} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors"><ChevronLeft size={14} /></button>
                       <span className="text-white text-sm font-medium flex-1 text-center py-1">{billingMonth.label}</span>
-                      <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() + 1); setInvoiceMonth(d) }} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors"><ChevronRight size={14} /></button>
+                      <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() + 1); setInvoiceMonth(d) }} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors"><ChevronRight size={14} /></button>
                     </div>
                   </div>
                   <div>
@@ -815,7 +811,7 @@ export default function ContractorPortal() {
                 {invoiceDistribution.length > 0 ? (
                   <div className="mb-5">
                     <p className={`${labelClass} mb-2`}>Timesheet Reference — {billingMonth.label}</p>
-                    <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl overflow-hidden">
+                    <div className="bg-slate-800/30 border border-slate-800/60 rounded-xl overflow-hidden">
                       <table className="w-full text-sm">
                         <thead><tr className="text-slate-600 text-[11px] uppercase tracking-wider">
                           <th className="text-left px-4 py-2.5 font-semibold">Client</th>
@@ -824,14 +820,14 @@ export default function ContractorPortal() {
                           {invoiceDistribution.some(l => l.allocation_pct !== undefined) && <th className="text-right px-4 py-2.5 font-semibold">%</th>}
                         </tr></thead>
                         <tbody>{invoiceDistribution.map((l, i) => (
-                          <tr key={i} className="border-t border-white/[0.04]">
+                          <tr key={i} className="border-t border-slate-800/60">
                             <td className="px-4 py-2.5 text-slate-400 text-xs">{l.client_name}</td>
                             {invoiceDistribution.some(x => x.project_name) && <td className="px-4 py-2.5 text-slate-500 text-xs">{l.project_name || '—'}</td>}
                             <td className="px-4 py-2.5 text-right text-slate-300 text-xs font-medium">{l.hours?.toFixed(1)}</td>
                             {invoiceDistribution.some(x => x.allocation_pct !== undefined) && <td className="px-4 py-2.5 text-right text-slate-500 text-xs">{l.allocation_pct !== undefined ? `${l.allocation_pct}%` : '—'}</td>}
                           </tr>
                         ))}</tbody>
-                        <tfoot><tr className="border-t border-white/[0.08]">
+                        <tfoot><tr className="border-t border-slate-800/80">
                           <td colSpan={invoiceDistribution.some(l => l.project_name) ? 2 : 1} className="px-4 py-2.5 text-slate-400 text-xs font-semibold">Total</td>
                           <td className="px-4 py-2.5 text-right text-white text-xs font-semibold">{invoiceDistribution.reduce((s, l) => s + (l.hours || 0), 0).toFixed(1)}h</td>
                           {invoiceDistribution.some(l => l.allocation_pct !== undefined) && <td className="px-4 py-2.5 text-right text-slate-400 text-xs">100%</td>}
@@ -840,7 +836,7 @@ export default function ContractorPortal() {
                     </div>
                   </div>
                 ) : (contractorType !== 'pure_ls' && !invoiceForm.client_id) ? (
-                  <div className="mb-5 p-4 bg-white/[0.02] border border-white/[0.04] rounded-xl text-center text-slate-500 text-sm">Select a client above to see your timesheet hours.</div>
+                  <div className="mb-5 p-4 bg-slate-800/30 border border-slate-800/60 rounded-xl text-center text-slate-500 text-sm">Select a client above to see your timesheet hours.</div>
                 ) : null}
 
                 {/* Attachment + Notes */}
@@ -880,14 +876,14 @@ export default function ContractorPortal() {
                         <span className="text-white font-semibold text-sm">{formatCurrency(inv.total_amount)}</span>
                         <StatusPill status={inv.status} />
                         {inv.status === 'submitted' && (
-                          <button onClick={() => deleteInvoice(inv.id)} className="p-2 rounded-lg text-slate-600 hover:text-rose-400 hover:bg-white/[0.04] transition-all duration-200" title="Delete">
+                          <button onClick={() => deleteInvoice(inv.id)} className="p-2 rounded-lg text-slate-600 hover:text-rose-400 hover:bg-slate-800/40 transition-all duration-200" title="Delete">
                             <Trash2 size={14} />
                           </button>
                         )}
                       </div>
                       {lines.length > 0 && (
                         <div className="px-5 pb-4 pt-0">
-                          <div className="border-t border-white/[0.04] pt-3 space-y-1.5">
+                          <div className="border-t border-slate-800/60 pt-3 space-y-1.5">
                             {lines.map((l: any, i: number) => (
                               <div key={i} className="flex items-center justify-between text-xs">
                                 <span className="text-slate-400">{l.description}</span>
@@ -903,7 +899,7 @@ export default function ContractorPortal() {
               </div>
             ) : (
               <div className={`${cardClass} text-center py-16`}>
-                <div className="w-14 h-14 rounded-2xl bg-white/[0.04] flex items-center justify-center mx-auto mb-4">
+                <div className="w-14 h-14 rounded-xl bg-slate-800/40 flex items-center justify-center mx-auto mb-4">
                   <FileText size={24} className="text-slate-600" />
                 </div>
                 <p className="text-slate-500 text-sm">No invoices submitted yet</p>
