@@ -1,476 +1,380 @@
+// Save as: src/app/api/qbo/sync/route.ts
+// Upgraded: auto token refresh, full pagination, sage_learned_patterns auto-categorization
+// Preserves: writes to transactions + accrual_transactions + invoices (same as before)
+
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getQBOAccessToken, qboQuery } from '@/lib/qbo-client'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// QuickBooks API base URL
-const QB_API_BASE = 'https://quickbooks.api.intuit.com/v3/company'
+// ============ HELPERS ============
 
-// Helper to parse "Customer:Project" format
 function parseCustomerProject(raw: string): { client: string; project: string | null } {
   if (!raw) return { client: '', project: null }
-  
-  const colonIndex = raw.indexOf(':')
-  if (colonIndex > 0) {
-    return {
-      client: raw.substring(0, colonIndex).trim(),
-      project: raw.substring(colonIndex + 1).trim() || null
-    }
-  }
+  const idx = raw.indexOf(':')
+  if (idx > 0) return { client: raw.substring(0, idx).trim(), project: raw.substring(idx + 1).trim() || null }
   return { client: raw.trim(), project: null }
 }
 
-// Helper to parse invoice status
 function parseInvoiceStatus(balance: number, dueDate: string | null): { status: string; statusDetail: string; daysOverdue: number } {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  
-  if (balance === 0) {
-    return { status: 'paid', statusDetail: 'Paid', daysOverdue: 0 }
-  }
-  
-  if (!dueDate) {
-    return { status: 'pending', statusDetail: 'Pending', daysOverdue: 0 }
-  }
-  
+
+  if (balance === 0) return { status: 'paid', statusDetail: 'Paid', daysOverdue: 0 }
+  if (!dueDate) return { status: 'pending', statusDetail: 'Pending', daysOverdue: 0 }
+
   const due = new Date(dueDate)
   due.setHours(0, 0, 0, 0)
   const diffDays = Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24))
-  
-  if (diffDays > 0) {
-    return { status: 'overdue', statusDetail: `Overdue ${diffDays} days`, daysOverdue: diffDays }
-  } else if (diffDays === 0) {
-    return { status: 'due_today', statusDetail: 'Due today', daysOverdue: 0 }
-  } else if (diffDays >= -1) {
-    return { status: 'due_soon', statusDetail: 'Due tomorrow', daysOverdue: 0 }
-  } else if (diffDays >= -7) {
-    return { status: 'due_soon', statusDetail: `Due in ${Math.abs(diffDays)} days`, daysOverdue: 0 }
-  }
-  
+
+  if (diffDays > 0) return { status: 'overdue', statusDetail: `Overdue ${diffDays} days`, daysOverdue: diffDays }
+  if (diffDays === 0) return { status: 'due_today', statusDetail: 'Due today', daysOverdue: 0 }
+  if (diffDays >= -1) return { status: 'due_soon', statusDetail: 'Due tomorrow', daysOverdue: 0 }
+  if (diffDays >= -7) return { status: 'due_soon', statusDetail: `Due in ${Math.abs(diffDays)} days`, daysOverdue: 0 }
   return { status: 'pending', statusDetail: `Due in ${Math.abs(diffDays)} days`, daysOverdue: 0 }
 }
 
-// Helper function to fetch from QB API
-async function fetchFromQB(
-  realmId: string,
-  accessToken: string,
-  query: string, 
-  entityName: string
-): Promise<any[]> {
-  console.log(`Fetching ${entityName}...`)
-  
-  const response = await fetch(
-    `${QB_API_BASE}/${realmId}/query?query=${encodeURIComponent(query)}`,
-    {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'application/json'
-      }
-    }
-  )
+function normalizeVendor(name: string): string {
+  return (name || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim()
+}
 
-  if (!response.ok) {
-    console.error(`QB query failed for ${entityName}:`, await response.text())
-    return []
+// ============ AUTO-CATEGORIZE using sage_learned_patterns ============
+
+async function loadLearnedPatterns(supabase: any, companyId: string) {
+  try {
+    const { data } = await supabase
+      .from('sage_learned_patterns')
+      .select('vendor_normalized, category, sub_category, confidence')
+      .eq('company_id', companyId)
+      .neq('status', 'rejected')
+    return data || []
+  } catch {
+    return [] // Table may not exist yet — safe fallback
+  }
+}
+
+function categorizeTransaction(
+  payee: string,
+  qbCategory: string,
+  amount: number,
+  patterns: any[]
+): { category: string; subcategory: string | null } {
+  const normalized = normalizeVendor(payee)
+
+  // 1. Learned patterns (highest priority — Sage-approved)
+  for (const p of patterns) {
+    if (p.vendor_normalized && normalized.includes(p.vendor_normalized)) {
+      return { category: p.category, subcategory: p.sub_category }
+    }
   }
 
-  const data = await response.json()
-  const items = data.QueryResponse?.[entityName] || []
-  console.log(`Fetched ${items.length} ${entityName}`)
-  return items
+  // 2. QBO category hints
+  const qbCat = (qbCategory || '').toLowerCase()
+  if (qbCat.includes('payroll') || qbCat.includes('salary') || qbCat.includes('wages')) return { category: 'direct_costs', subcategory: 'Payroll' }
+  if (qbCat.includes('contract') || qbCat.includes('subcontract')) return { category: 'direct_costs', subcategory: 'Contract Labor' }
+  if (qbCat.includes('insurance')) return { category: 'overhead', subcategory: 'Insurance' }
+  if (qbCat.includes('rent') || qbCat.includes('lease')) return { category: 'overhead', subcategory: 'Rent' }
+  if (qbCat.includes('travel')) return { category: 'opex', subcategory: 'Travel' }
+  if (qbCat.includes('office') || qbCat.includes('supply')) return { category: 'opex', subcategory: 'Office Supplies' }
+  if (qbCat.includes('software') || qbCat.includes('subscription')) return { category: 'opex', subcategory: 'Software & Tools' }
+  if (qbCat.includes('advertising') || qbCat.includes('marketing')) return { category: 'opex', subcategory: 'Marketing' }
+  if (qbCat.includes('legal') || qbCat.includes('professional')) return { category: 'opex', subcategory: 'Professional Services' }
+  if (qbCat.includes('income') || qbCat.includes('revenue') || qbCat.includes('sales')) return { category: 'revenue', subcategory: null }
+
+  // 3. Known vendor patterns
+  if (normalized.includes('gusto')) return { category: 'direct_costs', subcategory: 'Payroll' }
+  if (normalized.includes('adp') || normalized.includes('paychex')) return { category: 'direct_costs', subcategory: 'Payroll' }
+  if (normalized.includes('github') || normalized.includes('vercel') || normalized.includes('aws') || normalized.includes('google cloud')) return { category: 'opex', subcategory: 'Software & Tools' }
+  if (normalized.includes('slack') || normalized.includes('zoom') || normalized.includes('notion')) return { category: 'opex', subcategory: 'Software & Tools' }
+
+  // 4. Amount sign fallback
+  if (amount > 0) return { category: 'revenue', subcategory: null }
+  return { category: 'opex', subcategory: null }
 }
+
+// ============ SYNC BANK TRANSACTIONS ============
+
+async function syncBankTransactions(
+  accessToken: string,
+  realmId: string,
+  companyId: string,
+  supabase: any,
+  patterns: any[]
+): Promise<{ synced: number; errors: number }> {
+  let synced = 0
+  let errors = 0
+  const START_DATE = '2026-01-01'
+
+  const txnTypes = [
+    { query: `SELECT * FROM Purchase WHERE TxnDate >= '${START_DATE}' ORDER BY TxnDate DESC`, entity: 'Purchase', prefix: 'PUR' },
+    { query: `SELECT * FROM Deposit WHERE TxnDate >= '${START_DATE}' ORDER BY TxnDate DESC`, entity: 'Deposit', prefix: 'DEP' },
+    { query: `SELECT * FROM Transfer WHERE TxnDate >= '${START_DATE}' ORDER BY TxnDate DESC`, entity: 'Transfer', prefix: 'TRF' },
+    { query: `SELECT * FROM Payment WHERE TxnDate >= '${START_DATE}' ORDER BY TxnDate DESC`, entity: 'Payment', prefix: 'PMT' },
+    { query: `SELECT * FROM SalesReceipt WHERE TxnDate >= '${START_DATE}' ORDER BY TxnDate DESC`, entity: 'SalesReceipt', prefix: 'SR' },
+  ]
+
+  for (const { query, entity, prefix } of txnTypes) {
+    try {
+      // Full pagination via qboQuery
+      const items = await qboQuery(accessToken, realmId, query, entity)
+
+      for (const item of items) {
+        try {
+          const qbId = `${prefix}-${item.Id}`
+          let amount = 0, payee = '', description = '', qbCategory = '', accountName = ''
+
+          if (entity === 'Purchase') {
+            amount = -Math.abs(item.TotalAmt || 0)
+            payee = item.EntityRef?.name || ''
+            accountName = item.AccountRef?.name || ''
+            const line = item.Line?.[0]
+            description = line?.Description || ''
+            if (line?.AccountBasedExpenseLineDetail) qbCategory = line.AccountBasedExpenseLineDetail.AccountRef?.name || ''
+            if (line?.ItemBasedExpenseLineDetail) qbCategory = qbCategory || line.ItemBasedExpenseLineDetail.ItemRef?.name || ''
+            if (!description) description = item.PrivateNote || payee || 'Purchase'
+          } else if (entity === 'Deposit') {
+            amount = Math.abs(item.TotalAmt || 0)
+            accountName = item.DepositToAccountRef?.name || ''
+            const line = item.Line?.[0]
+            payee = line?.DepositLineDetail?.Entity?.name || ''
+            description = line?.Description || item.PrivateNote || 'Deposit'
+            if (line?.DepositLineDetail?.AccountRef) qbCategory = line.DepositLineDetail.AccountRef.name || ''
+          } else if (entity === 'Transfer') {
+            amount = item.Amount || 0
+            accountName = item.FromAccountRef?.name || ''
+            description = `Transfer: ${item.FromAccountRef?.name || '?'} → ${item.ToAccountRef?.name || '?'}`
+            payee = 'Internal Transfer'
+            qbCategory = 'Transfer'
+          } else if (entity === 'Payment') {
+            amount = Math.abs(item.TotalAmt || 0)
+            payee = item.CustomerRef?.name || ''
+            description = `Payment Received - ${payee}`
+            accountName = item.DepositToAccountRef?.name || 'Undeposited Funds'
+            qbCategory = 'Payment'
+          } else if (entity === 'SalesReceipt') {
+            amount = Math.abs(item.TotalAmt || 0)
+            payee = item.CustomerRef?.name || ''
+            description = item.Line?.[0]?.Description || `Sales Receipt - ${payee}`
+            accountName = item.DepositToAccountRef?.name || ''
+            qbCategory = 'Sales'
+          }
+
+          // Skip zero-amount
+          if (amount === 0 && entity !== 'Transfer') continue
+
+          // Auto-categorize (learned patterns → QBO hints → vendor rules → amount sign)
+          const { category, subcategory } = categorizeTransaction(payee, qbCategory, amount, patterns)
+
+          // Parse client/project from customer payments
+          const { client, project } = (entity === 'Payment' || entity === 'SalesReceipt' || entity === 'Deposit')
+            ? parseCustomerProject(payee) : { client: '', project: null }
+
+          const { error } = await supabase.from('transactions').upsert({
+            company_id: companyId,
+            qb_id: qbId,
+            date: item.TxnDate,
+            description,
+            amount,
+            payee,
+            qb_category: qbCategory,
+            category,
+            subcategory: subcategory || null,
+            type: 'actual',
+            client: client || null,
+            project: project || null,
+            account_name: accountName,
+            sync_source: 'quickbooks',
+            synced_at: new Date().toISOString(),
+          }, { onConflict: 'company_id,qb_id', ignoreDuplicates: false })
+
+          if (error) { console.error(`Upsert error ${qbId}:`, error.message); errors++ }
+          else synced++
+        } catch (e: any) { console.error(`Error processing ${entity} ${item.Id}:`, e.message); errors++ }
+      }
+    } catch (e: any) {
+      console.error(`Error fetching ${entity}:`, e.message)
+      if (e.message === 'QBO_TOKEN_EXPIRED') throw e // Bubble up auth errors
+    }
+  }
+
+  return { synced, errors }
+}
+
+// ============ SYNC INVOICES ============
+
+async function syncInvoices(
+  accessToken: string,
+  realmId: string,
+  companyId: string,
+  supabase: any
+): Promise<{ synced: number; errors: number }> {
+  let synced = 0
+  let errors = 0
+  const START_DATE = '2026-01-01'
+
+  // Full pagination
+  const invoices = await qboQuery(
+    accessToken, realmId,
+    `SELECT * FROM Invoice WHERE TxnDate >= '${START_DATE}' ORDER BY TxnDate DESC`,
+    'Invoice'
+  )
+
+  for (const inv of invoices) {
+    try {
+      const customerProjectRaw = inv.CustomerRef?.name || ''
+      const { client, project } = parseCustomerProject(customerProjectRaw)
+      const balance = inv.Balance || 0
+      const totalAmount = inv.TotalAmt || 0
+      const { status, statusDetail, daysOverdue } = parseInvoiceStatus(balance, inv.DueDate)
+
+      // Write to accrual_transactions (preserving existing behavior)
+      const { error: accrualErr } = await supabase.from('accrual_transactions').upsert({
+        company_id: companyId,
+        qb_invoice_id: inv.Id,
+        invoice_number: inv.DocNumber || '',
+        date: inv.TxnDate,
+        customer_project_raw: customerProjectRaw,
+        client,
+        project,
+        amount: totalAmount,
+        status,
+        status_detail: statusDetail,
+        days_overdue: daysOverdue,
+        type: 'revenue',
+        category: 'revenue',
+        description: `Invoice #${inv.DocNumber || inv.Id}`,
+        sync_source: 'quickbooks',
+        synced_at: new Date().toISOString(),
+      }, { onConflict: 'company_id,qb_invoice_id', ignoreDuplicates: false })
+
+      if (accrualErr) {
+        console.error('Accrual upsert error:', accrualErr.message)
+        errors++
+        continue
+      }
+
+      // Also write to invoices table (preserving existing behavior)
+      await supabase.from('invoices').upsert({
+        company_id: companyId,
+        qb_invoice_id: inv.Id,
+        invoice_number: inv.DocNumber || '',
+        customer_project_raw: customerProjectRaw,
+        client,
+        project,
+        amount: totalAmount,
+        amount_paid: totalAmount - balance,
+        balance_due: balance,
+        invoice_date: inv.TxnDate,
+        due_date: inv.DueDate,
+        status,
+        status_detail: statusDetail,
+        days_overdue: daysOverdue,
+        sync_source: 'quickbooks',
+        synced_at: new Date().toISOString(),
+      }, { onConflict: 'company_id,qb_invoice_id', ignoreDuplicates: false })
+
+      synced++
+    } catch (e: any) { console.error(`Error processing invoice ${inv.Id}:`, e.message); errors++ }
+  }
+
+  return { synced, errors }
+}
+
+// ============ POST: TRIGGER SYNC ============
 
 export async function POST(request: NextRequest) {
   try {
-    const { companyId, syncType, year } = await request.json()
-    
+    const { companyId, syncType } = await request.json()
+    // syncType: 'bank' | 'invoices' | 'all' (default)
+
     if (!companyId) {
-      return NextResponse.json({ error: 'Company ID required' }, { status: 400 })
+      return NextResponse.json({ error: 'companyId required' }, { status: 400 })
     }
 
-    // Sync by year to avoid timeout - default to current year
-    const syncYear = year || new Date().getFullYear()
-    const startDate = `${syncYear}-01-01`
-    const endDate = `${syncYear}-12-31`
-
-    // Get QuickBooks credentials from company_settings
-    const { data: settings, error: settingsError } = await supabase
-      .from('company_settings')
-      .select('qbo_realm_id, qbo_access_token, qbo_refresh_token, qbo_token_expires_at')
-      .eq('company_id', companyId)
-      .single()
-
-    if (settingsError || !settings || !settings.qbo_access_token) {
-      return NextResponse.json({ error: 'QuickBooks not connected' }, { status: 400 })
+    // Get valid token (auto-refreshes if expired)
+    const auth = await getQBOAccessToken(companyId)
+    if (!auth.success) {
+      return NextResponse.json({ error: auth.error, reconnect: true }, { status: 401 })
     }
 
-    // Decrypt the access token
-    const { decryptToken } = await import('@/lib/qbo-encryption')
-    const accessToken = decryptToken(settings.qbo_access_token)
-    
-    // Check if token needs refresh
-    const tokenExpiry = new Date(settings.qbo_token_expires_at)
-    
-    if (tokenExpiry < new Date()) {
-      return NextResponse.json({ error: 'Token expired, please reconnect' }, { status: 401 })
-    }
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const results: any = { bank: null, invoices: null }
 
-    const realmId = settings.qbo_realm_id
-    const results = {
-      bankTransactions: { synced: 0, skipped: 0, errors: 0 },
-      invoices: { synced: 0, skipped: 0, errors: 0 },
-      year: syncYear
-    }
+    // Load learned patterns for auto-categorization
+    const patterns = await loadLearnedPatterns(supabase, companyId)
+    console.log(`Loaded ${patterns.length} learned patterns`)
 
-    // ========================================
-    // SYNC BANK TRANSACTIONS (Cash Basis)
-    // Pulls: Purchases, Deposits, Transfers, Payments, SalesReceipts
-    // These are the transactions that hit your bank accounts
-    // ========================================
     if (!syncType || syncType === 'all' || syncType === 'bank') {
-      try {
-        // 1. PURCHASES (Expenses - checks, credit cards, etc.)
-        const purchases = await fetchFromQB(
-          realmId,
-          accessToken,
-          `SELECT * FROM Purchase WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`,
-          'Purchase'
-        )
+      results.bank = await syncBankTransactions(auth.accessToken, auth.realmId, companyId, supabase, patterns)
 
-        for (const purchase of purchases) {
-          const qbId = `PUR-${purchase.Id}`
-          const amount = -Math.abs(purchase.TotalAmt || 0)
-          
-          let payee = purchase.EntityRef?.name || ''
-          let description = ''
-          let qbCategory = ''
-          
-          if (purchase.Line && purchase.Line.length > 0) {
-            const firstLine = purchase.Line[0]
-            description = firstLine.Description || ''
-            if (firstLine.AccountBasedExpenseLineDetail) {
-              qbCategory = firstLine.AccountBasedExpenseLineDetail.AccountRef?.name || ''
-            }
-          }
-          
-          if (!description) description = purchase.PrivateNote || payee || 'Purchase'
-
-          const { error } = await supabase
-            .from('transactions')
-            .upsert({
-              company_id: companyId,
-              qb_id: qbId,
-              date: purchase.TxnDate,
-              description: description,
-              amount: amount,
-              payee: payee,
-              qb_category: qbCategory,
-              category: 'opex',
-              type: 'actual',
-              account_name: purchase.AccountRef?.name || '',
-              sync_source: 'quickbooks',
-              synced_at: new Date().toISOString()
-            }, { onConflict: 'company_id,qb_id', ignoreDuplicates: false })
-
-          if (error) results.bankTransactions.errors++
-          else results.bankTransactions.synced++
-        }
-
-        // 2. DEPOSITS (Income to bank)
-        const deposits = await fetchFromQB(
-          realmId,
-          accessToken,
-          `SELECT * FROM Deposit WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`,
-          'Deposit'
-        )
-
-        for (const deposit of deposits) {
-          const qbId = `DEP-${deposit.Id}`
-          const amount = Math.abs(deposit.TotalAmt || 0)
-          let description = deposit.PrivateNote || 'Deposit'
-          let payee = ''
-          
-          if (deposit.Line && deposit.Line.length > 0) {
-            const firstLine = deposit.Line[0]
-            if (firstLine.DepositLineDetail?.Entity) {
-              payee = firstLine.DepositLineDetail.Entity.name || ''
-            }
-          }
-
-          const { error } = await supabase
-            .from('transactions')
-            .upsert({
-              company_id: companyId,
-              qb_id: qbId,
-              date: deposit.TxnDate,
-              description: description,
-              amount: amount,
-              payee: payee,
-              qb_category: 'Income',
-              category: 'revenue',
-              type: 'actual',
-              account_name: deposit.DepositToAccountRef?.name || '',
-              sync_source: 'quickbooks',
-              synced_at: new Date().toISOString()
-            }, { onConflict: 'company_id,qb_id', ignoreDuplicates: false })
-
-          if (error) results.bankTransactions.errors++
-          else results.bankTransactions.synced++
-        }
-
-        // 3. TRANSFERS between accounts
-        const transfers = await fetchFromQB(
-          realmId,
-          accessToken,
-          `SELECT * FROM Transfer WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`,
-          'Transfer'
-        )
-
-        for (const transfer of transfers) {
-          const qbId = `TRF-${transfer.Id}`
-          const amount = -Math.abs(transfer.Amount || 0)
-
-          const { error } = await supabase
-            .from('transactions')
-            .upsert({
-              company_id: companyId,
-              qb_id: qbId,
-              date: transfer.TxnDate,
-              description: `Transfer: ${transfer.FromAccountRef?.name || ''} → ${transfer.ToAccountRef?.name || ''}`,
-              amount: amount,
-              payee: '',
-              qb_category: 'Transfer',
-              category: 'opex',
-              type: 'actual',
-              account_name: transfer.FromAccountRef?.name || '',
-              sync_source: 'quickbooks',
-              synced_at: new Date().toISOString()
-            }, { onConflict: 'company_id,qb_id', ignoreDuplicates: false })
-
-          if (error) results.bankTransactions.errors++
-          else results.bankTransactions.synced++
-        }
-
-        // 4. PAYMENTS received (invoice payments)
-        const payments = await fetchFromQB(
-          realmId,
-          accessToken,
-          `SELECT * FROM Payment WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`,
-          'Payment'
-        )
-
-        for (const payment of payments) {
-          const qbId = `PMT-${payment.Id}`
-          const amount = Math.abs(payment.TotalAmt || 0)
-          const customerName = payment.CustomerRef?.name || ''
-
-          const { error } = await supabase
-            .from('transactions')
-            .upsert({
-              company_id: companyId,
-              qb_id: qbId,
-              date: payment.TxnDate,
-              description: `Payment Received - ${customerName}`,
-              amount: amount,
-              payee: customerName,
-              qb_category: 'Payment',
-              category: 'revenue',
-              type: 'actual',
-              account_name: payment.DepositToAccountRef?.name || 'Undeposited Funds',
-              sync_source: 'quickbooks',
-              synced_at: new Date().toISOString()
-            }, { onConflict: 'company_id,qb_id', ignoreDuplicates: false })
-
-          if (error) results.bankTransactions.errors++
-          else results.bankTransactions.synced++
-        }
-
-        // 5. SALES RECEIPTS (direct sales, not invoiced)
-        const salesReceipts = await fetchFromQB(
-          realmId,
-          accessToken,
-          `SELECT * FROM SalesReceipt WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`,
-          'SalesReceipt'
-        )
-
-        for (const receipt of salesReceipts) {
-          const qbId = `SR-${receipt.Id}`
-          const amount = Math.abs(receipt.TotalAmt || 0)
-          const customerName = receipt.CustomerRef?.name || ''
-
-          const { error } = await supabase
-            .from('transactions')
-            .upsert({
-              company_id: companyId,
-              qb_id: qbId,
-              date: receipt.TxnDate,
-              description: `Sales Receipt - ${customerName}`,
-              amount: amount,
-              payee: customerName,
-              qb_category: 'Sales',
-              category: 'revenue',
-              type: 'actual',
-              account_name: receipt.DepositToAccountRef?.name || '',
-              sync_source: 'quickbooks',
-              synced_at: new Date().toISOString()
-            }, { onConflict: 'company_id,qb_id', ignoreDuplicates: false })
-
-          if (error) results.bankTransactions.errors++
-          else results.bankTransactions.synced++
-        }
-
-      } catch (bankError) {
-        console.error('Bank sync error:', bankError)
-      }
+      // Save last sync timestamp
+      await supabase.from('company_settings').update({
+        qbo_last_bank_sync: new Date().toISOString(),
+      }).eq('company_id', companyId).then(() => {})
     }
 
-    // ========================================
-    // SYNC INVOICES (Accrual Basis - Sales)
-    // From: Sales & Get Paid → Invoices
-    // ========================================
     if (!syncType || syncType === 'all' || syncType === 'invoices') {
-      try {
-        const invoices = await fetchFromQB(
-          realmId,
-          accessToken,
-          `SELECT * FROM Invoice WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`,
-          'Invoice'
-        )
+      results.invoices = await syncInvoices(auth.accessToken, auth.realmId, companyId, supabase)
 
-        console.log(`Found ${invoices.length} invoices`)
-
-        for (const invoice of invoices) {
-          const qbInvoiceId = invoice.Id
-          const customerProjectRaw = invoice.CustomerRef?.name || ''
-          const { client, project } = parseCustomerProject(customerProjectRaw)
-          const balance = invoice.Balance || 0
-          const totalAmount = invoice.TotalAmt || 0
-          const { status, statusDetail, daysOverdue } = parseInvoiceStatus(balance, invoice.DueDate)
-
-          // Insert into accrual_transactions
-          const { error: accrualError } = await supabase
-            .from('accrual_transactions')
-            .upsert({
-              company_id: companyId,
-              qb_invoice_id: qbInvoiceId,
-              invoice_number: invoice.DocNumber || '',
-              date: invoice.TxnDate,
-              customer_project_raw: customerProjectRaw,
-              client: client,
-              project: project,
-              amount: totalAmount,
-              status: status,
-              status_detail: statusDetail,
-              days_overdue: daysOverdue,
-              type: 'revenue',
-              category: 'revenue',
-              description: `Invoice #${invoice.DocNumber || qbInvoiceId}`,
-              sync_source: 'quickbooks',
-              synced_at: new Date().toISOString()
-            }, { onConflict: 'company_id,qb_invoice_id', ignoreDuplicates: false })
-
-          if (accrualError) {
-            console.error('Accrual upsert error:', accrualError)
-            results.invoices.errors++
-            continue
-          }
-
-          // Also insert into invoices table
-          await supabase
-            .from('invoices')
-            .upsert({
-              company_id: companyId,
-              qb_invoice_id: qbInvoiceId,
-              invoice_number: invoice.DocNumber || '',
-              customer_project_raw: customerProjectRaw,
-              client: client,
-              project: project,
-              amount: totalAmount,
-              amount_paid: totalAmount - balance,
-              balance_due: balance,
-              invoice_date: invoice.TxnDate,
-              due_date: invoice.DueDate,
-              status: status,
-              status_detail: statusDetail,
-              days_overdue: daysOverdue,
-              sync_source: 'quickbooks',
-              synced_at: new Date().toISOString()
-            }, { onConflict: 'company_id,qb_invoice_id', ignoreDuplicates: false })
-
-          results.invoices.synced++
-        }
-
-      } catch (invoiceError) {
-        console.error('Invoice sync error:', invoiceError)
-      }
+      await supabase.from('company_settings').update({
+        qbo_last_invoice_sync: new Date().toISOString(),
+      }).eq('company_id', companyId).then(() => {})
     }
 
     return NextResponse.json({
       success: true,
-      message: `Sync completed for ${syncYear}`,
       results,
-      syncedAt: new Date().toISOString()
+      syncedAt: new Date().toISOString(),
     })
-
-  } catch (error) {
-    console.error('QB Sync error:', error)
-    return NextResponse.json({ 
-      error: 'Sync failed', 
-      details: error instanceof Error ? error.message : 'Unknown error' 
-    }, { status: 500 })
+  } catch (err: any) {
+    console.error('QBO sync error:', err)
+    const isAuthErr = err.message === 'QBO_TOKEN_EXPIRED'
+    return NextResponse.json(
+      { error: isAuthErr ? 'Session expired, please reconnect QuickBooks' : (err.message || 'Sync failed'), reconnect: isAuthErr },
+      { status: isAuthErr ? 401 : 500 }
+    )
   }
 }
 
-// GET endpoint to check sync status
+// ============ GET: SYNC STATUS ============
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const companyId = searchParams.get('companyId')
 
   if (!companyId) {
-    return NextResponse.json({ error: 'Company ID required' }, { status: 400 })
+    return NextResponse.json({ error: 'companyId required' }, { status: 400 })
   }
 
-  const { data: lastTransaction } = await supabase
-    .from('transactions')
-    .select('synced_at')
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('qbo_realm_id, qbo_connected_at, qbo_token_expires_at, qbo_last_bank_sync, qbo_last_invoice_sync')
     .eq('company_id', companyId)
-    .eq('sync_source', 'quickbooks')
-    .order('synced_at', { ascending: false })
-    .limit(1)
     .single()
 
-  const { data: lastInvoice } = await supabase
-    .from('accrual_transactions')
-    .select('synced_at')
-    .eq('company_id', companyId)
-    .eq('sync_source', 'quickbooks')
-    .order('synced_at', { ascending: false })
-    .limit(1)
-    .single()
+  const connected = !!settings?.qbo_realm_id
 
-  const { count: transactionCount } = await supabase
+  const { count: txnCount } = await supabase
     .from('transactions')
     .select('*', { count: 'exact', head: true })
     .eq('company_id', companyId)
     .eq('sync_source', 'quickbooks')
 
-  const { count: invoiceCount } = await supabase
-    .from('accrual_transactions')
+  const { count: invCount } = await supabase
+    .from('invoices')
     .select('*', { count: 'exact', head: true })
     .eq('company_id', companyId)
     .eq('sync_source', 'quickbooks')
 
   return NextResponse.json({
-    lastSync: {
-      transactions: lastTransaction?.synced_at,
-      invoices: lastInvoice?.synced_at
-    },
-    counts: {
-      transactions: transactionCount || 0,
-      invoices: invoiceCount || 0
-    }
+    connected,
+    connectedAt: settings?.qbo_connected_at || null,
+    lastBankSync: settings?.qbo_last_bank_sync || null,
+    lastInvoiceSync: settings?.qbo_last_invoice_sync || null,
+    counts: { transactions: txnCount || 0, invoices: invCount || 0 },
   })
 }
