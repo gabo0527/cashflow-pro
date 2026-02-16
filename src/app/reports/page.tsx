@@ -6,7 +6,8 @@ import {
   DollarSign, TrendingUp, TrendingDown, Users, Clock, Briefcase,
   BarChart3, Table2, Eye, Save, Plus, X, Search,
   Building2, FolderOpen, Receipt, AlertTriangle,
-  Layers, LayoutGrid, GripVertical, ArrowUp, ArrowDown, Trash2, Settings, Type
+  Layers, LayoutGrid, GripVertical, ArrowUp, ArrowDown, Trash2, Settings, Type,
+  Bookmark, Copy, FileDown
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import { getCurrentUser } from '@/lib/supabase'
@@ -29,6 +30,32 @@ const fmtNum = (v: number, d = 1) => new Intl.NumberFormat('en-US', { minimumFra
 const fmtDate = (s: string) => s ? new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
 const inputClass = "bg-slate-800/60 border border-slate-800/80 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 transition-colors"
+
+// ============ SAVED TEMPLATE ============
+interface SavedTemplate {
+  id: string
+  company_id: string
+  name: string
+  blocks: { type: string; title: string; config?: Record<string, any> }[]
+  created_at?: string
+  updated_at?: string
+}
+
+// ============ CSV EXPORT ============
+const downloadCSV = (filename: string, headers: string[], rows: (string | number)[][]) => {
+  const csv = [headers.join(','), ...rows.map(r => r.map(v => typeof v === 'string' && v.includes(',') ? `"${v}"` : v).join(','))].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href = url; a.download = `${filename}-${new Date().toISOString().slice(0, 10)}.csv`; a.click()
+  URL.revokeObjectURL(url)
+}
+
+const downloadTXT = (filename: string, content: string) => {
+  const blob = new Blob([content], { type: 'text/plain' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href = url; a.download = `${filename}-${new Date().toISOString().slice(0, 10)}.txt`; a.click()
+  URL.revokeObjectURL(url)
+}
 
 // ============ DATE RANGES ============
 type DatePreset = 'this_month' | 'last_month' | 'this_quarter' | 'last_quarter' | 'ytd' | 'last_year' | 'custom'
@@ -719,10 +746,23 @@ const BLOCK_PALETTE: { type: BuilderBlock['type']; label: string; icon: any }[] 
   { type: 'text_note', label: 'Text / Notes', icon: Type },
 ]
 
-function ReportBuilder({ allData, dateRange }: { allData: any; dateRange: { start: Date; end: Date } }) {
+function ReportBuilder({ allData, dateRange, onSave, editingTemplate }: {
+  allData: any; dateRange: { start: Date; end: Date }
+  onSave?: (name: string, blocks: BuilderBlock[]) => Promise<void>
+  editingTemplate?: SavedTemplate | null
+}) {
   const [blocks, setBlocks] = useState<BuilderBlock[]>([])
   const [reportTitle, setReportTitle] = useState('Custom Report')
   const [editingNote, setEditingNote] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  // Load template if editing
+  useEffect(() => {
+    if (editingTemplate) {
+      setReportTitle(editingTemplate.name)
+      setBlocks(editingTemplate.blocks.map((b, i) => ({ id: `block_${Date.now()}_${i}`, type: b.type as BuilderBlock['type'], title: b.title, config: b.config })))
+    }
+  }, [editingTemplate])
 
   const addBlock = (type: BuilderBlock['type']) => {
     const palette = BLOCK_PALETTE.find(b => b.type === type)
@@ -762,11 +802,47 @@ function ReportBuilder({ allData, dateRange }: { allData: any; dateRange: { star
     }
   }
 
+  const handleSave = async () => {
+    if (!onSave || blocks.length === 0) return
+    setSaving(true)
+    try { await onSave(reportTitle, blocks) } finally { setSaving(false) }
+  }
+
+  const handleExportBuilder = () => {
+    const lines: string[] = []
+    lines.push(`CUSTOM REPORT: ${reportTitle}`)
+    lines.push(`Generated: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`)
+    lines.push(`Period: ${dateRange.start.toLocaleDateString()} – ${dateRange.end.toLocaleDateString()}`)
+    lines.push('')
+    blocks.forEach(block => {
+      lines.push(`=== ${block.title.toUpperCase()} ===`)
+      if (block.type === 'text_note') lines.push(block.config?.text || '')
+      else lines.push(`[${block.type} — rendered in application]`)
+      lines.push('')
+    })
+    downloadTXT(`report-${reportTitle.replace(/\s+/g, '-').toLowerCase()}`, lines.join('\n'))
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4 mb-2">
         <input type="text" value={reportTitle} onChange={e => setReportTitle(e.target.value)}
           className="bg-transparent text-lg font-bold text-white border-b border-transparent hover:border-slate-700 focus:border-teal-600 focus:outline-none pb-1 transition-colors flex-1" />
+        <div className="flex items-center gap-2">
+          {blocks.length > 0 && (
+            <>
+              <button onClick={handleExportBuilder}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-800/80 text-xs font-medium text-slate-300 hover:text-white hover:border-slate-700 transition-colors">
+                <FileDown size={13} /> Export
+              </button>
+              <button onClick={handleSave} disabled={saving}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-xs font-semibold text-white transition-colors disabled:opacity-50">
+                {saving ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={13} />}
+                {saving ? 'Saving...' : 'Save Template'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-12 gap-4">
@@ -831,6 +907,7 @@ function ReportBuilder({ allData, dateRange }: { allData: any; dateRange: { star
 // ============ MAIN PAGE ============
 export default function ReportsPage() {
   const [loading, setLoading] = useState(true)
+  const [companyId, setCompanyId] = useState<string | null>(null)
   const [invoices, setInvoices] = useState<any[]>([])
   const [bills, setBills] = useState<any[]>([])
   const [expenses, setExpenses] = useState<any[]>([])
@@ -839,11 +916,15 @@ export default function ReportsPage() {
   const [timeEntries, setTimeEntries] = useState<any[]>([])
   const [teamMembers, setTeamMembers] = useState<any[]>([])
 
-  const [activeTab, setActiveTab] = useState<'reports' | 'builder'>('reports')
+  const [activeTab, setActiveTab] = useState<'reports' | 'builder' | 'saved'>('reports')
   const [selectedReport, setSelectedReport] = useState<string | null>(null)
   const [datePreset, setDatePreset] = useState<DatePreset>('this_month')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
+
+  // Saved templates
+  const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>([])
+  const [editingTemplate, setEditingTemplate] = useState<SavedTemplate | null>(null)
 
   const dateRange = useMemo(() => getDateRange(datePreset, customStart, customEnd), [datePreset, customStart, customEnd])
 
@@ -855,8 +936,9 @@ export default function ReportsPage() {
         if (!user) { setLoading(false); return }
         const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
         if (!profile?.company_id) { setLoading(false); return }
+        setCompanyId(profile.company_id)
 
-        const [inv, bil, exp, proj, cli, te, tm] = await Promise.all([
+        const [inv, bil, exp, proj, cli, te, tm, tpl] = await Promise.all([
           supabase.from('invoices').select('*').eq('company_id', profile.company_id),
           supabase.from('bills').select('*').eq('company_id', profile.company_id),
           supabase.from('expenses').select('*').eq('company_id', profile.company_id),
@@ -864,15 +946,159 @@ export default function ReportsPage() {
           supabase.from('clients').select('*').eq('company_id', profile.company_id),
           supabase.from('time_entries').select('*').eq('company_id', profile.company_id),
           supabase.from('team_members').select('*').eq('company_id', profile.company_id),
+          supabase.from('report_templates').select('*').eq('company_id', profile.company_id).order('updated_at', { ascending: false }),
         ])
         setInvoices(inv.data || []); setBills(bil.data || []); setExpenses(exp.data || [])
         setProjects(proj.data || []); setClients(cli.data || []); setTimeEntries(te.data || []); setTeamMembers(tm.data || [])
+        setSavedTemplates(tpl.data || [])
       } catch (e) { console.error(e) } finally { setLoading(false) }
     }
     load()
   }, [])
 
   const allData = { invoices, bills, expenses, projects, clients, timeEntries, teamMembers }
+
+  // ============ TEMPLATE CRUD ============
+  const saveTemplate = async (name: string, blocks: BuilderBlock[]) => {
+    if (!companyId) return
+    const payload = {
+      company_id: companyId,
+      name,
+      blocks: blocks.map(b => ({ type: b.type, title: b.title, config: b.config })),
+      updated_at: new Date().toISOString(),
+    }
+
+    if (editingTemplate) {
+      await supabase.from('report_templates').update(payload).eq('id', editingTemplate.id)
+      setSavedTemplates(prev => prev.map(t => t.id === editingTemplate.id ? { ...t, ...payload } : t))
+      setEditingTemplate(null)
+    } else {
+      const { data } = await supabase.from('report_templates').insert(payload).select().single()
+      if (data) setSavedTemplates(prev => [data, ...prev])
+    }
+    setActiveTab('saved')
+  }
+
+  const deleteTemplate = async (id: string) => {
+    await supabase.from('report_templates').delete().eq('id', id)
+    setSavedTemplates(prev => prev.filter(t => t.id !== id))
+  }
+
+  const duplicateTemplate = async (tpl: SavedTemplate) => {
+    if (!companyId) return
+    const { data } = await supabase.from('report_templates').insert({
+      company_id: companyId,
+      name: `${tpl.name} (Copy)`,
+      blocks: tpl.blocks,
+      updated_at: new Date().toISOString(),
+    }).select().single()
+    if (data) setSavedTemplates(prev => [data, ...prev])
+  }
+
+  // ============ CSV EXPORT PER REPORT ============
+  const exportReport = (reportId: string) => {
+    const period = `${dateRange.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${dateRange.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+
+    switch (reportId) {
+      case 'pnl': {
+        // Build P&L data inline for export
+        let revenue = 0
+        invoices.filter(inv => inRange(inv.invoice_date, dateRange)).forEach(inv => { revenue += parseFloat(inv.total_amount || inv.amount || 0) })
+        let directLabor = 0
+        const projMap: Record<string, string> = {}
+        projects.forEach(p => { projMap[p.id] = p.client_id })
+        timeEntries.filter(t => inRange(t.date || t.week_starting, dateRange)).forEach(t => {
+          const hrs = parseFloat(t.hours || t.total_hours || 0)
+          const m = teamMembers.find(mm => mm.id === (t.contractor_id || t.team_member_id))
+          directLabor += hrs * (m?.cost_rate || (m?.cost_amount ? m.cost_amount / 172 : 0))
+        })
+        let billsCost = 0
+        bills.filter(b => inRange(b.date || b.bill_date, dateRange)).forEach(b => { billsCost += Math.abs(parseFloat(b.amount || b.total_amount || 0)) })
+        let totalExp = 0
+        expenses.filter(e => inRange(e.date, dateRange)).forEach(e => { totalExp += Math.abs(parseFloat(e.amount || 0)) })
+        const gross = revenue - directLabor - billsCost
+        const net = gross - totalExp
+        downloadCSV(`pnl-${datePreset}`, ['Line Item', 'Amount'], [
+          ['Revenue', revenue], ['Direct Labor', -directLabor], ['Bills / Subcontractors', -billsCost],
+          ['Gross Profit', gross], ['Total Expenses', -totalExp], ['Net Income', net],
+        ])
+        break
+      }
+      case 'ar_aging': {
+        const clientMap: Record<string, string> = {}
+        clients.forEach(c => { clientMap[c.id] = c.name })
+        const rows = invoices.filter(inv => parseFloat(inv.balance_due || 0) > 0).map(inv => [
+          clientMap[inv.client_id] || 'Unknown', inv.invoice_number || '—',
+          fmtDate(inv.invoice_date), inv.days_overdue || 0, parseFloat(inv.balance_due || 0)
+        ])
+        downloadCSV('ar-aging', ['Client', 'Invoice #', 'Date', 'Days Overdue', 'Balance Due'], rows)
+        break
+      }
+      case 'client_profit': {
+        const cd: Record<string, { name: string; rev: number; cost: number; hrs: number }> = {}
+        clients.forEach(c => { cd[c.id] = { name: c.name, rev: 0, cost: 0, hrs: 0 } })
+        invoices.filter(inv => inRange(inv.invoice_date, dateRange)).forEach(inv => { if (cd[inv.client_id]) cd[inv.client_id].rev += parseFloat(inv.total_amount || inv.amount || 0) })
+        const pm: Record<string, string> = {}
+        projects.forEach(p => { pm[p.id] = p.client_id })
+        timeEntries.filter(t => inRange(t.date || t.week_starting, dateRange)).forEach(t => {
+          const cid = pm[t.project_id]; if (!cid || !cd[cid]) return
+          const hrs = parseFloat(t.hours || t.total_hours || 0)
+          const m = teamMembers.find(mm => mm.id === (t.contractor_id || t.team_member_id))
+          cd[cid].cost += hrs * (m?.cost_rate || (m?.cost_amount ? m.cost_amount / 172 : 0))
+          cd[cid].hrs += hrs
+        })
+        const rows = Object.values(cd).filter(c => c.rev > 0 || c.hrs > 0).map(c => [c.name, c.rev, c.cost, c.rev - c.cost, c.rev > 0 ? ((c.rev - c.cost) / c.rev * 100).toFixed(1) + '%' : '0%', c.hrs])
+        downloadCSV(`client-profitability-${datePreset}`, ['Client', 'Revenue', 'Cost', 'Profit', 'Margin', 'Hours'], rows)
+        break
+      }
+      case 'utilization': {
+        const days = Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / (1000 * 60 * 60 * 24))
+        const avail = Math.floor(days * 5 / 7) * 8
+        const mem: Record<string, { name: string; bill: number; nb: number }> = {}
+        timeEntries.filter(t => inRange(t.date || t.week_starting, dateRange)).forEach(t => {
+          const mid = t.contractor_id || t.team_member_id || 'x'
+          const m = teamMembers.find(mm => mm.id === mid)
+          if (!mem[mid]) mem[mid] = { name: m?.name || 'Unknown', bill: 0, nb: 0 }
+          const hrs = parseFloat(t.hours || t.total_hours || 0)
+          if (t.billable !== false) mem[mid].bill += hrs; else mem[mid].nb += hrs
+        })
+        const rows = Object.values(mem).map(m => [m.name, m.bill, m.nb, m.bill + m.nb, avail > 0 ? ((m.bill / avail) * 100).toFixed(1) + '%' : '0%'])
+        downloadCSV(`utilization-${datePreset}`, ['Member', 'Billable Hrs', 'Non-Billable Hrs', 'Total Hrs', 'Utilization %'], rows)
+        break
+      }
+      case 'expense': {
+        const rows = expenses.filter(e => inRange(e.date, dateRange)).map(e => [
+          e.date || '', e.category || 'Uncategorized', e.description || e.vendor || '', Math.abs(parseFloat(e.amount || 0))
+        ])
+        downloadCSV(`expenses-${datePreset}`, ['Date', 'Category', 'Description', 'Amount'], rows)
+        break
+      }
+      case 'cash_flow': {
+        const cashIn = invoices.filter(inv => inRange(inv.payment_date || inv.paid_date || inv.invoice_date, dateRange) && (inv.status === 'paid' || inv.status === 'Paid')).reduce((s, inv) => s + parseFloat(inv.total_amount || inv.amount || 0), 0)
+        const billsOut = bills.filter(b => inRange(b.date || b.bill_date, dateRange)).reduce((s, b) => s + Math.abs(parseFloat(b.amount || b.total_amount || 0)), 0)
+        const expOut = expenses.filter(e => inRange(e.date, dateRange)).reduce((s, e) => s + Math.abs(parseFloat(e.amount || 0)), 0)
+        downloadCSV(`cash-flow-${datePreset}`, ['Line', 'Amount'], [
+          ['Client Payments Received', cashIn], ['Bills Paid', -billsOut], ['Expenses Paid', -expOut], ['Net Cash', cashIn - billsOut - expOut]
+        ])
+        break
+      }
+      case 'project_profit': {
+        const rows = projects.filter(p => p.status === 'active' || p.status === 'completed').map(p => {
+          const budget = parseFloat(p.budget || 0)
+          let lc = 0, hrs = 0
+          timeEntries.filter(t => t.project_id === p.id && inRange(t.date || t.week_starting, dateRange)).forEach(t => {
+            const h = parseFloat(t.hours || t.total_hours || 0); hrs += h
+            const m = teamMembers.find(mm => mm.id === (t.contractor_id || t.team_member_id))
+            lc += h * (m?.cost_rate || (m?.cost_amount ? m.cost_amount / 172 : 0))
+          })
+          const rev = invoices.filter(inv => inv.project_id === p.id && inRange(inv.invoice_date, dateRange)).reduce((s, inv) => s + parseFloat(inv.total_amount || inv.amount || 0), 0)
+          return [p.name, budget, rev, lc, rev - lc, rev > 0 ? ((rev - lc) / rev * 100).toFixed(1) + '%' : '0%', hrs]
+        }).filter(r => (r[1] as number) > 0 || (r[6] as number) > 0)
+        downloadCSV(`project-profitability-${datePreset}`, ['Project', 'Budget', 'Revenue', 'Labor Cost', 'Profit', 'Margin', 'Hours'], rows)
+        break
+      }
+    }
+  }
 
   const renderReport = (id: string) => {
     switch (id) {
@@ -943,6 +1169,7 @@ export default function ReportsPage() {
           {([
             { id: 'reports' as const, label: 'Quick Reports' },
             { id: 'builder' as const, label: 'Report Builder' },
+            { id: 'saved' as const, label: `Saved${savedTemplates.length > 0 ? ` (${savedTemplates.length})` : ''}` },
           ]).map(tab => (
             <button key={tab.id} onClick={() => { setActiveTab(tab.id); setSelectedReport(null) }}
               className={`relative px-5 py-3 text-sm font-medium transition-colors ${activeTab === tab.id ? 'text-teal-400' : 'text-slate-500 hover:text-slate-300'}`}>
@@ -978,17 +1205,84 @@ export default function ReportsPage() {
 
       {activeTab === 'reports' && selectedReport && (
         <div className="space-y-4">
-          <div className="flex items-center gap-2 text-sm">
-            <button onClick={() => setSelectedReport(null)} className="text-slate-500 hover:text-slate-300 transition-colors">Reports</button>
-            <ChevronRight size={14} className="text-slate-600" />
-            <span className="text-white font-medium">{REPORTS.find(r => r.id === selectedReport)?.name}</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm">
+              <button onClick={() => setSelectedReport(null)} className="text-slate-500 hover:text-slate-300 transition-colors">Reports</button>
+              <ChevronRight size={14} className="text-slate-600" />
+              <span className="text-white font-medium">{REPORTS.find(r => r.id === selectedReport)?.name}</span>
+            </div>
+            <button onClick={() => exportReport(selectedReport)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-800/80 text-xs font-medium text-slate-300 hover:text-white hover:border-slate-700 transition-colors">
+              <Download size={13} /> Export CSV
+            </button>
           </div>
           {renderReport(selectedReport)}
         </div>
       )}
 
       {/* Report Builder */}
-      {activeTab === 'builder' && <ReportBuilder allData={allData} dateRange={dateRange} />}
+      {activeTab === 'builder' && <ReportBuilder allData={allData} dateRange={dateRange} onSave={saveTemplate} editingTemplate={editingTemplate} />}
+
+      {/* Saved Templates */}
+      {activeTab === 'saved' && (
+        <div className="space-y-4">
+          {savedTemplates.length === 0 ? (
+            <div className="bg-[#111827] border border-dashed border-slate-700 rounded-xl p-16 text-center">
+              <Bookmark size={32} className="text-slate-600 mx-auto mb-3" />
+              <p className="text-sm text-slate-400 mb-1">No saved reports</p>
+              <p className="text-xs text-slate-600 mb-4">Build a custom report in the Report Builder tab and save it as a template.</p>
+              <button onClick={() => { setActiveTab('builder'); setEditingTemplate(null) }}
+                className="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-sm font-semibold text-white transition-colors">
+                <Plus size={14} className="inline mr-1.5" /> Create Report
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {savedTemplates.map(tpl => (
+                <div key={tpl.id} className="bg-[#111827] border border-slate-800/80 rounded-xl p-4 group">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-white">{tpl.name}</h3>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        {tpl.blocks.length} block{tpl.blocks.length !== 1 ? 's' : ''} · Updated {tpl.updated_at ? fmtDate(tpl.updated_at) : '—'}
+                      </p>
+                    </div>
+                    <Bookmark size={14} className="text-teal-400 shrink-0 mt-0.5" />
+                  </div>
+
+                  {/* Block summary */}
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {tpl.blocks.map((b, i) => {
+                      const palette = BLOCK_PALETTE.find(p => p.type === b.type)
+                      return (
+                        <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800/80 text-slate-400 border border-slate-800/60">
+                          {palette?.label || b.type}
+                        </span>
+                      )
+                    })}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 pt-2 border-t border-slate-800/60">
+                    <button onClick={() => { setEditingTemplate(tpl); setActiveTab('builder') }}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-600/30 text-xs font-medium text-teal-400 hover:bg-teal-600/30 transition-colors">
+                      <Eye size={12} /> Open
+                    </button>
+                    <button onClick={() => duplicateTemplate(tpl)}
+                      className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/40 border border-slate-800/60 text-xs font-medium text-slate-400 hover:text-white transition-colors">
+                      <Copy size={12} />
+                    </button>
+                    <button onClick={() => deleteTemplate(tpl.id)}
+                      className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/40 border border-slate-800/60 text-xs font-medium text-slate-400 hover:text-rose-400 transition-colors">
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
