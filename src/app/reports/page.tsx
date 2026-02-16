@@ -328,7 +328,7 @@ function ARAgingReport({ invoices, clients }: { invoices: any[]; clients: any[] 
       for (const b of buckets) {
         if (days >= b.min && days <= b.max) {
           b.amount += bal; b.count++
-          byClient[cid][b.key] = (byClient[cid][b.key] || 0) + bal
+          byClient[cid][b.key as keyof AgingRow] = (byClient[cid][b.key as keyof AgingRow] || 0) + bal
           break
         }
       }
