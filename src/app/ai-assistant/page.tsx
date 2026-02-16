@@ -61,7 +61,7 @@ interface Attachment { id: string; name: string; type: string; size: number; con
 interface ChartData { type: "bar" | "line" | "pie" | "area" | "waterfall" | "stacked_bar" | "multi_line" | "composed"; title: string; data: any[]; keys?: string[]; colors?: string[] }
 interface TableData { title: string; headers: string[]; rows: string[][] }
 interface Conversation { id: string; title: string; messages: Message[]; created_at: string; updated_at: string }
-interface CompanyData { transactions: any[]; invoices: any[]; projects: any[]; clients: any[]; teamMembers: any[]; timeEntries: any[]; projectAssignments: any[]; billRates: any[]; costOverrides: any[]; expenses: any[] }
+interface CompanyData { transactions: any[]; invoices: any[]; projects: any[]; clients: any[]; teamMembers: any[]; timeEntries: any[]; projectAssignments: any[]; billRates: any[]; costOverrides: any[]; expenses: any[]; learnedPatterns: any[] }
 interface KPISummary { totalRevenue: number; totalExpenses: number; netIncome: number; grossMargin: number; cashOnHand: number; arOutstanding: number; burnRate: number; runway: number; utilizationRate: number; dso: number; teamCost: number; teamRevenue: number; teamMarginPct: number }
 
 // ============ QUICK ACTIONS ============
@@ -129,12 +129,29 @@ Example: Brian logs 40 hours, leadership sets billable_hours to 32. Delta = 8 ho
 
 BANK TRANSACTION CATEGORIZATION:
 When asked to categorize transactions, analyze:
+- FIRST check the SAGE LEARNED PATTERNS section in your data context. If a vendor matches an approved pattern, use that category with high confidence.
 - Vendor name patterns (e.g., "GUSTO" = payroll, "AWS" = software, "AMEX" = credit card payment)
 - Amount patterns (recurring amounts = subscriptions, large one-time = equipment/deposits)
 - Historical categorizations for the same vendor
 - Suggest categories from: Direct Costs, Overhead, Other Business, Personal
 - Be specific with sub-categories: Payroll, Software & Tools, Insurance, Rent, Travel, Meals, Equipment, Subcontractors, Professional Services, Marketing, Utilities, Vehicle, Office Supplies
 - When uncertain, present your best guess with confidence level
+- For learned/approved patterns, show them as "Known" rather than "Suggested"
+
+LEARNING FLOW:
+When you categorize transactions and the user confirms or approves:
+1. Emit a PATTERN_LEARNED line for EACH confirmed vendor-category pair
+2. Format: PATTERN_LEARNED: vendor="EXACT_VENDOR_NAME" category="Category" sub_category="SubCategory"
+3. Put these AFTER your main response text (they will be auto-stripped from display)
+4. Only emit when the user explicitly confirms (says "yes", "approved", "correct", "save that", etc.)
+5. Do NOT emit patterns on your initial suggestion — wait for confirmation
+Example flow:
+- User: "Categorize my recent transactions"
+- Sage: [shows table with suggestions and confidence levels] "Want me to save these categorizations?"
+- User: "Yes, save them" or "Approve all" or "Looks good"
+- Sage: "Saved. I will remember these for next time."
+  PATTERN_LEARNED: vendor="GUSTO" category="Direct Costs" sub_category="Payroll"
+  PATTERN_LEARNED: vendor="AWS" category="Overhead" sub_category="Software & Tools"
 
 EXPENSE CATEGORIES:
 - Direct Costs: Payroll, Subcontractors, Project Materials, Equipment Rental
@@ -586,6 +603,21 @@ ${data.projectAssignments?.map(a => {
   }).join("\n") || "No project assignments"}
 
 ${bankPatterns}
+
+=== SAGE LEARNED PATTERNS (${data.learnedPatterns?.length || 0} total) ===
+${data.learnedPatterns?.length > 0 ? 
+  `Approved (use with high confidence):
+${data.learnedPatterns.filter(p => p.status === "approved").map(p => 
+    `  "${p.vendor_normalized || p.vendor_name}" -> ${p.category}${p.sub_category ? "/" + p.sub_category : ""} (confirmed ${p.times_confirmed}x)`
+  ).join("\n") || "  None yet"}
+Suggested (use but flag as suggestion):
+${data.learnedPatterns.filter(p => p.status === "suggested").map(p => 
+    `  "${p.vendor_normalized || p.vendor_name}" -> ${p.category}${p.sub_category ? "/" + p.sub_category : ""} (seen ${p.times_seen}x, confidence ${(p.confidence * 100).toFixed(0)}%)`
+  ).join("\n") || "  None yet"}`
+  : "No learned patterns yet. When categorizing transactions, suggest patterns and ask user to confirm. Use SAVE_PATTERN action to persist."}
+Note: When the user approves a categorization, respond with a line like:
+PATTERN_LEARNED: vendor="VENDOR_NAME" category="CATEGORY" sub_category="SUB_CATEGORY"
+The frontend will detect this and save the pattern to the database.
 `
 }
 
@@ -855,13 +887,15 @@ export default function SageAssistantPage() {
             supabase.from("cost_overrides").select("*").eq("company_id", cid),
             supabase.from("expenses").select("*").eq("company_id", cid).order("date", { ascending: false }).limit(500),
           ])
+          // Load learned patterns separately
+          const { data: learnedPatterns } = await supabase.from("sage_learned_patterns").select("*").eq("company_id", cid).neq("status", "rejected")
           const data: CompanyData = {
             transactions: transactions.data || [], invoices: invoices.data || [],
             projects: projects.data || [], clients: clients.data || [],
             teamMembers: teamMembers.data || [], timeEntries: timeEntries.data || [],
             projectAssignments: projectAssignments.data || [],
             billRates: billRates.data || [], costOverrides: costOverrides.data || [],
-            expenses: expenses.data || [],
+            expenses: expenses.data || [], learnedPatterns: learnedPatterns || [],
           }
           setCompanyData(data)
           setKpis(calculateKPIs(data))
@@ -923,7 +957,45 @@ export default function SageAssistantPage() {
       })
       if (!response.ok) throw new Error("Failed to get AI response")
       const data = await response.json()
-      const assistantMessage: Message = { id: `assistant_${Date.now()}`, role: "assistant", content: data.content, timestamp: new Date() }
+      let assistantContent = data.content
+      
+      // Detect and save learned patterns
+      const patternRegex = /PATTERN_LEARNED:\s*vendor="([^"]+)"\s*category="([^"]+)"(?:\s*sub_category="([^"]*)")?/g
+      let patternMatch
+      let patternsFound = false
+      while ((patternMatch = patternRegex.exec(assistantContent)) !== null) {
+        patternsFound = true
+        const [, vendor, category, subCategory] = patternMatch
+        const normalized = vendor.toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim()
+        try {
+          await supabase.from("sage_learned_patterns").upsert({
+            company_id: companyId,
+            pattern_type: "vendor_category",
+            vendor_name: vendor,
+            vendor_normalized: normalized,
+            category: category,
+            sub_category: subCategory || null,
+            match_field: "vendor",
+            match_value: normalized,
+            confidence: 1.00,
+            times_confirmed: 1,
+            status: "approved",
+            approved_by: userId,
+            approved_at: new Date().toISOString(),
+            source: "sage_ai",
+          }, { onConflict: "company_id,vendor_normalized", ignoreDuplicates: false })
+          console.log(`Pattern saved: ${vendor} -> ${category}/${subCategory || ""}`)
+        } catch (e) { console.error("Failed to save pattern:", e) }
+      }
+      // Refresh learned patterns in local state if any were saved
+      if (patternsFound && companyId) {
+        const { data: refreshedPatterns } = await supabase.from("sage_learned_patterns").select("*").eq("company_id", companyId).neq("status", "rejected")
+        if (refreshedPatterns && companyData) setCompanyData(prev => prev ? { ...prev, learnedPatterns: refreshedPatterns } : prev)
+      }
+      // Strip PATTERN_LEARNED lines from display
+      assistantContent = assistantContent.replace(/PATTERN_LEARNED:.*$/gm, "").replace(/\n{3,}/g, "\n\n").trim()
+      
+      const assistantMessage: Message = { id: `assistant_${Date.now()}`, role: "assistant", content: assistantContent, timestamp: new Date() }
       const finalMessages = [...newMessages, assistantMessage]
       setMessages(finalMessages)
       const title = messages.length === 0 ? generateTitle(content) : undefined
@@ -955,7 +1027,8 @@ export default function SageAssistantPage() {
     const overdueInvs = companyData.invoices?.filter(i => i.status !== "paid" && new Date(i.due_date || i.created_at) < new Date()).length || 0
     const activeRates = companyData.billRates?.filter(r => r.is_active).length || 0
     const totalDataPoints = (companyData.transactions?.length || 0) + (companyData.invoices?.length || 0) + (companyData.timeEntries?.length || 0)
-    return { uncatTxns, overdueInvs, activeRates, totalTxns: companyData.transactions?.length || 0, totalDataPoints }
+    const learnedCount = companyData.learnedPatterns?.filter(p => p.status === "approved").length || 0
+    return { uncatTxns, overdueInvs, activeRates, totalTxns: companyData.transactions?.length || 0, totalDataPoints, learnedCount }
   }, [companyData])
 
   // ---- LOADING STATE (Branded) ----
@@ -999,6 +1072,7 @@ export default function SageAssistantPage() {
               {dataStats.uncatTxns > 0 && <div className="flex items-center gap-2 text-amber-400/80 text-[11px]"><CreditCard size={11} /><span>{dataStats.uncatTxns} uncategorized</span></div>}
               {dataStats.overdueInvs > 0 && <div className="flex items-center gap-2 text-rose-400/80 text-[11px]"><AlertTriangle size={11} /><span>{dataStats.overdueInvs} overdue</span></div>}
               <div className="flex items-center gap-2 text-slate-500 text-[11px]"><Activity size={11} /><span>{dataStats.totalDataPoints.toLocaleString()} data points</span></div>
+              {dataStats.learnedCount > 0 && <div className="flex items-center gap-2 text-teal-400/70 text-[11px]"><Brain size={11} /><span>{dataStats.learnedCount} learned patterns</span></div>}
             </div>
           </div>
         )}
