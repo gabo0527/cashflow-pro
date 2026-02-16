@@ -115,6 +115,18 @@ Vantage uses a TWO-TIER cost model:
   - Client A gets $14k cost, Client B gets $12.25k, Client C gets $8.75k
 - cost_overrides table = monthly exceptions to override automatic distribution
 
+TIME TRACKING MODEL (IMPORTANT - logged vs billable):
+Each time entry has TWO hour fields:
+- "hours" = ACTUAL time logged by the contractor (what they worked)
+- "billable_hours" = ADJUSTED hours approved for billing (may be LESS than logged)
+When leadership reduces billable_hours below logged hours, that delta is "written down" or "non-billable" time.
+- Written-down hours = hours - billable_hours (when billable_hours < hours)
+- This represents revenue LOSS: the work was done but will not be billed to the client
+- When asked about "logged vs billed" or "lost hours", ALWAYS show both columns and the delta
+- Calculate potential lost revenue as: (hours - billable_hours) x bill_rate for that member+client
+- If billable_hours is null or not set, assume billable_hours = hours (no write-down)
+Example: Brian logs 40 hours, leadership sets billable_hours to 32. Delta = 8 hours written down. At $190/hr = $1,520 in lost revenue.
+
 BANK TRANSACTION CATEGORIZATION:
 When asked to categorize transactions, analyze:
 - Vendor name patterns (e.g., "GUSTO" = payroll, "AWS" = software, "AMEX" = credit card payment)
@@ -185,8 +197,16 @@ When asked general questions like "what should I focus on" or "any issues?", sca
 - Cash runway warnings
 - Upcoming invoice milestones
 - Rate card gaps (members working on clients without rate cards)
+- Hours written down (logged > billable) and the revenue impact of those reductions
 
-Remember: You are not just answering questions. You are an agent running alongside the business, spotting patterns humans miss.`
+Remember: You are not just answering questions. You are an agent running alongside the business, spotting patterns humans miss.
+
+IMPORTANT DISAMBIGUATION:
+When a user asks about "logged vs billed hours" or "lost hours" or "hours reduction":
+- This means comparing the "hours" field (what was worked) vs "billable_hours" field (what was approved for billing)
+- The WRITE-DOWN data section has this computed per member per month
+- Do NOT confuse this with "hours logged but no invoices generated" - that is a separate billing/rate card issue
+- Show a table with columns: Team Member, Logged Hours, Billable Hours, Written Down, Lost Revenue`
 
 function calculateKPIs(data: CompanyData): KPISummary {
   const totalRevenue = data.invoices?.filter(inv => inv.status === "paid").reduce((sum, inv) => sum + (inv.amount || 0), 0) || 0
@@ -358,7 +378,7 @@ function buildDataContext(data: CompanyData, kpis: KPISummary): string {
     const name = memberNameMap.get(entry.contractor_id) || "Unknown"
     if (!allTimeByMember[name]) allTimeByMember[name] = { hours: 0, billable: 0 }
     allTimeByMember[name].hours += entry.hours || 0
-    if (entry.billable || entry.is_billable) allTimeByMember[name].billable += entry.billable_hours != null ? entry.billable_hours : (entry.hours || 0)
+    allTimeByMember[name].billable += entry.billable_hours != null ? entry.billable_hours : (entry.hours || 0)
   })
 
   // Monthly time breakdown
@@ -437,6 +457,27 @@ function buildDataContext(data: CompanyData, kpis: KPISummary): string {
   data.expenses?.forEach(e => {
     const cat = e.category || e.expense_category || "Uncategorized"
     expenseByCategory[cat] = (expenseByCategory[cat] || 0) + Math.abs(e.amount || 0)
+  })
+
+  // Logged vs Billable hours analysis (write-downs)
+  const writeDownsByMember: Record<string, { name: string, months: Record<string, { logged: number, billable: number, delta: number, lostRevenue: number }> }> = {}
+  data.timeEntries?.forEach(entry => {
+    const memberId = entry.contractor_id
+    const name = memberNameMap.get(memberId) || "Unknown"
+    const mo = entry.date?.substring(0, 7) || "?"
+    const logged = entry.hours || 0
+    const billable = entry.billable_hours != null ? entry.billable_hours : logged
+    const delta = logged - billable
+    if (!writeDownsByMember[memberId]) writeDownsByMember[memberId] = { name, months: {} }
+    if (!writeDownsByMember[memberId].months[mo]) writeDownsByMember[memberId].months[mo] = { logged: 0, billable: 0, delta: 0, lostRevenue: 0 }
+    writeDownsByMember[memberId].months[mo].logged += logged
+    writeDownsByMember[memberId].months[mo].billable += billable
+    writeDownsByMember[memberId].months[mo].delta += delta
+    if (delta > 0) {
+      const clientId = projectClientMap.get(entry.project_id) || "unknown"
+      const rc = data.billRates?.find(r => r.team_member_id === memberId && r.client_id === clientId && r.is_active)
+      writeDownsByMember[memberId].months[mo].lostRevenue += delta * (rc?.rate || 0)
+    }
   })
 
   // Bank transaction patterns
@@ -518,6 +559,15 @@ ${Object.entries(thisWeekByMember).map(([name, hours]) => `  ${name}: ${hours.to
 ${Object.entries(timeByMonth).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 6).map(([month, members]) =>
     `${month}: ${Object.entries(members).map(([name, h]) => `${name}: ${h.toFixed(1)}h`).join(", ")}`
   ).join("\n") || "No entries"}
+
+=== LOGGED VS BILLABLE HOURS (Write-Downs) ===
+${Object.entries(writeDownsByMember).map(([id, wd]) => {
+    const recentMonths = Object.entries(wd.months).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 3)
+    return recentMonths.map(([mo, d]) => 
+      `  ${wd.name} (${mo}): Logged ${d.logged.toFixed(1)}h, Billable ${d.billable.toFixed(1)}h, Written-Down ${d.delta.toFixed(1)}h${d.lostRevenue > 0 ? `, Lost Revenue ${formatCurrency(d.lostRevenue)}` : ""}`
+    ).join("\n")
+  }).join("\n") || "No write-downs detected"}
+Note: "Written-Down" = hours logged but reduced by leadership before billing. Delta = logged - billable. Lost Revenue = delta x bill rate.
 
 === INVOICES ===
   Paid: ${data.invoices?.filter(i => i.status === "paid").length || 0} (${formatCurrency(data.invoices?.filter(i => i.status === "paid").reduce((s, i) => s + (i.amount || 0), 0) || 0)})
