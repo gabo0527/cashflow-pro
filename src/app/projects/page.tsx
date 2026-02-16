@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import { getCurrentUser } from '@/lib/supabase'
-import { THEME, PROJECT_STATUSES, getStatusConfig } from '@/components/projects/shared'
+import { PROJECT_STATUSES, getStatusConfig } from '@/components/projects/shared'
 import DashboardSection from '@/components/projects/DashboardSection'
 import ProjectsSection, { ProjectsSectionHandle } from '@/components/projects/ProjectsSection'
 import ImportSection from '@/components/projects/ImportSection'
@@ -16,6 +16,9 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
+
+const selectClass = "appearance-none bg-slate-800/60 border border-slate-800/80 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 cursor-pointer transition-colors"
+const inputClass = "w-full bg-slate-800/60 border border-slate-800/80 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 transition-colors"
 
 type TabType = 'dashboard' | 'projects' | 'pipeline' | 'import'
 
@@ -40,23 +43,14 @@ export default function ProjectsPage() {
 
   // Form state
   const [formData, setFormData] = useState({
-    name: '',
-    client_id: '',
-    status: 'active',
-    budget_type: 'lump_sum',
-    budget: '',
-    spent: '',
-    start_date: '',
-    end_date: '',
-    budgeted_hours: '',
-    percent_complete: '',
-    description: '',
+    name: '', client_id: '', status: 'active', budget_type: 'lump_sum',
+    budget: '', spent: '', start_date: '', end_date: '',
+    budgeted_hours: '', percent_complete: '', description: '',
   })
 
-  // Refs
   const projectsSectionRef = useRef<ProjectsSectionHandle>(null)
 
-  // Load data
+  // ============ DATA LOADING ============
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -64,14 +58,8 @@ export default function ProjectsPage() {
         const user = result?.user
         if (!user) { setLoading(false); return }
 
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single()
-
+        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
         if (!profile?.company_id) { setLoading(false); return }
-
         setCompanyId(profile.company_id)
 
         const [projRes, clientRes, teamRes, timeRes, expRes, invRes] = await Promise.all([
@@ -110,40 +98,26 @@ export default function ProjectsPage() {
     prospect: projects.filter(p => p.status === 'prospect' && !p.is_change_order).length,
   }), [projects])
 
-  // ============ HANDLERS ============
-
+  // ============ PROJECT HANDLERS ============
   const resetForm = () => {
-    setFormData({
-      name: '', client_id: '', status: 'active', budget_type: 'lump_sum',
-      budget: '', spent: '', start_date: '', end_date: '',
-      budgeted_hours: '', percent_complete: '', description: '',
-    })
+    setFormData({ name: '', client_id: '', status: 'active', budget_type: 'lump_sum', budget: '', spent: '', start_date: '', end_date: '', budgeted_hours: '', percent_complete: '', description: '' })
     setEditingProject(null)
     setIsAddingCO(false)
     setParentProjectId(null)
   }
 
-  const openAddProject = () => {
-    resetForm()
-    setShowProjectModal(true)
-  }
+  const openAddProject = () => { resetForm(); setShowProjectModal(true) }
 
   const openEditProject = (project: any) => {
     setEditingProject(project)
     setIsAddingCO(false)
     setParentProjectId(null)
     setFormData({
-      name: project.name || '',
-      client_id: project.client_id || '',
-      status: project.status || 'active',
-      budget_type: project.budget_type || 'lump_sum',
-      budget: project.budget?.toString() || '',
-      spent: project.spent?.toString() || '',
-      start_date: project.start_date || '',
-      end_date: project.end_date || '',
-      budgeted_hours: project.budgeted_hours?.toString() || '',
-      percent_complete: project.percent_complete?.toString() || '',
-      description: project.description || '',
+      name: project.name || '', client_id: project.client_id || '', status: project.status || 'active',
+      budget_type: project.budget_type || 'lump_sum', budget: project.budget?.toString() || '',
+      spent: project.spent?.toString() || '', start_date: project.start_date || '',
+      end_date: project.end_date || '', budgeted_hours: project.budgeted_hours?.toString() || '',
+      percent_complete: project.percent_complete?.toString() || '', description: project.description || '',
     })
     setShowProjectModal(true)
   }
@@ -167,42 +141,23 @@ export default function ProjectsPage() {
     if (!companyId || !formData.name) return
 
     const projectData = {
-      company_id: companyId,
-      name: formData.name,
-      client_id: formData.client_id || null,
-      status: formData.status,
-      budget_type: formData.budget_type,
-      budget: parseFloat(formData.budget) || 0,
-      spent: parseFloat(formData.spent) || 0,
-      start_date: formData.start_date || null,
-      end_date: formData.end_date || null,
+      company_id: companyId, name: formData.name, client_id: formData.client_id || null,
+      status: formData.status, budget_type: formData.budget_type,
+      budget: parseFloat(formData.budget) || 0, spent: parseFloat(formData.spent) || 0,
+      start_date: formData.start_date || null, end_date: formData.end_date || null,
       budgeted_hours: parseFloat(formData.budgeted_hours) || 0,
       percent_complete: parseFloat(formData.percent_complete) || 0,
       description: formData.description || null,
-      is_change_order: isAddingCO,
-      parent_id: parentProjectId,
+      is_change_order: isAddingCO, parent_id: parentProjectId,
     }
 
     if (editingProject) {
-      const { error } = await supabase
-        .from('projects')
-        .update({ ...projectData, updated_at: new Date().toISOString() })
-        .eq('id', editingProject.id)
-
+      const { error } = await supabase.from('projects').update({ ...projectData, updated_at: new Date().toISOString() }).eq('id', editingProject.id)
       if (error) { console.error('Error updating project:', error); return }
-
-      setProjects(prev => prev.map(p =>
-        p.id === editingProject.id ? { ...p, ...projectData } : p
-      ))
+      setProjects(prev => prev.map(p => p.id === editingProject.id ? { ...p, ...projectData } : p))
     } else {
-      const { data, error } = await supabase
-        .from('projects')
-        .insert(projectData)
-        .select()
-        .single()
-
+      const { data, error } = await supabase.from('projects').insert(projectData).select().single()
       if (error) { console.error('Error creating project:', error); return }
-
       setProjects(prev => [...prev, { ...data, budget: parseFloat(data.budget || 0), spent: parseFloat(data.spent || 0) }])
     }
 
@@ -212,54 +167,30 @@ export default function ProjectsPage() {
 
   const handleDeleteProject = async (id: string, name: string) => {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return
-
     const { error } = await supabase.from('projects').delete().eq('id', id)
     if (error) { console.error('Error deleting project:', error); return }
-
     setProjects(prev => prev.filter(p => p.id !== id))
   }
 
-  // Import handlers
+  // ============ IMPORT HANDLERS ============
   const handleImportProjects = async (data: any[]) => {
     if (!companyId) return
-
     for (const row of data) {
-      // Find or create client
       let clientId = null
       if (row.client) {
-        const existingClient = clients.find(c => c.name.toLowerCase() === row.client.toLowerCase())
-        if (existingClient) {
-          clientId = existingClient.id
-        } else {
-          const { data: newClient } = await supabase
-            .from('clients')
-            .insert({ company_id: companyId, name: row.client })
-            .select()
-            .single()
-          if (newClient) {
-            clientId = newClient.id
-            setClients(prev => [...prev, newClient])
-          }
+        const existing = clients.find(c => c.name.toLowerCase() === row.client.toLowerCase())
+        if (existing) { clientId = existing.id }
+        else {
+          const { data: newClient } = await supabase.from('clients').insert({ company_id: companyId, name: row.client }).select().single()
+          if (newClient) { clientId = newClient.id; setClients(prev => [...prev, newClient]) }
         }
       }
-
-      const { data: newProject } = await supabase
-        .from('projects')
-        .insert({
-          company_id: companyId,
-          name: row.name,
-          client_id: clientId,
-          budget: parseFloat(row.budget) || 0,
-          start_date: row.start_date || null,
-          end_date: row.end_date || null,
-          status: row.status || 'active',
-        })
-        .select()
-        .single()
-
-      if (newProject) {
-        setProjects(prev => [...prev, { ...newProject, budget: parseFloat(newProject.budget || 0), spent: 0 }])
-      }
+      const { data: newProject } = await supabase.from('projects').insert({
+        company_id: companyId, name: row.name, client_id: clientId,
+        budget: parseFloat(row.budget) || 0, start_date: row.start_date || null,
+        end_date: row.end_date || null, status: row.status || 'active',
+      }).select().single()
+      if (newProject) setProjects(prev => [...prev, { ...newProject, budget: parseFloat(newProject.budget || 0), spent: 0 }])
     }
   }
 
@@ -267,34 +198,19 @@ export default function ProjectsPage() {
     for (const row of data) {
       const project = projects.find(p => p.name.toLowerCase() === row.project_name?.toLowerCase())
       if (!project) continue
-
-      await supabase
-        .from('projects')
-        .update({
-          budget: parseFloat(row.budget) || project.budget,
-          spent: parseFloat(row.spent) || project.spent,
-          budgeted_hours: parseFloat(row.budgeted_hours) || project.budgeted_hours,
-        })
-        .eq('id', project.id)
-
-      setProjects(prev => prev.map(p =>
-        p.id === project.id
-          ? { ...p, budget: parseFloat(row.budget) || p.budget, spent: parseFloat(row.spent) || p.spent }
-          : p
-      ))
+      await supabase.from('projects').update({
+        budget: parseFloat(row.budget) || project.budget,
+        spent: parseFloat(row.spent) || project.spent,
+        budgeted_hours: parseFloat(row.budgeted_hours) || project.budgeted_hours,
+      }).eq('id', project.id)
+      setProjects(prev => prev.map(p => p.id === project.id ? { ...p, budget: parseFloat(row.budget) || p.budget, spent: parseFloat(row.spent) || p.spent } : p))
     }
   }
 
-  const handleImportResources = async (data: any[]) => {
-    // Resource assignment would go to a project_resources table
-    console.log('Importing resources:', data)
-  }
+  const handleImportResources = async (data: any[]) => { console.log('Importing resources:', data) }
 
   const handleDrillDown = (type: string, id: string) => {
-    if (type === 'project') {
-      const project = projects.find(p => p.id === id)
-      if (project) openEditProject(project)
-    }
+    if (type === 'project') { const project = projects.find(p => p.id === id); if (project) openEditProject(project) }
   }
 
   const handleExport = () => {
@@ -309,190 +225,144 @@ export default function ProjectsPage() {
     const a = document.createElement('a'); a.href = url; a.download = 'projects-export.csv'; a.click()
   }
 
+  // ============ LOADING ============
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="text-center">
-          <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" />
-          <p className={`text-sm ${THEME.textMuted}`}>Loading projects...</p>
+          <RefreshCw className="w-8 h-8 text-teal-500 animate-spin mx-auto mb-3" />
+          <p className="text-sm text-slate-500">Loading projects...</p>
         </div>
       </div>
     )
   }
 
+  // ============ RENDER ============
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className={`text-xl font-semibold ${THEME.textPrimary}`}>Projects</h1>
-          <p className={`text-sm ${THEME.textMuted} mt-1`}>
-            Portfolio analytics and project management
-          </p>
+          <h1 className="text-xl font-bold tracking-tight text-white">Projects</h1>
+          <p className="text-sm text-slate-500 mt-1">Portfolio analytics and project management</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 border border-white/[0.1] rounded-lg text-sm font-medium text-slate-300 hover:bg-white/[0.05] transition-colors"
-          >
+          <button onClick={handleExport}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:border-slate-700 transition-colors">
             <Download size={14} /> Export
           </button>
-          <button
-            onClick={openAddProject}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20"
-          >
+          <button onClick={openAddProject}
+            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-500 transition-colors">
             <Plus size={14} /> Add Project
           </button>
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-1.5 inline-flex gap-1`}>
-        <button
-          onClick={() => setActiveTab('dashboard')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-            activeTab === 'dashboard'
-              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-lg shadow-emerald-500/10'
-              : `${THEME.textMuted} hover:text-white hover:bg-white/[0.05]`
-          }`}
-        >
-          <LayoutGrid size={16} />
-          Dashboard
-        </button>
-        <button
-          onClick={() => setActiveTab('projects')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-            activeTab === 'projects'
-              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-lg shadow-emerald-500/10'
-              : `${THEME.textMuted} hover:text-white hover:bg-white/[0.05]`
-          }`}
-        >
-          <LayoutList size={16} />
-          Projects
-          <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-white/[0.08] text-slate-300">
-            {counts.active}
-          </span>
-        </button>
-        <button
-          onClick={() => setActiveTab('pipeline')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-            activeTab === 'pipeline'
-              ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 shadow-lg shadow-cyan-500/10'
-              : `${THEME.textMuted} hover:text-white hover:bg-white/[0.05]`
-          }`}
-        >
-          <Target size={16} />
-          Pipeline
-          {counts.prospect > 0 && (
-            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-cyan-500/20 text-cyan-400">
-              {counts.prospect}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('import')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-            activeTab === 'import'
-              ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30 shadow-lg shadow-blue-500/10'
-              : `${THEME.textMuted} hover:text-white hover:bg-white/[0.05]`
-          }`}
-        >
-          <Upload size={16} />
-          Import
-        </button>
+      {/* Tab Navigation — underline style */}
+      <div className="border-b border-slate-800/60">
+        <div className="flex gap-0">
+          <button onClick={() => setActiveTab('dashboard')}
+            className={`relative flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'dashboard' ? 'text-teal-400' : 'text-slate-500 hover:text-slate-300'
+            }`}>
+            <LayoutGrid size={15} />
+            Dashboard
+            {activeTab === 'dashboard' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500 rounded-t" />}
+          </button>
+          <button onClick={() => setActiveTab('projects')}
+            className={`relative flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'projects' ? 'text-teal-400' : 'text-slate-500 hover:text-slate-300'
+            }`}>
+            <LayoutList size={15} />
+            Projects
+            <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md ${
+              activeTab === 'projects' ? 'bg-teal-500/15 text-teal-400 border border-teal-500/20' : 'bg-slate-800/60 text-slate-400 border border-slate-800/80'
+            }`}>{counts.active}</span>
+            {activeTab === 'projects' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500 rounded-t" />}
+          </button>
+          <button onClick={() => setActiveTab('pipeline')}
+            className={`relative flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'pipeline' ? 'text-teal-400' : 'text-slate-500 hover:text-slate-300'
+            }`}>
+            <Target size={15} />
+            Pipeline
+            {counts.prospect > 0 && (
+              <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md ${
+                activeTab === 'pipeline' ? 'bg-teal-500/15 text-teal-400 border border-teal-500/20' : 'bg-slate-800/60 text-slate-400 border border-slate-800/80'
+              }`}>{counts.prospect}</span>
+            )}
+            {activeTab === 'pipeline' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500 rounded-t" />}
+          </button>
+          <button onClick={() => setActiveTab('import')}
+            className={`relative flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'import' ? 'text-teal-400' : 'text-slate-500 hover:text-slate-300'
+            }`}>
+            <Upload size={15} />
+            Import
+            {activeTab === 'import' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500 rounded-t" />}
+          </button>
+        </div>
       </div>
 
       {/* Tab Content */}
       {activeTab === 'dashboard' && (
-        <DashboardSection
-          projects={projects}
-          clients={clients}
-          expenses={expenses}
-          invoices={invoices}
-          timesheets={timesheets}
-          onDrillDown={handleDrillDown}
-        />
+        <DashboardSection projects={projects} clients={clients} expenses={expenses} invoices={invoices} timesheets={timesheets} onDrillDown={handleDrillDown} />
       )}
 
       {activeTab === 'projects' && (
-        <ProjectsSection
-          ref={projectsSectionRef}
-          projects={projects}
-          clients={clients}
-          timesheets={timesheets}
-          onAddProject={openAddProject}
-          onEditProject={openEditProject}
-          onDeleteProject={handleDeleteProject}
-          onAddChangeOrder={openAddChangeOrder}
-        />
+        <ProjectsSection ref={projectsSectionRef} projects={projects} clients={clients} timesheets={timesheets}
+          onAddProject={openAddProject} onEditProject={openEditProject} onDeleteProject={handleDeleteProject} onAddChangeOrder={openAddChangeOrder} />
       )}
 
       {activeTab === 'pipeline' && (
-        <ProjectsSection
-          ref={projectsSectionRef}
+        <ProjectsSection ref={projectsSectionRef}
           projects={projects.map(p => p.status === 'prospect' ? p : { ...p, status: 'prospect' }).filter(p => p.status === 'prospect')}
-          clients={clients}
-          timesheets={timesheets}
-          onAddProject={() => { resetForm(); setFormData(prev => ({ ...prev, status: 'prospect' })); setShowProjectModal(true); }}
-          onEditProject={openEditProject}
-          onDeleteProject={handleDeleteProject}
-          onAddChangeOrder={openAddChangeOrder}
-        />
+          clients={clients} timesheets={timesheets}
+          onAddProject={() => { resetForm(); setFormData(prev => ({ ...prev, status: 'prospect' })); setShowProjectModal(true) }}
+          onEditProject={openEditProject} onDeleteProject={handleDeleteProject} onAddChangeOrder={openAddChangeOrder} />
       )}
 
       {activeTab === 'import' && (
-        <ImportSection
-          projects={projects}
-          clients={clients}
-          teamMembers={teamMembers}
-          onImportProjects={handleImportProjects}
-          onImportBudgets={handleImportBudgets}
-          onImportResources={handleImportResources}
-        />
+        <ImportSection projects={projects} clients={clients} teamMembers={teamMembers}
+          onImportProjects={handleImportProjects} onImportBudgets={handleImportBudgets} onImportResources={handleImportResources} />
       )}
 
       {/* Project Modal */}
       {showProjectModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-2xl w-full max-w-lg mx-4 overflow-hidden shadow-2xl`}>
-            <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder}`}>
+          <div className="bg-[#111827] border border-slate-800/80 rounded-xl w-full max-w-lg mx-4 overflow-hidden shadow-2xl">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800/60">
               <div>
-                <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>
+                <h3 className="text-lg font-semibold text-white">
                   {editingProject ? 'Edit Project' : isAddingCO ? 'Add Change Order' : 'Add Project'}
                 </h3>
-                <p className={`text-xs ${THEME.textDim} mt-0.5`}>
+                <p className="text-xs text-slate-500 mt-0.5">
                   {editingProject ? 'Update project details' : 'Create a new project'}
                 </p>
               </div>
-              <button onClick={() => setShowProjectModal(false)} className="p-1.5 hover:bg-white/[0.05] rounded-lg transition-colors">
-                <X size={20} className={THEME.textMuted} />
+              <button onClick={() => setShowProjectModal(false)} className="p-1.5 hover:bg-slate-800/50 rounded-lg transition-colors">
+                <X size={18} className="text-slate-500" />
               </button>
             </div>
 
+            {/* Modal Body */}
             <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
               {/* Project Name */}
               <div>
-                <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
                   Project Name <span className="text-rose-400">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                  placeholder="Enter project name"
-                />
+                <input type="text" value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className={inputClass} placeholder="Enter project name" />
               </div>
 
               {/* Client */}
               {!isAddingCO && (
                 <div>
-                  <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Client</label>
-                  <select
-                    value={formData.client_id}
-                    onChange={(e) => setFormData(prev => ({ ...prev, client_id: e.target.value }))}
-                    className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
-                  >
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Client</label>
+                  <select value={formData.client_id} onChange={(e) => setFormData(prev => ({ ...prev, client_id: e.target.value }))}
+                    className={selectClass + ' w-full'}>
                     <option value="" className="bg-slate-900">Select client...</option>
                     {clients.map(c => <option key={c.id} value={c.id} className="bg-slate-900">{c.name}</option>)}
                   </select>
@@ -502,29 +372,19 @@ export default function ProjectsPage() {
               {/* Budget & Spent */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Budget</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Budget</label>
                   <div className="relative">
-                    <span className={`absolute left-3 top-1/2 -translate-y-1/2 ${THEME.textDim}`}>$</span>
-                    <input
-                      type="number"
-                      value={formData.budget}
-                      onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
-                      className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg pl-7 pr-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                      placeholder="0"
-                    />
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">$</span>
+                    <input type="number" value={formData.budget} onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
+                      className={inputClass + ' pl-7'} placeholder="0" />
                   </div>
                 </div>
                 <div>
-                  <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Spent</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Spent</label>
                   <div className="relative">
-                    <span className={`absolute left-3 top-1/2 -translate-y-1/2 ${THEME.textDim}`}>$</span>
-                    <input
-                      type="number"
-                      value={formData.spent}
-                      onChange={(e) => setFormData(prev => ({ ...prev, spent: e.target.value }))}
-                      className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg pl-7 pr-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                      placeholder="0"
-                    />
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">$</span>
+                    <input type="number" value={formData.spent} onChange={(e) => setFormData(prev => ({ ...prev, spent: e.target.value }))}
+                      className={inputClass + ' pl-7'} placeholder="0" />
                   </div>
                 </div>
               </div>
@@ -532,65 +392,42 @@ export default function ProjectsPage() {
               {/* Dates */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Start Date</label>
-                  <input
-                    type="date"
-                    value={formData.start_date}
-                    onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
-                    className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
-                  />
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Start Date</label>
+                  <input type="date" value={formData.start_date} onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
+                    className={inputClass} />
                 </div>
                 <div>
-                  <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>End Date</label>
-                  <input
-                    type="date"
-                    value={formData.end_date}
-                    onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
-                    className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
-                  />
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">End Date</label>
+                  <input type="date" value={formData.end_date} onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
+                    className={inputClass} />
                 </div>
               </div>
 
               {/* Hours & Progress */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>Budgeted Hours</label>
-                  <input
-                    type="number"
-                    value={formData.budgeted_hours}
-                    onChange={(e) => setFormData(prev => ({ ...prev, budgeted_hours: e.target.value }))}
-                    className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                    placeholder="0"
-                  />
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Budgeted Hours</label>
+                  <input type="number" value={formData.budgeted_hours} onChange={(e) => setFormData(prev => ({ ...prev, budgeted_hours: e.target.value }))}
+                    className={inputClass} placeholder="0" />
                 </div>
                 <div>
-                  <label className={`block text-sm font-medium ${THEME.textMuted} mb-1.5`}>% Complete</label>
-                  <input
-                    type="number"
-                    value={formData.percent_complete}
-                    onChange={(e) => setFormData(prev => ({ ...prev, percent_complete: e.target.value }))}
-                    className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                    placeholder="0"
-                    min="0"
-                    max="100"
-                  />
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">% Complete</label>
+                  <input type="number" value={formData.percent_complete} onChange={(e) => setFormData(prev => ({ ...prev, percent_complete: e.target.value }))}
+                    className={inputClass} placeholder="0" min="0" max="100" />
                 </div>
               </div>
 
               {/* Status */}
               <div>
-                <label className={`block text-sm font-medium ${THEME.textMuted} mb-2`}>Status</label>
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Status</label>
                 <div className="flex gap-2 flex-wrap">
                   {Object.values(PROJECT_STATUSES).filter(s => s.id !== 'archived').map(s => (
-                    <button
-                      key={s.id}
-                      onClick={() => setFormData(prev => ({ ...prev, status: s.id }))}
+                    <button key={s.id} onClick={() => setFormData(prev => ({ ...prev, status: s.id }))}
                       className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                         formData.status === s.id
                           ? `${s.bg} ${s.text} border ${s.border}`
-                          : 'bg-white/[0.05] text-slate-400 border border-transparent hover:bg-white/[0.08]'
-                      }`}
-                    >
+                          : 'bg-slate-800/60 text-slate-400 border border-transparent hover:bg-slate-800'
+                      }`}>
                       {s.label}
                     </button>
                   ))}
@@ -598,18 +435,12 @@ export default function ProjectsPage() {
               </div>
             </div>
 
-            <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
-              <button
-                onClick={() => setShowProjectModal(false)}
-                className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white transition-colors`}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveProject}
-                disabled={!formData.name}
-                className="px-5 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-emerald-500/20"
-              >
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-800/60">
+              <button onClick={() => setShowProjectModal(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancel</button>
+              <button onClick={handleSaveProject} disabled={!formData.name}
+                className="px-5 py-2.5 text-sm font-semibold bg-teal-600 text-white rounded-lg hover:bg-teal-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 {editingProject ? 'Save Changes' : 'Create Project'}
               </button>
             </div>
