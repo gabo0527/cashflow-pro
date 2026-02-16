@@ -1,17 +1,19 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { RefreshCw, Download, ChevronDown, Plus, FileText, Users } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import { getCurrentUser } from '@/lib/supabase'
-import { THEME } from '@/components/invoices/shared'
 import ARSection from '@/components/invoices/ARSection'
 import APSection, { APSectionHandle } from '@/components/invoices/APSection'
+import QBOSyncButton from '@/components/QBOSyncButton'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
+
+const selectClass = "appearance-none bg-slate-800/60 border border-slate-800/80 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 cursor-pointer transition-colors"
 
 export default function InvoicesPage() {
   const [loading, setLoading] = useState(true)
@@ -29,54 +31,54 @@ export default function InvoicesPage() {
   // Ref for AP Section to trigger Add Bill modal
   const apSectionRef = useRef<APSectionHandle>(null)
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const result = await getCurrentUser()
-        const user = result?.user
-        if (!user) { setLoading(false); return }
+  const loadData = useCallback(async () => {
+    try {
+      const result = await getCurrentUser()
+      const user = result?.user
+      if (!user) { setLoading(false); return }
 
-        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
-        if (!profile?.company_id) { setLoading(false); return }
+      const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
+      if (!profile?.company_id) { setLoading(false); return }
 
-        setCompanyId(profile.company_id)
+      setCompanyId(profile.company_id)
 
-        const [invRes, billRes, clientRes, projRes, teamRes] = await Promise.all([
-          supabase.from('invoices').select('*').eq('company_id', profile.company_id).order('invoice_date', { ascending: false }),
-          supabase.from('bills').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
-          supabase.from('clients').select('*').eq('company_id', profile.company_id).order('name'),
-          supabase.from('projects').select('*').eq('company_id', profile.company_id).order('name'),
-          supabase.from('team_members').select('id, name').eq('company_id', profile.company_id).order('name')
-        ])
+      const [invRes, billRes, clientRes, projRes, teamRes] = await Promise.all([
+        supabase.from('invoices').select('*').eq('company_id', profile.company_id).order('invoice_date', { ascending: false }),
+        supabase.from('bills').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
+        supabase.from('clients').select('*').eq('company_id', profile.company_id).order('name'),
+        supabase.from('projects').select('*').eq('company_id', profile.company_id).order('name'),
+        supabase.from('team_members').select('id, name').eq('company_id', profile.company_id).order('name')
+      ])
 
-        // Transform invoices (handle QBO field mapping)
-        const transformedInvoices = (invRes.data || []).map(inv => ({
-          ...inv,
-          amount: parseFloat(inv.total_amount || inv.amount || 0),
-          balance: parseFloat(inv.balance_due || inv.balance || inv.total_amount || inv.amount || 0),
-          qbo_customer: inv.customer_name || inv.qbo_customer || ''
-        }))
+      const transformedInvoices = (invRes.data || []).map(inv => ({
+        ...inv,
+        amount: parseFloat(inv.total_amount || inv.amount || 0),
+        balance: parseFloat(inv.balance_due || inv.balance || inv.total_amount || inv.amount || 0),
+        qbo_customer: inv.customer_name || inv.qbo_customer || ''
+      }))
 
-        // Transform bills
-        const transformedBills = (billRes.data || []).map(b => ({
-          ...b,
-          amount: parseFloat(b.amount || 0),
-          balance: parseFloat(b.balance ?? b.amount ?? 0),
-        }))
+      const transformedBills = (billRes.data || []).map(b => ({
+        ...b,
+        amount: parseFloat(b.amount || 0),
+        balance: parseFloat(b.balance ?? b.amount ?? 0),
+      }))
 
-        setInvoices(transformedInvoices)
-        setBills(transformedBills)
-        setClients(clientRes.data || [])
-        setProjects(projRes.data || [])
-        setTeamMembers(teamRes.data || [])
-      } catch (error) {
-        console.error('Error loading data:', error)
-      } finally {
-        setLoading(false)
-      }
+      setInvoices(transformedInvoices)
+      setBills(transformedBills)
+      setClients(clientRes.data || [])
+      setProjects(projRes.data || [])
+      setTeamMembers(teamRes.data || [])
+    } catch (error) {
+      console.error('Error loading data:', error)
+    } finally {
+      setLoading(false)
     }
-    loadData()
   }, [])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  // Reload after QBO sync
+  const handleSyncComplete = useCallback(() => { loadData() }, [loadData])
 
   // ============ AR HANDLERS ============
   const handleUpdateInvoice = async (id: string, updates: any) => {
@@ -149,7 +151,6 @@ export default function InvoicesPage() {
     setBills(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b))
   }
 
-  // Handle Add Bill button click
   const handleAddBillClick = () => {
     apSectionRef.current?.openAddModal()
   }
@@ -158,79 +159,86 @@ export default function InvoicesPage() {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="text-center">
-          <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" />
-          <p className={`text-sm ${THEME.textMuted}`}>Loading invoices...</p>
+          <RefreshCw className="w-8 h-8 text-teal-500 animate-spin mx-auto mb-3" />
+          <p className="text-sm text-slate-500">Loading invoices...</p>
         </div>
       </div>
     )
   }
+
+  const openARCount = invoices.filter(i => i.balance > 0).length
+  const openAPCount = bills.filter(b => b.balance > 0).length
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className={`text-xl font-semibold ${THEME.textPrimary}`}>Invoices</h1>
-          <p className={`text-sm ${THEME.textMuted} mt-1`}>
+          <h1 className="text-xl font-bold tracking-tight text-white">Invoices</h1>
+          <p className="text-sm text-slate-500 mt-1">
             {activeTab === 'ar' ? 'Accounts receivable — client invoices (revenue)' : 'Accounts payable — contractor bills (direct costs)'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Year selector */}
           <div className="relative">
-            <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-              className="appearance-none bg-white/[0.05] border border-white/[0.1] rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer">
+            <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))} className={selectClass}>
               <option value="all" className="bg-slate-900">All Time</option>
               {[2026, 2025, 2024, 2023].map(year => <option key={year} value={year} className="bg-slate-900">{year}</option>)}
             </select>
             <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 border border-white/[0.1] rounded-lg text-sm font-medium text-slate-300 hover:bg-white/[0.05] transition-colors">
-            <RefreshCw size={14} /> Sync QBO
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 border border-white/[0.1] rounded-lg text-sm font-medium text-slate-300 hover:bg-white/[0.05] transition-colors">
+
+          {/* QBO Sync Button (real) */}
+          {companyId && (
+            <QBOSyncButton companyId={companyId} syncType="invoices" onSyncComplete={handleSyncComplete} />
+          )}
+
+          {/* Export */}
+          <button className="flex items-center gap-2 px-4 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:border-slate-700 transition-colors">
             <Download size={14} /> Export
           </button>
+
+          {/* Add Bill (AP only) */}
           {activeTab === 'ap' && (
-            <button 
-              onClick={handleAddBillClick}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20"
-            >
+            <button onClick={handleAddBillClick}
+              className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-500 transition-colors">
               <Plus size={14} /> Add Bill
             </button>
           )}
         </div>
       </div>
 
-      {/* AR / AP Toggle */}
-      <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-1.5 inline-flex gap-1`}>
-        <button onClick={() => setActiveTab('ar')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-            activeTab === 'ar'
-              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-lg shadow-emerald-500/10'
-              : `${THEME.textMuted} hover:text-white hover:bg-white/[0.05]`
-          }`}>
-          <FileText size={16} />
-          Receivables (AR)
-          {invoices.filter(i => i.balance > 0).length > 0 && (
-            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/20 text-amber-400">
-              {invoices.filter(i => i.balance > 0).length}
-            </span>
-          )}
-        </button>
-        <button onClick={() => setActiveTab('ap')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-            activeTab === 'ap'
-              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30 shadow-lg shadow-rose-500/10'
-              : `${THEME.textMuted} hover:text-white hover:bg-white/[0.05]`
-          }`}>
-          <Users size={16} />
-          Payables (AP)
-          {bills.filter(b => b.balance > 0).length > 0 && (
-            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-rose-500/20 text-rose-400">
-              {bills.filter(b => b.balance > 0).length}
-            </span>
-          )}
-        </button>
+      {/* AR / AP Tabs — underline style */}
+      <div className="border-b border-slate-800/60">
+        <div className="flex gap-0">
+          <button onClick={() => setActiveTab('ar')}
+            className={`relative flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'ar' ? 'text-teal-400' : 'text-slate-500 hover:text-slate-300'
+            }`}>
+            <FileText size={15} />
+            Receivables (AR)
+            {openARCount > 0 && (
+              <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md ${
+                activeTab === 'ar' ? 'bg-teal-500/15 text-teal-400 border border-teal-500/20' : 'bg-slate-800/60 text-slate-400 border border-slate-800/80'
+              }`}>{openARCount}</span>
+            )}
+            {activeTab === 'ar' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500 rounded-t" />}
+          </button>
+          <button onClick={() => setActiveTab('ap')}
+            className={`relative flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'ap' ? 'text-teal-400' : 'text-slate-500 hover:text-slate-300'
+            }`}>
+            <Users size={15} />
+            Payables (AP)
+            {openAPCount > 0 && (
+              <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md ${
+                activeTab === 'ap' ? 'bg-teal-500/15 text-teal-400 border border-teal-500/20' : 'bg-slate-800/60 text-slate-400 border border-slate-800/80'
+              }`}>{openAPCount}</span>
+            )}
+            {activeTab === 'ap' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500 rounded-t" />}
+          </button>
+        </div>
       </div>
 
       {/* Tab Content */}
