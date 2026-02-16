@@ -315,7 +315,8 @@ function ARAgingReport({ invoices, clients }: { invoices: any[]; clients: any[] 
       { key: 'days90', label: '61–90', min: 61, max: 90, amount: 0, count: 0 },
       { key: 'over90', label: '90+', min: 91, max: 99999, amount: 0, count: 0 },
     ]
-    const byClient: Record<string, Record<string, number>> = {}
+    type AgingRow = { current: number; days30: number; days60: number; days90: number; over90: number; total: number }
+    const byClient: Record<string, AgingRow> = {}
 
     invoices.filter(inv => (parseFloat(inv.balance_due || 0)) > 0).forEach(inv => {
       const days = inv.days_overdue || 0
