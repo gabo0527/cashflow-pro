@@ -149,6 +149,10 @@ export default function ForecastPage() {
   // Category form
   const [catForm, setCatForm] = useState({ name: '', section: 'revenue' as PLSection })
 
+  // Historical actuals for comparison
+  const [historicalMonths, setHistoricalMonths] = useState<{ month: string; revenue: number; directCosts: number; opex: number; overhead: number; netIncome: number }[]>([])
+  const [comparisonPeriod, setComparisonPeriod] = useState<3 | 6 | 12>(3)
+
   // ============ LOAD DATA ============
   useEffect(() => {
     const loadData = async () => {
@@ -176,6 +180,58 @@ export default function ForecastPage() {
           if (d.lineItems?.length) setLineItems(d.lineItems)
           if (d.forecastHorizon) setForecastHorizon(d.forecastHorizon)
         }
+
+        // Load historical actuals for comparison (last 12 months)
+        const twelveMonthsAgo = new Date()
+        twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
+        const cutoff = twelveMonthsAgo.toISOString().slice(0, 10)
+
+        const [invRes, billsRes, expRes] = await Promise.all([
+          supabase.from('invoices').select('invoice_date, amount').eq('company_id', profile.company_id).gte('invoice_date', cutoff),
+          supabase.from('bills').select('date, amount').eq('company_id', profile.company_id).gte('date', cutoff),
+          supabase.from('expenses').select('date, amount, category').eq('company_id', profile.company_id).gte('date', cutoff),
+        ])
+
+        // Bucket into months
+        const monthBuckets: Record<string, { revenue: number; directCosts: number; opex: number; overhead: number }> = {}
+        const getKey = (dateStr: string) => {
+          const d = new Date(dateStr)
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        }
+        const ensureBucket = (key: string) => {
+          if (!monthBuckets[key]) monthBuckets[key] = { revenue: 0, directCosts: 0, opex: 0, overhead: 0 }
+        }
+
+        (invRes.data || []).forEach(inv => {
+          const key = getKey(inv.invoice_date)
+          ensureBucket(key)
+          monthBuckets[key].revenue += parseFloat(inv.amount) || 0
+        })
+        ;(billsRes.data || []).forEach(bill => {
+          const key = getKey(bill.date)
+          ensureBucket(key)
+          monthBuckets[key].directCosts += parseFloat(bill.amount) || 0
+        })
+        ;(expRes.data || []).forEach(exp => {
+          const key = getKey(exp.date)
+          ensureBucket(key)
+          const cat = (exp.category || '').toLowerCase()
+          if (cat.includes('overhead') || cat.includes('admin') || cat.includes('g&a')) {
+            monthBuckets[key].overhead += Math.abs(parseFloat(exp.amount) || 0)
+          } else {
+            monthBuckets[key].opex += Math.abs(parseFloat(exp.amount) || 0)
+          }
+        })
+
+        const sorted = Object.entries(monthBuckets)
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([key, data]) => {
+            const d = new Date(key + '-01')
+            const month = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+            const netIncome = data.revenue - data.directCosts - data.opex - data.overhead
+            return { month, ...data, netIncome }
+          })
+        setHistoricalMonths(sorted)
       } catch (error) {
         console.error('Error loading forecast:', error)
       } finally {
@@ -362,6 +418,39 @@ export default function ForecastPage() {
     worstNet: worstData[i]?.netIncome || 0,
   })), [baseData, bestData, worstData])
 
+  // ============ HISTORICAL AVERAGES ============
+  const historicalAverages = useMemo(() => {
+    if (historicalMonths.length === 0) return null
+    const slice = historicalMonths.slice(-comparisonPeriod)
+    if (slice.length === 0) return null
+    const n = slice.length
+    const avgRevenue = slice.reduce((s, m) => s + m.revenue, 0) / n
+    const avgDirectCosts = slice.reduce((s, m) => s + m.directCosts, 0) / n
+    const avgOpex = slice.reduce((s, m) => s + m.opex, 0) / n
+    const avgOverhead = slice.reduce((s, m) => s + m.overhead, 0) / n
+    const avgNetIncome = slice.reduce((s, m) => s + m.netIncome, 0) / n
+    const totalExpenses = avgDirectCosts + avgOpex + avgOverhead
+    const grossProfit = avgRevenue - avgDirectCosts
+    const grossMargin = avgRevenue > 0 ? (grossProfit / avgRevenue) * 100 : 0
+    return { avgRevenue, avgDirectCosts, avgOpex, avgOverhead, avgNetIncome, totalExpenses, grossProfit, grossMargin, monthCount: n }
+  }, [historicalMonths, comparisonPeriod])
+
+  // Forecast first-month averages (for comparison)
+  const forecastAvg = useMemo(() => {
+    // Average across first N months of forecast to match comparison period
+    const slice = baseData.slice(0, comparisonPeriod)
+    if (slice.length === 0) return null
+    const n = slice.length
+    return {
+      avgRevenue: slice.reduce((s, d) => s + d.revenue, 0) / n,
+      avgDirectCosts: slice.reduce((s, d) => s + d.directCosts, 0) / n,
+      avgOpex: slice.reduce((s, d) => s + d.opex, 0) / n,
+      avgOverhead: slice.reduce((s, d) => s + d.overhead, 0) / n,
+      avgNetIncome: slice.reduce((s, d) => s + d.netIncome, 0) / n,
+      grossMargin: slice.reduce((s, d) => s + d.grossMargin, 0) / n,
+    }
+  }, [baseData, comparisonPeriod])
+
   // ============ EXPORT ============
   const handleExport = () => {
     const lines: string[] = []
@@ -413,6 +502,19 @@ export default function ForecastPage() {
       const endCash = data[data.length - 1]?.endingCash || 0
       lines.push(`${label}: Revenue=${fmtCurrency(totalRev)}, Net Income=${fmtCurrency(totalNet)}, Ending Cash=${fmtCurrency(endCash)}`)
     })
+
+    if (historicalAverages && forecastAvg) {
+      lines.push('')
+      lines.push('=== ACTUALS vs FORECAST (Monthly Avg) ===')
+      lines.push(`Comparison period: Last ${comparisonPeriod} months of actuals vs first ${comparisonPeriod} months of forecast`)
+      lines.push(`Metric,Actual Avg,Forecast Avg,Delta %`)
+      lines.push(`Revenue,${fmtCurrency(historicalAverages.avgRevenue)},${fmtCurrency(forecastAvg.avgRevenue)},${historicalAverages.avgRevenue > 0 ? (((forecastAvg.avgRevenue - historicalAverages.avgRevenue) / historicalAverages.avgRevenue) * 100).toFixed(1) : '0'}%`)
+      lines.push(`Direct Costs,${fmtCurrency(historicalAverages.avgDirectCosts)},${fmtCurrency(forecastAvg.avgDirectCosts)},${historicalAverages.avgDirectCosts > 0 ? (((forecastAvg.avgDirectCosts - historicalAverages.avgDirectCosts) / historicalAverages.avgDirectCosts) * 100).toFixed(1) : '0'}%`)
+      lines.push(`OpEx,${fmtCurrency(historicalAverages.avgOpex)},${fmtCurrency(forecastAvg.avgOpex)},${historicalAverages.avgOpex > 0 ? (((forecastAvg.avgOpex - historicalAverages.avgOpex) / historicalAverages.avgOpex) * 100).toFixed(1) : '0'}%`)
+      lines.push(`Overhead,${fmtCurrency(historicalAverages.avgOverhead)},${fmtCurrency(forecastAvg.avgOverhead)},${historicalAverages.avgOverhead > 0 ? (((forecastAvg.avgOverhead - historicalAverages.avgOverhead) / historicalAverages.avgOverhead) * 100).toFixed(1) : '0'}%`)
+      lines.push(`Net Income,${fmtCurrency(historicalAverages.avgNetIncome)},${fmtCurrency(forecastAvg.avgNetIncome)},${historicalAverages.avgNetIncome !== 0 ? (((forecastAvg.avgNetIncome - historicalAverages.avgNetIncome) / Math.abs(historicalAverages.avgNetIncome)) * 100).toFixed(1) : '0'}%`)
+      lines.push(`Gross Margin,${fmtPct(historicalAverages.grossMargin)},${fmtPct(forecastAvg.grossMargin)},${(forecastAvg.grossMargin - historicalAverages.grossMargin).toFixed(1)} pts`)
+    }
 
     const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
@@ -721,6 +823,68 @@ export default function ForecastPage() {
             </div>
           )}
 
+          {/* Actuals vs Forecast Comparison */}
+          {historicalAverages && forecastAvg && (
+            <div className="bg-[#111827] border border-slate-800/80 rounded-xl overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800/60">
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Actuals vs Forecast</h3>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Trailing monthly avg vs your projected monthly avg</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Compare last</span>
+                  <div className="flex bg-slate-800/60 border border-slate-800/80 rounded-lg p-0.5">
+                    {([3, 6, 12] as const).map(p => (
+                      <button key={p} onClick={() => setComparisonPeriod(p)}
+                        className={`px-2 py-1 text-[10px] font-semibold rounded-md transition-all ${
+                          comparisonPeriod === p ? 'bg-teal-600 text-white' : 'text-slate-500 hover:text-slate-300'
+                        }`}>{p}M</button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="p-5">
+                <div className="grid grid-cols-6 gap-4">
+                  {[
+                    { label: 'Revenue', actual: historicalAverages.avgRevenue, forecast: forecastAvg.avgRevenue, color: 'emerald' },
+                    { label: 'Direct Costs', actual: historicalAverages.avgDirectCosts, forecast: forecastAvg.avgDirectCosts, color: 'blue' },
+                    { label: 'OpEx', actual: historicalAverages.avgOpex, forecast: forecastAvg.avgOpex, color: 'amber' },
+                    { label: 'Overhead', actual: historicalAverages.avgOverhead, forecast: forecastAvg.avgOverhead, color: 'purple' },
+                    { label: 'Net Income', actual: historicalAverages.avgNetIncome, forecast: forecastAvg.avgNetIncome, color: 'teal' },
+                    { label: 'Gross Margin', actual: historicalAverages.grossMargin, forecast: forecastAvg.grossMargin, color: 'cyan', isPct: true },
+                  ].map((item, i) => {
+                    const delta = item.isPct
+                      ? item.forecast - item.actual
+                      : item.actual !== 0 ? ((item.forecast - item.actual) / Math.abs(item.actual)) * 100 : 0
+                    const isRevenue = item.label === 'Revenue' || item.label === 'Net Income' || item.label === 'Gross Margin'
+                    const deltaPositive = isRevenue ? delta >= 0 : delta <= 0
+                    return (
+                      <div key={i} className="text-center">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">{item.label}</p>
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-600">Actual</span>
+                            <span className="text-slate-300 font-medium tabular-nums">{item.isPct ? fmtPct(item.actual) : fmtCurrency(item.actual)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-600">Forecast</span>
+                            <span className="text-white font-semibold tabular-nums">{item.isPct ? fmtPct(item.forecast) : fmtCurrency(item.forecast)}</span>
+                          </div>
+                          <div className={`pt-1 border-t border-slate-800/60 text-[10px] font-bold tabular-nums ${deltaPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {delta >= 0 ? '+' : ''}{delta.toFixed(1)}%{!item.isPct ? ' Δ' : ' pts'}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="text-[10px] text-slate-600 mt-4 pt-3 border-t border-slate-800/60">
+                  Based on {historicalAverages.monthCount} month{historicalAverages.monthCount !== 1 ? 's' : ''} of actuals from invoices, bills & expenses. Green = favorable direction for each line.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Revenue & Net Income */}
@@ -769,7 +933,7 @@ export default function ForecastPage() {
                     <XAxis dataKey="month" tick={{ fill: CHART.axis, fontSize: 10 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: CHART.axis, fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
                     <Tooltip content={<ChartTooltip formatter={(v: number) => fmtCurrency(v)} />} />
-                    <Area type="monotone" dataKey="bestCash" name="Best Case" stroke="transparent" fill={bandGrad} fillOpacity={1} />
+                    <Area type="monotone" dataKey="bestCash" name="Best Case" stroke="transparent" fill="url(#bandGrad)" fillOpacity={1} />
                     <Area type="monotone" dataKey="worstCash" name="Worst Case" stroke="transparent" fill="transparent" />
                     <Area type="monotone" dataKey="endingCash" name="Base" stroke={CHART.teal} strokeWidth={2} fill="url(#cashGrad)" />
                     <ReferenceLine y={minCashThreshold} stroke={CHART.amber} strokeDasharray="5 5" strokeWidth={1} />
