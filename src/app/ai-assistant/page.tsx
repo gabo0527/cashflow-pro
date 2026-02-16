@@ -6,7 +6,8 @@ import {
   AlertTriangle, RefreshCw, Users, ChevronRight, Trash2, Clock, Target,
   Plus, MessageSquare, Pencil, Check, X, PanelLeftClose, PanelLeft,
   Paperclip, Image as ImageIcon, FileText, XCircle, BarChart3, PieChart,
-  Zap, Brain, TrendingDown, ArrowUpRight, ArrowDownRight, Lightbulb, Activity
+  Zap, Brain, TrendingDown, ArrowUpRight, ArrowDownRight, Lightbulb, Activity,
+  Gauge, Receipt, Search, CreditCard
 } from "lucide-react"
 import { createClient } from "@supabase/supabase-js"
 import Link from "next/link"
@@ -21,20 +22,20 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 )
 
-const CHART_COLORS = ["#34D399", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444", "#EC4899", "#14B8A6", "#6366F1", "#F97316", "#06B6D4"]
+const CHART_COLORS = ["#14B8A6", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444", "#EC4899", "#34D399", "#6366F1", "#F97316", "#06B6D4"]
 
-// ============ SAGE LOGO ============
+// ============ SAGE LOGO (Teal gradient) ============
 function SageLogo({ size = 32, className = "" }: { size?: number, className?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
       <defs>
         <linearGradient id="sageGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#8B5CF6" />
-          <stop offset="50%" stopColor="#6366F1" />
-          <stop offset="100%" stopColor="#3B82F6" />
+          <stop offset="0%" stopColor="#14B8A6" />
+          <stop offset="50%" stopColor="#0D9488" />
+          <stop offset="100%" stopColor="#0F766E" />
         </linearGradient>
         <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#34D399" />
+          <stop offset="0%" stopColor="#14B8A6" />
           <stop offset="100%" stopColor="#3B82F6" />
         </linearGradient>
       </defs>
@@ -48,33 +49,20 @@ function SageLogo({ size = 32, className = "" }: { size?: number, className?: st
       <rect x="17" y="28" width="3" height="6" rx="1" fill="url(#accentGradient)" opacity="0.9" />
       <rect x="22" y="24" width="3" height="10" rx="1" fill="url(#accentGradient)" opacity="0.9" />
       <rect x="27" y="20" width="3" height="14" rx="1" fill="url(#accentGradient)" opacity="0.9" />
-      <path d="M16 32L21 28L26 24L32 18" stroke="#34D399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <path d="M30 16L32 18L30 20" stroke="#34D399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <path d="M16 32L21 28L26 24L32 18" stroke="#14B8A6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <path d="M30 16L32 18L30 20" stroke="#14B8A6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
     </svg>
   )
 }
 
 // ============ TYPES ============
-interface Message {
-  id: string; role: "user" | "assistant"; content: string; timestamp: Date
-  attachments?: Attachment[]; chart?: ChartData
-}
+interface Message { id: string; role: "user" | "assistant"; content: string; timestamp: Date; attachments?: Attachment[]; chart?: ChartData }
 interface Attachment { id: string; name: string; type: string; size: number; content?: string }
 interface ChartData { type: "bar" | "line" | "pie" | "area" | "waterfall" | "stacked_bar" | "multi_line" | "composed"; title: string; data: any[]; keys?: string[]; colors?: string[] }
 interface TableData { title: string; headers: string[]; rows: string[][] }
 interface Conversation { id: string; title: string; messages: Message[]; created_at: string; updated_at: string }
-
-interface CompanyData {
-  transactions: any[]; invoices: any[]; projects: any[]; clients: any[]
-  teamMembers: any[]; timeEntries: any[]; projectAssignments: any[]
-  billRates: any[]; costOverrides: any[]; expenses: any[]
-}
-
-interface KPISummary {
-  totalRevenue: number; totalExpenses: number; netIncome: number; grossMargin: number
-  cashOnHand: number; arOutstanding: number; burnRate: number; runway: number
-  utilizationRate: number; dso: number; teamCost: number; teamRevenue: number; teamMarginPct: number
-}
+interface CompanyData { transactions: any[]; invoices: any[]; projects: any[]; clients: any[]; teamMembers: any[]; timeEntries: any[]; projectAssignments: any[]; billRates: any[]; costOverrides: any[]; expenses: any[] }
+interface KPISummary { totalRevenue: number; totalExpenses: number; netIncome: number; grossMargin: number; cashOnHand: number; arOutstanding: number; burnRate: number; runway: number; utilizationRate: number; dso: number; teamCost: number; teamRevenue: number; teamMarginPct: number }
 
 // ============ QUICK ACTIONS ============
 const QUICK_ACTIONS = [
@@ -82,9 +70,15 @@ const QUICK_ACTIONS = [
   { label: "Show me client profitability chart", icon: TrendingUp },
   { label: "Any cash flow risks I should know about?", icon: AlertTriangle },
   { label: "Show team utilization and margins", icon: BarChart3 },
-  { label: "Categorize my recent bank transactions", icon: Zap },
+  { label: "Categorize my recent bank transactions", icon: CreditCard },
   { label: "Revenue trend over last 6 months", icon: Activity },
 ]
+
+// ============ UTILITIES ============
+const formatCurrency = (v: number): string => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
+const formatPercent = (v: number): string => v.toFixed(1) + "%"
+const formatFileSize = (bytes: number): string => { if (bytes < 1024) return bytes + " B"; if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"; return (bytes / (1024 * 1024)).toFixed(1) + " MB" }
+const getCurrentMonth = (): string => { const n = new Date(); return n.getFullYear() + "-" + String(n.getMonth() + 1).padStart(2, "0") }
 
 // ============ SYSTEM PROMPT ============
 const SYSTEM_PROMPT = `You are Sage, the AI Agent for Vantage (CashFlow-Pro). You are a virtual CFO, FP&A analyst, and operations partner for Mano CG LLC, a project-based consulting business.
@@ -137,16 +131,16 @@ EXPENSE CATEGORIES:
 - Personal: Owner Draws, Personal Expenses
 
 TABLE FORMAT:
-` + "```" + `sage-table
+\`\`\`sage-table
 {
   "title": "Table Title",
   "headers": ["Col1", "Col2"],
   "rows": [["val1", "val2"]]
 }
-` + "```" + `
+\`\`\`
 
 CHART FORMAT:
-` + "```" + `sage-chart
+\`\`\`sage-chart
 {
   "type": "bar|line|pie|area|waterfall|stacked_bar|multi_line|composed",
   "title": "Chart Title",
@@ -154,7 +148,7 @@ CHART FORMAT:
   "keys": ["revenue", "cost"],
   "colors": ["#10b981", "#ef4444"]
 }
-` + "```" + `
+\`\`\`
 
 Chart types:
 - "bar" - single metric comparisons (revenue by client)
@@ -194,13 +188,6 @@ When asked general questions like "what should I focus on" or "any issues?", sca
 
 Remember: You are not just answering questions. You are an agent running alongside the business, spotting patterns humans miss.`
 
-// ============ UTILITIES ============
-const formatCurrency = (v: number): string => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
-const formatPercent = (v: number): string => v.toFixed(1) + "%"
-const formatFileSize = (bytes: number): string => { if (bytes < 1024) return bytes + " B"; if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"; return (bytes / (1024 * 1024)).toFixed(1) + " MB" }
-const getCurrentMonth = (): string => { const n = new Date(); return n.getFullYear() + "-" + String(n.getMonth() + 1).padStart(2, "0") }
-
-// ============ KPI & DATA FUNCTIONS ============
 function calculateKPIs(data: CompanyData): KPISummary {
   const totalRevenue = data.invoices?.filter(inv => inv.status === "paid").reduce((sum, inv) => sum + (inv.amount || 0), 0) || 0
   const totalExpenses = data.transactions?.filter(t => t.type === "expense" || t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount || 0), 0) || 0
@@ -552,164 +539,81 @@ ${bankPatterns}
 `
 }
 
-// ============ TABLE RENDERER ============
+
+// ============ TABLE RENDERER (Institutional) ============
 function TableRenderer({ table }: { table: TableData }) {
   if (!table || !table.headers || !table.rows) return null
   return (
-    <div className="my-4 p-4 bg-slate-900/70 backdrop-blur-xl rounded-xl border border-white/[0.08] overflow-x-auto">
-      <h4 className="text-sm font-medium text-slate-200 mb-4">{table.title}</h4>
-      <table className="w-full text-sm">
-        <thead><tr className="border-b border-white/[0.08]">
-          {table.headers.map((h, i) => <th key={i} className="text-left py-2 px-3 text-slate-300 font-medium">{h}</th>)}
-        </tr></thead>
-        <tbody>{table.rows.map((row, ri) => (
-          <tr key={ri} className="border-b border-white/[0.08] hover:bg-white/[0.05]">
-            {row.map((cell, ci) => <td key={ci} className="py-2 px-3 text-slate-200">{cell}</td>)}
-          </tr>
-        ))}</tbody>
-      </table>
-    </div>
-  )
-}
-
-// ============ CHART RENDERER (Enhanced) ============
-function ChartRenderer({ chart }: { chart: ChartData }) {
-  if (!chart || !chart.data || chart.data.length === 0) return null
-
-  const colors = chart.colors || CHART_COLORS
-  const keys = chart.keys || ["value"]
-  const tooltipStyle = { backgroundColor: "rgba(15, 23, 42, 0.95)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px" }
-
-  const renderChart = () => {
-    switch (chart.type) {
-      case "bar":
-        return (
-          <BarChart data={chart.data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-            <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-            <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} />
-            <Tooltip contentStyle={tooltipStyle} />
-            <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        )
-
-      case "stacked_bar":
-        return (
-          <BarChart data={chart.data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-            <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-            <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} />
-            <Tooltip contentStyle={tooltipStyle} />
-            <Legend />
-            {keys.map((key, i) => <Bar key={key} dataKey={key} stackId="a" fill={colors[i % colors.length]} radius={i === keys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />)}
-          </BarChart>
-        )
-
-      case "line":
-        return (
-          <LineChart data={chart.data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-            <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-            <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} />
-            <Tooltip contentStyle={tooltipStyle} />
-            <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} dot={{ fill: "#10b981" }} />
-          </LineChart>
-        )
-
-      case "multi_line":
-        return (
-          <LineChart data={chart.data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-            <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-            <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} />
-            <Tooltip contentStyle={tooltipStyle} />
-            <Legend />
-            {keys.map((key, i) => <Line key={key} type="monotone" dataKey={key} stroke={colors[i % colors.length]} strokeWidth={2} dot={{ fill: colors[i % colors.length] }} />)}
-          </LineChart>
-        )
-
-      case "area":
-        return (
-          <AreaChart data={chart.data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-            <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-            <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} />
-            <Tooltip contentStyle={tooltipStyle} />
-            <defs>
-              <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <Area type="monotone" dataKey="value" stroke="#10b981" fill="url(#areaGrad)" strokeWidth={2} />
-          </AreaChart>
-        )
-
-      case "waterfall":
-        let running = 0
-        const waterfallData = chart.data.map(d => {
-          if (d.isTotal) {
-            const h = running
-            return { ...d, base: 0, bar: h, fill: h >= 0 ? "#3b82f6" : "#ef4444" }
-          }
-          const base = d.value >= 0 ? running : running + d.value
-          running += d.value
-          return { ...d, base: Math.max(base, 0), bar: Math.abs(d.value), fill: d.value >= 0 ? "#10b981" : "#ef4444" }
-        })
-        return (
-          <BarChart data={waterfallData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-            <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-            <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} />
-            <Tooltip contentStyle={tooltipStyle} formatter={(v: any, name: string) => name === "base" ? null : ["$" + Number(v).toLocaleString(), "Amount"]} />
-            <Bar dataKey="base" stackId="stack" fill="transparent" />
-            <Bar dataKey="bar" stackId="stack" radius={[4, 4, 0, 0]}>
-              {waterfallData.map((d, i) => <Cell key={i} fill={d.fill} />)}
-            </Bar>
-          </BarChart>
-        )
-
-      case "composed":
-        return (
-          <ComposedChart data={chart.data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-            <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-            <YAxis yAxisId="left" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-            <YAxis yAxisId="right" orientation="right" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-            <Tooltip contentStyle={tooltipStyle} />
-            <Legend />
-            {keys.slice(0, -1).map((key, i) => <Bar key={key} yAxisId="left" dataKey={key} fill={colors[i % colors.length]} radius={[4, 4, 0, 0]} />)}
-            <Line yAxisId="right" type="monotone" dataKey={keys[keys.length - 1]} stroke={colors[(keys.length - 1) % colors.length]} strokeWidth={2} dot={false} />
-          </ComposedChart>
-        )
-
-      case "pie":
-      default:
-        return (
-          <RechartsPie>
-            <Pie data={chart.data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-              {chart.data.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
-            </Pie>
-            <Tooltip contentStyle={tooltipStyle} />
-            <Legend />
-          </RechartsPie>
-        )
-    }
-  }
-
-  return (
-    <div className="my-4 p-4 bg-slate-900/70 backdrop-blur-xl rounded-xl border border-white/[0.08]">
-      <h4 className="text-sm font-medium text-slate-200 mb-4">{chart.title}</h4>
-      <div className="h-72">
-        <ResponsiveContainer width="100%" height="100%">
-          {renderChart()}
-        </ResponsiveContainer>
+    <div className="my-4 rounded-xl border border-white/[0.06] overflow-hidden">
+      <div className="bg-[#0D1520] px-4 py-3 border-b border-white/[0.06]">
+        <h4 className="text-sm font-medium text-slate-200">{table.title}</h4>
+      </div>
+      <div className="bg-[#111827] overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead><tr className="border-b border-white/[0.06]">
+            {table.headers.map((h, i) => <th key={i} className="text-left py-3 px-4 text-slate-400 font-medium text-xs uppercase tracking-wider">{h}</th>)}
+          </tr></thead>
+          <tbody>{table.rows.map((row, ri) => (
+            <tr key={ri} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+              {row.map((cell, ci) => <td key={ci} className="py-2.5 px-4 text-slate-200">{cell}</td>)}
+            </tr>
+          ))}</tbody>
+        </table>
       </div>
     </div>
   )
 }
 
-// ============ MESSAGE COMPONENT ============
+// ============ CHART RENDERER (Institutional) ============
+function ChartRenderer({ chart }: { chart: ChartData }) {
+  if (!chart || !chart.data || chart.data.length === 0) return null
+  const colors = chart.colors || CHART_COLORS
+  const keys = chart.keys || ["value"]
+  const tooltipStyle = { backgroundColor: "#0D1520", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }
+  const axisProps = { tick: { fill: "#64748b", fontSize: 11 }, axisLine: { stroke: "rgba(255,255,255,0.06)" } }
+  const gridStroke = "rgba(255,255,255,0.04)"
+
+  const renderChart = () => {
+    switch (chart.type) {
+      case "bar":
+        return (<BarChart data={chart.data}><CartesianGrid strokeDasharray="3 3" stroke={gridStroke} /><XAxis dataKey="name" {...axisProps} /><YAxis {...axisProps} /><Tooltip contentStyle={tooltipStyle} /><Bar dataKey="value" fill="#14B8A6" radius={[4, 4, 0, 0]} /></BarChart>)
+      case "stacked_bar":
+        return (<BarChart data={chart.data}><CartesianGrid strokeDasharray="3 3" stroke={gridStroke} /><XAxis dataKey="name" {...axisProps} /><YAxis {...axisProps} /><Tooltip contentStyle={tooltipStyle} /><Legend />{keys.map((key, i) => <Bar key={key} dataKey={key} stackId="a" fill={colors[i % colors.length]} radius={i === keys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />)}</BarChart>)
+      case "line":
+        return (<LineChart data={chart.data}><CartesianGrid strokeDasharray="3 3" stroke={gridStroke} /><XAxis dataKey="name" {...axisProps} /><YAxis {...axisProps} /><Tooltip contentStyle={tooltipStyle} /><Line type="monotone" dataKey="value" stroke="#14B8A6" strokeWidth={2} dot={{ fill: "#14B8A6", strokeWidth: 0 }} activeDot={{ r: 6, fill: "#14B8A6" }} /></LineChart>)
+      case "multi_line":
+        return (<LineChart data={chart.data}><CartesianGrid strokeDasharray="3 3" stroke={gridStroke} /><XAxis dataKey="name" {...axisProps} /><YAxis {...axisProps} /><Tooltip contentStyle={tooltipStyle} /><Legend />{keys.map((key, i) => <Line key={key} type="monotone" dataKey={key} stroke={colors[i % colors.length]} strokeWidth={2} dot={{ fill: colors[i % colors.length], strokeWidth: 0 }} />)}</LineChart>)
+      case "area":
+        return (<AreaChart data={chart.data}><CartesianGrid strokeDasharray="3 3" stroke={gridStroke} /><XAxis dataKey="name" {...axisProps} /><YAxis {...axisProps} /><Tooltip contentStyle={tooltipStyle} /><defs><linearGradient id="areaGradTeal" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#14B8A6" stopOpacity={0.25} /><stop offset="95%" stopColor="#14B8A6" stopOpacity={0} /></linearGradient></defs><Area type="monotone" dataKey="value" stroke="#14B8A6" fill="url(#areaGradTeal)" strokeWidth={2} /></AreaChart>)
+      case "waterfall": {
+        let running = 0
+        const wd = chart.data.map(d => {
+          if (d.isTotal) { const h = running; return { ...d, base: 0, bar: h, fill: h >= 0 ? "#3b82f6" : "#ef4444" } }
+          const base = d.value >= 0 ? running : running + d.value; running += d.value
+          return { ...d, base: Math.max(base, 0), bar: Math.abs(d.value), fill: d.value >= 0 ? "#14B8A6" : "#ef4444" }
+        })
+        return (<BarChart data={wd}><CartesianGrid strokeDasharray="3 3" stroke={gridStroke} /><XAxis dataKey="name" {...axisProps} /><YAxis {...axisProps} /><Tooltip contentStyle={tooltipStyle} formatter={(v: any, name: string) => name === "base" ? null : ["$" + Number(v).toLocaleString(), "Amount"]} /><Bar dataKey="base" stackId="stack" fill="transparent" /><Bar dataKey="bar" stackId="stack" radius={[4, 4, 0, 0]}>{wd.map((d, i) => <Cell key={i} fill={d.fill} />)}</Bar></BarChart>)
+      }
+      case "composed":
+        return (<ComposedChart data={chart.data}><CartesianGrid strokeDasharray="3 3" stroke={gridStroke} /><XAxis dataKey="name" {...axisProps} /><YAxis yAxisId="left" {...axisProps} /><YAxis yAxisId="right" orientation="right" {...axisProps} /><Tooltip contentStyle={tooltipStyle} /><Legend />{keys.slice(0, -1).map((key, i) => <Bar key={key} yAxisId="left" dataKey={key} fill={colors[i % colors.length]} radius={[4, 4, 0, 0]} />)}<Line yAxisId="right" type="monotone" dataKey={keys[keys.length - 1]} stroke={colors[(keys.length - 1) % colors.length]} strokeWidth={2} dot={false} /></ComposedChart>)
+      case "pie": default:
+        return (<RechartsPie><Pie data={chart.data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>{chart.data.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}</Pie><Tooltip contentStyle={tooltipStyle} /><Legend /></RechartsPie>)
+    }
+  }
+
+  return (
+    <div className="my-4 rounded-xl border border-white/[0.06] overflow-hidden">
+      <div className="bg-[#0D1520] px-4 py-3 border-b border-white/[0.06]">
+        <h4 className="text-sm font-medium text-slate-200">{chart.title}</h4>
+      </div>
+      <div className="bg-[#111827] p-4 h-72">
+        <ResponsiveContainer width="100%" height="100%">{renderChart()}</ResponsiveContainer>
+      </div>
+    </div>
+  )
+}
+
+// ============ MESSAGE COMPONENT (Institutional) ============
 function ChatMessage({ message }: { message: Message }) {
   const isUser = message.role === "user"
   
@@ -717,22 +621,13 @@ function ChatMessage({ message }: { message: Message }) {
     let text = content
     const charts: ChartData[] = []
     const tables: TableData[] = []
-    
-    // Parse all charts
     const chartRegex = /```sage-chart\s*([\s\S]*?)```/g
     let match
-    while ((match = chartRegex.exec(text)) !== null) {
-      try { charts.push(JSON.parse(match[1].trim())) } catch (e) { console.error("Chart parse error:", e) }
-    }
+    while ((match = chartRegex.exec(text)) !== null) { try { charts.push(JSON.parse(match[1].trim())) } catch (e) { console.error("Chart parse error:", e) } }
     text = text.replace(/```sage-chart[\s\S]*?```/g, "").trim()
-    
-    // Parse all tables
     const tableRegex = /```sage-table\s*([\s\S]*?)```/g
-    while ((match = tableRegex.exec(text)) !== null) {
-      try { tables.push(JSON.parse(match[1].trim())) } catch (e) { console.error("Table parse error:", e) }
-    }
+    while ((match = tableRegex.exec(text)) !== null) { try { tables.push(JSON.parse(match[1].trim())) } catch (e) { console.error("Table parse error:", e) } }
     text = text.replace(/```sage-table[\s\S]*?```/g, "").trim()
-    
     return { text, charts, tables }
   }
 
@@ -740,46 +635,38 @@ function ChatMessage({ message }: { message: Message }) {
   
   const formatContent = (content: string) => {
     return content.split("\n").map((line, i) => {
-      // Navigation links
       if (line.includes("[View") || line.includes("->]") || line.includes("\u2192]")) {
         const linkMatch = line.match(/\[(.*?)\s*(?:->|\u2192)\]/)
         if (linkMatch) {
-          const text = linkMatch[1].toLowerCase()
-          const href = text.includes("forecast") ? "/forecast" : text.includes("report") ? "/reports" : text.includes("invoice") ? "/invoices" : text.includes("project") ? "/projects" : text.includes("client") ? "/clients" : text.includes("time") ? "/time-tracking" : text.includes("team") ? "/team" : text.includes("expense") ? "/expense-mgmt" : "/dashboard"
-          return <p key={i} className="my-1"><Link href={href} className="text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1">{linkMatch[1]} <ChevronRight size={12} /></Link></p>
+          const t = linkMatch[1].toLowerCase()
+          const href = t.includes("forecast") ? "/forecast" : t.includes("report") ? "/reports" : t.includes("invoice") ? "/invoices" : t.includes("project") ? "/projects" : t.includes("client") ? "/clients" : t.includes("time") ? "/time-tracking" : t.includes("team") ? "/team" : t.includes("expense") ? "/expense-mgmt" : "/dashboard"
+          return <p key={i} className="my-1"><Link href={href} className="text-teal-400 hover:text-teal-300 inline-flex items-center gap-1 transition-colors">{linkMatch[1]} <ChevronRight size={12} /></Link></p>
         }
       }
-      // Bullet points
       if (line.trim().startsWith("- ") || line.trim().startsWith("\u2022 ")) {
-        const cleanLine = line.replace(/^[-\u2022]\s*/, "").replace(/\*\*/g, "")
-        return <p key={i} className="my-0.5 pl-2">{"\u2022"} {cleanLine}</p>
+        return <p key={i} className="my-0.5 pl-3 text-slate-300">{"\u2022"} {line.replace(/^[-\u2022]\s*/, "").replace(/\*\*/g, "")}</p>
       }
-      // Numbered lists
-      if (/^\d+\.\s/.test(line.trim())) {
-        return <p key={i} className="my-0.5 pl-2">{line.replace(/\*\*/g, "")}</p>
-      }
-      // Section headers (lines ending with :)
-      if (line.trim().endsWith(":") && line.trim().length < 60 && !line.includes("$")) {
-        return <p key={i} className="my-2 text-slate-300 font-medium">{line.replace(/\*\*/g, "")}</p>
-      }
-      return <p key={i} className="my-1">{line.replace(/\*\*/g, "")}</p>
+      if (/^\d+\.\s/.test(line.trim())) return <p key={i} className="my-0.5 pl-3 text-slate-300">{line.replace(/\*\*/g, "")}</p>
+      if (line.trim().endsWith(":") && line.trim().length < 60 && !line.includes("$")) return <p key={i} className="my-2.5 text-slate-200 font-medium text-[13px] uppercase tracking-wide">{line.replace(/\*\*/g, "")}</p>
+      return <p key={i} className="my-1 text-slate-300">{line.replace(/\*\*/g, "")}</p>
     })
   }
   
   return (
-    <div className={`flex gap-4 ${isUser ? "flex-row-reverse" : ""} max-w-4xl mx-auto`}>
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${isUser ? "bg-blue-500" : "bg-gradient-to-br from-purple-500 via-indigo-500 to-blue-500"}`}>
-        {isUser ? <User size={18} className="text-white" /> : <SageLogo size={24} />}
+    <div className={`flex gap-3.5 ${isUser ? "flex-row-reverse" : ""} max-w-4xl mx-auto`}>
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${isUser ? "bg-blue-500/20 ring-1 ring-blue-500/30" : "bg-teal-500/15 ring-1 ring-teal-500/25"}`}>
+        {isUser ? <User size={16} className="text-blue-400" /> : <SageLogo size={22} />}
       </div>
-      <div className={`flex-1 ${isUser ? "text-right" : ""}`}>
-        <div className={`inline-block rounded-2xl px-5 py-3 max-w-[85%] ${isUser ? "bg-blue-500 text-white rounded-tr-md" : "bg-slate-900/80 backdrop-blur-xl text-slate-100 rounded-tl-md border border-white/[0.08]"}`}>
+      <div className={`flex-1 min-w-0 ${isUser ? "text-right" : ""}`}>
+        <p className={`text-[11px] font-medium mb-1 px-1 ${isUser ? "text-blue-400/70" : "text-teal-400/70"}`}>{isUser ? "You" : "Sage"}</p>
+        <div className={`inline-block rounded-xl px-4 py-3 max-w-[90%] text-left ${isUser ? "bg-blue-500/10 border border-blue-500/20 text-slate-100" : "bg-[#111827] border border-white/[0.06] text-slate-200"}`}>
           {message.attachments && message.attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-2">
+            <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b border-white/[0.06]">
               {message.attachments.map(att => (
-                <div key={att.id} className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.05] rounded-lg text-xs">
-                  {att.type.startsWith("image/") ? <ImageIcon size={14} /> : <FileText size={14} />}
-                  <span className="truncate max-w-[150px]">{att.name}</span>
-                  <span className="text-slate-400">{formatFileSize(att.size)}</span>
+                <div key={att.id} className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.04] rounded-lg text-xs border border-white/[0.06]">
+                  {att.type.startsWith("image/") ? <ImageIcon size={14} className="text-teal-400" /> : <FileText size={14} className="text-teal-400" />}
+                  <span className="truncate max-w-[150px] text-slate-300">{att.name}</span>
+                  <span className="text-slate-500">{formatFileSize(att.size)}</span>
                 </div>
               ))}
             </div>
@@ -788,45 +675,86 @@ function ChatMessage({ message }: { message: Message }) {
           {tables.map((t, i) => <TableRenderer key={`t-${i}`} table={t} />)}
           {charts.map((c, i) => <ChartRenderer key={`c-${i}`} chart={c} />)}
         </div>
-        <p className="text-xs text-slate-500 mt-1.5 px-2">{new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+        <p className="text-[10px] text-slate-600 mt-1 px-1">{new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
       </div>
     </div>
   )
 }
 
-// ============ HELPER COMPONENTS ============
-function QuickActionButton({ action, onClick }: { action: typeof QUICK_ACTIONS[0], onClick: () => void }) {
-  const Icon = action.icon
-  return (
-    <button onClick={onClick} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] hover:bg-white/[0.08] hover:border-white/[0.12] transition-all text-sm text-slate-300 text-left">
-      <Icon size={18} className="text-emerald-400 flex-shrink-0" />
-      <span>{action.label}</span>
-    </button>
-  )
-}
-
+// ============ CONVERSATION ITEM (Institutional sidebar) ============
 function ConversationItem({ conversation, isActive, onClick, onDelete, onRename }: { conversation: Conversation, isActive: boolean, onClick: () => void, onDelete: () => void, onRename: (title: string) => void }) {
   const [isEditing, setIsEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(conversation.title)
+  const timeAgo = useMemo(() => {
+    const diff = Date.now() - new Date(conversation.updated_at).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 60) return `${mins}m`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h`
+    return `${Math.floor(hrs / 24)}d`
+  }, [conversation.updated_at])
+
   return (
-    <div className={`group relative flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all ${isActive ? "bg-white/[0.1]" : "hover:bg-white/[0.05]"}`} onClick={() => !isEditing && onClick()}>
-      <MessageSquare size={16} className="text-slate-400 flex-shrink-0" />
+    <div className={`group relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-all ${isActive ? "bg-teal-500/10 border-l-2 border-teal-400" : "hover:bg-white/[0.03] border-l-2 border-transparent"}`} onClick={() => !isEditing && onClick()}>
+      <MessageSquare size={14} className={isActive ? "text-teal-400 flex-shrink-0" : "text-slate-500 flex-shrink-0"} />
       {isEditing ? (
         <div className="flex-1 flex items-center gap-1">
-          <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} className="flex-1 bg-white/[0.05] text-sm text-slate-100 px-2 py-1 rounded border border-white/[0.08] focus:outline-none focus:border-emerald-500" autoFocus onClick={e => e.stopPropagation()} onKeyDown={e => { if (e.key === "Enter") { onRename(editTitle); setIsEditing(false) } if (e.key === "Escape") setIsEditing(false) }} />
-          <button onClick={e => { e.stopPropagation(); onRename(editTitle); setIsEditing(false) }} className="p-1 text-emerald-400"><Check size={14} /></button>
-          <button onClick={e => { e.stopPropagation(); setIsEditing(false) }} className="p-1 text-slate-400"><X size={14} /></button>
+          <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} className="flex-1 bg-[#0D1520] text-sm text-slate-100 px-2 py-1 rounded border border-white/[0.08] focus:outline-none focus:border-teal-500" autoFocus onClick={e => e.stopPropagation()} onKeyDown={e => { if (e.key === "Enter") { onRename(editTitle); setIsEditing(false) } if (e.key === "Escape") setIsEditing(false) }} />
+          <button onClick={e => { e.stopPropagation(); onRename(editTitle); setIsEditing(false) }} className="p-1 text-teal-400"><Check size={14} /></button>
+          <button onClick={e => { e.stopPropagation(); setIsEditing(false) }} className="p-1 text-slate-500"><X size={14} /></button>
         </div>
       ) : (
         <>
-          <span className="flex-1 text-sm text-slate-200 truncate">{conversation.title}</span>
-          <div className={`flex items-center gap-1 ${isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
-            <button onClick={e => { e.stopPropagation(); setIsEditing(true); setEditTitle(conversation.title) }} className="p-1 text-slate-400 hover:text-slate-200"><Pencil size={14} /></button>
-            <button onClick={e => { e.stopPropagation(); onDelete() }} className="p-1 text-slate-400 hover:text-red-400"><Trash2 size={14} /></button>
+          <div className="flex-1 min-w-0">
+            <span className={`text-sm truncate block ${isActive ? "text-slate-100" : "text-slate-300"}`}>{conversation.title}</span>
+            <span className="text-[10px] text-slate-600">{timeAgo} ago</span>
+          </div>
+          <div className={`flex items-center gap-0.5 ${isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
+            <button onClick={e => { e.stopPropagation(); setIsEditing(true); setEditTitle(conversation.title) }} className="p-1 text-slate-500 hover:text-slate-300"><Pencil size={12} /></button>
+            <button onClick={e => { e.stopPropagation(); onDelete() }} className="p-1 text-slate-500 hover:text-red-400"><Trash2 size={12} /></button>
           </div>
         </>
       )}
     </div>
+  )
+}
+
+// ============ KPI CARD (Left accent bar — institutional) ============
+function KPICard({ label, value, sublabel, accentColor = "teal", icon: Icon, trend }: { label: string, value: string, sublabel?: string, accentColor?: string, icon: any, trend?: "up" | "down" | "neutral" }) {
+  const cm: Record<string, { accent: string, iconBg: string, iconText: string }> = {
+    teal:    { accent: "border-l-teal-400",    iconBg: "bg-teal-500/10",    iconText: "text-teal-400" },
+    blue:    { accent: "border-l-blue-400",    iconBg: "bg-blue-500/10",    iconText: "text-blue-400" },
+    amber:   { accent: "border-l-amber-400",   iconBg: "bg-amber-500/10",   iconText: "text-amber-400" },
+    rose:    { accent: "border-l-rose-400",    iconBg: "bg-rose-500/10",    iconText: "text-rose-400" },
+    purple:  { accent: "border-l-purple-400",  iconBg: "bg-purple-500/10",  iconText: "text-purple-400" },
+    emerald: { accent: "border-l-emerald-400", iconBg: "bg-emerald-500/10", iconText: "text-emerald-400" },
+  }
+  const c = cm[accentColor] || cm.teal
+  return (
+    <div className={`bg-[#111827] rounded-lg border border-white/[0.06] border-l-[3px] ${c.accent} p-3.5 flex items-start gap-3`}>
+      <div className={`w-9 h-9 rounded-lg ${c.iconBg} flex items-center justify-center flex-shrink-0`}>
+        <Icon size={18} className={c.iconText} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] text-slate-500 uppercase tracking-wider font-medium">{label}</p>
+        <p className="text-lg font-semibold text-slate-100 mt-0.5 leading-tight">{value}</p>
+        {sublabel && <p className={`text-[11px] mt-0.5 ${trend === "up" ? "text-emerald-400" : trend === "down" ? "text-rose-400" : "text-slate-500"}`}>{trend === "up" && "\u2191 "}{trend === "down" && "\u2193 "}{sublabel}</p>}
+      </div>
+    </div>
+  )
+}
+
+// ============ ALERT BADGE ============
+function AlertCard({ icon: Icon, label, count, color, onClick }: { icon: any, label: string, count: number, color: string, onClick: () => void }) {
+  const cm: Record<string, string> = {
+    amber: "bg-amber-500/[0.08] border-amber-500/20 text-amber-400 hover:bg-amber-500/15",
+    rose:  "bg-rose-500/[0.08] border-rose-500/20 text-rose-400 hover:bg-rose-500/15",
+    orange:"bg-orange-500/[0.08] border-orange-500/20 text-orange-400 hover:bg-orange-500/15",
+  }
+  return (
+    <button onClick={onClick} className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border text-xs font-medium transition-all ${cm[color] || cm.amber}`}>
+      <Icon size={14} /><span>{count} {label}</span><ChevronRight size={12} className="opacity-50" />
+    </button>
   )
 }
 
@@ -845,6 +773,7 @@ export default function SageAssistantPage() {
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [isDragging, setIsDragging] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -853,7 +782,7 @@ export default function SageAssistantPage() {
   useEffect(() => { scrollToBottom() }, [messages])
   useEffect(() => { if (textareaRef.current) { textareaRef.current.style.height = "auto"; textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + "px" } }, [input])
 
-  // ---- DATA LOADING (ALL platform tables) ----
+  // ---- DATA LOADING (unchanged) ----
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -864,7 +793,6 @@ export default function SageAssistantPage() {
         if (profile?.company_id) {
           setCompanyId(profile.company_id)
           const cid = profile.company_id
-
           const [transactions, invoices, projects, clients, teamMembers, timeEntries, projectAssignments, billRates, costOverrides, expenses] = await Promise.all([
             supabase.from("transactions").select("*").eq("company_id", cid).order("date", { ascending: false }).limit(500),
             supabase.from("invoices").select("*").eq("company_id", cid),
@@ -877,7 +805,6 @@ export default function SageAssistantPage() {
             supabase.from("cost_overrides").select("*").eq("company_id", cid),
             supabase.from("expenses").select("*").eq("company_id", cid).order("date", { ascending: false }).limit(500),
           ])
-
           const data: CompanyData = {
             transactions: transactions.data || [], invoices: invoices.data || [],
             projects: projects.data || [], clients: clients.data || [],
@@ -888,8 +815,6 @@ export default function SageAssistantPage() {
           }
           setCompanyData(data)
           setKpis(calculateKPIs(data))
-
-          // Load conversations
           const { data: convos } = await supabase.from("sage_conversations").select("*").eq("user_id", user.id).order("updated_at", { ascending: false })
           if (convos) setConversations(convos.map(c => ({ ...c, messages: c.messages || [] })))
         }
@@ -899,7 +824,7 @@ export default function SageAssistantPage() {
     loadData()
   }, [])
 
-  // ---- CONVERSATION MANAGEMENT ----
+  // ---- CONVERSATION MANAGEMENT (unchanged) ----
   const saveConversation = async (msgs: Message[], conversationId: string | null, title?: string) => {
     if (!userId || !companyId) return null
     const messagesForStorage = msgs.map(m => ({ ...m, timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp }))
@@ -912,38 +837,29 @@ export default function SageAssistantPage() {
       return null
     }
   }
-
   const generateTitle = (content: string): string => content.split(" ").slice(0, 6).join(" ").slice(0, 40)
 
-  // ---- FILE HANDLING ----
+  // ---- FILE HANDLING (unchanged) ----
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return
     Array.from(files).forEach(file => {
       if (file.size > 10 * 1024 * 1024) { alert("File too large. Max 10MB."); return }
       const reader = new FileReader()
-      reader.onload = (e) => {
-        setAttachments(prev => [...prev, { id: `att_${Date.now()}_${Math.random()}`, name: file.name, type: file.type, size: file.size, content: e.target?.result as string }])
-      }
-      if (file.type.startsWith("image/")) reader.readAsDataURL(file)
-      else reader.readAsText(file)
+      reader.onload = (e) => { setAttachments(prev => [...prev, { id: `att_${Date.now()}_${Math.random()}`, name: file.name, type: file.type, size: file.size, content: e.target?.result as string }]) }
+      if (file.type.startsWith("image/")) reader.readAsDataURL(file); else reader.readAsText(file)
     })
   }
-
   const handleDrop = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); handleFileSelect(e.dataTransfer.files) }, [])
   const removeAttachment = (id: string) => setAttachments(prev => prev.filter(a => a.id !== id))
 
-  // ---- SEND MESSAGE ----
+  // ---- SEND MESSAGE (unchanged) ----
   const sendMessage = async (content: string) => {
     if ((!content.trim() && attachments.length === 0) || loading) return
     const userMessage: Message = { id: `user_${Date.now()}`, role: "user", content: content.trim(), timestamp: new Date(), attachments: attachments.length > 0 ? [...attachments] : undefined }
     const newMessages = [...messages, userMessage]
-    setMessages(newMessages)
-    setInput("")
-    setAttachments([])
-    setLoading(true)
-
+    setMessages(newMessages); setInput(""); setAttachments([]); setLoading(true)
     try {
-      let dataContext = companyData && kpis ? buildDataContext(companyData, kpis) : "No company data available yet. The user needs to set up their company first."
+      let dataContext = companyData && kpis ? buildDataContext(companyData, kpis) : "No company data available yet."
       if (userMessage.attachments) {
         dataContext += "\n\n=== ATTACHED FILES ===\n"
         userMessage.attachments.forEach(att => {
@@ -951,19 +867,15 @@ export default function SageAssistantPage() {
           else dataContext += `  File: ${att.name}\nContent:\n${att.content?.slice(0, 8000) || "[Unable to read]"}\n\n`
         })
       }
-      
       const response = await fetch("/api/ai/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: newMessages.map(m => ({ role: m.role, content: m.content })), systemPrompt: SYSTEM_PROMPT, dataContext })
       })
       if (!response.ok) throw new Error("Failed to get AI response")
       const data = await response.json()
-      
       const assistantMessage: Message = { id: `assistant_${Date.now()}`, role: "assistant", content: data.content, timestamp: new Date() }
       const finalMessages = [...newMessages, assistantMessage]
       setMessages(finalMessages)
-      
       const title = messages.length === 0 ? generateTitle(content) : undefined
       const savedId = await saveConversation(finalMessages, currentConversationId, title)
       if (savedId && !currentConversationId) setCurrentConversationId(savedId)
@@ -982,162 +894,201 @@ export default function SageAssistantPage() {
   const renameConversation = async (id: string, title: string) => { await supabase.from("sage_conversations").update({ title }).eq("id", id); setConversations(prev => prev.map(c => c.id === id ? { ...c, title } : c)) }
 
   const hasMessages = messages.length > 0
+  const filteredConversations = useMemo(() => {
+    if (!searchQuery.trim()) return conversations
+    return conversations.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase()))
+  }, [conversations, searchQuery])
 
-  // Data stats for welcome screen
   const dataStats = useMemo(() => {
     if (!companyData) return null
     const uncatTxns = companyData.transactions?.filter(t => !t.category || t.category === "uncategorized" || t.category === "").length || 0
     const overdueInvs = companyData.invoices?.filter(i => i.status !== "paid" && new Date(i.due_date || i.created_at) < new Date()).length || 0
     const activeRates = companyData.billRates?.filter(r => r.is_active).length || 0
-    return { uncatTxns, overdueInvs, activeRates, totalTxns: companyData.transactions?.length || 0 }
+    const totalDataPoints = (companyData.transactions?.length || 0) + (companyData.invoices?.length || 0) + (companyData.timeEntries?.length || 0)
+    return { uncatTxns, overdueInvs, activeRates, totalTxns: companyData.transactions?.length || 0, totalDataPoints }
   }, [companyData])
 
-  if (dataLoading) return <div className="flex items-center justify-center h-[calc(100vh-120px)]"><RefreshCw className="w-8 h-8 text-emerald-500 animate-spin" /></div>
+  // ---- LOADING STATE (Branded) ----
+  if (dataLoading) return (
+    <div className="flex items-center justify-center h-[calc(100vh-80px)] bg-[#0B0F1A]">
+      <div className="text-center">
+        <div className="w-16 h-16 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mx-auto mb-4">
+          <SageLogo size={36} className="animate-pulse" />
+        </div>
+        <p className="text-sm text-slate-400">Loading financial data...</p>
+      </div>
+    </div>
+  )
 
   return (
-    <div className="flex h-[calc(100vh-80px)]">
-      {/* Sidebar */}
-      <div className={`${sidebarOpen ? "w-72" : "w-0"} border-r border-white/[0.08] bg-slate-900/70 backdrop-blur-xl flex flex-col transition-all duration-300 overflow-hidden`}>
-        <div className="p-4 border-b border-white/[0.08] flex items-center gap-2">
-          <button onClick={startNewConversation} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-medium transition-colors">
-            <Plus size={18} /> New Chat
-          </button>
-          <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/[0.08] transition-colors" title="Collapse sidebar">
-            <PanelLeftClose size={18} />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2">
-          <div className="space-y-1">
-            {conversations.map(c => <ConversationItem key={c.id} conversation={c} isActive={c.id === currentConversationId} onClick={() => loadConversation(c)} onDelete={() => deleteConversation(c.id)} onRename={title => renameConversation(c.id, title)} />)}
+    <div className="flex h-[calc(100vh-80px)] bg-[#0B0F1A]">
+      {/* ========== SIDEBAR ========== */}
+      <div className={`${sidebarOpen ? "w-72" : "w-0"} border-r border-white/[0.06] bg-[#0D1117] flex flex-col transition-all duration-300 overflow-hidden flex-shrink-0`}>
+        <div className="p-3 border-b border-white/[0.06]">
+          <div className="flex items-center gap-2 mb-3">
+            <button onClick={startNewConversation} className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-teal-500/15 border border-teal-500/25 hover:bg-teal-500/25 text-teal-400 text-sm font-medium transition-all">
+              <Plus size={16} /> New Chat
+            </button>
+            <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/[0.04] transition-colors" title="Collapse">
+              <PanelLeftClose size={16} />
+            </button>
           </div>
-          {conversations.length === 0 && <p className="text-sm text-slate-500 text-center py-8">No conversations yet</p>}
+          <div className="relative">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search conversations..." className="w-full bg-[#111827] border border-white/[0.06] rounded-lg pl-8 pr-3 py-2 text-sm text-slate-300 placeholder-slate-600 focus:outline-none focus:border-teal-500/40" />
+          </div>
         </div>
-
-        {/* Sidebar data summary */}
+        <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+          {filteredConversations.map(c => <ConversationItem key={c.id} conversation={c} isActive={c.id === currentConversationId} onClick={() => loadConversation(c)} onDelete={() => deleteConversation(c.id)} onRename={title => renameConversation(c.id, title)} />)}
+          {filteredConversations.length === 0 && <p className="text-xs text-slate-600 text-center py-8">{searchQuery ? "No matches found" : "No conversations yet"}</p>}
+        </div>
         {dataStats && (
-          <div className="p-3 border-t border-white/[0.08]">
-            <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-2">Platform Status</p>
-            <div className="space-y-1.5 text-xs">
-              {dataStats.uncatTxns > 0 && (
-                <div className="flex items-center gap-2 text-amber-400"><Zap size={12} /><span>{dataStats.uncatTxns} uncategorized txns</span></div>
-              )}
-              {dataStats.overdueInvs > 0 && (
-                <div className="flex items-center gap-2 text-rose-400"><AlertTriangle size={12} /><span>{dataStats.overdueInvs} overdue invoices</span></div>
-              )}
-              <div className="flex items-center gap-2 text-slate-400"><Activity size={12} /><span>{dataStats.totalTxns} transactions loaded</span></div>
-              <div className="flex items-center gap-2 text-slate-400"><DollarSign size={12} /><span>{dataStats.activeRates} active rate cards</span></div>
+          <div className="p-3 border-t border-white/[0.06] bg-[#0B0F1A]">
+            <p className="text-[10px] font-medium text-slate-600 uppercase tracking-widest mb-2">Data Connected</p>
+            <div className="space-y-1.5">
+              {dataStats.uncatTxns > 0 && <div className="flex items-center gap-2 text-amber-400/80 text-[11px]"><CreditCard size={11} /><span>{dataStats.uncatTxns} uncategorized</span></div>}
+              {dataStats.overdueInvs > 0 && <div className="flex items-center gap-2 text-rose-400/80 text-[11px]"><AlertTriangle size={11} /><span>{dataStats.overdueInvs} overdue</span></div>}
+              <div className="flex items-center gap-2 text-slate-500 text-[11px]"><Activity size={11} /><span>{dataStats.totalDataPoints.toLocaleString()} data points</span></div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col relative" onDragOver={e => { e.preventDefault(); setIsDragging(true) }} onDragLeave={() => setIsDragging(false)} onDrop={handleDrop}>
+      {/* ========== MAIN AREA ========== */}
+      <div className="flex-1 flex flex-col relative min-w-0" onDragOver={e => { e.preventDefault(); setIsDragging(true) }} onDragLeave={() => setIsDragging(false)} onDrop={handleDrop}>
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-[#0D1117]">
           <div className="flex items-center gap-3">
-            {!sidebarOpen && (
-              <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/[0.08] transition-colors" title="Open sidebar">
-                <PanelLeft size={18} />
-              </button>
-            )}
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 via-indigo-500 to-blue-500 flex items-center justify-center">
-              <SageLogo size={28} />
-            </div>
+            {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/[0.04] transition-colors mr-1" title="Open sidebar"><PanelLeft size={16} /></button>}
+            <div className="w-9 h-9 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center"><SageLogo size={24} /></div>
             <div>
-              <h1 className="text-base font-semibold text-slate-100">Sage</h1>
-              <p className="text-xs text-slate-400">AI Agent {"\u2022"} Financial Intelligence</p>
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm font-semibold text-slate-100">Sage</h1>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-teal-500/15 text-teal-400 border border-teal-500/20 uppercase tracking-wider">Agent</span>
+              </div>
+              <p className="text-[11px] text-slate-500">Financial Intelligence & Operations</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-5">
             {kpis && (
-              <div className="hidden md:flex items-center gap-4 mr-4 text-xs">
-                <div className="flex items-center gap-1.5"><span className="text-slate-500">GM%</span><span className={kpis.teamMarginPct >= 20 ? "text-emerald-400 font-medium" : "text-amber-400 font-medium"}>{kpis.teamMarginPct.toFixed(1)}%</span></div>
-                <div className="flex items-center gap-1.5"><span className="text-slate-500">Runway</span><span className="text-blue-400 font-medium">{kpis.runway.toFixed(1)}mo</span></div>
+              <div className="hidden lg:flex items-center gap-5 text-xs">
+                <div className="flex items-center gap-1.5"><span className="text-slate-500">GM%</span><span className={`font-semibold tabular-nums ${kpis.teamMarginPct >= 20 ? "text-teal-400" : kpis.teamMarginPct >= 10 ? "text-amber-400" : "text-rose-400"}`}>{kpis.teamMarginPct.toFixed(1)}%</span></div>
+                <div className="w-px h-4 bg-white/[0.06]" />
+                <div className="flex items-center gap-1.5"><span className="text-slate-500">Runway</span><span className={`font-semibold tabular-nums ${kpis.runway >= 6 ? "text-teal-400" : kpis.runway >= 3 ? "text-amber-400" : "text-rose-400"}`}>{kpis.runway.toFixed(1)}mo</span></div>
+                <div className="w-px h-4 bg-white/[0.06]" />
+                <div className="flex items-center gap-1.5"><span className="text-slate-500">AR</span><span className="text-blue-400 font-semibold tabular-nums">{formatCurrency(kpis.arOutstanding)}</span></div>
+                <div className="w-px h-4 bg-white/[0.06]" />
+                <div className="flex items-center gap-1.5"><span className="text-slate-500">Util</span><span className="text-purple-400 font-semibold tabular-nums">{kpis.utilizationRate.toFixed(0)}%</span></div>
               </div>
             )}
-            <button onClick={startNewConversation} className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/[0.08] transition-colors" title="New conversation">
-              <Plus size={18} />
-            </button>
+            <button onClick={startNewConversation} className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/[0.04] transition-colors" title="New conversation"><Plus size={16} /></button>
           </div>
         </div>
 
         {/* Drop Zone */}
         {isDragging && (
-          <div className="absolute inset-0 bg-slate-900/90 z-50 flex items-center justify-center border-2 border-dashed border-emerald-500 m-4 rounded-xl">
+          <div className="absolute inset-0 bg-[#0B0F1A]/95 z-50 flex items-center justify-center border-2 border-dashed border-teal-500/40 m-4 rounded-xl">
             <div className="text-center">
-              <Paperclip size={48} className="mx-auto text-emerald-400 mb-4" />
-              <p className="text-xl text-slate-200">Drop files here</p>
-              <p className="text-sm text-slate-400 mt-2">Images, CSV, Excel, PDF, Text</p>
+              <div className="w-16 h-16 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mx-auto mb-4"><Paperclip size={28} className="text-teal-400" /></div>
+              <p className="text-lg text-slate-200 font-medium">Drop files here</p>
+              <p className="text-sm text-slate-500 mt-1">Images, CSV, Excel, PDF, Text</p>
             </div>
           </div>
         )}
 
-        {/* Messages Area */}
+        {/* ========== CONTENT ========== */}
         <div className="flex-1 overflow-y-auto">
           {!hasMessages ? (
-            <div className="h-full flex flex-col items-center justify-center px-4">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 via-indigo-500 to-blue-500 flex items-center justify-center mb-6 shadow-lg shadow-purple-500/20">
-                <SageLogo size={48} />
-              </div>
-              <h1 className="text-3xl font-bold text-slate-100 mb-2">Sage</h1>
-              <p className="text-slate-400 text-center mb-4 max-w-lg">Your AI agent for financial intelligence. I can analyze, forecast, categorize, and visualize across your entire platform.</p>
+            /* ===== WELCOME DASHBOARD ===== */
+            <div className="h-full flex flex-col px-6 py-8 overflow-y-auto">
+              <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col">
+                {/* Hero */}
+                <div className="text-center mb-8">
+                  <div className="w-16 h-16 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mx-auto mb-4"><SageLogo size={36} /></div>
+                  <h1 className="text-2xl font-bold text-slate-100 mb-1">Welcome back, Gabriel</h1>
+                  <p className="text-sm text-slate-500">Here is your financial snapshot. Ask me anything about your business.</p>
+                </div>
 
-              {/* Live data indicators */}
-              {dataStats && (
-                <div className="flex flex-wrap justify-center gap-3 mb-8 max-w-2xl">
-                  {dataStats.uncatTxns > 0 && (
-                    <button onClick={() => sendMessage("Categorize my recent bank transactions")} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs hover:bg-amber-500/20 transition-all">
-                      <Zap size={14} /> {dataStats.uncatTxns} transactions need categorizing
-                    </button>
-                  )}
-                  {dataStats.overdueInvs > 0 && (
-                    <button onClick={() => sendMessage("Show me overdue invoices and recommend follow-up actions")} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs hover:bg-rose-500/20 transition-all">
-                      <AlertTriangle size={14} /> {dataStats.overdueInvs} overdue invoices
-                    </button>
-                  )}
-                  {kpis && kpis.teamMarginPct > 0 && kpis.teamMarginPct < 15 && (
-                    <button onClick={() => sendMessage("My team margin is below 15%. What's driving this and how can I improve it?")} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs hover:bg-orange-500/20 transition-all">
-                      <TrendingDown size={14} /> Low margin alert: {kpis.teamMarginPct.toFixed(1)}%
-                    </button>
-                  )}
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs">
-                    <Brain size={14} /> Reading {(dataStats.totalTxns + (companyData?.invoices?.length || 0) + (companyData?.timeEntries?.length || 0))} data points
+                {/* KPI Grid */}
+                {kpis && (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+                    <KPICard label="Team Revenue" value={formatCurrency(kpis.teamRevenue)} sublabel={getCurrentMonth()} accentColor="teal" icon={DollarSign} />
+                    <KPICard label="Gross Margin" value={formatPercent(kpis.teamMarginPct)} sublabel={kpis.teamMarginPct >= 20 ? "Healthy" : kpis.teamMarginPct >= 10 ? "Needs attention" : "Critical"} accentColor={kpis.teamMarginPct >= 20 ? "emerald" : kpis.teamMarginPct >= 10 ? "amber" : "rose"} icon={TrendingUp} trend={kpis.teamMarginPct >= 20 ? "up" : "down"} />
+                    <KPICard label="AR Outstanding" value={formatCurrency(kpis.arOutstanding)} sublabel={`DSO: ${kpis.dso.toFixed(0)} days`} accentColor="blue" icon={Receipt} />
+                    <KPICard label="Cash Runway" value={`${kpis.runway.toFixed(1)} mo`} sublabel={`Burn: ${formatCurrency(kpis.burnRate)}/mo`} accentColor={kpis.runway >= 6 ? "purple" : "rose"} icon={Gauge} />
+                  </div>
+                )}
+
+                {/* Alert Badges */}
+                {dataStats && (dataStats.uncatTxns > 0 || dataStats.overdueInvs > 0 || (kpis && kpis.teamMarginPct > 0 && kpis.teamMarginPct < 15)) && (
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    {dataStats.uncatTxns > 0 && <AlertCard icon={CreditCard} label="uncategorized transactions" count={dataStats.uncatTxns} color="amber" onClick={() => sendMessage("Categorize my recent bank transactions")} />}
+                    {dataStats.overdueInvs > 0 && <AlertCard icon={AlertTriangle} label="overdue invoices" count={dataStats.overdueInvs} color="rose" onClick={() => sendMessage("Show me overdue invoices and recommend follow-up actions")} />}
+                    {kpis && kpis.teamMarginPct > 0 && kpis.teamMarginPct < 15 && <AlertCard icon={TrendingDown} label={`margin at ${kpis.teamMarginPct.toFixed(1)}%`} count={1} color="orange" onClick={() => sendMessage("My team margin is below 15%. What is driving this and how can I improve it?")} />}
+                  </div>
+                )}
+
+                {/* Quick Actions */}
+                <div className="mb-8">
+                  <p className="text-[11px] font-medium text-slate-600 uppercase tracking-widest mb-3">Quick Actions</p>
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
+                    {QUICK_ACTIONS.map((action, i) => {
+                      const Icon = action.icon
+                      return (
+                        <button key={i} onClick={() => handleQuickAction(action)} className="flex items-center gap-3 px-3.5 py-3 rounded-lg bg-[#111827] border border-white/[0.06] hover:border-teal-500/20 hover:bg-[#131B2E] transition-all text-sm text-slate-400 hover:text-slate-200 text-left group">
+                          <div className="w-8 h-8 rounded-md bg-white/[0.03] flex items-center justify-center flex-shrink-0 group-hover:bg-teal-500/10 transition-colors">
+                            <Icon size={16} className="text-slate-500 group-hover:text-teal-400 transition-colors" />
+                          </div>
+                          <span className="leading-tight">{action.label}</span>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
-              )}
-              
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-8 max-w-3xl w-full">
-                {QUICK_ACTIONS.map((action, i) => <QuickActionButton key={i} action={action} onClick={() => handleQuickAction(action)} />)}
-              </div>
 
-              <div className="w-full max-w-2xl">
-                <div className="relative">
-                  <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyPress} placeholder="Ask Sage anything about your business..." rows={1} className="w-full bg-slate-900/70 backdrop-blur-xl border border-white/[0.08] rounded-2xl pl-5 pr-28 py-4 text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-base" style={{ minHeight: "64px", maxHeight: "200px" }} />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                    <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-slate-200 transition-colors" title="Attach file"><Paperclip size={18} /></button>
-                    <button onClick={() => sendMessage(input)} disabled={!input.trim() || loading} className="w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-white/[0.05] disabled:cursor-not-allowed flex items-center justify-center transition-colors">
-                      {loading ? <RefreshCw size={18} className="text-white animate-spin" /> : <Send size={18} className="text-white" />}
-                    </button>
+                {/* Data context badge */}
+                {dataStats && (
+                  <div className="flex items-center justify-center mb-6">
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#111827] border border-white/[0.06] text-[11px] text-slate-500">
+                      <Brain size={12} className="text-teal-500" />
+                      <span>Analyzing {dataStats.totalDataPoints.toLocaleString()} data points across {companyData?.clients?.length || 0} clients</span>
+                    </div>
                   </div>
+                )}
+
+                {/* Input (welcome) */}
+                <div className="mt-auto w-full max-w-3xl mx-auto">
+                  <div className="relative">
+                    <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyPress} placeholder="Ask Sage anything about your business..." rows={1} className="w-full bg-[#111827] border border-white/[0.08] rounded-xl pl-5 pr-28 py-4 text-slate-100 placeholder-slate-600 resize-none focus:outline-none focus:border-teal-500/40 focus:ring-1 focus:ring-teal-500/20 text-sm transition-all" style={{ minHeight: "56px", maxHeight: "200px" }} />
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                      <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-500 hover:text-slate-300 transition-colors rounded-md hover:bg-white/[0.04]" title="Attach file"><Paperclip size={16} /></button>
+                      <button onClick={() => sendMessage(input)} disabled={!input.trim() || loading} className="w-9 h-9 rounded-lg bg-teal-500 hover:bg-teal-600 disabled:bg-white/[0.04] disabled:cursor-not-allowed flex items-center justify-center transition-colors">
+                        {loading ? <RefreshCw size={16} className="text-white animate-spin" /> : <Send size={16} className="text-white" />}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-600 mt-2.5 text-center">Enter to send · Drop files to attach · Charts, tables, categorization</p>
                 </div>
-                <p className="text-xs text-slate-500 mt-3 text-center">Enter to send {"\u2022"} Drop files to attach {"\u2022"} Ask for charts, tables, categorization</p>
               </div>
             </div>
           ) : (
-            <div className="py-6 px-4 space-y-6">
+            /* ===== MESSAGES ===== */
+            <div className="py-6 px-4 space-y-5">
               {messages.map(message => <ChatMessage key={message.id} message={message} />)}
               {loading && (
-                <div className="flex gap-4 max-w-4xl mx-auto">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 via-indigo-500 to-blue-500 flex items-center justify-center"><SageLogo size={24} /></div>
-                  <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl rounded-tl-md px-5 py-3 border border-white/[0.08]">
-                    <div className="flex items-center gap-2">
-                      <div className="flex gap-1">
-                        <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                        <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                        <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                <div className="flex gap-3.5 max-w-4xl mx-auto">
+                  <div className="w-8 h-8 rounded-lg bg-teal-500/15 ring-1 ring-teal-500/25 flex items-center justify-center mt-0.5"><SageLogo size={22} /></div>
+                  <div>
+                    <p className="text-[11px] font-medium text-teal-400/70 mb-1 px-1">Sage</p>
+                    <div className="bg-[#111827] border border-white/[0.06] rounded-xl px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex gap-1">
+                          <span className="w-1.5 h-1.5 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                          <span className="w-1.5 h-1.5 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                          <span className="w-1.5 h-1.5 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                        </div>
+                        <span className="text-xs text-slate-500">Analyzing your data...</span>
                       </div>
-                      <span className="text-sm text-slate-400">Sage is analyzing...</span>
                     </div>
                   </div>
                 </div>
@@ -1147,26 +1098,26 @@ export default function SageAssistantPage() {
           )}
         </div>
 
-        {/* Bottom Input */}
+        {/* ===== BOTTOM INPUT (in chat) ===== */}
         {hasMessages && (
-          <div className="border-t border-white/[0.08] px-4 py-4 bg-slate-900/80">
+          <div className="border-t border-white/[0.06] px-4 py-3.5 bg-[#0D1117]">
             {attachments.length > 0 && (
-              <div className="max-w-4xl mx-auto mb-3 flex flex-wrap gap-2">
+              <div className="max-w-4xl mx-auto mb-2.5 flex flex-wrap gap-2">
                 {attachments.map(att => (
-                  <div key={att.id} className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/70 backdrop-blur-xl rounded-lg text-sm">
-                    {att.type.startsWith("image/") ? <ImageIcon size={14} className="text-slate-400" /> : <FileText size={14} className="text-slate-400" />}
-                    <span className="text-slate-200 truncate max-w-[150px]">{att.name}</span>
-                    <button onClick={() => removeAttachment(att.id)} className="text-slate-400 hover:text-red-400"><XCircle size={14} /></button>
+                  <div key={att.id} className="flex items-center gap-2 px-3 py-1.5 bg-[#111827] border border-white/[0.06] rounded-lg text-xs">
+                    {att.type.startsWith("image/") ? <ImageIcon size={13} className="text-teal-400" /> : <FileText size={13} className="text-teal-400" />}
+                    <span className="text-slate-300 truncate max-w-[150px]">{att.name}</span>
+                    <button onClick={() => removeAttachment(att.id)} className="text-slate-500 hover:text-red-400 transition-colors"><XCircle size={13} /></button>
                   </div>
                 ))}
               </div>
             )}
             <div className="max-w-4xl mx-auto relative">
-              <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyPress} placeholder="Ask a follow-up question..." rows={1} className="w-full bg-slate-900/70 backdrop-blur-xl border border-white/[0.08] rounded-2xl pl-5 pr-28 py-4 text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/50" style={{ minHeight: "60px", maxHeight: "200px" }} />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-slate-200 transition-colors" title="Attach file"><Paperclip size={18} /></button>
-                <button onClick={() => sendMessage(input)} disabled={(!input.trim() && attachments.length === 0) || loading} className="w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-white/[0.05] disabled:cursor-not-allowed flex items-center justify-center transition-colors">
-                  {loading ? <RefreshCw size={18} className="text-white animate-spin" /> : <Send size={18} className="text-white" />}
+              <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyPress} placeholder="Ask a follow-up..." rows={1} className="w-full bg-[#111827] border border-white/[0.06] rounded-xl pl-5 pr-28 py-3.5 text-slate-100 placeholder-slate-600 resize-none focus:outline-none focus:border-teal-500/40 focus:ring-1 focus:ring-teal-500/20 text-sm transition-all" style={{ minHeight: "52px", maxHeight: "200px" }} />
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-500 hover:text-slate-300 transition-colors rounded-md hover:bg-white/[0.04]" title="Attach file"><Paperclip size={16} /></button>
+                <button onClick={() => sendMessage(input)} disabled={(!input.trim() && attachments.length === 0) || loading} className="w-9 h-9 rounded-lg bg-teal-500 hover:bg-teal-600 disabled:bg-white/[0.04] disabled:cursor-not-allowed flex items-center justify-center transition-colors">
+                  {loading ? <RefreshCw size={16} className="text-white animate-spin" /> : <Send size={16} className="text-white" />}
                 </button>
               </div>
             </div>
