@@ -158,34 +158,35 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Bottom — Social proof */}
+          {/* Bottom — Sage AI + real platform capabilities */}
           <div className={`${mounted ? 'animate-fadeUp opacity-0 delay-500' : ''}`}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex -space-x-2">
-                {['#10b981', '#0ea5e9', '#f59e0b', '#8b5cf6'].map((c, i) => (
-                  <div key={i} className="w-8 h-8 rounded-full border-2 border-[#060b14] flex items-center justify-center text-[10px] font-bold text-white"
-                    style={{ backgroundColor: c + '30', color: c }}>
-                    {['GV', 'EM', 'TR', 'HK'][i]}
-                  </div>
-                ))}
+            <div className="p-5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400">
+                    <path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93" /><path d="M8 6a4 4 0 0 1 7.54 1.81" /><path d="M15.58 13.71A6 6 0 0 1 12 22a6 6 0 0 1-3.58-8.29" /><path d="M12 12v4" /><path d="M10 16h4" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white mb-1">Meet Sage — your AI CFO</h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Smart transaction categorization, payment probability scoring, and proactive financial insights that learn your business patterns.
+                  </p>
+                </div>
               </div>
-              <span className="text-xs text-slate-500">Active team members</span>
             </div>
-            <div className="flex items-center gap-8 text-sm">
-              <div>
-                <span className="text-2xl font-bold text-white tracking-tight">$8.3M</span>
-                <p className="text-[11px] text-slate-500 mt-0.5">Revenue tracked</p>
-              </div>
-              <div className="w-px h-8 bg-white/[0.06]" />
-              <div>
-                <span className="text-2xl font-bold text-white tracking-tight">16</span>
-                <p className="text-[11px] text-slate-500 mt-0.5">Active projects</p>
-              </div>
-              <div className="w-px h-8 bg-white/[0.06]" />
-              <div>
-                <span className="text-2xl font-bold text-white tracking-tight">4.2x</span>
-                <p className="text-[11px] text-slate-500 mt-0.5">Avg ROI</p>
-              </div>
+            <div className="grid grid-cols-3 gap-4 mt-5">
+              {[
+                { label: 'Bank Feed Sync', desc: 'QuickBooks connected' },
+                { label: 'Project P&L', desc: 'Real-time margins' },
+                { label: 'Payment Scoring', desc: 'AI-powered AR' },
+              ].map((item, i) => (
+                <div key={i} className="text-center">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/60 mx-auto mb-2" />
+                  <p className="text-[11px] font-medium text-slate-300">{item.label}</p>
+                  <p className="text-[10px] text-slate-600 mt-0.5">{item.desc}</p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -212,13 +213,11 @@ export default function LoginPage() {
             <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-emerald-500/20 via-white/[0.06] to-transparent opacity-60 pointer-events-none" />
 
             <div className="relative bg-[#0c1220]/90 backdrop-blur-xl rounded-2xl border border-white/[0.08] p-10">
-              {/* V Logo as hero */}
+              {/* V Logo — floating, no container */}
               <div className="flex justify-center mb-8">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-emerald-500/10 rounded-2xl blur-xl scale-150" />
-                  <div className="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-white/[0.06] to-white/[0.02] border border-white/[0.1] flex items-center justify-center">
-                    <VLogo size={48} glow />
-                  </div>
+                  <div className="absolute inset-0 bg-emerald-500/15 rounded-full blur-2xl scale-[2]" />
+                  <VLogo size={56} glow />
                 </div>
               </div>
 
