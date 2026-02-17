@@ -1,10 +1,10 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 import {
   DollarSign, Clock, AlertTriangle, TrendingUp,
   ChevronDown, ChevronUp, Search, Zap, CheckCircle2,
-  MoreHorizontal
+  MoreHorizontal, Trash2, ChevronRight, Layers, List
 } from 'lucide-react'
 import {
   PieChart as RePieChart, Pie, Cell, Tooltip, ResponsiveContainer
@@ -13,8 +13,170 @@ import {
   THEME, COLORS, PIE_COLORS,
   formatCurrency, formatDateShort, getInvoiceStatus, getDaysOverdue, getPaymentProbability,
   MetricCard, StatusBadge, ProbabilityBadge, AgingBar, CustomTooltip,
-  EditableSelect, CollapsibleSection, PaymentModal
+  CollapsibleSection, PaymentModal
 } from './shared'
+
+// ============ PORTAL DROPDOWN ============
+// Fixes the clipping/overflow issue with EditableSelect
+
+function AssignDropdown({ value, options, onChange, placeholder = 'Assign' }: {
+  value: string; options: { id: string; name: string }[]; onChange: (v: string) => void; placeholder?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const dropRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+
+  const selected = options.find(o => o.id === value)
+  const filtered = options.filter(o => o.name.toLowerCase().includes(search.toLowerCase()))
+
+  useEffect(() => {
+    if (open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      setPos({ top: r.bottom + 4, left: r.left })
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const handleClick = (e: MouseEvent) => {
+      if (dropRef.current && !dropRef.current.contains(e.target as Node) && btnRef.current && !btnRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setSearch('')
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [open])
+
+  return (
+    <>
+      <button ref={btnRef} onClick={() => setOpen(!open)}
+        className={`text-xs px-1.5 py-0.5 rounded truncate max-w-full text-left transition-colors ${
+          selected ? 'text-slate-200 hover:bg-white/[0.05]' : 'text-teal-400/70 hover:text-teal-400 hover:bg-teal-500/10 italic'
+        }`}
+        title={selected?.name || placeholder}>
+        {selected?.name || placeholder}
+      </button>
+      {open && (
+        <div ref={dropRef} className="fixed z-[9999] bg-slate-900 border border-slate-700 rounded-lg shadow-2xl py-1 w-56"
+          style={{ top: pos.top, left: Math.min(pos.left, window.innerWidth - 240) }}>
+          <div className="px-2 py-1.5">
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." autoFocus
+              className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-teal-500/50" />
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            {value && (
+              <button onClick={() => { onChange(''); setOpen(false); setSearch('') }}
+                className="w-full text-left px-3 py-1.5 text-xs text-slate-500 hover:bg-white/[0.05] italic">
+                Clear assignment
+              </button>
+            )}
+            {filtered.map(o => (
+              <button key={o.id} onClick={() => { onChange(o.id); setOpen(false); setSearch('') }}
+                className={`w-full text-left px-3 py-1.5 text-xs hover:bg-teal-500/10 transition-colors truncate ${
+                  o.id === value ? 'text-teal-400 font-medium bg-teal-500/5' : 'text-slate-300'
+                }`}>
+                {o.name}
+              </button>
+            ))}
+            {filtered.length === 0 && <p className="px-3 py-2 text-xs text-slate-500">No matches</p>}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ============ ACTION MENU ============
+
+function ActionMenu({ invoice, onDelete, onPay }: { invoice: any; onDelete: (id: string) => void; onPay?: (inv: any) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+
+  useEffect(() => {
+    if (open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      const menuWidth = 160
+      setPos({ top: r.bottom + 4, left: Math.min(r.right - menuWidth, window.innerWidth - menuWidth - 8) })
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node) && btnRef.current && !btnRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [open])
+
+  return (
+    <>
+      <button ref={btnRef} onClick={() => setOpen(!open)} className="p-1 hover:bg-white/[0.05] rounded transition-colors">
+        <MoreHorizontal size={16} className={THEME.textMuted} />
+      </button>
+      {open && (
+        <div ref={ref} className="fixed z-[9999] bg-slate-900 border border-slate-700 rounded-lg shadow-2xl py-1 w-40"
+          style={{ top: pos.top, left: pos.left }}>
+          {invoice.balance > 0 && onPay && (
+            <button onClick={() => { onPay(invoice); setOpen(false) }}
+              className="w-full text-left px-3 py-1.5 text-xs text-emerald-400 hover:bg-emerald-500/10 flex items-center gap-2">
+              <DollarSign size={12} /> Record Payment
+            </button>
+          )}
+          <button onClick={() => { onDelete(invoice.id); setOpen(false) }}
+            className="w-full text-left px-3 py-1.5 text-xs text-rose-400 hover:bg-rose-500/10 flex items-center gap-2">
+            <Trash2 size={12} /> Delete Invoice
+          </button>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ============ DATE PERIOD HELPERS ============
+
+type DatePeriod = 'all' | 'ytd' | 'q1' | 'q2' | 'q3' | 'q4' | 'jan' | 'feb' | 'mar' | 'apr' | 'may' | 'jun' | 'jul' | 'aug' | 'sep' | 'oct' | 'nov' | 'dec'
+
+const PERIOD_OPTIONS: { value: DatePeriod; label: string; group: string }[] = [
+  { value: 'all', label: 'All Time', group: '' },
+  { value: 'ytd', label: 'Year to Date', group: '' },
+  { value: 'q1', label: 'Q1 (Jan–Mar)', group: 'Quarterly' },
+  { value: 'q2', label: 'Q2 (Apr–Jun)', group: 'Quarterly' },
+  { value: 'q3', label: 'Q3 (Jul–Sep)', group: 'Quarterly' },
+  { value: 'q4', label: 'Q4 (Oct–Dec)', group: 'Quarterly' },
+  { value: 'jan', label: 'January', group: 'Monthly' },
+  { value: 'feb', label: 'February', group: 'Monthly' },
+  { value: 'mar', label: 'March', group: 'Monthly' },
+  { value: 'apr', label: 'April', group: 'Monthly' },
+  { value: 'may', label: 'May', group: 'Monthly' },
+  { value: 'jun', label: 'June', group: 'Monthly' },
+  { value: 'jul', label: 'July', group: 'Monthly' },
+  { value: 'aug', label: 'August', group: 'Monthly' },
+  { value: 'sep', label: 'September', group: 'Monthly' },
+  { value: 'oct', label: 'October', group: 'Monthly' },
+  { value: 'nov', label: 'November', group: 'Monthly' },
+  { value: 'dec', label: 'December', group: 'Monthly' },
+]
+
+function getDateRange(period: DatePeriod, year: number): { start: Date; end: Date } | null {
+  if (period === 'all') return null
+  const monthMap: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 }
+  if (period === 'ytd') return { start: new Date(year, 0, 1), end: new Date() }
+  if (period === 'q1') return { start: new Date(year, 0, 1), end: new Date(year, 2, 31) }
+  if (period === 'q2') return { start: new Date(year, 3, 1), end: new Date(year, 5, 30) }
+  if (period === 'q3') return { start: new Date(year, 6, 1), end: new Date(year, 8, 30) }
+  if (period === 'q4') return { start: new Date(year, 9, 1), end: new Date(year, 11, 31) }
+  const m = monthMap[period]
+  if (m !== undefined) return { start: new Date(year, m, 1), end: new Date(year, m + 1, 0) }
+  return null
+}
+
+// ============ MAIN COMPONENT ============
 
 interface ARSectionProps {
   invoices: any[]
@@ -23,9 +185,10 @@ interface ARSectionProps {
   selectedYear: number | 'all'
   onUpdateInvoice: (id: string, updates: any) => void
   onRecordPayment: (id: string, amount: number) => void
+  onDeleteInvoice?: (id: string) => void
 }
 
-export default function ARSection({ invoices, clients, projects, selectedYear, onUpdateInvoice, onRecordPayment }: ARSectionProps) {
+export default function ARSection({ invoices, clients, projects, selectedYear, onUpdateInvoice, onRecordPayment, onDeleteInvoice }: ARSectionProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterClient, setFilterClient] = useState('all')
@@ -33,19 +196,40 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([])
   const [paymentInvoice, setPaymentInvoice] = useState<any>(null)
+  const [datePeriod, setDatePeriod] = useState<DatePeriod>('all')
+  const [viewMode, setViewMode] = useState<'flat' | 'grouped'>('flat')
+  const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set())
+
+  const currentYear = typeof selectedYear === 'number' ? selectedYear : new Date().getFullYear()
 
   // Filtered & sorted
   const filteredInvoices = useMemo(() => {
     let result = [...invoices]
+
+    // Year filter from parent
     if (selectedYear !== 'all') result = result.filter(inv => new Date(inv.invoice_date).getFullYear() === selectedYear)
+
+    // Period filter
+    const range = getDateRange(datePeriod, currentYear)
+    if (range) {
+      result = result.filter(inv => {
+        const d = new Date(inv.invoice_date)
+        return d >= range.start && d <= range.end
+      })
+    }
+
+    // Search
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       result = result.filter(inv =>
         inv.invoice_number?.toString().toLowerCase().includes(q) ||
-        inv.qbo_customer?.toLowerCase().includes(q) ||
+        inv.client?.toLowerCase().includes(q) ||
+        inv.customer_project_raw?.toLowerCase().includes(q) ||
         clients.find(c => c.id === inv.client_id)?.name?.toLowerCase().includes(q)
       )
     }
+
+    // Status filter
     if (filterStatus !== 'all') {
       result = result.filter(inv => {
         const status = getInvoiceStatus(inv.due_date, inv.amount, inv.balance)
@@ -56,14 +240,34 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
         return true
       })
     }
+
+    // Client filter
     if (filterClient !== 'all') result = result.filter(inv => inv.client_id === filterClient)
+
+    // Sort
     result.sort((a, b) => {
       let aVal = a[sortField], bVal = b[sortField]
-      if (['invoice_date', 'due_date'].includes(sortField)) { aVal = new Date(aVal).getTime(); bVal = new Date(bVal).getTime() }
+      if (['invoice_date', 'due_date'].includes(sortField)) { aVal = new Date(aVal || 0).getTime(); bVal = new Date(bVal || 0).getTime() }
+      if (typeof aVal === 'string') { aVal = aVal.toLowerCase(); bVal = (bVal || '').toLowerCase() }
       return sortDir === 'asc' ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1)
     })
     return result
-  }, [invoices, selectedYear, searchQuery, filterStatus, filterClient, sortField, sortDir, clients])
+  }, [invoices, selectedYear, datePeriod, currentYear, searchQuery, filterStatus, filterClient, sortField, sortDir, clients])
+
+  // Grouped by client
+  const groupedInvoices = useMemo(() => {
+    const groups: Record<string, { clientName: string; clientId: string | null; invoices: any[]; totalAmount: number; totalBalance: number }> = {}
+    filteredInvoices.forEach(inv => {
+      const client = clients.find(c => c.id === inv.client_id)
+      const key = inv.client_id || 'unassigned'
+      const name = client?.name || inv.client || 'Unassigned'
+      if (!groups[key]) groups[key] = { clientName: name, clientId: inv.client_id, invoices: [], totalAmount: 0, totalBalance: 0 }
+      groups[key].invoices.push(inv)
+      groups[key].totalAmount += inv.amount
+      groups[key].totalBalance += inv.balance
+    })
+    return Object.values(groups).sort((a, b) => b.totalBalance - a.totalBalance)
+  }, [filteredInvoices, clients])
 
   // AR Metrics
   const arMetrics = useMemo(() => {
@@ -97,24 +301,100 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
     const clientAR: Record<string, number> = {}
     invoices.filter(inv => inv.balance > 0).forEach(inv => {
       const client = clients.find(c => c.id === inv.client_id)
-      const name = client?.name || inv.qbo_customer || 'Unassigned'
+      const name = client?.name || inv.client || 'Unassigned'
       clientAR[name] = (clientAR[name] || 0) + inv.balance
     })
     return Object.entries(clientAR).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
   }, [invoices, clients])
 
-  const handleSort = (field: string) => { 
+  const handleSort = (field: string) => {
     if (sortField === field) setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
-    else { setSortField(field); setSortDir('asc') } 
+    else { setSortField(field); setSortDir('asc') }
   }
+
   const handleSelectAll = () => setSelectedInvoices(prev => prev.length === filteredInvoices.length ? [] : filteredInvoices.map(i => i.id))
 
-  const handleBulkMarkPaid = async () => {
+  const handleBulkMarkPaid = () => {
     for (const id of selectedInvoices) {
       const inv = invoices.find(i => i.id === id)
       if (inv && inv.balance > 0) onRecordPayment(id, inv.balance)
     }
     setSelectedInvoices([])
+  }
+
+  const handleBulkDelete = () => {
+    if (!onDeleteInvoice) return
+    if (!confirm(`Delete ${selectedInvoices.length} invoice(s)? This cannot be undone.`)) return
+    for (const id of selectedInvoices) onDeleteInvoice(id)
+    setSelectedInvoices([])
+  }
+
+  const handleDelete = (id: string) => {
+    if (!onDeleteInvoice) return
+    if (!confirm('Delete this invoice? This cannot be undone.')) return
+    onDeleteInvoice(id)
+  }
+
+  const toggleClientCollapse = (key: string) => {
+    setCollapsedClients(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
+
+  const selectClass = "bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/30 cursor-pointer"
+
+  // ---- Invoice Row Renderer ----
+  const renderInvoiceRow = (invoice: any) => {
+    const status = getInvoiceStatus(invoice.due_date, invoice.amount, invoice.balance)
+    const daysOverdue = getDaysOverdue(invoice.due_date)
+    const probability = invoice.balance > 0 ? getPaymentProbability(invoice, invoices) : null
+
+    return (
+      <div key={invoice.id}
+        className={`grid grid-cols-[32px_72px_52px_72px_72px_1fr_1fr_100px_100px_80px_48px] items-center gap-2 py-2.5 px-4 hover:bg-white/[0.03] transition-colors border-b border-white/[0.05] ${
+          selectedInvoices.includes(invoice.id) ? 'bg-teal-500/5' : ''
+        }`}>
+        {/* Checkbox */}
+        <div>
+          <input type="checkbox" checked={selectedInvoices.includes(invoice.id)}
+            onChange={() => setSelectedInvoices(prev => prev.includes(invoice.id) ? prev.filter(i => i !== invoice.id) : [...prev, invoice.id])}
+            className="w-3.5 h-3.5 rounded border-white/20 bg-white/5 text-teal-500 focus:ring-teal-500/30 cursor-pointer" />
+        </div>
+        {/* Inv # */}
+        <div><span className="text-sm font-medium text-teal-400">#{invoice.invoice_number}</span></div>
+        {/* Prob */}
+        <div>{probability ? <ProbabilityBadge score={probability.score} color={probability.color} /> : <span className="text-xs text-teal-400">✓</span>}</div>
+        {/* Date */}
+        <div><span className={`text-xs ${THEME.textMuted}`}>{formatDateShort(invoice.invoice_date)}</span></div>
+        {/* Due */}
+        <div><span className={`text-xs ${status.includes('overdue') ? 'text-rose-400 font-medium' : THEME.textMuted}`}>{formatDateShort(invoice.due_date)}</span></div>
+        {/* Client */}
+        <div className="min-w-0">
+          <AssignDropdown value={invoice.client_id || ''} options={clients} onChange={(v) => onUpdateInvoice(invoice.id, { client_id: v || null })} placeholder="Assign" />
+        </div>
+        {/* Project */}
+        <div className="min-w-0">
+          <AssignDropdown
+            value={invoice.project_id || ''}
+            options={invoice.client_id ? projects.filter(p => p.client_id === invoice.client_id || !p.client_id) : projects}
+            onChange={(v) => onUpdateInvoice(invoice.id, { project_id: v || null })}
+            placeholder="Assign"
+          />
+        </div>
+        {/* Amount */}
+        <div className="text-right"><span className={`text-sm font-medium ${THEME.textPrimary}`}>{formatCurrency(invoice.amount)}</span></div>
+        {/* Balance */}
+        <div className="text-right"><span className={`text-sm font-semibold ${invoice.balance > 0 ? 'text-amber-400' : 'text-teal-400'}`}>{formatCurrency(invoice.balance)}</span></div>
+        {/* Status */}
+        <div><StatusBadge status={status} daysOverdue={daysOverdue} /></div>
+        {/* Actions */}
+        <div className="flex items-center justify-end">
+          <ActionMenu invoice={invoice} onDelete={handleDelete} onPay={(inv) => setPaymentInvoice(inv)} />
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -194,117 +474,136 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
         defaultExpanded={true}
         noPadding
       >
-        {/* Filters */}
-        <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b ${THEME.glassBorder}`}>
+        {/* Filters Row */}
+        <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-b ${THEME.glassBorder}`}>
           <div className="flex items-center gap-2">
-            <Zap size={14} className="text-emerald-400" />
+            <Zap size={14} className="text-teal-400" />
             <span className={`text-xs ${THEME.textMuted}`}>Payment probability powered by AI</span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Search */}
             <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
               <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search invoices..."
-                className="bg-white/[0.05] border border-white/[0.1] rounded-lg pl-9 pr-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 w-48 focus:outline-none focus:ring-2 focus:ring-emerald-500/30" />
+                className="bg-white/[0.05] border border-white/[0.1] rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 w-40 focus:outline-none focus:ring-2 focus:ring-teal-500/30" />
             </div>
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer">
+            {/* Period */}
+            <select value={datePeriod} onChange={(e) => setDatePeriod(e.target.value as DatePeriod)} className={selectClass}>
+              {PERIOD_OPTIONS.map(o => <option key={o.value} value={o.value} className="bg-slate-900">{o.label}</option>)}
+            </select>
+            {/* Status */}
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={selectClass}>
               <option value="all" className="bg-slate-900">All Status</option>
               <option value="unpaid" className="bg-slate-900">Unpaid</option>
               <option value="paid" className="bg-slate-900">Paid</option>
               <option value="current" className="bg-slate-900">Current</option>
               <option value="overdue" className="bg-slate-900">Overdue</option>
             </select>
-            <select value={filterClient} onChange={(e) => setFilterClient(e.target.value)} className="bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer">
+            {/* Client */}
+            <select value={filterClient} onChange={(e) => setFilterClient(e.target.value)} className={selectClass}>
               <option value="all" className="bg-slate-900">All Clients</option>
               {clients.map(c => <option key={c.id} value={c.id} className="bg-slate-900">{c.name}</option>)}
             </select>
+            {/* View Toggle */}
+            <div className="flex items-center bg-white/[0.05] border border-white/[0.1] rounded-lg overflow-hidden">
+              <button onClick={() => setViewMode('flat')}
+                className={`p-1.5 transition-colors ${viewMode === 'flat' ? 'bg-teal-500/20 text-teal-400' : 'text-slate-500 hover:text-slate-300'}`}
+                title="Flat list">
+                <List size={14} />
+              </button>
+              <button onClick={() => setViewMode('grouped')}
+                className={`p-1.5 transition-colors ${viewMode === 'grouped' ? 'bg-teal-500/20 text-teal-400' : 'text-slate-500 hover:text-slate-300'}`}
+                title="Group by client">
+                <Layers size={14} />
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Bulk Actions */}
         {selectedInvoices.length > 0 && (
-          <div className="flex items-center gap-4 px-6 py-3 bg-emerald-500/10 border-b border-emerald-500/20">
-            <span className="text-sm font-medium text-emerald-400">{selectedInvoices.length} selected</span>
-            <button onClick={handleBulkMarkPaid} className={`text-sm ${THEME.textSecondary} hover:text-white transition-colors`}>Mark as Paid</button>
-            <button className={`text-sm ${THEME.textSecondary} hover:text-white transition-colors`}>Send Reminder</button>
+          <div className="flex items-center gap-4 px-4 py-2.5 bg-teal-500/5 border-b border-teal-500/20">
+            <span className="text-xs font-medium text-teal-400">{selectedInvoices.length} selected</span>
+            <button onClick={handleBulkMarkPaid} className="text-xs text-slate-400 hover:text-white transition-colors">Mark as Paid</button>
+            <button onClick={handleBulkDelete} className="text-xs text-rose-400 hover:text-rose-300 transition-colors">Delete</button>
             <button onClick={() => {
               const csv = ['Invoice #,Date,Due,Client,Project,Amount,Balance,Status']
               filteredInvoices.filter(i => selectedInvoices.includes(i.id)).forEach(i => {
                 const client = clients.find(c => c.id === i.client_id)
                 const project = projects.find(p => p.id === i.project_id)
-                csv.push(`${i.invoice_number},${i.invoice_date},${i.due_date},"${client?.name || ''}","${project?.name || ''}",${i.amount},${i.balance},${getInvoiceStatus(i.due_date, i.amount, i.balance)}`)
+                csv.push(`${i.invoice_number},${i.invoice_date},${i.due_date},"${client?.name || i.client || ''}","${project?.name || i.project || ''}",${i.amount},${i.balance},${getInvoiceStatus(i.due_date, i.amount, i.balance)}`)
               })
               const blob = new Blob([csv.join('\n')], { type: 'text/csv' })
               const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'invoices-export.csv'; a.click()
-            }} className={`text-sm ${THEME.textSecondary} hover:text-white transition-colors`}>Export</button>
+            }} className="text-xs text-slate-400 hover:text-white transition-colors">Export</button>
           </div>
         )}
 
         {/* Column Headers */}
-        <div className={`flex items-center gap-3 py-2.5 px-4 bg-white/[0.03] border-b ${THEME.glassBorder} text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>
-          <div className="w-8 shrink-0">
-            <input type="checkbox" checked={selectedInvoices.length === filteredInvoices.length && filteredInvoices.length > 0} onChange={handleSelectAll} 
-              className="w-4 h-4 rounded border-white/20 bg-white/5 text-emerald-500 focus:ring-emerald-500/30 cursor-pointer" />
+        <div className="grid grid-cols-[32px_72px_52px_72px_72px_1fr_1fr_100px_100px_80px_48px] items-center gap-2 py-2 px-4 bg-white/[0.02] border-b border-white/[0.08] text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+          <div>
+            <input type="checkbox" checked={selectedInvoices.length === filteredInvoices.length && filteredInvoices.length > 0} onChange={handleSelectAll}
+              className="w-3.5 h-3.5 rounded border-white/20 bg-white/5 text-teal-500 focus:ring-teal-500/30 cursor-pointer" />
           </div>
-          <button onClick={() => handleSort('invoice_number')} className="w-20 shrink-0 flex items-center gap-1 hover:text-white transition-colors">
-            Inv # {sortField === 'invoice_number' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+          <button onClick={() => handleSort('invoice_number')} className="flex items-center gap-0.5 hover:text-white transition-colors">
+            Inv # {sortField === 'invoice_number' && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
           </button>
-          <div className="w-14 shrink-0 flex items-center gap-1"><Zap size={10} className="text-emerald-400" /> Prob</div>
-          <button onClick={() => handleSort('invoice_date')} className="w-20 shrink-0 flex items-center gap-1 hover:text-white transition-colors">
-            Date {sortField === 'invoice_date' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+          <div className="flex items-center gap-0.5"><Zap size={8} className="text-teal-400" /> Prob</div>
+          <button onClick={() => handleSort('invoice_date')} className="flex items-center gap-0.5 hover:text-white transition-colors">
+            Date {sortField === 'invoice_date' && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
           </button>
-          <button onClick={() => handleSort('due_date')} className="w-20 shrink-0 flex items-center gap-1 hover:text-white transition-colors">
-            Due {sortField === 'due_date' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+          <button onClick={() => handleSort('due_date')} className="flex items-center gap-0.5 hover:text-white transition-colors">
+            Due {sortField === 'due_date' && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
           </button>
-          <div className="w-28 shrink-0">Client</div>
-          <div className="w-36 shrink-0">Project</div>
-          <div className="flex-1">QBO Customer</div>
-          <button onClick={() => handleSort('amount')} className="w-24 text-right shrink-0 flex items-center justify-end gap-1 hover:text-white transition-colors">
-            Amount {sortField === 'amount' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+          <div>Client</div>
+          <div>Project</div>
+          <button onClick={() => handleSort('amount')} className="flex items-center justify-end gap-0.5 hover:text-white transition-colors">
+            Amount {sortField === 'amount' && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
           </button>
-          <button onClick={() => handleSort('balance')} className="w-24 text-right shrink-0 flex items-center justify-end gap-1 hover:text-white transition-colors">
-            Balance {sortField === 'balance' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+          <button onClick={() => handleSort('balance')} className="flex items-center justify-end gap-0.5 hover:text-white transition-colors">
+            Balance {sortField === 'balance' && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
           </button>
-          <div className="w-24 shrink-0">Status</div>
-          <div className="w-20 shrink-0"></div>
+          <div>Status</div>
+          <div></div>
         </div>
 
         {/* Invoice List */}
-        <div className="max-h-[500px] overflow-y-auto">
-          {filteredInvoices.length > 0 ? filteredInvoices.map(invoice => {
-            const status = getInvoiceStatus(invoice.due_date, invoice.amount, invoice.balance)
-            const daysOverdue = getDaysOverdue(invoice.due_date)
-            const client = clients.find(c => c.id === invoice.client_id)
-            const project = projects.find(p => p.id === invoice.project_id)
-            const probability = invoice.balance > 0 ? getPaymentProbability(invoice, invoices) : null
-
-            return (
-              <div key={invoice.id} className={`flex items-center gap-3 py-3 px-4 hover:bg-white/[0.03] transition-colors border-b border-white/[0.05] ${selectedInvoices.includes(invoice.id) ? 'bg-emerald-500/10' : ''}`}>
-                <div className="w-8 shrink-0">
-                  <input type="checkbox" checked={selectedInvoices.includes(invoice.id)} onChange={() => setSelectedInvoices(prev => prev.includes(invoice.id) ? prev.filter(i => i !== invoice.id) : [...prev, invoice.id])} 
-                    className="w-4 h-4 rounded border-white/20 bg-white/5 text-emerald-500 focus:ring-emerald-500/30 cursor-pointer" />
-                </div>
-                <div className="w-20 shrink-0"><p className="text-sm font-medium text-emerald-400">#{invoice.invoice_number}</p></div>
-                <div className="w-14 shrink-0">{probability ? <ProbabilityBadge score={probability.score} color={probability.color} /> : <span className="text-xs text-emerald-400">✓</span>}</div>
-                <div className="w-20 shrink-0"><p className={`text-sm ${THEME.textMuted}`}>{formatDateShort(invoice.invoice_date)}</p></div>
-                <div className="w-20 shrink-0"><p className={`text-sm ${status.includes('overdue') ? 'text-rose-400 font-medium' : THEME.textMuted}`}>{formatDateShort(invoice.due_date)}</p></div>
-                <div className="w-28 shrink-0"><EditableSelect value={invoice.client_id || ''} options={clients} onChange={(v) => onUpdateInvoice(invoice.id, { client_id: v })} placeholder="Assign" /></div>
-                <div className="w-36 shrink-0"><EditableSelect value={invoice.project_id || ''} options={projects} onChange={(v) => onUpdateInvoice(invoice.id, { project_id: v })} placeholder="Assign" /></div>
-                <div className="flex-1 min-w-0"><p className={`text-xs ${THEME.textDim} truncate`} title={invoice.qbo_customer}>{invoice.qbo_customer || '—'}</p></div>
-                <div className="w-24 text-right shrink-0"><p className={`text-sm font-medium ${THEME.textPrimary}`}>{formatCurrency(invoice.amount)}</p></div>
-                <div className="w-24 text-right shrink-0"><p className={`text-sm font-semibold ${invoice.balance > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>{formatCurrency(invoice.balance)}</p></div>
-                <div className="w-24 shrink-0"><StatusBadge status={status} daysOverdue={daysOverdue} /></div>
-                <div className="w-20 shrink-0 flex items-center justify-end gap-1">
-                  {invoice.balance > 0 && (
-                    <button onClick={() => setPaymentInvoice(invoice)} className="px-2 py-1 text-xs font-medium text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded transition-colors">+ Pay</button>
-                  )}
-                  <button className="p-1 hover:bg-white/[0.05] rounded transition-colors"><MoreHorizontal size={16} className={THEME.textMuted} /></button>
-                </div>
-              </div>
+        <div className="max-h-[600px] overflow-y-auto">
+          {filteredInvoices.length > 0 ? (
+            viewMode === 'flat' ? (
+              filteredInvoices.map(renderInvoiceRow)
+            ) : (
+              /* Grouped by Client */
+              groupedInvoices.map(group => {
+                const key = group.clientId || 'unassigned'
+                const collapsed = collapsedClients.has(key)
+                return (
+                  <div key={key}>
+                    {/* Client Group Header */}
+                    <button onClick={() => toggleClientCollapse(key)}
+                      className="w-full grid grid-cols-[32px_1fr_100px_100px_80px_48px] items-center gap-2 py-2.5 px-4 bg-slate-800/40 hover:bg-slate-800/60 border-b border-white/[0.08] transition-colors">
+                      <div className="flex items-center">
+                        <ChevronRight size={14} className={`text-slate-400 transition-transform ${collapsed ? '' : 'rotate-90'}`} />
+                      </div>
+                      <div className="flex items-center gap-2 text-left">
+                        <span className="text-sm font-semibold text-slate-200">{group.clientName}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-400 font-medium">{group.invoices.length}</span>
+                      </div>
+                      <div className="text-right"><span className={`text-sm font-medium ${THEME.textPrimary}`}>{formatCurrency(group.totalAmount)}</span></div>
+                      <div className="text-right"><span className="text-sm font-semibold text-amber-400">{formatCurrency(group.totalBalance)}</span></div>
+                      <div></div>
+                      <div></div>
+                    </button>
+                    {/* Client's Invoices */}
+                    {!collapsed && group.invoices.map(renderInvoiceRow)}
+                  </div>
+                )
+              })
             )
-          }) : (
-            <div className={`flex flex-col items-center justify-center py-16 gap-4`}>
-              <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                <DollarSign size={28} className="text-emerald-400" />
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16 gap-4">
+              <div className="w-16 h-16 rounded-full bg-teal-500/10 flex items-center justify-center">
+                <DollarSign size={28} className="text-teal-400" />
               </div>
               <div className="text-center">
                 <p className={`font-medium ${THEME.textSecondary}`}>No invoices found</p>
@@ -316,8 +615,8 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
 
         {/* Footer */}
         {filteredInvoices.length > 0 && (
-          <div className={`flex items-center justify-between px-6 py-3 bg-white/[0.03] border-t ${THEME.glassBorder}`}>
-            <p className={`text-sm ${THEME.textMuted}`}>Showing {filteredInvoices.length} of {invoices.length} invoices</p>
+          <div className={`flex items-center justify-between px-4 py-3 bg-white/[0.03] border-t ${THEME.glassBorder}`}>
+            <p className={`text-xs ${THEME.textMuted}`}>Showing {filteredInvoices.length} of {invoices.length} invoices</p>
             <div className="flex items-center gap-6 text-sm">
               <div><span className={THEME.textMuted}>Total: </span><span className={`font-semibold ${THEME.textPrimary}`}>{formatCurrency(filteredInvoices.reduce((s, i) => s + i.amount, 0))}</span></div>
               <div><span className={THEME.textMuted}>Balance: </span><span className="font-semibold text-amber-400">{formatCurrency(filteredInvoices.reduce((s, i) => s + i.balance, 0))}</span></div>
@@ -328,8 +627,8 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
 
       {/* Payment Modal */}
       {paymentInvoice && (
-        <PaymentModal 
-          invoice={paymentInvoice} 
+        <PaymentModal
+          invoice={paymentInvoice}
           onClose={() => setPaymentInvoice(null)}
           onSave={(id, amount) => { onRecordPayment(id, amount); setPaymentInvoice(null) }}
           type="invoice"
