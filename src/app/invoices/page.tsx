@@ -35,19 +35,68 @@ export default function InvoicesPage() {
       const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
       if (!profile?.company_id) { setLoading(false); return }
       setCompanyId(profile.company_id)
-      const [invRes, billRes, clientRes, projRes, teamRes] = await Promise.all([
+      const [invRes, billRes, clientRes, projRes, teamRes, contInvRes, contExpRes] = await Promise.all([
         supabase.from('invoices').select('*').eq('company_id', profile.company_id).order('invoice_date', { ascending: false }),
         supabase.from('bills').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
         supabase.from('clients').select('*').eq('company_id', profile.company_id).order('name'),
         supabase.from('projects').select('*').eq('company_id', profile.company_id).order('name'),
-        supabase.from('team_members').select('id, name').eq('company_id', profile.company_id).order('name')
+        supabase.from('team_members').select('id, name').eq('company_id', profile.company_id).order('name'),
+        supabase.from('contractor_invoices').select('*, team_members(name)').eq('company_id', profile.company_id).eq('status', 'approved').order('submitted_at', { ascending: false }),
+        supabase.from('contractor_expenses').select('*, team_members(name)').eq('company_id', profile.company_id).eq('status', 'approved').order('submitted_at', { ascending: false }),
       ])
       setInvoices((invRes.data || []).map(inv => ({
         ...inv,
         amount: parseFloat(inv.total_amount || inv.amount || 0),
         balance: parseFloat(inv.balance_due || inv.balance || inv.total_amount || inv.amount || 0),
       })))
-      setBills((billRes.data || []).map(b => ({ ...b, amount: parseFloat(b.amount || 0), balance: parseFloat(b.balance ?? b.amount ?? 0) })))
+
+      // Normalize contractor invoices → bill format
+      const contractorInvBills = (contInvRes.data || []).map((ci: any) => ({
+        id: ci.id,
+        _source: 'contractor_invoice' as const,
+        bill_number: ci.invoice_number || ci.id.slice(0, 8),
+        vendor_name: ci.team_members?.name || 'Contractor',
+        amount: parseFloat(ci.amount || 0),
+        balance: ci.paid_at ? 0 : parseFloat(ci.amount || 0),
+        date: ci.period_start || ci.submitted_at?.split('T')[0] || ci.created_at?.split('T')[0],
+        due_date: ci.period_end || ci.period_start || ci.submitted_at?.split('T')[0],
+        project_id: ci.project_id || null,
+        client_id: ci.client_id || null,
+        notes: ci.period_start && ci.period_end ? `Period: ${ci.period_start} – ${ci.period_end}` : '',
+        status: ci.paid_at ? 'paid' : 'unpaid',
+        paid_amount: ci.paid_at ? parseFloat(ci.amount || 0) : 0,
+        team_member_id: ci.team_member_id,
+      }))
+
+      // Normalize contractor expenses → bill format
+      const contractorExpBills = (contExpRes.data || []).map((ce: any) => ({
+        id: ce.id,
+        _source: 'contractor_expense' as const,
+        bill_number: `EXP-${ce.id.slice(0, 6)}`,
+        vendor_name: ce.team_members?.name || 'Contractor',
+        amount: parseFloat(ce.amount || 0),
+        balance: parseFloat(ce.amount || 0), // expenses don't have a paid state in this table
+        date: ce.date || ce.submitted_at?.split('T')[0],
+        due_date: ce.date || ce.submitted_at?.split('T')[0],
+        project_id: ce.project_id || null,
+        client_id: ce.client_id || null,
+        notes: `${ce.category ? ce.category.charAt(0).toUpperCase() + ce.category.slice(1) : ''}: ${ce.description || ''}`.trim(),
+        status: 'unpaid',
+        paid_amount: 0,
+        team_member_id: ce.team_member_id,
+        is_billable: ce.is_billable,
+      }))
+
+      // Manual bills
+      const manualBills = (billRes.data || []).map(b => ({
+        ...b,
+        _source: 'manual' as const,
+        amount: parseFloat(b.amount || 0),
+        balance: parseFloat(b.balance ?? b.amount ?? 0),
+      }))
+
+      // Combine all sources
+      setBills([...contractorInvBills, ...contractorExpBills, ...manualBills])
       setClients(clientRes.data || [])
       setProjects(projRes.data || [])
       setTeamMembers(teamRes.data || [])
@@ -59,9 +108,10 @@ export default function InvoicesPage() {
 
   // ============ AR HANDLERS ============
   const handleUpdateInvoice = async (id: string, updates: any) => {
-    const { error } = await supabase.from('invoices').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
-    if (error) { console.error('Error updating invoice:', error); alert('Failed to update invoice. Check permissions.'); return }
+    // Optimistic: update UI immediately
     setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, ...updates } : inv))
+    const { error } = await supabase.from('invoices').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) { console.error('Error updating invoice:', error); loadData() }
   }
 
   const handleDeleteInvoice = async (id: string) => {
@@ -87,18 +137,24 @@ export default function InvoicesPage() {
     if (!companyId) return
     const { data, error } = await supabase.from('bills').insert({ company_id: companyId, ...bill }).select().single()
     if (error) { console.error('Error adding bill:', error); alert('Failed to add bill'); return }
-    setBills(prev => [{ ...data, amount: parseFloat(data.amount || 0), balance: parseFloat(data.balance ?? data.amount ?? 0) }, ...prev])
+    setBills(prev => [{ ...data, _source: 'manual' as const, amount: parseFloat(data.amount || 0), balance: parseFloat(data.balance ?? data.amount ?? 0) }, ...prev])
   }
 
   const handleUpdateBill = async (id: string, updates: any) => {
-    const { error } = await supabase.from('bills').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+    const bill = bills.find(b => b.id === id)
+    if (!bill) return
+    const table = bill._source === 'contractor_invoice' ? 'contractor_invoices' : bill._source === 'contractor_expense' ? 'contractor_expenses' : 'bills'
+    const { error } = await supabase.from(table).update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
     if (error) { console.error('Error updating bill:', error); return }
     setBills(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b))
   }
 
   const handleDeleteBill = async (id: string) => {
+    const bill = bills.find(b => b.id === id)
+    if (!bill) return
     if (!confirm('Delete this bill?')) return
-    const { error } = await supabase.from('bills').delete().eq('id', id)
+    const table = bill._source === 'contractor_invoice' ? 'contractor_invoices' : bill._source === 'contractor_expense' ? 'contractor_expenses' : 'bills'
+    const { error } = await supabase.from(table).delete().eq('id', id)
     if (error) { console.error('Error deleting bill:', error); return }
     setBills(prev => prev.filter(b => b.id !== id))
   }
@@ -108,11 +164,20 @@ export default function InvoicesPage() {
     if (!bill) return
     const newPaidAmount = (bill.paid_amount || 0) + amount
     const newBalance = Math.max(0, bill.amount - newPaidAmount)
-    const updates: any = { paid_amount: newPaidAmount, balance: newBalance, updated_at: new Date().toISOString() }
-    if (newBalance === 0) updates.status = 'paid'
-    const { error } = await supabase.from('bills').update(updates).eq('id', id)
-    if (error) { console.error('Error recording payment:', error); alert('Failed to record payment'); return }
-    setBills(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b))
+    
+    if (bill._source === 'contractor_invoice') {
+      const updates: any = { paid_at: new Date().toISOString(), status: 'paid' }
+      const { error } = await supabase.from('contractor_invoices').update(updates).eq('id', id)
+      if (error) { console.error('Error recording payment:', error); alert('Failed to record payment'); return }
+      setBills(prev => prev.map(b => b.id === id ? { ...b, paid_amount: b.amount, balance: 0, status: 'paid' } : b))
+    } else {
+      const updates: any = { paid_amount: newPaidAmount, balance: newBalance, updated_at: new Date().toISOString() }
+      if (newBalance === 0) updates.status = 'paid'
+      const table = bill._source === 'contractor_expense' ? 'contractor_expenses' : 'bills'
+      const { error } = await supabase.from(table).update(updates).eq('id', id)
+      if (error) { console.error('Error recording payment:', error); alert('Failed to record payment'); return }
+      setBills(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b))
+    }
   }
 
   if (loading) {
