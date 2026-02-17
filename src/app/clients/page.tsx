@@ -191,8 +191,8 @@ function calculateClientHealth(
   const flags: string[] = []
   let score = 100
 
-  const clientProjects = projects.filter(p => p.client?.toLowerCase() === client.name?.toLowerCase())
-  const clientInvoices = invoices.filter(i => i.client?.toLowerCase() === client.name?.toLowerCase())
+  const clientProjects = projects.filter(p => p.client_id === client.id || p.client?.toLowerCase() === client.name?.toLowerCase())
+  const clientInvoices = invoices.filter(i => i.client_id === client.id || i.client?.toLowerCase() === client.name?.toLowerCase())
   
   // 1. Payment Behavior (40 points)
   const termsDays = PAYMENT_TERMS.find(t => t.id === client.payment_terms)?.days || 30
@@ -330,7 +330,7 @@ function ClientDetailFlyout({ client, projects, invoices, onClose }: {
   invoices: Invoice[]
   onClose: () => void 
 }) {
-  const clientProjects = projects.filter(p => p.client?.toLowerCase() === client.name?.toLowerCase())
+  const clientProjects = projects.filter(p => p.client_id === client.id || p.client?.toLowerCase() === client.name?.toLowerCase())
   const healthColor = getHealthColor(client.healthScore)
 
   return (
@@ -800,12 +800,12 @@ export default function ClientsPage() {
   // Enrich clients
   const enrichedClients = useMemo((): EnrichedClient[] => {
     const maxLTV = Math.max(...clients.map(c => 
-      invoices.filter(i => i.client?.toLowerCase() === c.name?.toLowerCase()).reduce((sum, i) => sum + (i.amount || 0), 0)
+      invoices.filter(i => i.client_id === c.id || i.client?.toLowerCase() === c.name?.toLowerCase()).reduce((sum, i) => sum + (i.amount || 0), 0)
     ), 1)
 
     return clients.map(client => {
-      const clientProjects = projects.filter(p => p.client?.toLowerCase() === client.name?.toLowerCase())
-      const clientInvoices = invoices.filter(i => i.client?.toLowerCase() === client.name?.toLowerCase())
+      const clientProjects = projects.filter(p => p.client_id === client.id || p.client?.toLowerCase() === client.name?.toLowerCase())
+      const clientInvoices = invoices.filter(i => i.client_id === client.id || i.client?.toLowerCase() === client.name?.toLowerCase())
       
       const activeProjects = clientProjects.filter(p => p.status === 'active').length
       const totalProjects = clientProjects.length
