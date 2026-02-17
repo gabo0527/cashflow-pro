@@ -138,7 +138,28 @@ export default function InvoicesPage() {
             <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
           </div>
           {companyId && <QBOSyncButton companyId={companyId} syncType="invoices" onSyncComplete={handleSyncComplete} />}
-          <button className="flex items-center gap-2 px-4 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:border-slate-700 transition-colors"><Download size={14} /> Export</button>
+          <button onClick={() => {
+            const data = activeTab === 'ar' ? invoices : bills
+            if (data.length === 0) { alert('No data to export'); return }
+            if (activeTab === 'ar') {
+              const csv = ['Invoice #,Date,Due Date,Client,Project,Amount,Balance,Status']
+              data.forEach((i: any) => {
+                const client = clients.find(c => c.id === i.client_id)?.name || i.client || ''
+                const project = projects.find(p => p.id === i.project_id)?.name || i.project || ''
+                csv.push(`${i.invoice_number},${i.invoice_date},${i.due_date},"${client}","${project}",${i.amount},${i.balance},${i.status || ''}`)
+              })
+              const blob = new Blob([csv.join('\n')], { type: 'text/csv' })
+              const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `invoices-ar-${new Date().toISOString().split('T')[0]}.csv`; a.click()
+            } else {
+              const csv = ['Bill #,Date,Due Date,Vendor,Project,Amount,Balance,Status']
+              data.forEach((b: any) => {
+                const project = projects.find(p => p.id === b.project_id)?.name || ''
+                csv.push(`${b.bill_number || ''},${b.date},${b.due_date},"${b.vendor_name || ''}","${project}",${b.amount},${b.balance},${b.status || ''}`)
+              })
+              const blob = new Blob([csv.join('\n')], { type: 'text/csv' })
+              const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `invoices-ap-${new Date().toISOString().split('T')[0]}.csv`; a.click()
+            }
+          }} className="flex items-center gap-2 px-4 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:border-slate-700 transition-colors"><Download size={14} /> Export</button>
           {activeTab === 'ap' && (
             <button onClick={() => apSectionRef.current?.openAddModal()} className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-500 transition-colors"><Plus size={14} /> Add Bill</button>
           )}
