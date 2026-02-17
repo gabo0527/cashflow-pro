@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import {
   DollarSign, Clock, AlertTriangle, TrendingUp,
   ChevronDown, ChevronUp, Search, Zap, CheckCircle2,
@@ -16,151 +16,42 @@ import {
   CollapsibleSection, PaymentModal
 } from './shared'
 
-// ============ PORTAL DROPDOWN ============
-// Fixes the clipping/overflow issue with EditableSelect
+// ============ SINGLE SHARED DROPDOWN (one instance for the entire table) ============
 
-function AssignDropdown({ value, options, onChange, placeholder = 'Assign' }: {
-  value: string; options: { id: string; name: string }[]; onChange: (v: string) => void; placeholder?: string
-}) {
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const btnRef = useRef<HTMLButtonElement>(null)
-  const dropRef = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState({ top: 0, left: 0 })
-
-  const selected = options.find(o => o.id === value)
-  const filtered = options.filter(o => o.name.toLowerCase().includes(search.toLowerCase()))
-
-  useEffect(() => {
-    if (open && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect()
-      setPos({ top: r.bottom + 4, left: r.left })
-    }
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const handleClick = (e: MouseEvent) => {
-      if (dropRef.current && !dropRef.current.contains(e.target as Node) && btnRef.current && !btnRef.current.contains(e.target as Node)) {
-        setOpen(false)
-        setSearch('')
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [open])
-
-  return (
-    <>
-      <button ref={btnRef} onClick={() => setOpen(!open)}
-        className={`text-xs px-1.5 py-0.5 rounded truncate max-w-full text-left transition-colors ${
-          selected ? 'text-slate-200 hover:bg-white/[0.05]' : 'text-teal-400/70 hover:text-teal-400 hover:bg-teal-500/10 italic'
-        }`}
-        title={selected?.name || placeholder}>
-        {selected?.name || placeholder}
-      </button>
-      {open && (
-        <div ref={dropRef} className="fixed z-[9999] bg-slate-900 border border-slate-700 rounded-lg shadow-2xl py-1 w-56"
-          style={{ top: pos.top, left: Math.min(pos.left, window.innerWidth - 240) }}>
-          <div className="px-2 py-1.5">
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." autoFocus
-              className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-teal-500/50" />
-          </div>
-          <div className="max-h-48 overflow-y-auto">
-            {value && (
-              <button onClick={() => { onChange(''); setOpen(false); setSearch('') }}
-                className="w-full text-left px-3 py-1.5 text-xs text-slate-500 hover:bg-white/[0.05] italic">
-                Clear assignment
-              </button>
-            )}
-            {filtered.map(o => (
-              <button key={o.id} onClick={() => { onChange(o.id); setOpen(false); setSearch('') }}
-                className={`w-full text-left px-3 py-1.5 text-xs hover:bg-teal-500/10 transition-colors truncate ${
-                  o.id === value ? 'text-teal-400 font-medium bg-teal-500/5' : 'text-slate-300'
-                }`}>
-                {o.name}
-              </button>
-            ))}
-            {filtered.length === 0 && <p className="px-3 py-2 text-xs text-slate-500">No matches</p>}
-          </div>
-        </div>
-      )}
-    </>
-  )
+interface DropdownState {
+  open: boolean
+  invoiceId: string
+  field: 'client_id' | 'project_id' | 'action'
+  options: { id: string; name: string }[]
+  currentValue: string
+  pos: { top: number; left: number }
 }
 
-// ============ ACTION MENU ============
-
-function ActionMenu({ invoice, onDelete, onPay }: { invoice: any; onDelete: (id: string) => void; onPay?: (inv: any) => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  const btnRef = useRef<HTMLButtonElement>(null)
-  const [pos, setPos] = useState({ top: 0, left: 0 })
-
-  useEffect(() => {
-    if (open && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect()
-      const menuWidth = 160
-      setPos({ top: r.bottom + 4, left: Math.min(r.right - menuWidth, window.innerWidth - menuWidth - 8) })
-    }
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node) && btnRef.current && !btnRef.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [open])
-
-  return (
-    <>
-      <button ref={btnRef} onClick={() => setOpen(!open)} className="p-1 hover:bg-white/[0.05] rounded transition-colors">
-        <MoreHorizontal size={16} className={THEME.textMuted} />
-      </button>
-      {open && (
-        <div ref={ref} className="fixed z-[9999] bg-slate-900 border border-slate-700 rounded-lg shadow-2xl py-1 w-40"
-          style={{ top: pos.top, left: pos.left }}>
-          {invoice.balance > 0 && onPay && (
-            <button onClick={() => { onPay(invoice); setOpen(false) }}
-              className="w-full text-left px-3 py-1.5 text-xs text-emerald-400 hover:bg-emerald-500/10 flex items-center gap-2">
-              <DollarSign size={12} /> Record Payment
-            </button>
-          )}
-          <button onClick={() => { onDelete(invoice.id); setOpen(false) }}
-            className="w-full text-left px-3 py-1.5 text-xs text-rose-400 hover:bg-rose-500/10 flex items-center gap-2">
-            <Trash2 size={12} /> Delete Invoice
-          </button>
-        </div>
-      )}
-    </>
-  )
-}
+const EMPTY_DROPDOWN: DropdownState = { open: false, invoiceId: '', field: 'client_id', options: [], currentValue: '', pos: { top: 0, left: 0 } }
 
 // ============ DATE PERIOD HELPERS ============
 
 type DatePeriod = 'all' | 'ytd' | 'q1' | 'q2' | 'q3' | 'q4' | 'jan' | 'feb' | 'mar' | 'apr' | 'may' | 'jun' | 'jul' | 'aug' | 'sep' | 'oct' | 'nov' | 'dec'
 
-const PERIOD_OPTIONS: { value: DatePeriod; label: string; group: string }[] = [
-  { value: 'all', label: 'All Time', group: '' },
-  { value: 'ytd', label: 'Year to Date', group: '' },
-  { value: 'q1', label: 'Q1 (Jan–Mar)', group: 'Quarterly' },
-  { value: 'q2', label: 'Q2 (Apr–Jun)', group: 'Quarterly' },
-  { value: 'q3', label: 'Q3 (Jul–Sep)', group: 'Quarterly' },
-  { value: 'q4', label: 'Q4 (Oct–Dec)', group: 'Quarterly' },
-  { value: 'jan', label: 'January', group: 'Monthly' },
-  { value: 'feb', label: 'February', group: 'Monthly' },
-  { value: 'mar', label: 'March', group: 'Monthly' },
-  { value: 'apr', label: 'April', group: 'Monthly' },
-  { value: 'may', label: 'May', group: 'Monthly' },
-  { value: 'jun', label: 'June', group: 'Monthly' },
-  { value: 'jul', label: 'July', group: 'Monthly' },
-  { value: 'aug', label: 'August', group: 'Monthly' },
-  { value: 'sep', label: 'September', group: 'Monthly' },
-  { value: 'oct', label: 'October', group: 'Monthly' },
-  { value: 'nov', label: 'November', group: 'Monthly' },
-  { value: 'dec', label: 'December', group: 'Monthly' },
+const PERIOD_OPTIONS: { value: DatePeriod; label: string }[] = [
+  { value: 'all', label: 'All Time' },
+  { value: 'ytd', label: 'Year to Date' },
+  { value: 'q1', label: 'Q1 (Jan–Mar)' },
+  { value: 'q2', label: 'Q2 (Apr–Jun)' },
+  { value: 'q3', label: 'Q3 (Jul–Sep)' },
+  { value: 'q4', label: 'Q4 (Oct–Dec)' },
+  { value: 'jan', label: 'January' },
+  { value: 'feb', label: 'February' },
+  { value: 'mar', label: 'March' },
+  { value: 'apr', label: 'April' },
+  { value: 'may', label: 'May' },
+  { value: 'jun', label: 'June' },
+  { value: 'jul', label: 'July' },
+  { value: 'aug', label: 'August' },
+  { value: 'sep', label: 'September' },
+  { value: 'oct', label: 'October' },
+  { value: 'nov', label: 'November' },
+  { value: 'dec', label: 'December' },
 ]
 
 function getDateRange(period: DatePeriod, year: number): { start: Date; end: Date } | null {
@@ -197,28 +88,81 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([])
   const [paymentInvoice, setPaymentInvoice] = useState<any>(null)
   const [datePeriod, setDatePeriod] = useState<DatePeriod>('all')
-  const [viewMode, setViewMode] = useState<'flat' | 'grouped'>('flat')
+  const [viewMode, setViewMode] = useState<'flat' | 'grouped'>('grouped')
   const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set())
+
+  // ---- SINGLE SHARED DROPDOWN STATE ----
+  const [dropdown, setDropdown] = useState<DropdownState>(EMPTY_DROPDOWN)
+  const [ddSearch, setDdSearch] = useState('')
+  const ddRef = useRef<HTMLDivElement>(null)
+  const ddSearchRef = useRef<HTMLInputElement>(null)
+
+  const closeDropdown = useCallback(() => { setDropdown(EMPTY_DROPDOWN); setDdSearch('') }, [])
+
+  // Open dropdown positioned at the clicked cell
+  const openDropdown = useCallback((e: React.MouseEvent<HTMLButtonElement>, invoiceId: string, field: 'client_id' | 'project_id', options: { id: string; name: string }[], currentValue: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const btn = e.currentTarget
+    const rect = btn.getBoundingClientRect()
+    const dropW = 224, dropH = 260
+    // Position directly below the button, flip up if no room
+    const top = rect.bottom + 4 + dropH > window.innerHeight ? Math.max(8, rect.top - dropH - 4) : rect.bottom + 4
+    const left = Math.min(Math.max(8, rect.left), window.innerWidth - dropW - 8)
+    setDropdown({ open: true, invoiceId, field, options, currentValue, pos: { top, left } })
+    setDdSearch('')
+    // Focus search after render
+    setTimeout(() => ddSearchRef.current?.focus(), 50)
+  }, [])
+
+  // Close on outside click — use mouseup instead of mousedown to avoid race
+  useEffect(() => {
+    if (!dropdown.open) return
+    const handle = (e: MouseEvent) => {
+      if (ddRef.current?.contains(e.target as Node)) return
+      closeDropdown()
+    }
+    // Use mouseup + delay so the opening click doesn't trigger close
+    const id = setTimeout(() => document.addEventListener('mouseup', handle), 100)
+    return () => { clearTimeout(id); document.removeEventListener('mouseup', handle) }
+  }, [dropdown.open, closeDropdown])
+
+  // Handle dropdown selection
+  const handleDropdownSelect = useCallback((optionId: string) => {
+    onUpdateInvoice(dropdown.invoiceId, { [dropdown.field]: optionId || null })
+    closeDropdown()
+  }, [dropdown.invoiceId, dropdown.field, onUpdateInvoice, closeDropdown])
+
+  // ---- ACTION MENU STATE (also shared, one instance) ----
+  const [actionMenu, setActionMenu] = useState<{ open: boolean; invoiceId: string; invoice: any; pos: { top: number; left: number } }>({ open: false, invoiceId: '', invoice: null, pos: { top: 0, left: 0 } })
+  const actionRef = useRef<HTMLDivElement>(null)
+
+  const openActionMenu = useCallback((e: React.MouseEvent, invoice: any) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const menuW = 160
+    setActionMenu({ open: true, invoiceId: invoice.id, invoice, pos: { top: rect.bottom + 4, left: Math.min(rect.right - menuW, window.innerWidth - menuW - 8) } })
+  }, [])
+
+  useEffect(() => {
+    if (!actionMenu.open) return
+    const handle = (e: MouseEvent) => {
+      if (actionRef.current?.contains(e.target as Node)) return
+      setActionMenu(prev => ({ ...prev, open: false }))
+    }
+    const id = setTimeout(() => document.addEventListener('mouseup', handle), 100)
+    return () => { clearTimeout(id); document.removeEventListener('mouseup', handle) }
+  }, [actionMenu.open])
 
   const currentYear = typeof selectedYear === 'number' ? selectedYear : new Date().getFullYear()
 
-  // Filtered & sorted
+  // ---- Filtered & sorted ----
   const filteredInvoices = useMemo(() => {
     let result = [...invoices]
-
-    // Year filter from parent
     if (selectedYear !== 'all') result = result.filter(inv => new Date(inv.invoice_date).getFullYear() === selectedYear)
-
-    // Period filter
     const range = getDateRange(datePeriod, currentYear)
-    if (range) {
-      result = result.filter(inv => {
-        const d = new Date(inv.invoice_date)
-        return d >= range.start && d <= range.end
-      })
-    }
-
-    // Search
+    if (range) result = result.filter(inv => { const d = new Date(inv.invoice_date); return d >= range.start && d <= range.end })
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       result = result.filter(inv =>
@@ -228,8 +172,6 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
         clients.find(c => c.id === inv.client_id)?.name?.toLowerCase().includes(q)
       )
     }
-
-    // Status filter
     if (filterStatus !== 'all') {
       result = result.filter(inv => {
         const status = getInvoiceStatus(inv.due_date, inv.amount, inv.balance)
@@ -240,11 +182,7 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
         return true
       })
     }
-
-    // Client filter
     if (filterClient !== 'all') result = result.filter(inv => inv.client_id === filterClient)
-
-    // Sort
     result.sort((a, b) => {
       let aVal = a[sortField], bVal = b[sortField]
       if (['invoice_date', 'due_date'].includes(sortField)) { aVal = new Date(aVal || 0).getTime(); bVal = new Date(bVal || 0).getTime() }
@@ -269,12 +207,11 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
     return Object.values(groups).sort((a, b) => b.totalBalance - a.totalBalance)
   }, [filteredInvoices, clients])
 
-  // AR Metrics
+  // ---- AR Metrics ----
   const arMetrics = useMemo(() => {
     const unpaid = invoices.filter(inv => inv.balance > 0)
     const totalAR = unpaid.reduce((sum, inv) => sum + inv.balance, 0)
     const aging = { current: { amount: 0, count: 0 }, days_1_30: { amount: 0, count: 0 }, days_31_60: { amount: 0, count: 0 }, days_61_90: { amount: 0, count: 0 }, days_90_plus: { amount: 0, count: 0 } }
-
     unpaid.forEach(inv => {
       const status = getInvoiceStatus(inv.due_date, inv.amount, inv.balance)
       if (status === 'current') { aging.current.amount += inv.balance; aging.current.count++ }
@@ -283,7 +220,6 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
       else if (status === 'overdue_61_90') { aging.days_61_90.amount += inv.balance; aging.days_61_90.count++ }
       else if (status === 'overdue_90_plus') { aging.days_90_plus.amount += inv.balance; aging.days_90_plus.count++ }
     })
-
     const overdueTotal = aging.days_1_30.amount + aging.days_31_60.amount + aging.days_61_90.amount + aging.days_90_plus.amount
     const paidInvoices = invoices.filter(inv => inv.balance === 0 && inv.paid_date && inv.invoice_date)
     const dso = paidInvoices.length > 0
@@ -292,7 +228,6 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
     const recentInvoices = invoices.filter(inv => { const d = new Date(inv.invoice_date); const ago = new Date(); ago.setDate(ago.getDate() - 180); return d >= ago })
     const paidOnTime = recentInvoices.filter(inv => { if (inv.balance > 0 || !inv.paid_date) return false; return Math.floor((new Date(inv.paid_date).getTime() - new Date(inv.due_date).getTime()) / (1000 * 60 * 60 * 24)) <= 0 })
     const collectionRate = recentInvoices.length > 0 ? (paidOnTime.length / recentInvoices.length) * 100 : 0
-
     return { totalAR, unpaidCount: unpaid.length, overdueTotal, aging, dso, collectionRate }
   }, [invoices])
 
@@ -311,91 +246,86 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
     if (sortField === field) setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
     else { setSortField(field); setSortDir('asc') }
   }
-
   const handleSelectAll = () => setSelectedInvoices(prev => prev.length === filteredInvoices.length ? [] : filteredInvoices.map(i => i.id))
-
-  const handleBulkMarkPaid = () => {
-    for (const id of selectedInvoices) {
-      const inv = invoices.find(i => i.id === id)
-      if (inv && inv.balance > 0) onRecordPayment(id, inv.balance)
-    }
-    setSelectedInvoices([])
-  }
-
+  const handleBulkMarkPaid = () => { for (const id of selectedInvoices) { const inv = invoices.find(i => i.id === id); if (inv && inv.balance > 0) onRecordPayment(id, inv.balance) }; setSelectedInvoices([]) }
   const handleBulkDelete = () => {
     if (!onDeleteInvoice) return
-    if (!confirm(`Delete ${selectedInvoices.length} invoice(s)? This cannot be undone.`)) return
+    if (!confirm(`Delete ${selectedInvoices.length} invoice(s)?`)) return
     for (const id of selectedInvoices) onDeleteInvoice(id)
     setSelectedInvoices([])
   }
-
-  const handleDelete = (id: string) => {
-    if (!onDeleteInvoice) return
-    if (!confirm('Delete this invoice? This cannot be undone.')) return
-    onDeleteInvoice(id)
-  }
-
   const toggleClientCollapse = (key: string) => {
-    setCollapsedClients(prev => {
-      const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
-      return next
-    })
+    setCollapsedClients(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
   }
+
+  // Client/project lookup maps (fast O(1) lookups instead of .find())
+  const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c])), [clients])
+  const projectMap = useMemo(() => new Map(projects.map(p => [p.id, p])), [projects])
 
   const selectClass = "bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/30 cursor-pointer"
 
-  // ---- Invoice Row Renderer ----
-  const renderInvoiceRow = (invoice: any) => {
+  // ---- RENDER A SINGLE ROW (pure inline, no sub-components) ----
+  const renderRow = (invoice: any) => {
     const status = getInvoiceStatus(invoice.due_date, invoice.amount, invoice.balance)
     const daysOverdue = getDaysOverdue(invoice.due_date)
     const probability = invoice.balance > 0 ? getPaymentProbability(invoice, invoices) : null
+    const client = clientMap.get(invoice.client_id)
+    const project = projectMap.get(invoice.project_id)
+    const isSelected = selectedInvoices.includes(invoice.id)
 
     return (
       <div key={invoice.id}
-        className={`grid grid-cols-[32px_72px_52px_72px_72px_1fr_1fr_100px_100px_80px_48px] items-center gap-2 py-2.5 px-4 hover:bg-white/[0.03] transition-colors border-b border-white/[0.05] ${
-          selectedInvoices.includes(invoice.id) ? 'bg-teal-500/5' : ''
-        }`}>
-        {/* Checkbox */}
+        className={`grid grid-cols-[32px_72px_52px_72px_72px_1fr_1fr_100px_100px_80px_48px] items-center gap-2 py-2.5 px-4 hover:bg-white/[0.03] transition-colors border-b border-white/[0.05] ${isSelected ? 'bg-teal-500/5' : ''}`}>
         <div>
-          <input type="checkbox" checked={selectedInvoices.includes(invoice.id)}
+          <input type="checkbox" checked={isSelected}
             onChange={() => setSelectedInvoices(prev => prev.includes(invoice.id) ? prev.filter(i => i !== invoice.id) : [...prev, invoice.id])}
             className="w-3.5 h-3.5 rounded border-white/20 bg-white/5 text-teal-500 focus:ring-teal-500/30 cursor-pointer" />
         </div>
-        {/* Inv # */}
         <div><span className="text-sm font-medium text-teal-400">#{invoice.invoice_number}</span></div>
-        {/* Prob */}
         <div>{probability ? <ProbabilityBadge score={probability.score} color={probability.color} /> : <span className="text-xs text-teal-400">✓</span>}</div>
-        {/* Date */}
         <div><span className={`text-xs ${THEME.textMuted}`}>{formatDateShort(invoice.invoice_date)}</span></div>
-        {/* Due */}
         <div><span className={`text-xs ${status.includes('overdue') ? 'text-rose-400 font-medium' : THEME.textMuted}`}>{formatDateShort(invoice.due_date)}</span></div>
-        {/* Client */}
+        {/* Client cell — just a button, dropdown is shared */}
         <div className="min-w-0">
-          <AssignDropdown value={invoice.client_id || ''} options={clients} onChange={(v) => onUpdateInvoice(invoice.id, { client_id: v || null })} placeholder="Assign" />
+          <button
+            onClick={(e) => openDropdown(e, invoice.id, 'client_id', clients, invoice.client_id || '')}
+            className={`text-xs px-1.5 py-1 rounded truncate max-w-full block text-left cursor-pointer ${
+              client ? 'text-slate-200 hover:bg-white/[0.08]' : 'text-teal-400/70 hover:text-teal-400 hover:bg-teal-500/10 italic'
+            }`}>
+            {client?.name || 'Assign'}
+          </button>
         </div>
-        {/* Project */}
+        {/* Project cell */}
         <div className="min-w-0">
-          <AssignDropdown
-            value={invoice.project_id || ''}
-            options={invoice.client_id ? projects.filter(p => p.client_id === invoice.client_id || !p.client_id) : projects}
-            onChange={(v) => onUpdateInvoice(invoice.id, { project_id: v || null })}
-            placeholder="Assign"
-          />
+          <button
+            onClick={(e) => {
+              const filtered = invoice.client_id ? projects.filter(p => p.client_id === invoice.client_id || !p.client_id) : projects
+              openDropdown(e, invoice.id, 'project_id', filtered, invoice.project_id || '')
+            }}
+            className={`text-xs px-1.5 py-1 rounded truncate max-w-full block text-left cursor-pointer ${
+              project ? 'text-slate-200 hover:bg-white/[0.08]' : 'text-teal-400/70 hover:text-teal-400 hover:bg-teal-500/10 italic'
+            }`}>
+            {project?.name || 'Assign'}
+          </button>
         </div>
-        {/* Amount */}
         <div className="text-right"><span className={`text-sm font-medium ${THEME.textPrimary}`}>{formatCurrency(invoice.amount)}</span></div>
-        {/* Balance */}
         <div className="text-right"><span className={`text-sm font-semibold ${invoice.balance > 0 ? 'text-amber-400' : 'text-teal-400'}`}>{formatCurrency(invoice.balance)}</span></div>
-        {/* Status */}
         <div><StatusBadge status={status} daysOverdue={daysOverdue} /></div>
-        {/* Actions */}
         <div className="flex items-center justify-end">
-          <ActionMenu invoice={invoice} onDelete={handleDelete} onPay={(inv) => setPaymentInvoice(inv)} />
+          <button onClick={(e) => openActionMenu(e, invoice)} className="p-1 hover:bg-white/[0.05] rounded transition-colors">
+            <MoreHorizontal size={16} className={THEME.textMuted} />
+          </button>
         </div>
       </div>
     )
   }
+
+  // ---- Dropdown filtered options ----
+  const ddFiltered = useMemo(() => {
+    if (!dropdown.open) return []
+    const q = ddSearch.toLowerCase()
+    return dropdown.options.filter(o => o.name.toLowerCase().includes(q))
+  }, [dropdown.open, dropdown.options, ddSearch])
 
   return (
     <div className="space-y-6">
@@ -474,24 +404,21 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
         defaultExpanded={true}
         noPadding
       >
-        {/* Filters Row */}
+        {/* Filters */}
         <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-b ${THEME.glassBorder}`}>
           <div className="flex items-center gap-2">
             <Zap size={14} className="text-teal-400" />
             <span className={`text-xs ${THEME.textMuted}`}>Payment probability powered by AI</span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Search */}
             <div className="relative">
               <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
               <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search invoices..."
                 className="bg-white/[0.05] border border-white/[0.1] rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 w-40 focus:outline-none focus:ring-2 focus:ring-teal-500/30" />
             </div>
-            {/* Period */}
             <select value={datePeriod} onChange={(e) => setDatePeriod(e.target.value as DatePeriod)} className={selectClass}>
               {PERIOD_OPTIONS.map(o => <option key={o.value} value={o.value} className="bg-slate-900">{o.label}</option>)}
             </select>
-            {/* Status */}
             <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={selectClass}>
               <option value="all" className="bg-slate-900">All Status</option>
               <option value="unpaid" className="bg-slate-900">Unpaid</option>
@@ -499,23 +426,13 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
               <option value="current" className="bg-slate-900">Current</option>
               <option value="overdue" className="bg-slate-900">Overdue</option>
             </select>
-            {/* Client */}
             <select value={filterClient} onChange={(e) => setFilterClient(e.target.value)} className={selectClass}>
               <option value="all" className="bg-slate-900">All Clients</option>
               {clients.map(c => <option key={c.id} value={c.id} className="bg-slate-900">{c.name}</option>)}
             </select>
-            {/* View Toggle */}
             <div className="flex items-center bg-white/[0.05] border border-white/[0.1] rounded-lg overflow-hidden">
-              <button onClick={() => setViewMode('flat')}
-                className={`p-1.5 transition-colors ${viewMode === 'flat' ? 'bg-teal-500/20 text-teal-400' : 'text-slate-500 hover:text-slate-300'}`}
-                title="Flat list">
-                <List size={14} />
-              </button>
-              <button onClick={() => setViewMode('grouped')}
-                className={`p-1.5 transition-colors ${viewMode === 'grouped' ? 'bg-teal-500/20 text-teal-400' : 'text-slate-500 hover:text-slate-300'}`}
-                title="Group by client">
-                <Layers size={14} />
-              </button>
+              <button onClick={() => setViewMode('flat')} className={`p-1.5 transition-colors ${viewMode === 'flat' ? 'bg-teal-500/20 text-teal-400' : 'text-slate-500 hover:text-slate-300'}`} title="Flat list"><List size={14} /></button>
+              <button onClick={() => setViewMode('grouped')} className={`p-1.5 transition-colors ${viewMode === 'grouped' ? 'bg-teal-500/20 text-teal-400' : 'text-slate-500 hover:text-slate-300'}`} title="Group by client"><Layers size={14} /></button>
             </div>
           </div>
         </div>
@@ -529,12 +446,9 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
             <button onClick={() => {
               const csv = ['Invoice #,Date,Due,Client,Project,Amount,Balance,Status']
               filteredInvoices.filter(i => selectedInvoices.includes(i.id)).forEach(i => {
-                const client = clients.find(c => c.id === i.client_id)
-                const project = projects.find(p => p.id === i.project_id)
-                csv.push(`${i.invoice_number},${i.invoice_date},${i.due_date},"${client?.name || i.client || ''}","${project?.name || i.project || ''}",${i.amount},${i.balance},${getInvoiceStatus(i.due_date, i.amount, i.balance)}`)
+                csv.push(`${i.invoice_number},${i.invoice_date},${i.due_date},"${clientMap.get(i.client_id)?.name || i.client || ''}","${projectMap.get(i.project_id)?.name || i.project || ''}",${i.amount},${i.balance},${getInvoiceStatus(i.due_date, i.amount, i.balance)}`)
               })
-              const blob = new Blob([csv.join('\n')], { type: 'text/csv' })
-              const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'invoices-export.csv'; a.click()
+              const blob = new Blob([csv.join('\n')], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'invoices-export.csv'; a.click()
             }} className="text-xs text-slate-400 hover:text-white transition-colors">Export</button>
           </div>
         )}
@@ -548,7 +462,7 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
           <button onClick={() => handleSort('invoice_number')} className="flex items-center gap-0.5 hover:text-white transition-colors">
             Inv # {sortField === 'invoice_number' && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
           </button>
-          <div className="flex items-center gap-0.5"><Zap size={8} className="text-teal-400" /> Prob</div>
+          <div className="flex items-center gap-0.5" title="Payment probability — AI prediction of on-time payment"><Zap size={8} className="text-teal-400" /> Prob</div>
           <button onClick={() => handleSort('invoice_date')} className="flex items-center gap-0.5 hover:text-white transition-colors">
             Date {sortField === 'invoice_date' && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
           </button>
@@ -567,44 +481,36 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
           <div></div>
         </div>
 
-        {/* Invoice List */}
+        {/* Invoice Rows */}
         <div className="max-h-[600px] overflow-y-auto">
           {filteredInvoices.length > 0 ? (
             viewMode === 'flat' ? (
-              filteredInvoices.map(renderInvoiceRow)
+              filteredInvoices.map(renderRow)
             ) : (
-              /* Grouped by Client */
               groupedInvoices.map(group => {
                 const key = group.clientId || 'unassigned'
                 const collapsed = collapsedClients.has(key)
                 return (
                   <div key={key}>
-                    {/* Client Group Header */}
                     <button onClick={() => toggleClientCollapse(key)}
                       className="w-full grid grid-cols-[32px_1fr_100px_100px_80px_48px] items-center gap-2 py-2.5 px-4 bg-slate-800/40 hover:bg-slate-800/60 border-b border-white/[0.08] transition-colors">
-                      <div className="flex items-center">
-                        <ChevronRight size={14} className={`text-slate-400 transition-transform ${collapsed ? '' : 'rotate-90'}`} />
-                      </div>
+                      <div className="flex items-center"><ChevronRight size={14} className={`text-slate-400 transition-transform ${collapsed ? '' : 'rotate-90'}`} /></div>
                       <div className="flex items-center gap-2 text-left">
                         <span className="text-sm font-semibold text-slate-200">{group.clientName}</span>
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-400 font-medium">{group.invoices.length}</span>
                       </div>
                       <div className="text-right"><span className={`text-sm font-medium ${THEME.textPrimary}`}>{formatCurrency(group.totalAmount)}</span></div>
                       <div className="text-right"><span className="text-sm font-semibold text-amber-400">{formatCurrency(group.totalBalance)}</span></div>
-                      <div></div>
-                      <div></div>
+                      <div></div><div></div>
                     </button>
-                    {/* Client's Invoices */}
-                    {!collapsed && group.invoices.map(renderInvoiceRow)}
+                    {!collapsed && group.invoices.map(renderRow)}
                   </div>
                 )
               })
             )
           ) : (
             <div className="flex flex-col items-center justify-center py-16 gap-4">
-              <div className="w-16 h-16 rounded-full bg-teal-500/10 flex items-center justify-center">
-                <DollarSign size={28} className="text-teal-400" />
-              </div>
+              <div className="w-16 h-16 rounded-full bg-teal-500/10 flex items-center justify-center"><DollarSign size={28} className="text-teal-400" /></div>
               <div className="text-center">
                 <p className={`font-medium ${THEME.textSecondary}`}>No invoices found</p>
                 <p className={`text-sm ${THEME.textDim} mt-1`}>Sync with QuickBooks to import invoices</p>
@@ -625,14 +531,58 @@ export default function ARSection({ invoices, clients, projects, selectedYear, o
         )}
       </CollapsibleSection>
 
+      {/* ======= SINGLE SHARED ASSIGN DROPDOWN (rendered once, positioned at active cell) ======= */}
+      {dropdown.open && (
+        <div ref={ddRef} className="fixed z-[9999] bg-slate-900 border border-slate-700 rounded-lg shadow-2xl py-1"
+          style={{ top: dropdown.pos.top, left: dropdown.pos.left, width: 224 }}>
+          <div className="px-2 py-1.5">
+            <input ref={ddSearchRef} type="text" value={ddSearch} onChange={e => setDdSearch(e.target.value)} placeholder="Search..."
+              className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-teal-500/50" />
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            {dropdown.currentValue && (
+              <button onClick={() => handleDropdownSelect('')}
+                className="w-full text-left px-3 py-1.5 text-xs text-slate-500 hover:bg-white/[0.05] italic">Clear assignment</button>
+            )}
+            {ddFiltered.map(o => (
+              <button key={o.id} onClick={() => handleDropdownSelect(o.id)}
+                className={`w-full text-left px-3 py-1.5 text-xs hover:bg-teal-500/10 transition-colors truncate ${
+                  o.id === dropdown.currentValue ? 'text-teal-400 font-medium bg-teal-500/5' : 'text-slate-300'
+                }`}>
+                {o.name}
+              </button>
+            ))}
+            {ddFiltered.length === 0 && <p className="px-3 py-2 text-xs text-slate-500">No matches</p>}
+          </div>
+        </div>
+      )}
+
+      {/* ======= SINGLE SHARED ACTION MENU ======= */}
+      {actionMenu.open && (
+        <div ref={actionRef} className="fixed z-[9999] bg-slate-900 border border-slate-700 rounded-lg shadow-2xl py-1 w-40"
+          style={{ top: actionMenu.pos.top, left: actionMenu.pos.left }}>
+          {actionMenu.invoice?.balance > 0 && (
+            <button onClick={() => { setPaymentInvoice(actionMenu.invoice); setActionMenu(prev => ({ ...prev, open: false })) }}
+              className="w-full text-left px-3 py-1.5 text-xs text-emerald-400 hover:bg-emerald-500/10 flex items-center gap-2">
+              <DollarSign size={12} /> Record Payment
+            </button>
+          )}
+          {onDeleteInvoice && (
+            <button onClick={() => {
+              if (confirm('Delete this invoice?')) onDeleteInvoice(actionMenu.invoiceId)
+              setActionMenu(prev => ({ ...prev, open: false }))
+            }}
+              className="w-full text-left px-3 py-1.5 text-xs text-rose-400 hover:bg-rose-500/10 flex items-center gap-2">
+              <Trash2 size={12} /> Delete Invoice
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Payment Modal */}
       {paymentInvoice && (
-        <PaymentModal
-          invoice={paymentInvoice}
-          onClose={() => setPaymentInvoice(null)}
-          onSave={(id, amount) => { onRecordPayment(id, amount); setPaymentInvoice(null) }}
-          type="invoice"
-        />
+        <PaymentModal invoice={paymentInvoice} onClose={() => setPaymentInvoice(null)}
+          onSave={(id, amount) => { onRecordPayment(id, amount); setPaymentInvoice(null) }} type="invoice" />
       )}
     </div>
   )
