@@ -16,11 +16,11 @@ import {
 import { supabase, getCurrentUser, fetchClients, fetchProjects, fetchInvoices, fetchTransactions } from '@/lib/supabase'
 import Link from 'next/link'
 
-// ============ GLASSMORPHISM THEME ============
+// ============ INSTITUTIONAL THEME ============
 const THEME = {
-  glass: 'bg-slate-900/70 backdrop-blur-xl',
-  glassBorder: 'border-white/[0.08]',
-  glassHover: 'hover:bg-white/[0.05] hover:border-white/[0.12]',
+  glass: 'bg-[#111827]',
+  glassBorder: 'border-slate-800/80',
+  glassHover: 'hover:bg-white/[0.05] hover:border-slate-700',
   textPrimary: 'text-white',
   textSecondary: 'text-slate-300',
   textMuted: 'text-slate-400',
@@ -312,10 +312,10 @@ function RiskIndicator({ flags }: { flags: string[] }) {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
   return (
-    <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-lg px-3 py-2 shadow-xl`}>
-      <p className={`text-xs ${THEME.textDim}`}>{payload[0]?.payload?.fullName || label}</p>
+    <div className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 shadow-xl">
+      <p className="text-xs text-slate-300">{payload[0]?.payload?.fullName || label}</p>
       {payload.map((entry: any, i: number) => (
-        <p key={i} className="text-sm font-semibold" style={{ color: entry.fill || entry.color }}>
+        <p key={i} className="text-sm font-semibold text-white">
           {formatCurrency(entry.value)}
         </p>
       ))}
@@ -365,7 +365,7 @@ function ClientDetailFlyout({ client, projects, invoices, onClose }: {
                 {client.healthScore >= 80 ? 'Excellent' : client.healthScore >= 60 ? 'Good' : 'Needs Attention'}
               </p>
             </div>
-            <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08]">
+            <div className="p-4 rounded-xl bg-slate-800/30 border border-white/[0.08]">
               <p className={`text-xs font-medium ${THEME.textMuted}`}>Lifetime Value</p>
               <p className={`text-2xl font-bold ${THEME.textPrimary} mt-1`}>{formatCurrency(client.ltv)}</p>
               <p className={`text-xs ${THEME.textDim} mt-1`}>{formatPercent(client.concentration)} of portfolio</p>
@@ -374,15 +374,15 @@ function ClientDetailFlyout({ client, projects, invoices, onClose }: {
 
           {/* Quick Stats */}
           <div className="grid grid-cols-3 gap-3">
-            <div className="text-center p-3 rounded-lg bg-white/[0.03]">
+            <div className="text-center p-3 rounded-lg bg-slate-800/30">
               <p className={`text-lg font-semibold ${client.margin >= 20 ? 'text-emerald-400' : client.margin >= 10 ? 'text-amber-400' : 'text-rose-400'}`}>{formatPercent(client.margin)}</p>
               <p className={`text-xs ${THEME.textMuted}`}>Margin</p>
             </div>
-            <div className="text-center p-3 rounded-lg bg-white/[0.03]">
+            <div className="text-center p-3 rounded-lg bg-slate-800/30">
               <p className={`text-lg font-semibold ${client.avgPayDays > 45 ? 'text-rose-400' : client.avgPayDays > 30 ? 'text-amber-400' : THEME.textPrimary}`}>{client.avgPayDays > 0 ? `${Math.round(client.avgPayDays)}d` : '—'}</p>
               <p className={`text-xs ${THEME.textMuted}`}>Avg Pay</p>
             </div>
-            <div className="text-center p-3 rounded-lg bg-white/[0.03]">
+            <div className="text-center p-3 rounded-lg bg-slate-800/30">
               <p className={`text-lg font-semibold ${THEME.textPrimary}`}>{client.activeProjects}</p>
               <p className={`text-xs ${THEME.textMuted}`}>Active</p>
             </div>
@@ -437,7 +437,7 @@ function ClientDetailFlyout({ client, projects, invoices, onClose }: {
                   const margin = project.budget > 0 ? ((project.budget - project.spent) / project.budget) * 100 : 0
                   const statusStyle = getStatusStyle(project.status)
                   return (
-                    <div key={project.id} className="flex items-center justify-between p-3 rounded-lg bg-white/[0.03]">
+                    <div key={project.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-800/30">
                       <div className="flex items-center gap-2">
                         <Briefcase size={14} className={THEME.textDim} />
                         <span className={`text-sm ${THEME.textPrimary}`}>{project.name}</span>
@@ -461,7 +461,7 @@ function ClientDetailFlyout({ client, projects, invoices, onClose }: {
           {client.notes && (
             <div className="space-y-2">
               <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Notes</h3>
-              <p className={`text-sm ${THEME.textMuted} p-3 rounded-lg bg-white/[0.03]`}>{client.notes}</p>
+              <p className={`text-sm ${THEME.textMuted} p-3 rounded-lg bg-slate-800/30`}>{client.notes}</p>
             </div>
           )}
         </div>
@@ -605,7 +605,7 @@ function ImportModal({ onClose, onImport }: { onClose: () => void; onImport: (cl
 
               <div className="max-h-64 overflow-y-auto border border-white/[0.08] rounded-lg">
                 <table className="w-full text-sm">
-                  <thead className={`bg-white/[0.03] sticky top-0`}>
+                  <thead className={`bg-slate-800/30 sticky top-0`}>
                     <tr>
                       <th className={`px-3 py-2 text-left ${THEME.textDim} font-medium`}>Name</th>
                       <th className={`px-3 py-2 text-left ${THEME.textDim} font-medium`}>Contact</th>
@@ -644,7 +644,7 @@ function ImportModal({ onClose, onImport }: { onClose: () => void; onImport: (cl
           )}
         </div>
 
-        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
+        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-slate-800/30`}>
           <button onClick={onClose} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white transition-colors`}>
             Cancel
           </button>
@@ -1111,32 +1111,32 @@ export default function ClientsPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4 border-l-2 border-l-teal-500`}>
           <p className={`text-xs font-medium ${THEME.textMuted} uppercase tracking-wide`}>Total Clients</p>
           <p className="text-2xl font-bold text-white mt-1">{summary.totalClients}</p>
           <p className={`text-xs ${THEME.textDim} mt-1`}>{summary.activeClients} active</p>
         </div>
-        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4 border-l-2 border-l-emerald-500`}>
           <p className={`text-xs font-medium ${THEME.textMuted} uppercase tracking-wide`}>Lifetime Value</p>
           <p className="text-2xl font-bold text-emerald-400 mt-1">{formatCompactCurrency(summary.totalLTV)}</p>
           <p className={`text-xs ${THEME.textDim} mt-1`}>All time revenue</p>
         </div>
-        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4 border-l-2 border-l-amber-500`}>
           <p className={`text-xs font-medium ${THEME.textMuted} uppercase tracking-wide`}>Outstanding AR</p>
           <p className="text-2xl font-bold text-amber-400 mt-1">{formatCompactCurrency(summary.totalAR)}</p>
           <p className={`text-xs ${THEME.textDim} mt-1`}>Open balances</p>
         </div>
-        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4 border-l-2 border-l-blue-500`}>
           <p className={`text-xs font-medium ${THEME.textMuted} uppercase tracking-wide`}>Avg Margin</p>
           <p className={`text-2xl font-bold ${summary.avgMargin >= 20 ? 'text-emerald-400' : summary.avgMargin >= 10 ? 'text-amber-400' : 'text-rose-400'} mt-1`}>{formatPercent(summary.avgMargin)}</p>
           <p className={`text-xs ${THEME.textDim} mt-1`}>Active clients</p>
         </div>
-        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4 border-l-2 border-l-amber-400`}>
           <p className={`text-xs font-medium ${THEME.textMuted} uppercase tracking-wide`}>Top Tier</p>
           <p className="text-2xl font-bold text-amber-400 mt-1">{summary.topTierCount}</p>
           <p className={`text-xs ${THEME.textDim} mt-1`}>A-tier clients</p>
         </div>
-        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4`}>
+        <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4 border-l-2 ${summary.atRiskCount > 0 ? 'border-l-rose-500' : 'border-l-emerald-500'}`}>
           <p className={`text-xs font-medium ${THEME.textMuted} uppercase tracking-wide`}>At Risk</p>
           <p className={`text-2xl font-bold ${summary.atRiskCount > 0 ? 'text-rose-400' : 'text-emerald-400'} mt-1`}>{summary.atRiskCount}</p>
           <p className={`text-xs ${THEME.textDim} mt-1`}>Health &lt; 60</p>
@@ -1190,8 +1190,8 @@ export default function ClientsPage() {
                   <BarChart data={concentrationData} layout="vertical" margin={{ left: 80 }}>
                     <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCompactCurrency(v)} />
                     <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={16}>
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={16} background={{ fill: 'rgba(255,255,255,0.03)', radius: 4 }}>
                       {concentrationData.map((entry, i) => (
                         <Cell key={i} fill={entry.fill} />
                       ))}
@@ -1225,8 +1225,8 @@ export default function ClientsPage() {
                 <BarChart data={arChartData} margin={{ left: 100 }} layout="vertical">
                   <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCompactCurrency(v)} />
                   <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} width={100} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="ar" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={14} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+                  <Bar dataKey="ar" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={14} background={{ fill: 'rgba(255,255,255,0.03)', radius: 4 }} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -1275,7 +1275,7 @@ export default function ClientsPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className={`bg-white/[0.02] border-b ${THEME.glassBorder}`}>
+              <tr className={`bg-slate-800/30 border-b ${THEME.glassBorder}`}>
                 <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Client</th>
                 <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium w-16`}>Tier</th>
                 <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium w-16`}>Health</th>
@@ -1296,7 +1296,7 @@ export default function ClientsPage() {
                   return (
                     <tr
                       key={client.id}
-                      className={`border-b border-white/[0.05] hover:bg-white/[0.03] transition-colors cursor-pointer`}
+                      className={`border-b border-slate-800/60 hover:bg-slate-800/40 transition-colors cursor-pointer`}
                       onClick={() => setSelectedClientDetail(client)}
                     >
                       <td className="px-4 py-3">
@@ -1380,7 +1380,7 @@ export default function ClientsPage() {
         </div>
 
         {/* Footer */}
-        <div className={`flex items-center justify-between px-6 py-3 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
+        <div className={`flex items-center justify-between px-6 py-3 border-t ${THEME.glassBorder} bg-slate-800/30`}>
           <p className={`text-sm ${THEME.textMuted}`}>
             {filteredClients.length} of {enrichedClients.length} clients
           </p>
@@ -1503,7 +1503,7 @@ export default function ClientsPage() {
               </div>
             </div>
 
-            <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
+            <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-slate-800/30`}>
               <button onClick={() => setShowClientModal(false)} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white transition-colors`}>
                 Cancel
               </button>
