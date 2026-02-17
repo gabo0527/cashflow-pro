@@ -51,22 +51,27 @@ export default function InvoicesPage() {
       })))
 
       // Normalize contractor invoices → bill format
-      const contractorInvBills = (contInvRes.data || []).map((ci: any) => ({
-        id: ci.id,
-        _source: 'contractor_invoice' as const,
-        bill_number: ci.invoice_number || ci.id.slice(0, 8),
-        vendor_name: ci.team_members?.name || 'Contractor',
-        amount: parseFloat(ci.amount || 0),
-        balance: ci.paid_at ? 0 : parseFloat(ci.amount || 0),
-        date: ci.period_start || ci.submitted_at?.split('T')[0] || ci.created_at?.split('T')[0],
-        due_date: ci.period_end || ci.period_start || ci.submitted_at?.split('T')[0],
-        project_id: ci.project_id || null,
-        client_id: ci.client_id || null,
-        notes: ci.period_start && ci.period_end ? `Period: ${ci.period_start} – ${ci.period_end}` : '',
-        status: ci.paid_at ? 'paid' : 'unpaid',
-        paid_amount: ci.paid_at ? parseFloat(ci.amount || 0) : 0,
-        team_member_id: ci.team_member_id,
-      }))
+      const contractorInvBills = (contInvRes.data || []).map((ci: any) => {
+        const amt = parseFloat(ci.total_amount || 0)
+        const isPaid = !!ci.paid_at
+        return {
+          id: ci.id,
+          _source: 'contractor_invoice' as const,
+          bill_number: ci.invoice_number || ci.id.slice(0, 8),
+          vendor_name: ci.team_members?.name || 'Contractor',
+          amount: amt,
+          balance: isPaid ? 0 : amt,
+          date: ci.invoice_date || ci.submitted_at?.split('T')[0] || ci.created_at?.split('T')[0],
+          due_date: ci.due_date || ci.period_end || ci.invoice_date || ci.submitted_at?.split('T')[0],
+          project_id: null,
+          client_id: null,
+          notes: ci.period_start && ci.period_end ? `Period: ${ci.period_start} – ${ci.period_end}` : (ci.notes || ''),
+          status: isPaid ? 'paid' : 'unpaid',
+          paid_amount: isPaid ? amt : 0,
+          team_member_id: ci.team_member_id,
+          submitted_at: ci.submitted_at,
+        }
+      })
 
       // Normalize contractor expenses → bill format
       const contractorExpBills = (contExpRes.data || []).map((ce: any) => ({
