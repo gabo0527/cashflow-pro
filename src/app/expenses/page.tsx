@@ -150,8 +150,10 @@ export default function ExpensesPage() {
     if (companyId) {
       const { error } = await supabase
         .from('company_settings')
-        .update({ expense_categories: newCategories, updated_at: new Date().toISOString() })
-        .eq('company_id', companyId)
+        .upsert(
+          { company_id: companyId, expense_categories: newCategories, updated_at: new Date().toISOString() },
+          { onConflict: 'company_id' }
+        )
       if (error) console.error('Error saving categories:', error)
     }
   }
