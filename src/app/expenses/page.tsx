@@ -333,7 +333,9 @@ export default function BankingPage() {
       {activeTab === 'overview' && (
         <OverviewSection
           expenses={expenses}
+          transactions={transactions}
           projects={projects}
+          clients={clients}
           selectedYear={selectedYear}
           selectedMonth={selectedMonth}
           categories={customCategories}
@@ -362,6 +364,7 @@ export default function BankingPage() {
           expenses={expenses}
           projects={projects}
           clients={clients}
+          categories={customCategories}
           onCategorizeTransaction={handleCategorizeTransaction}
           onSkipTransaction={handleSkipTransaction}
           onSyncQBO={handleSyncQBO}
