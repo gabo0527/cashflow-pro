@@ -7,7 +7,7 @@ import {
   ArrowDownLeft, ArrowUpRight, Filter, User
 } from 'lucide-react'
 import {
-  THEME, EXPENSE_CATEGORIES, INCOME_CATEGORIES, TRANSFER_CATEGORY, ALL_CATEGORIES,
+  THEME, EXPENSE_CATEGORIES, INCOME_CATEGORIES, TRANSFER_CATEGORY,
   getCategoryConfig, getCategoriesForDirection, CARDHOLDERS,
   formatCurrency, formatDateShort, shortAccountName
 } from './shared'
@@ -17,6 +17,7 @@ interface BankFeedSectionProps {
   expenses: any[]
   projects: any[]
   clients: any[]
+  categories: typeof EXPENSE_CATEGORIES
   onCategorizeTransaction: (transactionId: string, data: any) => void
   onSkipTransaction: (transactionId: string) => void
   onSyncQBO: () => void
@@ -24,7 +25,7 @@ interface BankFeedSectionProps {
 }
 
 export default function BankFeedSection({
-  transactions, expenses, projects, clients, onCategorizeTransaction, onSkipTransaction, onSyncQBO, isSyncing
+  transactions, expenses, projects, clients, categories, onCategorizeTransaction, onSkipTransaction, onSyncQBO, isSyncing
 }: BankFeedSectionProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState<'pending' | 'categorized' | 'skipped' | 'all'>('pending')
@@ -288,6 +289,7 @@ export default function BankFeedSection({
                 transaction={t}
                 projects={projects}
                 clients={clients}
+                categories={categories}
                 onCategorize={onCategorizeTransaction}
                 onSkip={onSkipTransaction}
               />
@@ -320,10 +322,11 @@ export default function BankFeedSection({
 }
 
 // ============ TRANSACTION ROW ============
-function TransactionRow({ transaction, projects, clients, onCategorize, onSkip }: {
+function TransactionRow({ transaction, projects, clients, categories, onCategorize, onSkip }: {
   transaction: any
   projects: any[]
   clients: any[]
+  categories: typeof EXPENSE_CATEGORIES
   onCategorize: (transactionId: string, data: any) => void
   onSkip: (transactionId: string) => void
 }) {
@@ -333,7 +336,7 @@ function TransactionRow({ transaction, projects, clients, onCategorize, onSkip }
 
   // Default category based on direction
   const defaultCat = isInflow ? 'clientPayments' : 'overhead'
-  const defaultSub = isInflow ? 'invoicePayment' : 'software'
+  const defaultSub = isInflow ? 'invoicePayment' : (categories.overhead?.subcategories?.[0]?.id || 'software')
 
   const [selectedCategory, setSelectedCategory] = useState(defaultCat)
   const [selectedSubcategory, setSelectedSubcategory] = useState(defaultSub)
@@ -341,13 +344,17 @@ function TransactionRow({ transaction, projects, clients, onCategorize, onSkip }
   const [selectedClient, setSelectedClient] = useState('')
   const [selectedCardholder, setSelectedCardholder] = useState('')
 
-  const categories = isInflow
+  // Use custom categories for outflows, income categories for inflows
+  const activeCats = isInflow
     ? { ...INCOME_CATEGORIES, ...TRANSFER_CATEGORY }
-    : { ...EXPENSE_CATEGORIES, ...TRANSFER_CATEGORY }
+    : { ...categories, ...TRANSFER_CATEGORY }
+
+  // Merged for lookups (need all for getCategoryConfig calls)
+  const allMerged = { ...categories, ...INCOME_CATEGORIES, ...TRANSFER_CATEGORY }
 
   const handleCategoryChange = (cat: string) => {
     setSelectedCategory(cat)
-    const catConfig = ALL_CATEGORIES[cat as keyof typeof ALL_CATEGORIES]
+    const catConfig = allMerged[cat as keyof typeof allMerged]
     if (catConfig?.subcategories?.length) {
       setSelectedSubcategory(catConfig.subcategories[0].id)
     }
@@ -459,7 +466,7 @@ function TransactionRow({ transaction, projects, clients, onCategorize, onSkip }
             <div className="flex-1 min-w-[200px]">
               <label className={`block text-[11px] font-semibold uppercase tracking-wider ${THEME.textDim} mb-1.5`}>Category</label>
               <div className="flex flex-wrap gap-1">
-                {Object.values(categories).map(cat => (
+                {Object.values(activeCats).map(cat => (
                   <button
                     key={cat.id}
                     onClick={() => handleCategoryChange(cat.id)}
@@ -483,19 +490,19 @@ function TransactionRow({ transaction, projects, clients, onCategorize, onSkip }
                 onChange={(e) => setSelectedSubcategory(e.target.value)}
                 className={`w-full ${THEME.input} px-2.5 py-1.5 text-xs`}
               >
-                {ALL_CATEGORIES[selectedCategory as keyof typeof ALL_CATEGORIES]?.subcategories.map(sub => (
+                {allMerged[selectedCategory as keyof typeof allMerged]?.subcategories.map(sub => (
                   <option key={sub.id} value={sub.id} className="bg-slate-900">{sub.name}</option>
                 ))}
               </select>
             </div>
 
-            {/* Client */}
-            {isInflow && (
+            {/* Client (always available except transfers) */}
+            {selectedCategory !== 'transfer' && (
               <div className="w-40">
                 <label className={`block text-[11px] font-semibold uppercase tracking-wider ${THEME.textDim} mb-1.5`}>Client</label>
                 <select
                   value={selectedClient}
-                  onChange={(e) => setSelectedClient(e.target.value)}
+                  onChange={(e) => { setSelectedClient(e.target.value); setSelectedProject('') }}
                   className={`w-full ${THEME.input} px-2.5 py-1.5 text-xs`}
                 >
                   <option value="" className="bg-slate-900">No client</option>
@@ -504,18 +511,25 @@ function TransactionRow({ transaction, projects, clients, onCategorize, onSkip }
               </div>
             )}
 
-            {/* Project (for outflows that could be direct costs) */}
-            {!isInflow && selectedCategory !== 'transfer' && (
-              <div className="w-40">
-                <label className={`block text-[11px] font-semibold uppercase tracking-wider ${THEME.textDim} mb-1.5`}>Project</label>
+            {/* Project (filtered by selected client, optional — client-only = client P&L) */}
+            {selectedCategory !== 'transfer' && selectedClient && (
+              <div className="w-44">
+                <label className={`block text-[11px] font-semibold uppercase tracking-wider ${THEME.textDim} mb-1.5`}>
+                  Project <span className={`font-normal ${THEME.textDim}`}>(optional)</span>
+                </label>
                 <select
                   value={selectedProject}
                   onChange={(e) => setSelectedProject(e.target.value)}
                   className={`w-full ${THEME.input} px-2.5 py-1.5 text-xs`}
                 >
-                  <option value="" className="bg-slate-900">No project</option>
-                  {projects.map(p => <option key={p.id} value={p.id} className="bg-slate-900">{p.name}</option>)}
+                  <option value="" className="bg-slate-900">All projects (client-level)</option>
+                  {projects.filter(p => p.client_id === selectedClient).map(p => (
+                    <option key={p.id} value={p.id} className="bg-slate-900">{p.name}</option>
+                  ))}
                 </select>
+                {!selectedProject && (
+                  <p className={`text-[10px] ${THEME.textDim} mt-1`}>Client P&L only — won't affect project GM</p>
+                )}
               </div>
             )}
 
