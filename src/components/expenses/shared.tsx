@@ -7,21 +7,27 @@ import {
   CreditCard, FileText, MoreHorizontal, Wrench, Package, 
   UserCheck, Monitor, Receipt, Landmark, Calculator, Gavel,
   Car, Utensils, Plane, Heart, GraduationCap, Wallet,
-  CheckCircle2, Clock, AlertCircle, Settings
+  CheckCircle2, Clock, AlertCircle, Settings, ArrowDownLeft,
+  ArrowUpRight, Repeat, Banknote, PiggyBank, Gift, RefreshCw
 } from 'lucide-react'
 
-// ============ GLASSMORPHISM THEME ============
+// ============ INSTITUTIONAL THEME ============
 export const THEME = {
-  glass: 'bg-slate-900/70 backdrop-blur-xl',
-  glassBorder: 'border-white/[0.08]',
-  glassHover: 'hover:bg-white/[0.05] hover:border-white/[0.12]',
+  glass: 'bg-[#111827]',
+  glassBorder: 'border-slate-800/80',
+  glassHover: 'hover:bg-slate-800/40 hover:border-slate-700/60',
   textPrimary: 'text-white',
   textSecondary: 'text-slate-300',
   textMuted: 'text-slate-400',
   textDim: 'text-slate-500',
+  // Institutional card + input styles
+  card: 'bg-[#111827] border border-slate-800/80 rounded-xl',
+  input: 'bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50',
+  selectClass: 'appearance-none bg-slate-800/60 border border-slate-800/80 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 cursor-pointer transition-colors',
 }
 
 export const COLORS = {
+  teal: '#0d9488',
   emerald: '#10b981',
   rose: '#f43f5e',
   amber: '#f59e0b',
@@ -30,14 +36,16 @@ export const COLORS = {
   cyan: '#06b6d4',
   orange: '#f97316',
   slate: '#64748b',
+  green: '#22c55e',
 }
 
-// ============ EXPENSE CATEGORY SYSTEM ============
+// ============ OUTFLOW CATEGORIES (Expenses) ============
 export const EXPENSE_CATEGORIES = {
   directCosts: {
     id: 'directCosts',
     label: 'Direct Costs',
     description: 'Project-specific costs — affects Gross Margin',
+    direction: 'outflow' as const,
     color: 'rose',
     hex: COLORS.rose,
     bgClass: 'bg-rose-500/10',
@@ -55,6 +63,7 @@ export const EXPENSE_CATEGORIES = {
     id: 'overhead',
     label: 'Overhead',
     description: 'Operating expenses — affects Net Profit',
+    direction: 'outflow' as const,
     color: 'amber',
     hex: COLORS.amber,
     bgClass: 'bg-amber-500/10',
@@ -76,6 +85,7 @@ export const EXPENSE_CATEGORIES = {
     id: 'otherBusiness',
     label: 'Other Business',
     description: 'Non-operational costs — below the line',
+    direction: 'outflow' as const,
     color: 'blue',
     hex: COLORS.blue,
     bgClass: 'bg-blue-500/10',
@@ -94,6 +104,7 @@ export const EXPENSE_CATEGORIES = {
     id: 'personal',
     label: 'Personal',
     description: 'Owner/CEO personal expenses',
+    direction: 'outflow' as const,
     color: 'cyan',
     hex: COLORS.cyan,
     bgClass: 'bg-cyan-500/10',
@@ -110,11 +121,100 @@ export const EXPENSE_CATEGORIES = {
   }
 }
 
-export type CategoryKey = keyof typeof EXPENSE_CATEGORIES
+// ============ INFLOW CATEGORIES (Income) ============
+export const INCOME_CATEGORIES = {
+  clientPayments: {
+    id: 'clientPayments',
+    label: 'Client Payments',
+    description: 'Revenue received — feeds AR & Cash Flow',
+    direction: 'inflow' as const,
+    color: 'emerald',
+    hex: COLORS.emerald,
+    bgClass: 'bg-emerald-500/10',
+    textClass: 'text-emerald-400',
+    borderClass: 'border-emerald-500/30',
+    subcategories: [
+      { id: 'invoicePayment', name: 'Invoice Payment', icon: Receipt },
+      { id: 'retainer', name: 'Retainer', icon: Briefcase },
+      { id: 'deposit', name: 'Deposit', icon: Banknote },
+      { id: 'otherRevenue', name: 'Other Revenue', icon: DollarSign },
+    ]
+  },
+  otherIncome: {
+    id: 'otherIncome',
+    label: 'Other Income',
+    description: 'Interest, refunds, misc income',
+    direction: 'inflow' as const,
+    color: 'green',
+    hex: COLORS.green,
+    bgClass: 'bg-green-500/10',
+    textClass: 'text-green-400',
+    borderClass: 'border-green-500/30',
+    subcategories: [
+      { id: 'interest', name: 'Interest Income', icon: Calculator },
+      { id: 'refund', name: 'Refund', icon: RefreshCw },
+      { id: 'otherMiscIncome', name: 'Other Income', icon: MoreHorizontal },
+    ]
+  },
+  ownerCapital: {
+    id: 'ownerCapital',
+    label: 'Owner / Capital',
+    description: 'Owner contributions & distributions',
+    direction: 'inflow' as const,
+    color: 'purple',
+    hex: COLORS.purple,
+    bgClass: 'bg-purple-500/10',
+    textClass: 'text-purple-400',
+    borderClass: 'border-purple-500/30',
+    subcategories: [
+      { id: 'contribution', name: 'Owner Contribution', icon: PiggyBank },
+      { id: 'distribution', name: 'Owner Distribution', icon: Wallet },
+      { id: 'loan', name: 'Loan Proceeds', icon: Landmark },
+    ]
+  },
+}
 
-// Get category config by ID
+// ============ TRANSFER CATEGORY (Both directions) ============
+export const TRANSFER_CATEGORY = {
+  transfer: {
+    id: 'transfer',
+    label: 'Transfer',
+    description: 'Account transfers — excluded from P&L',
+    direction: 'both' as const,
+    color: 'slate',
+    hex: COLORS.slate,
+    bgClass: 'bg-slate-500/10',
+    textClass: 'text-slate-400',
+    borderClass: 'border-slate-500/30',
+    subcategories: [
+      { id: 'accountTransfer', name: 'Account Transfer', icon: Repeat },
+      { id: 'ccPayment', name: 'Credit Card Payment', icon: CreditCard },
+      { id: 'otherTransfer', name: 'Other Transfer', icon: MoreHorizontal },
+    ]
+  }
+}
+
+// ============ COMBINED CATEGORIES ============
+export const ALL_CATEGORIES = {
+  ...EXPENSE_CATEGORIES,
+  ...INCOME_CATEGORIES,
+  ...TRANSFER_CATEGORY,
+}
+
+export type CategoryKey = keyof typeof ALL_CATEGORIES
+export type ExpenseCategoryKey = keyof typeof EXPENSE_CATEGORIES
+export type IncomeCategoryKey = keyof typeof INCOME_CATEGORIES
+
+// Get categories by direction
+export const getCategoriesForDirection = (direction: 'inflow' | 'outflow' | 'all') => {
+  if (direction === 'all') return ALL_CATEGORIES
+  if (direction === 'inflow') return { ...INCOME_CATEGORIES, ...TRANSFER_CATEGORY }
+  return { ...EXPENSE_CATEGORIES, ...TRANSFER_CATEGORY }
+}
+
+// Get category config by ID (searches all)
 export const getCategoryConfig = (categoryId: string) => {
-  return EXPENSE_CATEGORIES[categoryId as CategoryKey] || EXPENSE_CATEGORIES.overhead
+  return ALL_CATEGORIES[categoryId as CategoryKey] || EXPENSE_CATEGORIES.overhead
 }
 
 // Get subcategory config
@@ -125,10 +225,17 @@ export const getSubcategoryConfig = (categoryId: string, subcategoryId: string) 
 
 // Get all subcategories flat
 export const getAllSubcategories = () => {
-  return Object.values(EXPENSE_CATEGORIES).flatMap(cat => 
+  return Object.values(ALL_CATEGORIES).flatMap(cat => 
     cat.subcategories.map(sub => ({ ...sub, categoryId: cat.id, categoryLabel: cat.label }))
   )
 }
+
+// ============ CARDHOLDERS ============
+export const CARDHOLDERS = [
+  { id: 'gabriel', name: 'Gabriel Vazquez' },
+  { id: 'marcus', name: 'Marcus Mattox' },
+  { id: 'ceo', name: 'CEO' },
+]
 
 // ============ UTILITY FUNCTIONS ============
 export const formatCurrency = (value: number): string => {
@@ -145,34 +252,44 @@ export const formatDateFull = (dateStr: string): string => {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+// Short account name (strip long QBO account names)
+export const shortAccountName = (name: string): string => {
+  if (!name) return '—'
+  if (name.toLowerCase().includes('credit card') || name.toLowerCase().includes('credit')) return 'Credit Card'
+  if (name.toLowerCase().includes('corp account') || name.toLowerCase().includes('business adv')) return 'Corp Card'
+  if (name.toLowerCase().includes('consulting') || name.toLowerCase().includes('1404')) return 'Checking'
+  return name.length > 25 ? name.substring(0, 22) + '...' : name
+}
+
 // ============ SHARED COMPONENTS ============
 
-export function MetricCard({ label, value, subtitle, icon: Icon, color = 'emerald', trend }: { 
+export function MetricCard({ label, value, subtitle, icon: Icon, color = 'teal', trend }: { 
   label: string; value: string; subtitle?: string; icon: any; color?: string
   trend?: { value: number; label: string }
 }) {
   const colorMap: Record<string, string> = {
-    emerald: 'text-emerald-400', rose: 'text-rose-400', amber: 'text-amber-400',
-    blue: 'text-blue-400', cyan: 'text-cyan-400', slate: 'text-slate-300',
+    teal: 'text-teal-400', emerald: 'text-emerald-400', rose: 'text-rose-400', amber: 'text-amber-400',
+    blue: 'text-blue-400', cyan: 'text-cyan-400', slate: 'text-slate-300', green: 'text-green-400',
+    purple: 'text-purple-400',
   }
   return (
-    <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-5 ${THEME.glassHover} transition-all`}>
+    <div className={`${THEME.card} p-5 ${THEME.glassHover} transition-all`}>
       <div className="flex items-start justify-between">
         <div>
           <p className={`text-sm font-medium ${THEME.textMuted}`}>{label}</p>
-          <p className={`text-2xl font-semibold ${colorMap[color]} mt-1`}>{value}</p>
+          <p className={`text-2xl font-semibold ${colorMap[color] || 'text-teal-400'} mt-1 tabular-nums`}>{value}</p>
           {subtitle && <p className={`text-xs ${THEME.textDim} mt-1`}>{subtitle}</p>}
           {trend && (
             <div className="flex items-center gap-1 mt-2">
               {trend.value >= 0 ? <TrendingUp size={14} className="text-emerald-400" /> : <TrendingDown size={14} className="text-rose-400" />}
-              <span className={`text-xs font-medium ${trend.value >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              <span className={`text-xs font-medium tabular-nums ${trend.value >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                 {Math.abs(trend.value).toFixed(1)}%
               </span>
               <span className={`text-xs ${THEME.textDim}`}>{trend.label}</span>
             </div>
           )}
         </div>
-        <div className="p-2.5 rounded-lg bg-white/[0.05]">
+        <div className="p-2.5 rounded-lg bg-slate-800/50">
           <Icon size={20} className={THEME.textMuted} strokeWidth={1.5} />
         </div>
       </div>
@@ -205,6 +322,18 @@ export function StatusBadge({ status }: { status: string }) {
   )
 }
 
+export function DirectionBadge({ amount }: { amount: number }) {
+  const isInflow = amount >= 0
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider ${
+      isInflow ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+    }`}>
+      {isInflow ? <ArrowDownLeft size={10} /> : <ArrowUpRight size={10} />}
+      {isInflow ? 'In' : 'Out'}
+    </span>
+  )
+}
+
 export function EditableSelect({ value, options, onChange, placeholder = 'Select...' }: {
   value: string; options: { id: string; name: string }[]; onChange: (value: string) => void; placeholder?: string
 }) {
@@ -222,16 +351,16 @@ export function EditableSelect({ value, options, onChange, placeholder = 'Select
       {isOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-          <div className={`absolute top-full left-0 mt-1 w-56 ${THEME.glass} border ${THEME.glassBorder} rounded-lg shadow-xl z-20 overflow-hidden`}>
-            <div className="p-2 border-b border-white/[0.08]">
+          <div className={`absolute top-full left-0 mt-1 w-56 ${THEME.card} shadow-xl z-20 overflow-hidden`}>
+            <div className="p-2 border-b border-slate-800/80">
               <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..."
-                className="w-full bg-white/[0.05] border border-white/[0.1] rounded px-2 py-1.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30" autoFocus />
+                className={`w-full ${THEME.input} px-2 py-1.5`} autoFocus />
             </div>
             <div className="max-h-48 overflow-y-auto">
-              <button onClick={() => { onChange(''); setIsOpen(false); setSearch(''); }} className={`w-full px-3 py-2 text-left text-sm ${THEME.textDim} hover:bg-white/[0.05] transition-colors`}>— None —</button>
+              <button onClick={() => { onChange(''); setIsOpen(false); setSearch(''); }} className={`w-full px-3 py-2 text-left text-sm ${THEME.textDim} hover:bg-slate-800/50 transition-colors`}>— None —</button>
               {filteredOptions.map(opt => (
                 <button key={opt.id} onClick={() => { onChange(opt.id); setIsOpen(false); setSearch(''); }}
-                  className={`w-full px-3 py-2 text-left text-sm hover:bg-white/[0.05] transition-colors ${opt.id === value ? 'text-emerald-400 bg-emerald-500/10' : THEME.textSecondary}`}>{opt.name}</button>
+                  className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-800/50 transition-colors ${opt.id === value ? 'text-teal-400 bg-teal-500/10' : THEME.textSecondary}`}>{opt.name}</button>
               ))}
             </div>
           </div>
@@ -241,9 +370,10 @@ export function EditableSelect({ value, options, onChange, placeholder = 'Select
   )
 }
 
-export function CategorySelect({ value, onChange }: { value: string; onChange: (categoryId: string) => void }) {
+export function CategorySelect({ value, onChange, direction = 'all' }: { value: string; onChange: (categoryId: string) => void; direction?: 'inflow' | 'outflow' | 'all' }) {
   const [isOpen, setIsOpen] = useState(false)
   const config = getCategoryConfig(value)
+  const categories = getCategoriesForDirection(direction)
 
   return (
     <div className="relative">
@@ -255,13 +385,13 @@ export function CategorySelect({ value, onChange }: { value: string; onChange: (
       {isOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-          <div className={`absolute top-full left-0 mt-1 w-56 ${THEME.glass} border ${THEME.glassBorder} rounded-lg shadow-xl z-20 overflow-hidden`}>
-            <div className="p-2 border-b border-white/[0.08]">
+          <div className={`absolute top-full left-0 mt-1 w-56 ${THEME.card} shadow-xl z-20 overflow-hidden`}>
+            <div className="p-2 border-b border-slate-800/80">
               <p className={`text-xs font-medium ${THEME.textDim} px-1`}>Select Category</p>
             </div>
-            {Object.values(EXPENSE_CATEGORIES).map(cat => (
+            {Object.values(categories).map(cat => (
               <button key={cat.id} onClick={() => { onChange(cat.id); setIsOpen(false); }}
-                className={`w-full px-3 py-2.5 text-left text-sm flex items-center gap-2 hover:bg-white/[0.05] transition-colors ${cat.id === value ? `${cat.textClass} ${cat.bgClass}` : THEME.textSecondary}`}>
+                className={`w-full px-3 py-2.5 text-left text-sm flex items-center gap-2 hover:bg-slate-800/50 transition-colors ${cat.id === value ? `${cat.textClass} ${cat.bgClass}` : THEME.textSecondary}`}>
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.hex }} />
                 <div>
                   <p className="font-medium">{cat.label}</p>
@@ -295,8 +425,8 @@ export function SubcategorySelect({ categoryId, value, onChange }: {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-          <div className={`absolute top-full left-0 mt-1 w-56 ${THEME.glass} border ${THEME.glassBorder} rounded-lg shadow-xl z-20 overflow-hidden`}>
-            <div className="p-2 border-b border-white/[0.08]">
+          <div className={`absolute top-full left-0 mt-1 w-56 ${THEME.card} shadow-xl z-20 overflow-hidden`}>
+            <div className="p-2 border-b border-slate-800/80">
               <p className={`text-xs font-medium ${THEME.textDim} px-1`}>{category.label} Types</p>
             </div>
             <div className="max-h-48 overflow-y-auto">
@@ -304,8 +434,8 @@ export function SubcategorySelect({ categoryId, value, onChange }: {
                 const SubIcon = sub.icon
                 return (
                   <button key={sub.id} onClick={() => { onChange(sub.id); setIsOpen(false); }}
-                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-white/[0.05] transition-colors ${
-                      sub.id === value ? 'text-emerald-400 bg-emerald-500/10' : THEME.textSecondary
+                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-slate-800/50 transition-colors ${
+                      sub.id === value ? 'text-teal-400 bg-teal-500/10' : THEME.textSecondary
                     }`}>
                     <SubIcon size={14} className={THEME.textDim} />
                     {sub.name}
@@ -326,15 +456,15 @@ export function CollapsibleSection({ title, subtitle, badge, children, defaultEx
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
   return (
-    <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
-      <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder} cursor-pointer hover:bg-white/[0.03] transition-colors`}
+    <div className={`${THEME.card} overflow-hidden`}>
+      <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder} cursor-pointer hover:bg-slate-800/30 transition-colors`}
         onClick={() => setIsExpanded(!isExpanded)}>
         <div className="flex items-center gap-3">
           <div className={THEME.textMuted}>{isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}</div>
           <div>
             <div className="flex items-center gap-2">
               <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>{title}</h3>
-              {badge !== undefined && <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-white/[0.08] text-slate-300">{badge}</span>}
+              {badge !== undefined && <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-slate-800/60 text-slate-300 border border-slate-800/80">{badge}</span>}
             </div>
             {subtitle && <p className={`text-xs ${THEME.textDim} mt-0.5`}>{subtitle}</p>}
           </div>
@@ -342,7 +472,7 @@ export function CollapsibleSection({ title, subtitle, badge, children, defaultEx
         {action && (
           <button 
             onClick={(e) => { e.stopPropagation(); action.onClick(); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/20 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-teal-400 bg-teal-500/10 border border-teal-500/30 rounded-lg hover:bg-teal-500/20 transition-colors"
           >
             + {action.label}
           </button>
@@ -356,10 +486,10 @@ export function CollapsibleSection({ title, subtitle, badge, children, defaultEx
 export const CustomTooltip = ({ active, payload, label, formatter }: any) => {
   if (!active || !payload?.length) return null
   return (
-    <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-lg px-3 py-2 shadow-xl`}>
+    <div className={`${THEME.card} px-3 py-2 shadow-xl`}>
       <p className={`text-xs ${THEME.textDim} mb-1`}>{label}</p>
       {payload.map((entry: any, index: number) => (
-        <p key={index} className="text-sm font-medium" style={{ color: entry.color }}>
+        <p key={index} className="text-sm font-medium tabular-nums" style={{ color: entry.color }}>
           {entry.name}: {formatter ? formatter(entry.value) : entry.value}
         </p>
       ))}
@@ -372,11 +502,11 @@ export function ExpenseBar({ label, amount, total, color }: { label: string; amo
   return (
     <div className="flex items-center gap-4 py-2">
       <div className="w-36 shrink-0"><p className={`text-sm ${THEME.textSecondary} truncate`}>{label}</p></div>
-      <div className="flex-1 h-2 bg-white/[0.08] rounded-full overflow-hidden">
+      <div className="flex-1 h-2 bg-slate-800/60 rounded-full overflow-hidden">
         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${percent}%`, backgroundColor: color }} />
       </div>
-      <div className="w-24 text-right shrink-0"><p className={`text-sm font-semibold ${THEME.textPrimary}`}>{formatCurrency(amount)}</p></div>
-      <div className="w-12 text-right shrink-0"><p className={`text-xs ${THEME.textMuted}`}>{percent.toFixed(0)}%</p></div>
+      <div className="w-24 text-right shrink-0"><p className={`text-sm font-semibold tabular-nums ${THEME.textPrimary}`}>{formatCurrency(amount)}</p></div>
+      <div className="w-12 text-right shrink-0"><p className={`text-xs tabular-nums ${THEME.textMuted}`}>{percent.toFixed(0)}%</p></div>
     </div>
   )
 }
@@ -460,13 +590,13 @@ export function CategoryManager({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-2xl w-full max-w-2xl mx-4 overflow-hidden shadow-2xl max-h-[85vh] flex flex-col`}>
+      <div className={`${THEME.card} w-full max-w-2xl mx-4 overflow-hidden shadow-2xl max-h-[85vh] flex flex-col`}>
         <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder} shrink-0`}>
           <div>
             <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>Manage Categories</h3>
             <p className={`text-xs ${THEME.textDim} mt-0.5`}>Edit category names and subcategories</p>
           </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-white/[0.05] rounded-lg transition-colors">
+          <button onClick={onClose} className="p-1.5 hover:bg-slate-800/50 rounded-lg transition-colors">
             <X size={20} className={THEME.textMuted} />
           </button>
         </div>
@@ -476,7 +606,7 @@ export function CategoryManager({
             <div key={cat.id} className={`border ${THEME.glassBorder} rounded-xl overflow-hidden`}>
               {/* Category Header */}
               <div 
-                className={`flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-white/[0.03] transition-colors`}
+                className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-slate-800/30 transition-colors"
                 onClick={() => setExpandedCategory(expandedCategory === cat.id ? null : cat.id)}
               >
                 <div className="flex items-center gap-3">
@@ -487,14 +617,14 @@ export function CategoryManager({
                       value={cat.label}
                       onChange={(e) => handleCategoryLabelChange(cat.id, e.target.value)}
                       onClick={(e) => e.stopPropagation()}
-                      className={`bg-transparent text-sm font-semibold ${THEME.textPrimary} focus:outline-none focus:ring-1 focus:ring-emerald-500/50 rounded px-1 -ml-1`}
+                      className={`bg-transparent text-sm font-semibold ${THEME.textPrimary} focus:outline-none focus:ring-1 focus:ring-teal-500/50 rounded px-1 -ml-1`}
                     />
                     <input
                       type="text"
                       value={cat.description}
                       onChange={(e) => handleCategoryDescChange(cat.id, e.target.value)}
                       onClick={(e) => e.stopPropagation()}
-                      className={`bg-transparent text-xs ${THEME.textDim} focus:outline-none focus:ring-1 focus:ring-emerald-500/50 rounded px-1 -ml-1 w-full`}
+                      className={`bg-transparent text-xs ${THEME.textDim} focus:outline-none focus:ring-1 focus:ring-teal-500/50 rounded px-1 -ml-1 w-full`}
                     />
                   </div>
                 </div>
@@ -506,14 +636,14 @@ export function CategoryManager({
 
               {/* Subcategories */}
               {expandedCategory === cat.id && (
-                <div className={`px-4 pb-4 pt-2 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
+                <div className={`px-4 pb-4 pt-2 border-t ${THEME.glassBorder} bg-slate-800/20`}>
                   <div className="space-y-2">
                     {cat.subcategories.map(sub => {
                       const SubIcon = sub.icon
                       const isEditing = editingSubcategory?.catId === cat.id && editingSubcategory?.subId === sub.id
                       
                       return (
-                        <div key={sub.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-white/[0.03] group">
+                        <div key={sub.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-slate-800/40 group">
                           <div className="flex items-center gap-2">
                             <SubIcon size={14} className={THEME.textDim} />
                             {isEditing ? (
@@ -523,7 +653,7 @@ export function CategoryManager({
                                 onChange={(e) => setEditingSubcategory({ ...editingSubcategory, name: e.target.value })}
                                 onBlur={() => handleRenameSubcategory(cat.id, sub.id, editingSubcategory.name)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleRenameSubcategory(cat.id, sub.id, editingSubcategory.name)}
-                                className="bg-white/[0.05] border border-white/[0.1] rounded px-2 py-0.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                                className={`${THEME.input} px-2 py-0.5 text-sm`}
                                 autoFocus
                               />
                             ) : (
@@ -533,13 +663,13 @@ export function CategoryManager({
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={() => setEditingSubcategory({ catId: cat.id, subId: sub.id, name: sub.name })}
-                              className="p-1 hover:bg-white/[0.05] rounded transition-colors"
+                              className="p-1 hover:bg-slate-800/50 rounded transition-colors"
                             >
                               <Edit2 size={12} className={THEME.textDim} />
                             </button>
                             <button
                               onClick={() => handleDeleteSubcategory(cat.id, sub.id)}
-                              className="p-1 hover:bg-white/[0.05] rounded transition-colors"
+                              className="p-1 hover:bg-slate-800/50 rounded transition-colors"
                             >
                               <Trash2 size={12} className="text-rose-400" />
                             </button>
@@ -550,19 +680,19 @@ export function CategoryManager({
                   </div>
 
                   {/* Add New Subcategory */}
-                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/[0.05]">
+                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-800/60">
                     <input
                       type="text"
                       value={newSubcategoryName}
                       onChange={(e) => setNewSubcategoryName(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleAddSubcategory(cat.id)}
                       placeholder="New subcategory name..."
-                      className="flex-1 bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                      className={`flex-1 ${THEME.input} px-3 py-1.5`}
                     />
                     <button
                       onClick={() => handleAddSubcategory(cat.id)}
                       disabled={!newSubcategoryName.trim()}
-                      className="px-3 py-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-medium hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                      className="px-3 py-1.5 bg-teal-500/10 text-teal-400 border border-teal-500/30 rounded-lg text-xs font-medium hover:bg-teal-500/20 transition-colors disabled:opacity-50"
                     >
                       + Add
                     </button>
@@ -573,13 +703,13 @@ export function CategoryManager({
           ))}
         </div>
 
-        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-white/[0.02] shrink-0`}>
+        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-slate-800/20 shrink-0`}>
           <button onClick={onClose} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white transition-colors`}>
             Cancel
           </button>
           <button 
             onClick={handleSave}
-            className="px-5 py-2 text-sm font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20"
+            className="px-5 py-2 text-sm font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-500 transition-colors"
           >
             Save Changes
           </button>
