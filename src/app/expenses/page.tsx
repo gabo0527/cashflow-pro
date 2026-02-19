@@ -22,7 +22,7 @@ const selectClass = "appearance-none bg-slate-800/60 border border-slate-800/80 
 
 type TabType = 'overview' | 'expenses' | 'bankfeed'
 
-export default function ExpensesPage() {
+export default function BankingPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabType>('overview')
   const [companyId, setCompanyId] = useState<string | null>(null)
@@ -115,22 +115,70 @@ export default function ExpensesPage() {
   }
 
   // ============ BANK FEED HANDLERS ============
-  const handleCategorizeTransaction = async (transactionId: string, expenseData: any) => {
+  const handleCategorizeTransaction = async (transactionId: string, data: any) => {
     if (!companyId) return
-    const newExpense = { company_id: companyId, ...expenseData }
-    const { data, error } = await supabase.from('expenses').insert(newExpense).select().single()
-    if (error) { console.error('Error creating expense:', error); alert('Failed to categorize transaction'); return }
-    setExpenses(prev => [{ ...data, amount: parseFloat(data.amount || 0) }, ...prev])
+
+    // Step 1: Update the transaction record directly with category info
+    const txnUpdate: any = {
+      category: data.category,
+      subcategory: data.subcategory,
+      type: data.type || (data.amount >= 0 ? 'income' : 'expense'),
+      updated_at: new Date().toISOString(),
+    }
+    if (data.project_id) txnUpdate.project_id = data.project_id
+    if (data.client_id) txnUpdate.client_id = data.client_id
+    if (data.cardholder) txnUpdate.cardholder = data.cardholder
+
+    const { error: txnError } = await supabase
+      .from('transactions')
+      .update(txnUpdate)
+      .eq('id', transactionId)
+
+    if (txnError) {
+      console.error('Error updating transaction:', txnError)
+      alert('Failed to categorize transaction')
+      return
+    }
+
+    // Step 2: For outflows, also create an expense record (for backwards compatibility)
+    if (data.type === 'expense' && data.category !== 'transfer') {
+      const expenseData = {
+        company_id: companyId,
+        category: data.category,
+        subcategory: data.subcategory,
+        project_id: data.project_id || null,
+        client_id: data.client_id || null,
+        description: data.description,
+        amount: Math.abs(data.amount),
+        date: data.date,
+        vendor: data.vendor,
+        status: 'paid',
+        transaction_id: transactionId,
+      }
+      const { data: newExp, error: expError } = await supabase.from('expenses').insert(expenseData).select().single()
+      if (expError) {
+        console.error('Error creating expense record:', expError)
+      } else {
+        setExpenses(prev => [{ ...newExp, amount: parseFloat(newExp.amount || 0) }, ...prev])
+      }
+    }
+
+    // Step 3: Update local transaction state
+    setTransactions(prev => prev.map(t => 
+      t.id === transactionId ? { ...t, ...txnUpdate } : t
+    ))
   }
 
   const handleSkipTransaction = async (transactionId: string) => {
-    const { error } = await supabase.from('transactions').update({ skipped: true }).eq('id', transactionId)
+    const { error } = await supabase
+      .from('transactions')
+      .update({ skipped: true, updated_at: new Date().toISOString() })
+      .eq('id', transactionId)
     if (error) { console.error('Error skipping transaction:', error); return }
     setTransactions(prev => prev.map(t => t.id === transactionId ? { ...t, skipped: true } : t))
   }
 
   const handleSyncQBO = async () => {
-    // Bank feed sync is handled by QBOSyncButton; this is the legacy callback for BankFeedSection
     if (!companyId) return
     try {
       const res = await fetch('/api/qbo/sync', {
@@ -160,19 +208,19 @@ export default function ExpensesPage() {
 
   // ============ EXPORT ============
   const handleExport = () => {
-    const csv = ['Date,Description,Category,Subcategory,Project,Amount,Status']
+    const csv = ['Date,Description,Category,Subcategory,Project,Amount,Type']
     expenses.forEach(e => {
       const proj = projects.find(p => p.id === e.project_id)
-      csv.push(`${e.date},"${e.description}",${e.category},${e.subcategory},"${proj?.name || ''}",${e.amount},${e.status}`)
+      csv.push(`${e.date},"${e.description}",${e.category},${e.subcategory},"${proj?.name || ''}",${e.amount},${e.type || 'expense'}`)
     })
     const blob = new Blob([csv.join('\n')], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = 'expenses-export.csv'; a.click()
+    const a = document.createElement('a'); a.href = url; a.download = 'banking-export.csv'; a.click()
   }
 
-  // Pending bank feed count
+  // Pending bank feed count — now includes BOTH inflows and outflows
   const pendingTransactions = transactions.filter(t => {
-    if (t.amount >= 0 || t.skipped) return false
+    if (t.skipped || t.category) return false
     const linkedIds = new Set(expenses.filter(e => e.transaction_id).map(e => e.transaction_id))
     return !linkedIds.has(t.id)
   }).length
@@ -183,7 +231,7 @@ export default function ExpensesPage() {
       <div className="flex items-center justify-center h-[60vh]">
         <div className="text-center">
           <RefreshCw className="w-8 h-8 text-teal-500 animate-spin mx-auto mb-3" />
-          <p className="text-sm text-slate-500">Loading expenses...</p>
+          <p className="text-sm text-slate-500">Loading banking data...</p>
         </div>
       </div>
     )
@@ -195,8 +243,8 @@ export default function ExpensesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-white">Expenses</h1>
-          <p className="text-sm text-slate-500 mt-1">Track direct costs, overhead, and personal expenses</p>
+          <h1 className="text-xl font-bold tracking-tight text-white">Banking</h1>
+          <p className="text-sm text-slate-500 mt-1">Categorize transactions, track cash flow, manage accounts</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Year */}
@@ -259,7 +307,7 @@ export default function ExpensesPage() {
               activeTab === 'expenses' ? 'text-teal-400' : 'text-slate-500 hover:text-slate-300'
             }`}>
             <LayoutList size={15} />
-            Expenses
+            Transactions
             <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md ${
               activeTab === 'expenses' ? 'bg-teal-500/15 text-teal-400 border border-teal-500/20' : 'bg-slate-800/60 text-slate-400 border border-slate-800/80'
             }`}>{expenses.length}</span>
@@ -313,6 +361,7 @@ export default function ExpensesPage() {
           transactions={transactions}
           expenses={expenses}
           projects={projects}
+          clients={clients}
           onCategorizeTransaction={handleCategorizeTransaction}
           onSkipTransaction={handleSkipTransaction}
           onSyncQBO={handleSyncQBO}
