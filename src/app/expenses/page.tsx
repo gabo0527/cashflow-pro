@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import { getCurrentUser } from '@/lib/supabase'
-import { EXPENSE_CATEGORIES, CategoryManager } from '@/components/expenses/shared'
+import { EXPENSE_CATEGORIES, CategoryManager, hydrateCategories } from '@/components/expenses/shared'
 import OverviewSection from '@/components/expenses/OverviewSection'
 import ExpensesSection, { ExpensesSectionHandle } from '@/components/expenses/ExpensesSection'
 import BankFeedSection from '@/components/expenses/BankFeedSection'
@@ -79,7 +79,7 @@ export default function BankingPage() {
         .single()
       
       if (settings?.expense_categories) {
-        setCustomCategories(settings.expense_categories)
+        setCustomCategories(hydrateCategories(settings.expense_categories))
       }
     } catch (error) {
       console.error('Error loading data:', error)
