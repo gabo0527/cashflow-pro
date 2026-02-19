@@ -230,6 +230,43 @@ export const getAllSubcategories = () => {
   )
 }
 
+// ============ ICON RESOLVER ============
+// When categories are saved to JSON, React components serialize as {displayName: "Monitor"}
+// This maps them back to actual Lucide components on load
+
+const ICON_MAP: Record<string, any> = {
+  DollarSign, TrendingUp, TrendingDown, Users, Building2, Briefcase,
+  CreditCard, FileText, MoreHorizontal, Wrench, Package, UserCheck,
+  Monitor, Receipt, Landmark, Calculator, Gavel, Car, Utensils, Plane,
+  Heart, GraduationCap, Wallet, CheckCircle2, Clock, AlertCircle, Settings,
+  ArrowDownLeft, ArrowUpRight, Repeat, Banknote, PiggyBank, Gift, RefreshCw,
+  // Common aliases from serialization
+  Ellipsis: MoreHorizontal,
+}
+
+function resolveIcon(icon: any): any {
+  if (typeof icon === 'function') return icon // Already a component
+  if (icon?.displayName && ICON_MAP[icon.displayName]) return ICON_MAP[icon.displayName]
+  if (typeof icon === 'string' && ICON_MAP[icon]) return ICON_MAP[icon]
+  return MoreHorizontal // Fallback
+}
+
+// Hydrate categories loaded from DB — resolve serialized icons back to components
+export function hydrateCategories(saved: any): typeof EXPENSE_CATEGORIES {
+  if (!saved) return EXPENSE_CATEGORIES
+  const hydrated: any = {}
+  for (const [key, cat] of Object.entries(saved) as any[]) {
+    hydrated[key] = {
+      ...cat,
+      subcategories: cat.subcategories.map((sub: any) => ({
+        ...sub,
+        icon: resolveIcon(sub.icon),
+      }))
+    }
+  }
+  return hydrated
+}
+
 // ============ CARDHOLDERS ============
 export const CARDHOLDERS = [
   { id: 'gabriel', name: 'Gabriel Vazquez' },
