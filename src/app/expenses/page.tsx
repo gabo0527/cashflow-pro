@@ -41,6 +41,7 @@ export default function BankingPage() {
   // Category management
   const [showCategoryManager, setShowCategoryManager] = useState(false)
   const [customCategories, setCustomCategories] = useState(EXPENSE_CATEGORIES)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   // Ref for Expenses section
   const expensesSectionRef = useRef<ExpensesSectionHandle>(null)
@@ -182,16 +183,27 @@ export default function BankingPage() {
   }
 
   const handleSyncQBO = async () => {
-    if (!companyId) return
+    if (!companyId || isSyncing) return
+    setIsSyncing(true)
     try {
       const res = await fetch('/api/qbo/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ companyId, syncType: 'bank' }),
       })
-      if (res.ok) { loadData() }
+      const data = await res.json()
+      if (!res.ok) {
+        console.error('Sync failed:', data)
+        alert(`Sync failed: ${data.error || 'Unknown error'}`)
+      } else {
+        console.log('Sync result:', data)
+        loadData()
+      }
     } catch (err) {
       console.error('Sync error:', err)
+      alert('Sync failed — check console for details')
+    } finally {
+      setIsSyncing(false)
     }
   }
 
@@ -371,7 +383,7 @@ export default function BankingPage() {
           onCategorizeTransaction={handleCategorizeTransaction}
           onSkipTransaction={handleSkipTransaction}
           onSyncQBO={handleSyncQBO}
-          isSyncing={false}
+          isSyncing={isSyncing}
         />
       )}
 
