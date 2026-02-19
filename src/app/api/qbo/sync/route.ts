@@ -249,7 +249,7 @@ async function syncBankFeed(
             continue
           }
 
-          // Raw bank feed — no categories, no client/project assignment
+          // Raw bank feed — only update QBO-sourced fields, NEVER overwrite user categorizations
           const { error } = await supabase.from('transactions').upsert({
             company_id: companyId,
             qb_id: qbId,
@@ -259,14 +259,6 @@ async function syncBankFeed(
             payee: parsed.payee,
             account_name: parsed.accountName,
             type: parsed.amount >= 0 ? 'income' : 'expense',
-            category: null,
-            subcategory: null,
-            qb_category: null,
-            client: null,
-            client_id: null,
-            project: null,
-            project_id: null,
-            notes: null,
             sync_source: 'quickbooks',
             synced_at: new Date().toISOString(),
           }, { onConflict: 'company_id,qb_id', ignoreDuplicates: false })
