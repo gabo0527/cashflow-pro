@@ -57,9 +57,12 @@ export default function BankingPage() {
 
       setCompanyId(profile.company_id)
 
+      const yearStart = `${selectedYear}-01-01`
+      const yearEnd = `${selectedYear}-12-31`
+
       const [expRes, txnRes, projRes, clientRes, teamRes] = await Promise.all([
-        supabase.from('expenses').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
-        supabase.from('transactions').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
+        supabase.from('expenses').select('*').eq('company_id', profile.company_id).gte('date', yearStart).lte('date', yearEnd).order('date', { ascending: false }).limit(10000),
+        supabase.from('transactions').select('*').eq('company_id', profile.company_id).gte('date', yearStart).lte('date', yearEnd).order('date', { ascending: false }).limit(10000),
         supabase.from('projects').select('*').eq('company_id', profile.company_id).order('name'),
         supabase.from('clients').select('*').eq('company_id', profile.company_id).order('name'),
         supabase.from('team_members').select('id, name').eq('company_id', profile.company_id).order('name')
@@ -86,7 +89,7 @@ export default function BankingPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [selectedYear])
 
   useEffect(() => { loadData() }, [loadData])
 
