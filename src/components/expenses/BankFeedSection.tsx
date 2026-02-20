@@ -22,10 +22,11 @@ interface BankFeedSectionProps {
   onSkipTransaction: (transactionId: string) => void
   onSyncQBO: () => void
   isSyncing: boolean
+  syncStatus?: string
 }
 
 export default function BankFeedSection({
-  transactions, expenses, projects, clients, categories, onCategorizeTransaction, onSkipTransaction, onSyncQBO, isSyncing
+  transactions, expenses, projects, clients, categories, onCategorizeTransaction, onSkipTransaction, onSyncQBO, isSyncing, syncStatus
 }: BankFeedSectionProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState<'pending' | 'categorized' | 'skipped' | 'all'>('pending')
@@ -192,14 +193,21 @@ export default function BankFeedSection({
             <h2 className={`text-sm font-semibold ${THEME.textPrimary}`}>Bank Transactions</h2>
             <p className={`text-xs ${THEME.textDim} mt-0.5`}>Review and categorize transactions from your bank feed</p>
           </div>
-          <button 
-            onClick={onSyncQBO}
-            disabled={isSyncing}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/30 rounded-lg text-sm font-medium hover:bg-blue-500/20 transition-colors disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
-            {isSyncing ? 'Syncing...' : 'Sync QBO'}
-          </button>
+          <div className="flex items-center gap-3">
+            {syncStatus && (
+              <span className={`text-xs font-medium ${syncStatus.startsWith('Done') ? 'text-emerald-400' : 'text-blue-400'}`}>
+                {syncStatus}
+              </span>
+            )}
+            <button 
+              onClick={onSyncQBO}
+              disabled={isSyncing}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/30 rounded-lg text-sm font-medium hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
+              {isSyncing ? 'Syncing...' : 'Sync QBO'}
+            </button>
+          </div>
         </div>
 
         {/* Filters Row */}
