@@ -182,26 +182,64 @@ export default function BankingPage() {
     setTransactions(prev => prev.map(t => t.id === transactionId ? { ...t, skipped: true } : t))
   }
 
+  const [syncStatus, setSyncStatus] = useState('')
+
   const handleSyncQBO = async () => {
     if (!companyId || isSyncing) return
     setIsSyncing(true)
+    setSyncStatus('Getting sync plan...')
     try {
-      const res = await fetch('/api/qbo/sync', {
+      // Step 1: Get the list of entities to sync
+      const planRes = await fetch('/api/qbo/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ companyId, syncType: 'bank' }),
       })
-      const data = await res.json()
-      if (!res.ok) {
-        console.error('Sync failed:', data)
-        alert(`Sync failed: ${data.error || 'Unknown error'}`)
-      } else {
-        console.log('Sync result:', data)
-        loadData()
+      const plan = await planRes.json()
+
+      if (!planRes.ok || !plan.entities) {
+        alert(`Sync failed: ${plan.error || 'Could not get sync plan'}`)
+        setIsSyncing(false)
+        setSyncStatus('')
+        return
       }
+
+      // Step 2: Chain each entity one at a time
+      let totalSynced = 0
+      let totalErrors = 0
+      for (let i = 0; i < plan.entities.length; i++) {
+        const entity = plan.entities[i]
+        setSyncStatus(`Syncing ${entity}... (${i + 1}/${plan.entities.length})`)
+
+        const res = await fetch('/api/qbo/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ companyId, entity }),
+        })
+        const data = await res.json()
+
+        if (!res.ok) {
+          console.error(`Failed syncing ${entity}:`, data)
+          if (data.reconnect) {
+            alert('QuickBooks session expired — please reconnect.')
+            break
+          }
+          totalErrors++
+          continue
+        }
+
+        totalSynced += data.result?.synced || 0
+        totalErrors += data.result?.errors || 0
+        console.log(`✓ ${entity}: ${data.result?.synced || 0} synced`)
+      }
+
+      setSyncStatus(`Done! ${totalSynced} transactions synced.`)
+      loadData()
+      setTimeout(() => setSyncStatus(''), 4000)
     } catch (err) {
       console.error('Sync error:', err)
       alert('Sync failed — check console for details')
+      setSyncStatus('')
     } finally {
       setIsSyncing(false)
     }
@@ -384,6 +422,7 @@ export default function BankingPage() {
           onSkipTransaction={handleSkipTransaction}
           onSyncQBO={handleSyncQBO}
           isSyncing={isSyncing}
+          syncStatus={syncStatus}
         />
       )}
 
