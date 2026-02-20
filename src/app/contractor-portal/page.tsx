@@ -5,7 +5,8 @@ import {
   Clock, Receipt, FileText, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   AlertCircle, CheckCircle, Loader2, Upload, X, Plus, Trash2, Calendar,
   DollarSign, Send, Eye, Building2, User, FileUp, LogOut, Paperclip, File,
-  ArrowRight, CircleDot, Briefcase, Timer, CreditCard, Hash, History
+  ArrowRight, CircleDot, Briefcase, Timer, CreditCard, Hash, History,
+  LayoutDashboard, TrendingUp
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 
@@ -49,12 +50,24 @@ const PAYMENT_TERMS = [
   { id: 'NET45', label: 'Net 45' }, { id: 'NET60', label: 'Net 60' },
 ]
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  pending:   { label: 'Pending',   color: 'text-amber-400',   bg: 'bg-amber-400/10 border-amber-400/20' },
-  submitted: { label: 'Submitted', color: 'text-sky-400',     bg: 'bg-sky-400/10 border-sky-400/20' },
-  approved:  { label: 'Approved',  color: 'text-emerald-400', bg: 'bg-emerald-400/10 border-emerald-400/20' },
-  rejected:  { label: 'Rejected',  color: 'text-rose-400',    bg: 'bg-rose-400/10 border-rose-400/20' },
-  paid:      { label: 'Paid',      color: 'text-emerald-300', bg: 'bg-emerald-400/10 border-emerald-400/20' },
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; dot: string }> = {
+  pending:   { label: 'Pending',   color: 'text-amber-400',   bg: 'bg-amber-950/60 border-amber-800/40', dot: 'bg-amber-400' },
+  submitted: { label: 'Submitted', color: 'text-sky-400',     bg: 'bg-sky-950/60 border-sky-800/40', dot: 'bg-sky-400' },
+  approved:  { label: 'Approved',  color: 'text-emerald-400', bg: 'bg-emerald-950/60 border-emerald-800/40', dot: 'bg-emerald-400' },
+  rejected:  { label: 'Rejected',  color: 'text-rose-400',    bg: 'bg-rose-950/60 border-rose-800/40', dot: 'bg-rose-400' },
+  paid:      { label: 'Paid',      color: 'text-emerald-300', bg: 'bg-emerald-950/60 border-emerald-800/40', dot: 'bg-emerald-300' },
+}
+
+// ============ DESIGN TOKENS ============
+const T = {
+  card: "bg-[#0f1623] border border-slate-800/60 rounded-xl",
+  cardHover: "bg-[#0f1623] border border-slate-800/60 rounded-xl transition-all duration-200 hover:border-slate-700/80 hover:bg-[#111a2e]",
+  input: "w-full px-3.5 py-2.5 bg-[#0c1220] border border-slate-800/60 rounded-lg text-white text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500/40 transition-all duration-200",
+  select: "w-full px-3.5 py-2.5 bg-[#0c1220] border border-slate-800/60 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500/40 transition-all duration-200 cursor-pointer appearance-none",
+  label: "block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2",
+  btnPrimary: "px-5 py-2.5 bg-teal-600 hover:bg-teal-500 active:bg-teal-700 text-white text-sm font-semibold rounded-lg transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-teal-900/20",
+  btnGhost: "px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-white/[0.04] transition-all duration-200",
+  sectionTitle: "text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500",
 }
 
 // ============ FILE UPLOAD ============
@@ -72,19 +85,12 @@ async function uploadFile(file: File, folder: string, memberId: string): Promise
   } catch (err) { console.error('Upload error:', err); return null }
 }
 
-// ============ STYLED INPUT (institutional — matches admin pages) ============
-const inputClass = "w-full px-3.5 py-2.5 bg-slate-800/60 border border-slate-800/80 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 transition-colors"
-const selectClass = "w-full px-3.5 py-2.5 bg-slate-800/60 border border-slate-800/80 rounded-lg text-white text-sm focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 transition-colors cursor-pointer"
-const labelClass = "block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2"
-const btnPrimary = "px-5 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-const cardClass = "bg-[#111827] border border-slate-800/80 rounded-xl"
-
 // ============ STATUS PILL ============
 function StatusPill({ status }: { status: string }) {
   const config = STATUS_CONFIG[status] || STATUS_CONFIG.pending
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold uppercase tracking-wide border ${config.bg} ${config.color}`}>
-      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${config.bg} ${config.color}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${config.dot} animate-pulse`} style={{ animationDuration: '3s' }} />
       {config.label}
     </span>
   )
@@ -108,20 +114,20 @@ function DropZone({ file, onFile, onRemove, uploading, label, accept }: {
   if (file) {
     const isImage = file.type.startsWith('image/')
     return (
-      <div className="flex items-center gap-3 px-4 py-3 bg-slate-800/40 border border-slate-800/80 rounded-lg">
+      <div className="flex items-center gap-3 px-4 py-3 bg-[#0c1220] border border-slate-800/60 rounded-lg group">
         {isImage ? (
-          <img src={URL.createObjectURL(file)} alt="" className="w-10 h-10 rounded-lg object-cover border border-slate-800" />
+          <img src={URL.createObjectURL(file)} alt="" className="w-10 h-10 rounded-lg object-cover border border-slate-700/50" />
         ) : (
           <div className="w-10 h-10 rounded-lg bg-rose-500/10 flex items-center justify-center shrink-0">
             <FileText size={16} className="text-rose-400" />
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <p className="text-white text-sm truncate">{file.name}</p>
-          <p className="text-slate-500 text-xs">{file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}</p>
+          <p className="text-white text-sm font-medium truncate">{file.name}</p>
+          <p className="text-slate-600 text-xs tabular-nums">{file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}</p>
         </div>
         {uploading ? <Loader2 size={16} className="text-teal-400 animate-spin shrink-0" /> : (
-          <button onClick={onRemove} className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800/50 transition-colors shrink-0"><X size={14} /></button>
+          <button onClick={onRemove} className="p-1.5 rounded-lg text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-all duration-200 shrink-0 opacity-0 group-hover:opacity-100"><X size={14} /></button>
         )}
       </div>
     )
@@ -130,15 +136,15 @@ function DropZone({ file, onFile, onRemove, uploading, label, accept }: {
   return (
     <div onDragEnter={handleDragIn} onDragLeave={handleDragOut} onDragOver={handleDrag} onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
-      className={`relative cursor-pointer rounded-xl border-2 border-dashed transition-all duration-200 group ${
-        dragging ? 'border-teal-500/40 bg-teal-500/5' : 'border-slate-800/80 bg-slate-800/30 hover:border-slate-700 hover:bg-slate-800/40'
+      className={`relative cursor-pointer rounded-xl border-2 border-dashed transition-all duration-300 group ${
+        dragging ? 'border-teal-500/50 bg-teal-500/5 scale-[1.01]' : 'border-slate-800/50 bg-[#0c1220]/50 hover:border-slate-700/60 hover:bg-[#0c1220]'
       }`}>
-      <div className="flex flex-col items-center justify-center py-6 px-4">
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${dragging ? 'bg-teal-500/15' : 'bg-slate-800/50 group-hover:bg-slate-800/60'}`}>
-          <Upload size={18} className={dragging ? 'text-teal-400' : 'text-slate-400'} />
+      <div className="flex flex-col items-center justify-center py-8 px-4">
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 transition-all duration-300 ${dragging ? 'bg-teal-500/15 scale-110' : 'bg-slate-800/40 group-hover:bg-slate-800/60'}`}>
+          <Upload size={18} className={`transition-colors duration-200 ${dragging ? 'text-teal-400' : 'text-slate-500 group-hover:text-slate-400'}`} />
         </div>
-        <p className={`text-sm font-medium ${dragging ? 'text-teal-400' : 'text-slate-400'}`}>{dragging ? 'Drop file here' : label}</p>
-        <p className="text-[11px] text-slate-600 mt-1">or click to browse</p>
+        <p className={`text-sm font-medium transition-colors duration-200 ${dragging ? 'text-teal-400' : 'text-slate-500'}`}>{dragging ? 'Drop file here' : label}</p>
+        <p className="text-[11px] text-slate-700 mt-1.5">or click to browse</p>
       </div>
       <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={e => { if (e.target.files?.[0]) onFile(e.target.files[0]) }} />
     </div>
@@ -165,15 +171,15 @@ function MultiDropZone({ files, onAddFiles, onRemoveFile, uploading, label, acce
     <div className="space-y-2">
       <div onDragEnter={handleDragIn} onDragLeave={handleDragOut} onDragOver={handleDrag} onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
-        className={`relative cursor-pointer rounded-xl border-2 border-dashed transition-all duration-200 group ${
-          dragging ? 'border-teal-500/40 bg-teal-500/5' : 'border-slate-800/80 bg-slate-800/30 hover:border-slate-700 hover:bg-slate-800/40'
+        className={`relative cursor-pointer rounded-xl border-2 border-dashed transition-all duration-300 group ${
+          dragging ? 'border-teal-500/50 bg-teal-500/5 scale-[1.01]' : 'border-slate-800/50 bg-[#0c1220]/50 hover:border-slate-700/60 hover:bg-[#0c1220]'
         }`}>
-        <div className="flex flex-col items-center justify-center py-5 px-4">
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-colors ${dragging ? 'bg-teal-500/15' : 'bg-slate-800/50 group-hover:bg-slate-800/60'}`}>
-            <Upload size={18} className={dragging ? 'text-teal-400' : 'text-slate-400'} />
+        <div className="flex flex-col items-center justify-center py-6 px-4">
+          <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 transition-all duration-300 ${dragging ? 'bg-teal-500/15 scale-110' : 'bg-slate-800/40 group-hover:bg-slate-800/60'}`}>
+            <Upload size={18} className={`transition-colors duration-200 ${dragging ? 'text-teal-400' : 'text-slate-500 group-hover:text-slate-400'}`} />
           </div>
-          <p className={`text-sm font-medium ${dragging ? 'text-teal-400' : 'text-slate-400'}`}>{dragging ? 'Drop files here' : label}</p>
-          <p className="text-[11px] text-slate-600 mt-1">PDF, JPEG, PNG — multiple files</p>
+          <p className={`text-sm font-medium transition-colors duration-200 ${dragging ? 'text-teal-400' : 'text-slate-500'}`}>{dragging ? 'Drop files here' : label}</p>
+          <p className="text-[11px] text-slate-700 mt-1.5">PDF, JPEG, PNG — multiple files</p>
         </div>
         <input ref={inputRef} type="file" accept={accept} multiple className="hidden" onChange={e => {
           if (e.target.files) {
@@ -184,23 +190,41 @@ function MultiDropZone({ files, onAddFiles, onRemoveFile, uploading, label, acce
         }} />
       </div>
       {files.map((file, i) => (
-        <div key={i} className="flex items-center gap-3 px-3.5 py-2.5 bg-slate-800/40 border border-slate-800/80 rounded-xl">
+        <div key={i} className="flex items-center gap-3 px-3.5 py-2.5 bg-[#0c1220] border border-slate-800/60 rounded-lg group">
           {file.type.startsWith('image/') ? (
-            <img src={URL.createObjectURL(file)} alt="" className="w-8 h-8 rounded-lg object-cover border border-slate-800" />
+            <img src={URL.createObjectURL(file)} alt="" className="w-8 h-8 rounded-lg object-cover border border-slate-700/50" />
           ) : (
             <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center shrink-0">
               <FileText size={14} className="text-rose-400" />
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-white text-xs truncate">{file.name}</p>
-            <p className="text-slate-500 text-[11px]">{file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}</p>
+            <p className="text-white text-xs font-medium truncate">{file.name}</p>
+            <p className="text-slate-600 text-[11px] tabular-nums">{file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}</p>
           </div>
           {uploading ? <Loader2 size={14} className="text-teal-400 animate-spin shrink-0" /> : (
-            <button onClick={(e) => { e.stopPropagation(); onRemoveFile(i) }} className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800/50 transition-colors shrink-0"><X size={12} /></button>
+            <button onClick={(e) => { e.stopPropagation(); onRemoveFile(i) }} className="p-1 rounded-lg text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-all duration-200 shrink-0 opacity-0 group-hover:opacity-100"><X size={12} /></button>
           )}
         </div>
       ))}
+    </div>
+  )
+}
+
+// ============ WEEK NAVIGATOR ============
+function WeekNav({ week, onPrev, onNext }: { week: { label: string }; onPrev: () => void; onNext: () => void }) {
+  return (
+    <div className="inline-flex items-center gap-0 bg-[#0f1623] border border-slate-800/60 rounded-xl overflow-hidden">
+      <button onClick={onPrev} className="p-2.5 text-slate-500 hover:text-white hover:bg-white/[0.04] transition-all duration-200 border-r border-slate-800/40">
+        <ChevronLeft size={15} />
+      </button>
+      <div className="flex items-center gap-2.5 px-5 py-2">
+        <Calendar size={13} className="text-teal-400" />
+        <span className="text-sm font-semibold text-white tracking-tight">{week.label}</span>
+      </div>
+      <button onClick={onNext} className="p-2.5 text-slate-500 hover:text-white hover:bg-white/[0.04] transition-all duration-200 border-l border-slate-800/40">
+        <ChevronRight size={15} />
+      </button>
     </div>
   )
 }
@@ -293,7 +317,6 @@ export default function ContractorPortal() {
       const pMap: Record<string, any> = {}; (projects || []).forEach((p: any) => { pMap[p.id] = p })
       const assigns: Assignment[] = (pa || []).map((a: any) => { const p = pMap[a.project_id]; return { project_id: a.project_id, project_name: p?.name || 'Unknown', client_id: p?.client_id || '', client_name: p?.client_id ? cMap[p.client_id] || '' : '', payment_type: a.payment_type || 'tm', rate: a.bill_rate || a.rate || 0 } }).filter((a: Assignment) => a.project_name !== 'Unknown')
 
-      // Ensure company_id — fallback to project's company_id if member record is missing it
       if (!md.company_id && projects && projects.length > 0) {
         const projectWithCompany = projects.find((p: any) => p.company_id)
         if (projectWithCompany) md.company_id = projectWithCompany.company_id
@@ -442,7 +465,6 @@ export default function ContractorPortal() {
     const load = async () => {
       setHistoryLoading(true)
       try {
-        // Time entries for the selected month
         const { data: timeData } = await supabase
           .from('time_entries')
           .select('id, project_id, hours, billable_hours, description, date, created_at')
@@ -451,7 +473,6 @@ export default function ContractorPortal() {
           .lte('date', historyRange.end)
           .order('date', { ascending: false })
 
-        // Expenses for the selected month
         const { data: expData } = await supabase
           .from('contractor_expenses')
           .select('*')
@@ -460,7 +481,6 @@ export default function ContractorPortal() {
           .lte('date', historyRange.end)
           .order('date', { ascending: false })
 
-        // Invoices where period overlaps the selected month
         const { data: invData } = await supabase
           .from('contractor_invoices')
           .select('*, contractor_invoice_lines(*)')
@@ -478,7 +498,6 @@ export default function ContractorPortal() {
     load()
   }, [member, activeTab, historyRange.start, historyRange.end])
 
-  // History computed totals
   const historyTotals = useMemo(() => {
     const totalHours = historyTime.reduce((s: number, e: any) => s + (e.hours || 0), 0)
     const totalExpenses = historyExpenses.reduce((s, e) => s + (e.amount || 0), 0)
@@ -486,7 +505,6 @@ export default function ContractorPortal() {
     return { totalHours, totalExpenses, totalInvoiced }
   }, [historyTime, historyExpenses, historyInvoices])
 
-  // Group time entries by week for history display
   const historyTimeByWeek = useMemo(() => {
     const weeks: Record<string, { label: string; entries: any[]; totalHours: number }> = {}
     historyTime.forEach((e: any) => {
@@ -509,48 +527,52 @@ export default function ContractorPortal() {
   }, [historyTime])
 
   const navItems = [
-    { id: 'time' as const, label: 'Timesheet', icon: Timer, desc: 'Log hours' },
-    { id: 'expenses' as const, label: 'Expenses', icon: CreditCard, desc: 'Track costs' },
-    { id: 'invoices' as const, label: 'Invoices', icon: FileText, desc: 'Bill clients' },
-    { id: 'history' as const, label: 'History', icon: History, desc: 'Past records' }
+    { id: 'time' as const, label: 'Timesheet', icon: Timer },
+    { id: 'expenses' as const, label: 'Expenses', icon: CreditCard },
+    { id: 'invoices' as const, label: 'Invoices', icon: FileText },
+    { id: 'history' as const, label: 'History', icon: History }
   ]
   const totalTimeHours = Object.values(timeEntries).reduce((s, e) => s + parseFloat(e.hours || '0'), 0)
 
   // ============ LOGIN SCREEN ============
   if (step === 'email') {
     return (
-      <div className="min-h-screen bg-[#0B0F19] flex items-center justify-center p-4">
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center justify-center w-14 h-14 mb-5">
-              <svg width={40} height={40} viewBox="0 0 40 40" fill="none">
-                <defs><linearGradient id="vLogo" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#2dd4bf" /><stop offset="100%" stopColor="#10b981" /></linearGradient></defs>
-                <path d="M8 8L20 32L32 8" stroke="url(#vLogo)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <div className="min-h-screen bg-[#080c14] flex items-center justify-center p-4 relative overflow-hidden">
+        {/* Subtle ambient glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-teal-500/[0.03] rounded-full blur-[120px] pointer-events-none" />
+        
+        <div className="w-full max-w-[380px] relative z-10">
+          {/* Logo */}
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center justify-center w-16 h-16 mb-6">
+              <svg width={44} height={44} viewBox="0 0 40 40" fill="none">
+                <defs><linearGradient id="vLogo" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#2dd4bf" /><stop offset="100%" stopColor="#0d9488" /></linearGradient></defs>
+                <path d="M8 8L20 32L32 8" stroke="url(#vLogo)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
               </svg>
             </div>
-            <h1 className="text-[22px] font-bold text-white tracking-tight">Welcome to Vantage</h1>
-            <p className="text-slate-500 text-sm mt-2">Time tracking, expenses, and invoicing</p>
+            <h1 className="text-2xl font-bold text-white tracking-tight">Vantage</h1>
+            <p className="text-slate-600 text-sm mt-2 tracking-wide">Contractor Portal</p>
           </div>
 
-          <div className={`${cardClass} p-6`}>
-            <label className={labelClass}>Email address</label>
+          <div className={`${T.card} p-7`}>
+            <label className={T.label}>Email address</label>
             <input 
               type="email" value={email} onChange={e => setEmail(e.target.value)} 
               onKeyDown={e => e.key === 'Enter' && lookupEmail()} 
               placeholder="you@company.com"
-              className={`${inputClass} mb-4`} 
+              className={`${T.input} mb-5`} 
             />
             {error && (
-              <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg flex items-center gap-2.5 text-rose-400 text-sm">
+              <div className="mb-5 p-3.5 bg-rose-500/8 border border-rose-500/15 rounded-lg flex items-center gap-2.5 text-rose-400 text-sm">
                 <AlertCircle size={15} className="shrink-0" /> {error}
               </div>
             )}
-            <button onClick={lookupEmail} disabled={loading} className={`w-full ${btnPrimary}`}>
-              {loading ? <><Loader2 size={16} className="animate-spin" /> Looking up...</> : <>Continue <ArrowRight size={15} /></>}
+            <button onClick={lookupEmail} disabled={loading} className={`w-full ${T.btnPrimary} py-3`}>
+              {loading ? <><Loader2 size={16} className="animate-spin" /> Verifying...</> : <>Sign In <ArrowRight size={15} /></>}
             </button>
           </div>
 
-          <p className="text-center text-slate-700 text-[11px] mt-8 tracking-wide uppercase">Powered by Vantage</p>
+          <p className="text-center text-slate-800 text-[10px] mt-10 tracking-[0.12em] uppercase font-medium">Powered by Vantage</p>
         </div>
       </div>
     )
@@ -558,40 +580,43 @@ export default function ContractorPortal() {
 
   // ============ PORTAL ============
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-white">
+    <div className="min-h-screen bg-[#080c14] text-white">
       {/* Top Bar */}
-      <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-[#0B0F19]/95">
+      <header className="sticky top-0 z-40 border-b border-slate-800/50 bg-[#080c14]/90 backdrop-blur-xl">
         <div className="max-w-5xl mx-auto px-6">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-[60px]">
             {/* Logo + Name */}
-            <div className="flex items-center gap-3.5">
-              <svg width={24} height={24} viewBox="0 0 40 40" fill="none">
-                <defs><linearGradient id="vS" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#2dd4bf" /><stop offset="100%" stopColor="#10b981" /></linearGradient></defs>
-                <path d="M8 8L20 32L32 8" stroke="url(#vS)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <div className="flex items-center gap-3">
+              <svg width={22} height={22} viewBox="0 0 40 40" fill="none">
+                <defs><linearGradient id="vS" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#2dd4bf" /><stop offset="100%" stopColor="#0d9488" /></linearGradient></defs>
+                <path d="M8 8L20 32L32 8" stroke="url(#vS)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
               </svg>
-              <div className="h-5 w-px bg-slate-700" />
-              <span className="text-sm text-slate-400">{member?.name}</span>
+              <div className="h-4 w-px bg-slate-800" />
+              <span className="text-[13px] font-medium text-slate-500">{member?.name}</span>
             </div>
 
-            {/* Nav — underline tabs */}
-            <nav className="flex items-center gap-0">
+            {/* Nav Tabs */}
+            <nav className="flex items-center">
               {navItems.map(item => (
                 <button key={item.id} onClick={() => { setActiveTab(item.id); setError(null) }}
-                  className={`relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 ${
+                  className={`relative flex items-center gap-2 px-4 h-[60px] text-[13px] font-medium transition-all duration-200 ${
                     activeTab === item.id 
-                      ? 'text-teal-400 border-teal-400' 
-                      : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'
+                      ? 'text-white' 
+                      : 'text-slate-600 hover:text-slate-400'
                   }`}>
-                  <item.icon size={15} />
+                  <item.icon size={14} className={activeTab === item.id ? 'text-teal-400' : ''} />
                   <span>{item.label}</span>
+                  {activeTab === item.id && (
+                    <span className="absolute bottom-0 left-4 right-4 h-[2px] bg-teal-400 rounded-full" />
+                  )}
                 </button>
               ))}
             </nav>
 
             {/* Sign out */}
             <button onClick={() => { setStep('email'); setMember(null); setAssignments([]); setRateCards([]); setEmail('') }}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-slate-600 hover:text-rose-400 hover:bg-slate-800/40 transition-all duration-200">
-              <LogOut size={15} />
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-700 hover:text-rose-400 hover:bg-rose-500/5 transition-all duration-200">
+              <LogOut size={14} />
             </button>
           </div>
         </div>
@@ -601,92 +626,80 @@ export default function ContractorPortal() {
       <main className="max-w-5xl mx-auto px-6 py-8">
         {/* Error Banner */}
         {error && (
-          <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-lg flex items-center gap-3 text-rose-400 text-sm animate-in slide-in-from-top-2">
+          <div className="mb-6 p-4 bg-rose-500/8 border border-rose-500/15 rounded-xl flex items-center gap-3 text-rose-400 text-sm">
             <AlertCircle size={16} className="shrink-0" />
             <span className="flex-1">{error}</span>
-            <button onClick={() => setError(null)} className="p-1 hover:bg-slate-800/50 rounded-lg transition-colors"><X size={14} /></button>
+            <button onClick={() => setError(null)} className="p-1 hover:bg-white/5 rounded-lg transition-colors"><X size={14} /></button>
           </div>
         )}
 
         {/* ====== TIMESHEET ====== */}
         {activeTab === 'time' && (
           <div className="space-y-6">
-            {/* Header */}
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-xl font-bold tracking-tight">Timesheet</h1>
-                <p className="text-slate-500 text-sm mt-1">Log your hours for the week</p>
+                <p className="text-slate-600 text-sm mt-0.5">Log your weekly hours by project</p>
               </div>
-              <div className="flex items-center gap-2">
-                {timeSuccess && (
-                  <div className="flex items-center gap-2 text-emerald-400 text-sm bg-emerald-400/10 border border-emerald-400/20 px-4 py-2 rounded-xl">
-                    <CheckCircle size={15} /> Submitted
-                  </div>
-                )}
-              </div>
+              {timeSuccess && (
+                <div className="flex items-center gap-2 text-emerald-400 text-sm bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-xl animate-in fade-in slide-in-from-right-2 duration-300">
+                  <CheckCircle size={15} /> Submitted successfully
+                </div>
+              )}
             </div>
 
-            {/* Week Navigator */}
-            <div className={`${cardClass} p-1.5 inline-flex items-center gap-1`}>
-              <button onClick={() => { const d = new Date(weekDate); d.setDate(d.getDate() - 7); setWeekDate(d) }}
-                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-200">
-                <ChevronLeft size={16} />
-              </button>
-              <div className="flex items-center gap-2.5 px-4 py-1.5">
-                <Calendar size={14} className="text-teal-400" />
-                <span className="text-sm font-medium text-white">{week.label}</span>
-              </div>
-              <button onClick={() => { const d = new Date(weekDate); d.setDate(d.getDate() + 7); setWeekDate(d) }}
-                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-200">
-                <ChevronRight size={16} />
-              </button>
-            </div>
+            <WeekNav week={week}
+              onPrev={() => { const d = new Date(weekDate); d.setDate(d.getDate() - 7); setWeekDate(d) }}
+              onNext={() => { const d = new Date(weekDate); d.setDate(d.getDate() + 7); setWeekDate(d) }}
+            />
 
             {/* Client Sections */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               {Object.entries(assignmentsByClient).map(([cid, { clientName, projects }]) => {
                 const collapsed = collapsedClients.has(cid)
                 const clientHours = projects.reduce((s, p) => s + parseFloat(timeEntries[p.project_id]?.hours || '0'), 0)
                 return (
-                  <div key={cid} className={`${cardClass} overflow-hidden`}>
+                  <div key={cid} className={`${T.card} overflow-hidden`}>
                     <button onClick={() => { const n = new Set(collapsedClients); collapsed ? n.delete(cid) : n.add(cid); setCollapsedClients(n) }}
-                      className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-800/30 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
+                      className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-all duration-200">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-9 h-9 rounded-lg bg-teal-500/8 border border-teal-500/15 flex items-center justify-center">
                           <Briefcase size={14} className="text-teal-400" />
                         </div>
                         <div className="text-left">
                           <span className="text-white font-semibold text-sm">{clientName}</span>
-                          <span className="text-slate-600 text-xs ml-2">{projects.length} project{projects.length !== 1 ? 's' : ''}</span>
+                          <span className="text-slate-700 text-xs ml-2.5">{projects.length} project{projects.length !== 1 ? 's' : ''}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3">
                         {clientHours > 0 && (
-                          <span className="text-sm font-semibold text-teal-400 bg-teal-400/10 px-3 py-1 rounded-lg">{clientHours}h</span>
+                          <span className="text-sm font-bold text-teal-400 tabular-nums bg-teal-400/8 border border-teal-400/15 px-3 py-1 rounded-lg">{clientHours}h</span>
                         )}
-                        <ChevronDown size={16} className={`text-slate-500 transition-transform duration-200 ${collapsed ? '' : 'rotate-180'}`} />
+                        <ChevronDown size={14} className={`text-slate-600 transition-transform duration-300 ${collapsed ? '' : 'rotate-180'}`} />
                       </div>
                     </button>
                     {!collapsed && (
-                      <div className="px-5 pb-4 space-y-2">
+                      <div className="px-5 pb-5 space-y-2">
                         {projects.map(p => (
-                            <div key={p.project_id} className="bg-slate-800/30 border border-slate-800/60 rounded-xl p-3.5 transition-all duration-200 hover:border-slate-700">
-                              <div className="flex items-center gap-4">
-                                <span className="text-slate-300 text-sm flex-1 min-w-0 truncate">{p.project_name}</span>
-                                <div className="flex items-center gap-2">
-                                  <input type="number" placeholder="0" min="0" step="0.5" 
-                                    value={timeEntries[p.project_id]?.hours || ''} 
-                                    onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], hours: e.target.value } }))}
-                                    className="w-20 px-3 py-2 bg-slate-800/40 border border-slate-800/80 rounded-lg text-white text-sm text-right focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 transition-all" />
-                                  <span className="text-slate-600 text-xs font-medium w-6">hrs</span>
-                                </div>
+                          <div key={p.project_id} className="bg-white/[0.02] border border-slate-800/40 rounded-xl p-4 transition-all duration-200 hover:border-slate-700/60 group">
+                            <div className="flex items-center gap-4">
+                              <div className="flex-1 min-w-0">
+                                <span className="text-slate-300 text-sm font-medium truncate block">{p.project_name}</span>
                               </div>
-                              <input type="text" placeholder="What did you work on?" 
-                                value={timeEntries[p.project_id]?.notes || ''} 
-                                onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], notes: e.target.value } }))}
-                                className="w-full mt-3 px-3.5 py-2 bg-slate-800/30 border border-slate-800/60 rounded-lg text-slate-400 text-xs placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 transition-all" />
+                              <div className="flex items-center gap-2">
+                                <input type="number" placeholder="0" min="0" step="0.5" 
+                                  value={timeEntries[p.project_id]?.hours || ''} 
+                                  onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], hours: e.target.value } }))}
+                                  className="w-[72px] px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-white text-sm text-right tabular-nums font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500/40 transition-all duration-200" />
+                                <span className="text-slate-700 text-xs font-medium w-5">hrs</span>
+                              </div>
                             </div>
-                          ))}
+                            <input type="text" placeholder="What did you work on?" 
+                              value={timeEntries[p.project_id]?.notes || ''} 
+                              onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], notes: e.target.value } }))}
+                              className="w-full mt-3 px-3.5 py-2 bg-transparent border border-slate-800/30 rounded-lg text-slate-400 text-xs placeholder-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500/15 focus:border-teal-500/30 focus:bg-[#0c1220]/50 transition-all duration-200" />
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -695,12 +708,12 @@ export default function ContractorPortal() {
             </div>
 
             {/* Submit Footer */}
-            <div className={`${cardClass} p-5`}>
+            <div className={`${T.card} p-5`}>
               <div className="flex items-center justify-between mb-4">
-                <span className="text-slate-400 text-sm font-medium">Total Hours</span>
-                <span className={`text-2xl font-bold tracking-tight ${totalTimeHours > 0 ? 'text-white' : 'text-slate-700'}`}>{totalTimeHours}</span>
+                <span className="text-slate-500 text-sm font-medium">Total Hours</span>
+                <span className={`text-2xl font-bold tracking-tight tabular-nums ${totalTimeHours > 0 ? 'text-white' : 'text-slate-800'}`}>{totalTimeHours}</span>
               </div>
-              <button onClick={submitTime} disabled={submittingTime || totalTimeHours === 0} className={`w-full ${btnPrimary} py-3`}>
+              <button onClick={submitTime} disabled={submittingTime || totalTimeHours === 0} className={`w-full ${T.btnPrimary} py-3`}>
                 {submittingTime ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <><Send size={16} /> Submit Timesheet</>}
               </button>
             </div>
@@ -713,52 +726,56 @@ export default function ContractorPortal() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-xl font-bold tracking-tight">Expenses</h1>
-                <p className="text-slate-500 text-sm mt-1">Submit and track expense reports</p>
+                <p className="text-slate-600 text-sm mt-0.5">Submit and track expense reports</p>
               </div>
-              <button onClick={() => setShowExpenseForm(true)} className={btnPrimary}>
+              <button onClick={() => setShowExpenseForm(true)} className={T.btnPrimary}>
                 <Plus size={15} /> New Expense
               </button>
             </div>
 
             {/* New Expense Form */}
             {showExpenseForm && (
-              <div className={`${cardClass} p-6 border-teal-500/20`}>
+              <div className={`${T.card} p-6 border-teal-500/15`}>
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-white font-semibold">New Expense</h2>
-                  <button onClick={() => { setShowExpenseForm(false); setExpenseFiles([]) }} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800/50 transition-colors"><X size={16} /></button>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
+                      <Receipt size={14} className="text-teal-400" />
+                    </div>
+                    <h2 className="text-white font-semibold text-sm">New Expense</h2>
+                  </div>
+                  <button onClick={() => { setShowExpenseForm(false); setExpenseFiles([]) }} className="p-1.5 rounded-lg text-slate-600 hover:text-white hover:bg-white/5 transition-all duration-200"><X size={16} /></button>
                 </div>
                 <div className="grid grid-cols-2 gap-5">
                   <div>
-                    <label className={labelClass}>Date</label>
-                    <input type="date" value={expenseForm.date} onChange={e => setExpenseForm(p => ({ ...p, date: e.target.value }))} className={inputClass} />
+                    <label className={T.label}>Date</label>
+                    <input type="date" value={expenseForm.date} onChange={e => setExpenseForm(p => ({ ...p, date: e.target.value }))} className={T.input} />
                   </div>
                   <div>
-                    <label className={labelClass}>Category</label>
-                    <select value={expenseForm.category} onChange={e => setExpenseForm(p => ({ ...p, category: e.target.value }))} className={selectClass}>
+                    <label className={T.label}>Category</label>
+                    <select value={expenseForm.category} onChange={e => setExpenseForm(p => ({ ...p, category: e.target.value }))} className={T.select}>
                       {EXPENSE_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className={labelClass}>Amount</label>
+                    <label className={T.label}>Amount</label>
                     <div className="relative">
-                      <DollarSign size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                      <input type="number" placeholder="0.00" step="0.01" min="0" value={expenseForm.amount} onChange={e => setExpenseForm(p => ({ ...p, amount: e.target.value }))} className={`${inputClass} pl-9`} />
+                      <DollarSign size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-600" />
+                      <input type="number" placeholder="0.00" step="0.01" min="0" value={expenseForm.amount} onChange={e => setExpenseForm(p => ({ ...p, amount: e.target.value }))} className={`${T.input} pl-9 tabular-nums`} />
                     </div>
                   </div>
                   <div>
-                    <label className={labelClass}>Client</label>
-                    <select value={expenseForm.client_id} onChange={e => setExpenseForm(p => ({ ...p, client_id: e.target.value, project_id: '' }))} className={selectClass}>
+                    <label className={T.label}>Client</label>
+                    <select value={expenseForm.client_id} onChange={e => setExpenseForm(p => ({ ...p, client_id: e.target.value, project_id: '' }))} className={T.select}>
                       <option value="">No client (general)</option>
                       {Object.entries(assignmentsByClient).map(([cid, { clientName }]) => <option key={cid} value={cid}>{clientName}</option>)}
                     </select>
                   </div>
 
-                  {/* Billable Indicator */}
                   {expenseForm.client_id && (() => {
                     const cName = assignmentsByClient[expenseForm.client_id]?.clientName || ''
                     const isInternal = cName.toLowerCase().includes('mano') || cName.toLowerCase().includes('internal') || cName.toLowerCase().includes('overhead')
                     return (
-                      <div className={`col-span-2 flex items-center gap-2.5 px-4 py-3 rounded-xl border ${isInternal ? 'bg-amber-400/5 border-amber-400/15' : 'bg-teal-400/5 border-teal-400/15'}`}>
+                      <div className={`col-span-2 flex items-center gap-2.5 px-4 py-3 rounded-xl border ${isInternal ? 'bg-amber-500/5 border-amber-500/10' : 'bg-teal-500/5 border-teal-500/10'}`}>
                         <div className={`w-2 h-2 rounded-full ${isInternal ? 'bg-amber-400' : 'bg-teal-400'}`} />
                         <span className={`text-xs font-semibold ${isInternal ? 'text-amber-400' : 'text-teal-400'}`}>
                           {isInternal ? 'Overhead — company operating expense' : 'Billable — billed to client at cost'}
@@ -768,15 +785,15 @@ export default function ContractorPortal() {
                   })()}
 
                   <div className="col-span-2">
-                    <label className={labelClass}>Description</label>
-                    <input type="text" placeholder="What was this expense for?" value={expenseForm.description} onChange={e => setExpenseForm(p => ({ ...p, description: e.target.value }))} className={inputClass} />
+                    <label className={T.label}>Description</label>
+                    <input type="text" placeholder="What was this expense for?" value={expenseForm.description} onChange={e => setExpenseForm(p => ({ ...p, description: e.target.value }))} className={T.input} />
                   </div>
                   <div className="col-span-2">
-                    <label className={labelClass}>Receipts / Documents</label>
+                    <label className={T.label}>Receipts / Documents</label>
                     <MultiDropZone files={expenseFiles} onAddFiles={(f) => setExpenseFiles(prev => [...prev, ...f])} onRemoveFile={(i) => setExpenseFiles(prev => prev.filter((_, idx) => idx !== i))} uploading={submittingExpense} label="Drop receipts here" accept="image/*,.pdf" />
                   </div>
                 </div>
-                <button onClick={submitExpense} disabled={submittingExpense || !expenseForm.description || !expenseForm.amount} className={`w-full mt-6 ${btnPrimary} py-3`}>
+                <button onClick={submitExpense} disabled={submittingExpense || !expenseForm.description || !expenseForm.amount} className={`w-full mt-6 ${T.btnPrimary} py-3`}>
                   {submittingExpense ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <><Send size={16} /> Submit Expense</>}
                 </button>
               </div>
@@ -784,37 +801,36 @@ export default function ContractorPortal() {
 
             {/* Expense List */}
             {expenses.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {expenses.map(exp => {
                   const cat = EXPENSE_CATEGORIES.find(c => c.id === exp.category)
-                  const st = STATUS_CONFIG[exp.status] || STATUS_CONFIG.pending
                   return (
-                    <div key={exp.id} className={`${cardClass} px-5 py-4 flex items-center gap-4 hover:bg-slate-800/30 transition-all duration-200`}>
-                      <div className="w-10 h-10 rounded-xl bg-slate-800/40 flex items-center justify-center shrink-0">
-                        <Receipt size={16} className="text-slate-400" />
+                    <div key={exp.id} className={`${T.cardHover} px-5 py-4 flex items-center gap-4`}>
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/8 border border-amber-500/12 flex items-center justify-center shrink-0">
+                        <Receipt size={15} className="text-amber-400" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-white text-sm font-medium truncate">{exp.description}</p>
-                        <div className="flex items-center gap-2 text-slate-500 text-xs mt-1">
+                        <div className="flex items-center gap-2 text-slate-600 text-xs mt-1">
                           <span>{formatDate(exp.date)}</span>
-                          <span className="w-1 h-1 rounded-full bg-slate-700" />
+                          <span className="w-0.5 h-0.5 rounded-full bg-slate-700" />
                           <span>{cat?.label || exp.category}</span>
-                          {exp.receipt_url && <><span className="w-1 h-1 rounded-full bg-slate-700" /><Paperclip size={10} className="text-sky-400" /></>}
+                          {exp.receipt_url && <><span className="w-0.5 h-0.5 rounded-full bg-slate-700" /><Paperclip size={10} className="text-sky-500" /></>}
                         </div>
                       </div>
-                      <span className="text-white font-semibold text-sm">{formatCurrency(exp.amount)}</span>
+                      <span className="text-white font-semibold text-sm tabular-nums">{formatCurrency(exp.amount)}</span>
                       <StatusPill status={exp.status} />
                     </div>
                   )
                 })}
               </div>
             ) : (
-              <div className={`${cardClass} text-center py-16`}>
-                <div className="w-14 h-14 rounded-xl bg-slate-800/40 flex items-center justify-center mx-auto mb-4">
-                  <Receipt size={24} className="text-slate-600" />
+              <div className={`${T.card} text-center py-20`}>
+                <div className="w-14 h-14 rounded-2xl bg-slate-800/30 flex items-center justify-center mx-auto mb-4">
+                  <Receipt size={22} className="text-slate-700" />
                 </div>
-                <p className="text-slate-500 text-sm">No expenses submitted yet</p>
-                <p className="text-slate-700 text-xs mt-1">Click "New Expense" to get started</p>
+                <p className="text-slate-500 text-sm font-medium">No expenses yet</p>
+                <p className="text-slate-700 text-xs mt-1.5">Click "New Expense" to submit your first report</p>
               </div>
             )}
           </div>
@@ -826,47 +842,52 @@ export default function ContractorPortal() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-xl font-bold tracking-tight">Invoices</h1>
-                <p className="text-slate-500 text-sm mt-1">Submit monthly invoices</p>
+                <p className="text-slate-600 text-sm mt-0.5">Submit monthly invoices</p>
               </div>
               <button onClick={() => { 
                 const defaultClient = contractorType === 'pure_ls' ? 'all' : ''
                 setInvoiceForm(p => ({ ...p, client_id: defaultClient }))
                 setShowInvoiceForm(true) 
-              }} className={btnPrimary}>
+              }} className={T.btnPrimary}>
                 <Plus size={15} /> New Invoice
               </button>
             </div>
 
             {/* New Invoice Form */}
             {showInvoiceForm && (
-              <div className={`${cardClass} p-6 border-teal-500/20`}>
+              <div className={`${T.card} p-6 border-teal-500/15`}>
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-white font-semibold">Submit Invoice</h2>
-                  <button onClick={() => { setShowInvoiceForm(false); setInvoiceFile(null) }} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800/50 transition-colors"><X size={16} /></button>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-sky-500/10 flex items-center justify-center">
+                      <FileText size={14} className="text-sky-400" />
+                    </div>
+                    <h2 className="text-white font-semibold text-sm">Submit Invoice</h2>
+                  </div>
+                  <button onClick={() => { setShowInvoiceForm(false); setInvoiceFile(null) }} className="p-1.5 rounded-lg text-slate-600 hover:text-white hover:bg-white/5 transition-all duration-200"><X size={16} /></button>
                 </div>
 
                 {/* Row 1 */}
                 <div className="grid grid-cols-2 gap-5 mb-5">
                   <div>
-                    <label className={labelClass}>Invoice Number</label>
+                    <label className={T.label}>Invoice Number</label>
                     <div className="relative">
-                      <Hash size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                      <input type="text" placeholder="INV-2026-001" value={invoiceForm.invoice_number} onChange={e => setInvoiceForm(p => ({ ...p, invoice_number: e.target.value }))} className={`${inputClass} pl-9`} />
+                      <Hash size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-600" />
+                      <input type="text" placeholder="INV-2026-001" value={invoiceForm.invoice_number} onChange={e => setInvoiceForm(p => ({ ...p, invoice_number: e.target.value }))} className={`${T.input} pl-9`} />
                     </div>
                   </div>
                   {contractorType === 'pure_ls' ? (
                     <div>
-                      <label className={labelClass}>Invoice For</label>
-                      <div className={`${inputClass} bg-slate-800/30 text-slate-400`}>All Clients (distributed by effort)</div>
+                      <label className={T.label}>Invoice For</label>
+                      <div className={`${T.input} bg-slate-800/20 text-slate-500 cursor-default`}>All Clients (distributed by effort)</div>
                     </div>
                   ) : (
                     <div>
-                      <label className={labelClass}>Invoice For</label>
-                      <select value={invoiceForm.client_id} onChange={e => setInvoiceForm(p => ({ ...p, client_id: e.target.value }))} className={selectClass}>
+                      <label className={T.label}>Invoice For</label>
+                      <select value={invoiceForm.client_id} onChange={e => setInvoiceForm(p => ({ ...p, client_id: e.target.value }))} className={T.select}>
                         <option value="">Select a client</option>
                         {Object.entries(assignmentsByClient).map(([cid, { clientName }]) => <option key={cid} value={cid}>{clientName}</option>)}
                       </select>
-                      {contractorType === 'mixed' && <p className="text-[11px] text-slate-600 mt-1.5">Submit a separate invoice for each client.</p>}
+                      {contractorType === 'mixed' && <p className="text-[11px] text-slate-700 mt-1.5">Submit a separate invoice for each client.</p>}
                     </div>
                   )}
                 </div>
@@ -874,18 +895,18 @@ export default function ContractorPortal() {
                 {/* Row 2 */}
                 <div className="grid grid-cols-2 gap-5 mb-5">
                   <div>
-                    <label className={labelClass}>Billing Period</label>
-                    <div className={`${cardClass} p-1 inline-flex items-center gap-1 w-full`}>
-                      <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() - 1); setInvoiceMonth(d) }} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors"><ChevronLeft size={14} /></button>
-                      <span className="text-white text-sm font-medium flex-1 text-center py-1">{billingMonth.label}</span>
-                      <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() + 1); setInvoiceMonth(d) }} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors"><ChevronRight size={14} /></button>
+                    <label className={T.label}>Billing Period</label>
+                    <div className="inline-flex items-center gap-0 bg-[#0f1623] border border-slate-800/60 rounded-xl overflow-hidden w-full">
+                      <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() - 1); setInvoiceMonth(d) }} className="p-2.5 text-slate-500 hover:text-white hover:bg-white/[0.04] transition-all duration-200 border-r border-slate-800/40"><ChevronLeft size={14} /></button>
+                      <span className="text-white text-sm font-medium flex-1 text-center py-2">{billingMonth.label}</span>
+                      <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() + 1); setInvoiceMonth(d) }} className="p-2.5 text-slate-500 hover:text-white hover:bg-white/[0.04] transition-all duration-200 border-l border-slate-800/40"><ChevronRight size={14} /></button>
                     </div>
                   </div>
                   <div>
-                    <label className={labelClass}>Invoice Amount</label>
+                    <label className={T.label}>Invoice Amount</label>
                     <div className="relative">
-                      <DollarSign size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                      <input type="number" placeholder="0.00" step="0.01" min="0" value={invoiceForm.amount} onChange={e => setInvoiceForm(p => ({ ...p, amount: e.target.value }))} className={`${inputClass} pl-9`} />
+                      <DollarSign size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-600" />
+                      <input type="number" placeholder="0.00" step="0.01" min="0" value={invoiceForm.amount} onChange={e => setInvoiceForm(p => ({ ...p, amount: e.target.value }))} className={`${T.input} pl-9 tabular-nums`} />
                     </div>
                   </div>
                 </div>
@@ -893,46 +914,46 @@ export default function ContractorPortal() {
                 {/* Distribution Reference */}
                 {invoiceDistribution.length > 0 ? (
                   <div className="mb-5">
-                    <p className={`${labelClass} mb-2`}>Timesheet Reference — {billingMonth.label}</p>
-                    <div className="bg-slate-800/30 border border-slate-800/60 rounded-xl overflow-hidden">
+                    <p className={`${T.label} mb-2`}>Timesheet Reference — {billingMonth.label}</p>
+                    <div className="bg-white/[0.02] border border-slate-800/40 rounded-xl overflow-hidden">
                       <table className="w-full text-sm">
-                        <thead><tr className="text-slate-600 text-[11px] uppercase tracking-wider">
-                          <th className="text-left px-4 py-2.5 font-semibold">Client</th>
-                          {invoiceDistribution.some(l => l.project_name) && <th className="text-left px-4 py-2.5 font-semibold">Project</th>}
-                          <th className="text-right px-4 py-2.5 font-semibold">Hours</th>
-                          {invoiceDistribution.some(l => l.allocation_pct !== undefined) && <th className="text-right px-4 py-2.5 font-semibold">%</th>}
+                        <thead><tr className="text-slate-600 text-[10px] uppercase tracking-wider">
+                          <th className="text-left px-4 py-2.5 font-bold">Client</th>
+                          {invoiceDistribution.some(l => l.project_name) && <th className="text-left px-4 py-2.5 font-bold">Project</th>}
+                          <th className="text-right px-4 py-2.5 font-bold">Hours</th>
+                          {invoiceDistribution.some(l => l.allocation_pct !== undefined) && <th className="text-right px-4 py-2.5 font-bold">%</th>}
                         </tr></thead>
                         <tbody>{invoiceDistribution.map((l, i) => (
-                          <tr key={i} className="border-t border-slate-800/60">
+                          <tr key={i} className="border-t border-slate-800/30">
                             <td className="px-4 py-2.5 text-slate-400 text-xs">{l.client_name}</td>
                             {invoiceDistribution.some(x => x.project_name) && <td className="px-4 py-2.5 text-slate-500 text-xs">{l.project_name || '—'}</td>}
-                            <td className="px-4 py-2.5 text-right text-slate-300 text-xs font-medium">{l.hours?.toFixed(1)}</td>
-                            {invoiceDistribution.some(x => x.allocation_pct !== undefined) && <td className="px-4 py-2.5 text-right text-slate-500 text-xs">{l.allocation_pct !== undefined ? `${l.allocation_pct}%` : '—'}</td>}
+                            <td className="px-4 py-2.5 text-right text-slate-300 text-xs font-medium tabular-nums">{l.hours?.toFixed(1)}</td>
+                            {invoiceDistribution.some(x => x.allocation_pct !== undefined) && <td className="px-4 py-2.5 text-right text-slate-500 text-xs tabular-nums">{l.allocation_pct !== undefined ? `${l.allocation_pct}%` : '—'}</td>}
                           </tr>
                         ))}</tbody>
-                        <tfoot><tr className="border-t border-slate-800/80">
-                          <td colSpan={invoiceDistribution.some(l => l.project_name) ? 2 : 1} className="px-4 py-2.5 text-slate-400 text-xs font-semibold">Total</td>
-                          <td className="px-4 py-2.5 text-right text-white text-xs font-semibold">{invoiceDistribution.reduce((s, l) => s + (l.hours || 0), 0).toFixed(1)}h</td>
-                          {invoiceDistribution.some(l => l.allocation_pct !== undefined) && <td className="px-4 py-2.5 text-right text-slate-400 text-xs">100%</td>}
+                        <tfoot><tr className="border-t border-slate-800/50">
+                          <td colSpan={invoiceDistribution.some(l => l.project_name) ? 2 : 1} className="px-4 py-2.5 text-slate-400 text-xs font-bold">Total</td>
+                          <td className="px-4 py-2.5 text-right text-white text-xs font-bold tabular-nums">{invoiceDistribution.reduce((s, l) => s + (l.hours || 0), 0).toFixed(1)}h</td>
+                          {invoiceDistribution.some(l => l.allocation_pct !== undefined) && <td className="px-4 py-2.5 text-right text-slate-500 text-xs tabular-nums">100%</td>}
                         </tr></tfoot>
                       </table>
                     </div>
                   </div>
                 ) : (contractorType !== 'pure_ls' && !invoiceForm.client_id) ? (
-                  <div className="mb-5 p-4 bg-slate-800/30 border border-slate-800/60 rounded-xl text-center text-slate-500 text-sm">Select a client above to see your timesheet hours.</div>
+                  <div className="mb-5 p-4 bg-white/[0.02] border border-slate-800/40 rounded-xl text-center text-slate-600 text-sm">Select a client above to see your timesheet hours.</div>
                 ) : null}
 
                 {/* Attachment + Notes */}
                 <div className="mb-5">
-                  <label className={labelClass}>Invoice Attachment</label>
+                  <label className={T.label}>Invoice Attachment</label>
                   <DropZone file={invoiceFile} onFile={setInvoiceFile} onRemove={() => setInvoiceFile(null)} uploading={submittingInvoice} label="Drop invoice PDF here" accept=".pdf,image/*" />
                 </div>
                 <div className="mb-5">
-                  <label className={labelClass}>Notes (optional)</label>
-                  <textarea rows={2} placeholder="Any additional notes..." value={invoiceForm.notes} onChange={e => setInvoiceForm(p => ({ ...p, notes: e.target.value }))} className={`${inputClass} resize-none`} />
+                  <label className={T.label}>Notes (optional)</label>
+                  <textarea rows={2} placeholder="Any additional notes..." value={invoiceForm.notes} onChange={e => setInvoiceForm(p => ({ ...p, notes: e.target.value }))} className={`${T.input} resize-none`} />
                 </div>
 
-                <button onClick={submitInvoice} disabled={submittingInvoice || !invoiceForm.invoice_number || parseFloat(invoiceForm.amount || '0') <= 0 || (contractorType !== 'pure_ls' && !invoiceForm.client_id)} className={`w-full ${btnPrimary} py-3`}>
+                <button onClick={submitInvoice} disabled={submittingInvoice || !invoiceForm.invoice_number || parseFloat(invoiceForm.amount || '0') <= 0 || (contractorType !== 'pure_ls' && !invoiceForm.client_id)} className={`w-full ${T.btnPrimary} py-3`}>
                   {submittingInvoice ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <><Send size={16} /> Submit Invoice</>}
                 </button>
               </div>
@@ -940,37 +961,37 @@ export default function ContractorPortal() {
 
             {/* Invoice History */}
             {invoices.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {invoices.map(inv => {
                   const lines = inv.contractor_invoice_lines || inv.lines || []
                   return (
-                    <div key={inv.id} className={`${cardClass} overflow-hidden`}>
+                    <div key={inv.id} className={`${T.cardHover} overflow-hidden`}>
                       <div className="px-5 py-4 flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center shrink-0">
-                          <FileText size={16} className="text-sky-400" />
+                        <div className="w-10 h-10 rounded-xl bg-sky-500/8 border border-sky-500/12 flex items-center justify-center shrink-0">
+                          <FileText size={15} className="text-sky-400" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-white text-sm font-medium">{inv.invoice_number}</p>
-                            {inv.receipt_url && <Paperclip size={11} className="text-sky-400" />}
+                            {inv.receipt_url && <Paperclip size={11} className="text-sky-500" />}
                           </div>
-                          <p className="text-slate-500 text-xs mt-0.5">{formatDate(inv.period_start)} – {formatDate(inv.period_end)}</p>
+                          <p className="text-slate-600 text-xs mt-0.5">{formatDate(inv.period_start)} – {formatDate(inv.period_end)}</p>
                         </div>
-                        <span className="text-white font-semibold text-sm">{formatCurrency(inv.total_amount)}</span>
+                        <span className="text-white font-semibold text-sm tabular-nums">{formatCurrency(inv.total_amount)}</span>
                         <StatusPill status={inv.status} />
                         {inv.status === 'submitted' && (
-                          <button onClick={() => deleteInvoice(inv.id)} className="p-2 rounded-lg text-slate-600 hover:text-rose-400 hover:bg-slate-800/40 transition-all duration-200" title="Delete">
+                          <button onClick={() => deleteInvoice(inv.id)} className="p-2 rounded-lg text-slate-700 hover:text-rose-400 hover:bg-rose-500/5 transition-all duration-200" title="Delete">
                             <Trash2 size={14} />
                           </button>
                         )}
                       </div>
                       {lines.length > 0 && (
                         <div className="px-5 pb-4 pt-0">
-                          <div className="border-t border-slate-800/60 pt-3 space-y-1.5">
+                          <div className="border-t border-slate-800/40 pt-3 space-y-1.5">
                             {lines.map((l: any, i: number) => (
-                              <div key={i} className="flex items-center justify-between text-xs">
-                                <span className="text-slate-400">{l.description}</span>
-                                <span className="text-slate-500">{l.hours ? `${l.hours}h` : ''}{l.allocation_pct ? ` · ${l.allocation_pct}%` : ''}</span>
+                              <div key={i} className="flex items-center justify-between text-xs py-0.5">
+                                <span className="text-slate-500">{l.description}</span>
+                                <span className="text-slate-600 tabular-nums">{l.hours ? `${l.hours}h` : ''}{l.allocation_pct ? ` · ${l.allocation_pct}%` : ''}</span>
                               </div>
                             ))}
                           </div>
@@ -981,12 +1002,12 @@ export default function ContractorPortal() {
                 })}
               </div>
             ) : (
-              <div className={`${cardClass} text-center py-16`}>
-                <div className="w-14 h-14 rounded-xl bg-slate-800/40 flex items-center justify-center mx-auto mb-4">
-                  <FileText size={24} className="text-slate-600" />
+              <div className={`${T.card} text-center py-20`}>
+                <div className="w-14 h-14 rounded-2xl bg-slate-800/30 flex items-center justify-center mx-auto mb-4">
+                  <FileText size={22} className="text-slate-700" />
                 </div>
-                <p className="text-slate-500 text-sm">No invoices submitted yet</p>
-                <p className="text-slate-700 text-xs mt-1">Click "New Invoice" to get started</p>
+                <p className="text-slate-500 text-sm font-medium">No invoices yet</p>
+                <p className="text-slate-700 text-xs mt-1.5">Click "New Invoice" to submit your first invoice</p>
               </div>
             )}
           </div>
@@ -995,36 +1016,23 @@ export default function ContractorPortal() {
         {/* ====== HISTORY ====== */}
         {activeTab === 'history' && (
           <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-xl font-bold tracking-tight">History</h1>
-                <p className="text-slate-500 text-sm mt-1">Review your submitted timesheets, expenses, and invoices</p>
-              </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">History</h1>
+              <p className="text-slate-600 text-sm mt-0.5">Review past timesheets, expenses, and invoices</p>
             </div>
 
             {/* Month Navigator + Filter */}
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className={`${cardClass} p-1 inline-flex items-center gap-1`}>
-                <button onClick={() => { const d = new Date(historyMonth); d.setMonth(d.getMonth() - 1); setHistoryMonth(d) }}
-                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors">
-                  <ChevronLeft size={16} />
-                </button>
-                <div className="flex items-center gap-2.5 px-4 py-1.5">
-                  <Calendar size={14} className="text-teal-400" />
-                  <span className="text-sm font-medium text-white">{historyRange.label}</span>
-                </div>
-                <button onClick={() => { const d = new Date(historyMonth); d.setMonth(d.getMonth() + 1); setHistoryMonth(d) }}
-                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors">
-                  <ChevronRight size={16} />
-                </button>
-              </div>
+              <WeekNav week={historyRange}
+                onPrev={() => { const d = new Date(historyMonth); d.setMonth(d.getMonth() - 1); setHistoryMonth(d) }}
+                onNext={() => { const d = new Date(historyMonth); d.setMonth(d.getMonth() + 1); setHistoryMonth(d) }}
+              />
 
-              <div className="inline-flex items-center bg-slate-800/50 border border-slate-800/80 rounded-lg p-0.5">
+              <div className="inline-flex items-center bg-[#0f1623] border border-slate-800/60 rounded-xl p-1">
                 {([['all', 'All'], ['time', 'Time'], ['expenses', 'Expenses'], ['invoices', 'Invoices']] as const).map(([key, label]) => (
                   <button key={key} onClick={() => setHistoryFilter(key)}
-                    className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                      historyFilter === key ? 'bg-slate-700 text-teal-400' : 'text-slate-500 hover:text-slate-300'
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                      historyFilter === key ? 'bg-white/[0.06] text-teal-400' : 'text-slate-600 hover:text-slate-400'
                     }`}>
                     {label}
                   </button>
@@ -1033,62 +1041,52 @@ export default function ContractorPortal() {
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className={`${cardClass} p-4 flex items-start gap-3`}>
-                <div className="w-1 h-10 rounded-r-full bg-teal-500 shrink-0 -ml-4" />
-                <div className="pl-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Hours Logged</p>
-                  <p className="text-xl font-semibold text-white tabular-nums mt-1">{historyTotals.totalHours.toFixed(1)}</p>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Hours Logged', value: historyTotals.totalHours.toFixed(1), accent: 'bg-teal-400', isCurrency: false },
+                { label: 'Expenses', value: formatCurrency(historyTotals.totalExpenses), accent: 'bg-amber-400', isCurrency: true },
+                { label: 'Invoiced', value: formatCurrency(historyTotals.totalInvoiced), accent: 'bg-sky-400', isCurrency: true },
+              ].map(card => (
+                <div key={card.label} className={`${T.card} p-5 relative overflow-hidden`}>
+                  <div className={`absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full ${card.accent}`} />
+                  <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-600 mb-2 pl-3">{card.label}</p>
+                  <p className="text-xl font-bold text-white tabular-nums tracking-tight pl-3">{card.value}</p>
                 </div>
-              </div>
-              <div className={`${cardClass} p-4 flex items-start gap-3`}>
-                <div className="w-1 h-10 rounded-r-full bg-amber-500 shrink-0 -ml-4" />
-                <div className="pl-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Expenses</p>
-                  <p className="text-xl font-semibold text-white tabular-nums mt-1">{formatCurrency(historyTotals.totalExpenses)}</p>
-                </div>
-              </div>
-              <div className={`${cardClass} p-4 flex items-start gap-3`}>
-                <div className="w-1 h-10 rounded-r-full bg-sky-500 shrink-0 -ml-4" />
-                <div className="pl-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Invoiced</p>
-                  <p className="text-xl font-semibold text-white tabular-nums mt-1">{formatCurrency(historyTotals.totalInvoiced)}</p>
-                </div>
-              </div>
+              ))}
             </div>
 
             {historyLoading ? (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 size={24} className="text-teal-500 animate-spin" />
+              <div className="flex items-center justify-center py-20">
+                <Loader2 size={22} className="text-teal-500 animate-spin" />
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-8">
                 {/* TIME ENTRIES */}
                 {(historyFilter === 'all' || historyFilter === 'time') && (
                   <div>
                     <div className="flex items-center gap-2 mb-3">
-                      <Timer size={14} className="text-teal-400" />
-                      <h2 className="text-sm font-semibold text-white">Timesheet Entries</h2>
-                      <span className="text-[11px] text-slate-500 ml-1">{historyTotals.totalHours.toFixed(1)}h total</span>
+                      <Timer size={13} className="text-teal-400" />
+                      <h2 className={T.sectionTitle}>Timesheet Entries</h2>
+                      <span className="text-[11px] text-slate-700 ml-1 tabular-nums">{historyTotals.totalHours.toFixed(1)}h total</span>
                     </div>
                     {historyTimeByWeek.length > 0 ? (
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         {historyTimeByWeek.map(([weekKey, week]) => (
-                          <div key={weekKey} className={`${cardClass} overflow-hidden`}>
-                            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800/60">
-                              <span className="text-xs font-medium text-slate-400">{week.label}</span>
-                              <span className="text-xs font-semibold text-teal-400 tabular-nums">{week.totalHours.toFixed(1)}h</span>
+                          <div key={weekKey} className={`${T.card} overflow-hidden`}>
+                            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800/40">
+                              <span className="text-xs font-medium text-slate-500">{week.label}</span>
+                              <span className="text-xs font-bold text-teal-400 tabular-nums">{week.totalHours.toFixed(1)}h</span>
                             </div>
-                            <div className="divide-y divide-slate-800/40">
+                            <div className="divide-y divide-slate-800/30">
                               {week.entries.map((e: any) => {
                                 const a = assignments.find(a => a.project_id === e.project_id)
                                 return (
-                                  <div key={e.id} className="px-5 py-3 flex items-center gap-4">
+                                  <div key={e.id} className="px-5 py-3 flex items-center gap-4 hover:bg-white/[0.01] transition-colors">
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-sm text-white truncate">{a?.project_name || 'Unknown Project'}</p>
-                                      <p className="text-xs text-slate-500 mt-0.5">{a?.client_name || ''}{e.description ? ` — ${e.description}` : ''}</p>
+                                      <p className="text-sm text-white font-medium truncate">{a?.project_name || 'Unknown Project'}</p>
+                                      <p className="text-xs text-slate-600 mt-0.5">{a?.client_name || ''}{e.description ? ` — ${e.description}` : ''}</p>
                                     </div>
-                                    <span className="text-sm font-medium text-slate-300 tabular-nums">{e.hours}h</span>
+                                    <span className="text-sm font-semibold text-slate-300 tabular-nums">{e.hours}h</span>
                                   </div>
                                 )
                               })}
@@ -1097,8 +1095,8 @@ export default function ContractorPortal() {
                         ))}
                       </div>
                     ) : (
-                      <div className={`${cardClass} text-center py-10`}>
-                        <p className="text-slate-600 text-sm">No timesheet entries for {historyRange.label}</p>
+                      <div className={`${T.card} text-center py-12`}>
+                        <p className="text-slate-700 text-sm">No timesheet entries for {historyRange.label}</p>
                       </div>
                     )}
                   </div>
@@ -1108,26 +1106,26 @@ export default function ContractorPortal() {
                 {(historyFilter === 'all' || historyFilter === 'expenses') && (
                   <div>
                     <div className="flex items-center gap-2 mb-3">
-                      <CreditCard size={14} className="text-amber-400" />
-                      <h2 className="text-sm font-semibold text-white">Expenses</h2>
-                      <span className="text-[11px] text-slate-500 ml-1">{historyExpenses.length} item{historyExpenses.length !== 1 ? 's' : ''}</span>
+                      <CreditCard size={13} className="text-amber-400" />
+                      <h2 className={T.sectionTitle}>Expenses</h2>
+                      <span className="text-[11px] text-slate-700 ml-1">{historyExpenses.length} item{historyExpenses.length !== 1 ? 's' : ''}</span>
                     </div>
                     {historyExpenses.length > 0 ? (
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         {historyExpenses.map(exp => {
                           const cat = EXPENSE_CATEGORIES.find(c => c.id === exp.category)
                           return (
-                            <div key={exp.id} className={`${cardClass} px-5 py-4 flex items-center gap-4`}>
-                              <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
-                                <Receipt size={16} className="text-amber-400" />
+                            <div key={exp.id} className={`${T.cardHover} px-5 py-4 flex items-center gap-4`}>
+                              <div className="w-10 h-10 rounded-xl bg-amber-500/8 border border-amber-500/12 flex items-center justify-center shrink-0">
+                                <Receipt size={15} className="text-amber-400" />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-white text-sm font-medium truncate">{exp.description}</p>
-                                <div className="flex items-center gap-2 text-slate-500 text-xs mt-1">
+                                <div className="flex items-center gap-2 text-slate-600 text-xs mt-1">
                                   <span>{formatDate(exp.date)}</span>
-                                  <span className="w-1 h-1 rounded-full bg-slate-700" />
+                                  <span className="w-0.5 h-0.5 rounded-full bg-slate-700" />
                                   <span>{cat?.label || exp.category}</span>
-                                  {exp.receipt_url && <><span className="w-1 h-1 rounded-full bg-slate-700" /><Paperclip size={10} className="text-sky-400" /></>}
+                                  {exp.receipt_url && <><span className="w-0.5 h-0.5 rounded-full bg-slate-700" /><Paperclip size={10} className="text-sky-500" /></>}
                                 </div>
                               </div>
                               <span className="text-white font-semibold text-sm tabular-nums">{formatCurrency(exp.amount)}</span>
@@ -1137,8 +1135,8 @@ export default function ContractorPortal() {
                         })}
                       </div>
                     ) : (
-                      <div className={`${cardClass} text-center py-10`}>
-                        <p className="text-slate-600 text-sm">No expenses for {historyRange.label}</p>
+                      <div className={`${T.card} text-center py-12`}>
+                        <p className="text-slate-700 text-sm">No expenses for {historyRange.label}</p>
                       </div>
                     )}
                   </div>
@@ -1148,48 +1146,48 @@ export default function ContractorPortal() {
                 {(historyFilter === 'all' || historyFilter === 'invoices') && (
                   <div>
                     <div className="flex items-center gap-2 mb-3">
-                      <FileText size={14} className="text-sky-400" />
-                      <h2 className="text-sm font-semibold text-white">Invoices</h2>
-                      <span className="text-[11px] text-slate-500 ml-1">{historyInvoices.length} invoice{historyInvoices.length !== 1 ? 's' : ''}</span>
+                      <FileText size={13} className="text-sky-400" />
+                      <h2 className={T.sectionTitle}>Invoices</h2>
+                      <span className="text-[11px] text-slate-700 ml-1">{historyInvoices.length} invoice{historyInvoices.length !== 1 ? 's' : ''}</span>
                     </div>
                     {historyInvoices.length > 0 ? (
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         {historyInvoices.map(inv => {
                           const lines = inv.contractor_invoice_lines || inv.lines || []
                           return (
-                            <div key={inv.id} className={`${cardClass} overflow-hidden`}>
+                            <div key={inv.id} className={`${T.cardHover} overflow-hidden`}>
                               <div className="px-5 py-4 flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-lg bg-sky-500/10 flex items-center justify-center shrink-0">
-                                  <FileText size={16} className="text-sky-400" />
+                                <div className="w-10 h-10 rounded-xl bg-sky-500/8 border border-sky-500/12 flex items-center justify-center shrink-0">
+                                  <FileText size={15} className="text-sky-400" />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2">
                                     <p className="text-white text-sm font-medium">{inv.invoice_number}</p>
-                                    {inv.receipt_url && <Paperclip size={11} className="text-sky-400" />}
+                                    {inv.receipt_url && <Paperclip size={11} className="text-sky-500" />}
                                   </div>
-                                  <p className="text-slate-500 text-xs mt-0.5">{formatDate(inv.period_start)} – {formatDate(inv.period_end)}</p>
+                                  <p className="text-slate-600 text-xs mt-0.5">{formatDate(inv.period_start)} – {formatDate(inv.period_end)}</p>
                                 </div>
                                 <span className="text-white font-semibold text-sm tabular-nums">{formatCurrency(inv.total_amount)}</span>
                                 <StatusPill status={inv.status} />
                               </div>
                               {lines.length > 0 && (
                                 <div className="px-5 pb-4 pt-0">
-                                  <div className="border-t border-slate-800/60 pt-3">
+                                  <div className="border-t border-slate-800/30 pt-3">
                                     <table className="w-full text-xs">
                                       <thead>
-                                        <tr className="text-[11px] text-slate-600 font-semibold uppercase tracking-wider">
+                                        <tr className="text-[10px] text-slate-700 font-bold uppercase tracking-wider">
                                           <th className="text-left pb-2">Description</th>
                                           <th className="text-right pb-2">Hours</th>
                                           <th className="text-right pb-2">Allocation</th>
                                           <th className="text-right pb-2">Amount</th>
                                         </tr>
                                       </thead>
-                                      <tbody className="divide-y divide-slate-800/40">
+                                      <tbody className="divide-y divide-slate-800/20">
                                         {lines.map((l: any, i: number) => (
                                           <tr key={i}>
-                                            <td className="py-2 text-slate-400">{l.description}</td>
-                                            <td className="py-2 text-right text-slate-500 tabular-nums">{l.hours ? `${Number(l.hours).toFixed(1)}h` : '—'}</td>
-                                            <td className="py-2 text-right text-slate-500 tabular-nums">{l.allocation_pct ? `${l.allocation_pct}%` : '—'}</td>
+                                            <td className="py-2 text-slate-500">{l.description}</td>
+                                            <td className="py-2 text-right text-slate-600 tabular-nums">{l.hours ? `${Number(l.hours).toFixed(1)}h` : '—'}</td>
+                                            <td className="py-2 text-right text-slate-600 tabular-nums">{l.allocation_pct ? `${l.allocation_pct}%` : '—'}</td>
                                             <td className="py-2 text-right text-slate-300 font-medium tabular-nums">{l.amount ? formatCurrency(l.amount) : '—'}</td>
                                           </tr>
                                         ))}
@@ -1203,8 +1201,8 @@ export default function ContractorPortal() {
                         })}
                       </div>
                     ) : (
-                      <div className={`${cardClass} text-center py-10`}>
-                        <p className="text-slate-600 text-sm">No invoices for {historyRange.label}</p>
+                      <div className={`${T.card} text-center py-12`}>
+                        <p className="text-slate-700 text-sm">No invoices for {historyRange.label}</p>
                       </div>
                     )}
                   </div>
@@ -1212,12 +1210,12 @@ export default function ContractorPortal() {
 
                 {/* Empty state when all filtered sections are empty */}
                 {historyFilter === 'all' && historyTime.length === 0 && historyExpenses.length === 0 && historyInvoices.length === 0 && (
-                  <div className={`${cardClass} text-center py-16`}>
-                    <div className="w-14 h-14 rounded-xl bg-slate-800/40 flex items-center justify-center mx-auto mb-4">
-                      <History size={24} className="text-slate-600" />
+                  <div className={`${T.card} text-center py-20`}>
+                    <div className="w-14 h-14 rounded-2xl bg-slate-800/30 flex items-center justify-center mx-auto mb-4">
+                      <History size={22} className="text-slate-700" />
                     </div>
-                    <p className="text-slate-500 text-sm">No submissions for {historyRange.label}</p>
-                    <p className="text-slate-700 text-xs mt-1">Try navigating to a different month</p>
+                    <p className="text-slate-500 text-sm font-medium">No submissions for {historyRange.label}</p>
+                    <p className="text-slate-700 text-xs mt-1.5">Try navigating to a different month</p>
                   </div>
                 )}
               </div>
