@@ -13,18 +13,18 @@ import {
 } from "recharts"
 import { supabase, getCurrentUser } from "@/lib/supabase"
 
-// ============ THEME (institutional — matches Time Tracking / Contractor Mgmt) ============
+// ============ THEME (premium — Mercury / Ramp / Carta level) ============
 const THEME = {
-  card: "bg-[#111827] border-slate-800/80",
-  border: "border-slate-800/80",
+  card: "bg-[#0f1623] border-slate-800/60",
+  border: "border-slate-800/60",
   textPrimary: "text-white",
   textSecondary: "text-slate-300",
   textMuted: "text-slate-400",
   textDim: "text-slate-500",
 }
 
-const inputClass = "w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50"
-const selectInputClass = "w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50"
+const inputClass = "w-full px-3.5 py-2.5 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500/40 transition-all duration-200"
+const selectInputClass = "w-full px-3.5 py-2.5 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500/40 transition-all duration-200 cursor-pointer"
 
 // ============ TOAST ============
 interface Toast { id: number; type: "success" | "error" | "info"; message: string }
@@ -33,16 +33,16 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
   return (
     <div className="fixed bottom-4 right-4 z-50 space-y-2">
       {toasts.map(toast => (
-        <div key={toast.id} className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border ${
-          toast.type === "success" ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400" :
-          toast.type === "error" ? "bg-rose-500/20 border-rose-500/30 text-rose-400" :
-          "bg-blue-500/20 border-blue-500/30 text-blue-400"
+        <div key={toast.id} className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border backdrop-blur-xl ${
+          toast.type === "success" ? "bg-emerald-950/80 border-emerald-800/30 text-emerald-400" :
+          toast.type === "error" ? "bg-rose-950/80 border-rose-800/30 text-rose-400" :
+          "bg-sky-950/80 border-sky-800/30 text-sky-400"
         }`}>
-          {toast.type === "success" && <CheckCircle size={18} />}
-          {toast.type === "error" && <AlertCircle size={18} />}
-          {toast.type === "info" && <AlertCircle size={18} />}
+          {toast.type === "success" && <CheckCircle size={16} />}
+          {toast.type === "error" && <AlertCircle size={16} />}
+          {toast.type === "info" && <AlertCircle size={16} />}
           <span className="text-sm font-medium">{toast.message}</span>
-          <button onClick={() => onDismiss(toast.id)} className="ml-2 hover:opacity-70"><X size={16} /></button>
+          <button onClick={() => onDismiss(toast.id)} className="ml-2 opacity-50 hover:opacity-100 transition-opacity"><X size={14} /></button>
         </div>
       ))}
     </div>
@@ -104,8 +104,8 @@ const formatCurrency = (v: number) => new Intl.NumberFormat("en-US", { style: "c
 const formatCurrencyDecimal = (v: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)
 const formatCompactCurrency = (v: number) => { if (v >= 1e6) return `$${(v/1e6).toFixed(1)}M`; if (v >= 1e3) return `$${(v/1e3).toFixed(0)}k`; return `$${v.toFixed(0)}` }
 const maskNumber = (num: string | null) => num ? "\u2022\u2022\u2022\u2022 " + num.slice(-4) : "\u2014"
-const getStatusStyle = (s: string) => s === "active" ? { bg: "bg-emerald-500/10", text: "text-emerald-400" } : { bg: "bg-slate-500/10", text: "text-slate-400" }
-const getEmploymentStyle = (t: string) => t === "employee" ? { bg: "bg-blue-500/10", text: "text-blue-400" } : { bg: "bg-purple-500/10", text: "text-purple-400" }
+const getStatusStyle = (s: string) => s === "active" ? { bg: "bg-emerald-950/60", text: "text-emerald-400", border: "border-emerald-800/40" } : { bg: "bg-slate-800/60", text: "text-slate-500", border: "border-slate-700/40" }
+const getEmploymentStyle = (t: string) => t === "employee" ? { bg: "bg-blue-950/60", text: "text-blue-400", border: "border-blue-800/40" } : { bg: "bg-purple-950/60", text: "text-purple-400", border: "border-purple-800/40" }
 
 const getCurrentMonth = () => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}` }
 const formatMonth = (m: string) => { const [y, mo] = m.split("-"); return new Date(parseInt(y), parseInt(mo)-1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }) }
@@ -163,28 +163,28 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
   const empStyle = getEmploymentStyle(member.employment_type)
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50" onClick={onClose}>
-      <div className={`w-full max-w-xl h-full ${THEME.card} border-l ${THEME.border} overflow-y-auto`} onClick={e => e.stopPropagation()}>
-        <div className={`sticky top-0 ${THEME.card} border-b ${THEME.border} px-6 py-4 z-10`}>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex justify-end z-50" onClick={onClose}>
+      <div className="w-full max-w-xl h-full bg-[#0b1020] border-l border-slate-800/40 overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 bg-[#0b1020]/95 backdrop-blur-xl border-b border-slate-800/40 px-6 py-5 z-10">
           <div className="flex items-start justify-between">
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className={`text-lg font-semibold ${THEME.textPrimary}`}>{member.name}</h2>
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${empStyle.bg} ${empStyle.text}`}>
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-lg font-bold text-white tracking-tight">{member.name}</h2>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${empStyle.bg} ${empStyle.text}`}>
                   {member.employment_type === "employee" ? "W-2" : "1099"}
                 </span>
               </div>
-              <p className={`text-sm ${THEME.textMuted} mt-0.5`}>{member.role || "No role"}</p>
+              <p className="text-sm text-slate-500 mt-1">{member.role || "No role"}</p>
             </div>
-            <div className="flex items-center gap-2">
-              <button onClick={onEdit} className="p-2 rounded-lg hover:bg-slate-800/60"><Edit2 size={16} className={THEME.textMuted} /></button>
-              <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-800/60"><X size={18} className={THEME.textMuted} /></button>
+            <div className="flex items-center gap-1">
+              <button onClick={onEdit} className="p-2 rounded-lg hover:bg-white/[0.05] transition-all duration-200"><Edit2 size={15} className="text-slate-500" /></button>
+              <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/[0.05] transition-all duration-200"><X size={16} className="text-slate-500" /></button>
             </div>
           </div>
         </div>
         <div className="p-6 space-y-6">
           <div className="space-y-3">
-            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Contact</h3>
+            <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">Contact</h3>
             <div className="space-y-2">
               <a href={`mailto:${member.email}`} className="flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm"><Mail size={14} /> {member.email}</a>
               {member.phone && <p className={`flex items-center gap-2 text-sm ${THEME.textSecondary}`}><Phone size={14} /> {member.phone}</p>}
@@ -194,8 +194,8 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
           </div>
 
           <div className="space-y-3">
-            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Default Cost (fallback)</h3>
-            <div className="p-3 rounded-lg bg-slate-800/30">
+            <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">Default Cost (fallback)</h3>
+            <div className="p-4 rounded-xl bg-white/[0.02] border border-slate-800/30">
               <div className="flex justify-between">
                 <span className={THEME.textMuted}>{member.cost_type === "hourly" ? "T&M" : "Fixed"}</span>
                 <span className="text-orange-400 font-medium tabular-nums">{member.cost_amount ? (member.cost_type === "hourly" ? `$${member.cost_amount}/hr` : `${formatCurrency(member.cost_amount)}/mo`) : "\u2014"}</span>
@@ -204,7 +204,7 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
           </div>
 
           <div className="space-y-3">
-            <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Rate Card ({memberRates.length} client{memberRates.length !== 1 ? "s" : ""})</h3>
+            <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">Rate Card ({memberRates.length} client{memberRates.length !== 1 ? "s" : ""})</h3>
             {memberRates.length > 0 ? (
               <div className="space-y-2">
                 {memberRates.map(r => {
@@ -216,13 +216,13 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
                     ? (hasCustomCost && revAmt > 0 ? ((revAmt - (r.cost_type === "hourly" ? r.cost_amount * (r.baseline_hours || 172) : r.cost_amount)) / revAmt * 100) : 0)
                     : (hasCustomCost && r.rate > 0 ? ((r.rate - effCost) / r.rate * 100) : 0)
                   return (
-                    <div key={r.id} className="p-3 rounded-lg bg-slate-800/30">
+                    <div key={r.id} className="p-4 rounded-xl bg-white/[0.02] border border-slate-800/30">
                       <div className="flex items-center justify-between mb-1">
                         <p className={`text-sm font-medium ${THEME.textPrimary}`}>{r.client_name}</p>
                         {hasCustomCost || isLumpRev ? (
                           <span className={`text-xs font-medium px-2 py-0.5 rounded ${mg >= 20 ? "bg-emerald-500/10 text-emerald-400" : mg >= 0 ? "bg-amber-500/10 text-amber-400" : "bg-rose-500/10 text-rose-400"}`}>{mg.toFixed(0)}% GM</span>
                         ) : (
-                          <span className="text-xs font-medium px-2 py-0.5 rounded bg-blue-500/10 text-blue-400">Distributed</span>
+                          <span className="text-xs font-medium px-2 py-0.5 rounded bg-blue-950/40 text-blue-400">Distributed</span>
                         )}
                       </div>
                       <div className="flex gap-4 text-xs">
@@ -242,19 +242,19 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Banking</h3>
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">Banking</h3>
               {member.bank_name && <button onClick={() => setShowBanking(!showBanking)} className={`text-xs ${THEME.textMuted} hover:text-white flex items-center gap-1`}>
                 {showBanking ? <EyeOff size={14} /> : <Eye size={14} />} {showBanking ? "Hide" : "Show"}
               </button>}
             </div>
             {member.bank_name ? (
-              <div className="p-4 rounded-lg bg-slate-800/30 space-y-2">
+              <div className="p-4 rounded-xl bg-white/[0.02] border border-slate-800/30 space-y-2">
                 <div className="flex justify-between"><span className={THEME.textMuted}>Bank</span><span className={THEME.textPrimary}>{member.bank_name}</span></div>
                 <div className="flex justify-between"><span className={THEME.textMuted}>Routing</span><span className="font-mono text-sm">{showBanking?member.routing_number:maskNumber(member.routing_number)}</span></div>
                 <div className="flex justify-between"><span className={THEME.textMuted}>Account</span><span className="font-mono text-sm">{showBanking?member.account_number:maskNumber(member.account_number)}</span></div>
                 <div className="flex justify-between"><span className={THEME.textMuted}>Method</span><span className={THEME.textPrimary}>{PAYMENT_METHODS.find(m=>m.id===member.payment_method)?.label||"\u2014"}</span></div>
               </div>
-            ) : <p className={`text-sm ${THEME.textMuted} p-4 rounded-lg bg-slate-800/30 text-center`}>No banking info</p>}
+            ) : <p className={`text-sm ${THEME.textMuted} p-4 rounded-xl bg-white/[0.02] border border-slate-800/30 text-center`}>No banking info</p>}
           </div>
         </div>
       </div>
@@ -396,18 +396,18 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className={`${THEME.card} border ${THEME.border} rounded-xl w-full max-w-lg my-8`}>
         <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.border}`}>
-          <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>{editingRate ? "Edit Rate Card" : "Add Rate Card"}</h3>
-          <button onClick={onClose} className="p-1 hover:bg-slate-800/50 rounded-lg"><X size={20} className={THEME.textMuted} /></button>
+          <h3 className={`text-lg font-bold ${THEME.textPrimary}`}>{editingRate ? "Edit Rate Card" : "Add Rate Card"}</h3>
+          <button onClick={onClose} className="p-1 hover:bg-white/[0.04] rounded-lg"><X size={20} className={THEME.textMuted} /></button>
         </div>
         <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={`block text-xs ${THEME.textMuted} mb-1`}>Team Member *</label>
               <select value={form.team_member_id} onChange={e => handleMemberChange(e.target.value)} disabled={!!editingRate}
-                className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white disabled:opacity-50">
+                className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white disabled:opacity-40 disabled:cursor-not-allowed">
                 <option value="">Select...</option>
                 {teamMembers.filter(m=>m.status==="active").map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
@@ -415,7 +415,7 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
             <div>
               <label className={`block text-xs ${THEME.textMuted} mb-1`}>Client *</label>
               <select value={form.client_id} onChange={e => setForm(p=>({...p,client_id:e.target.value}))} disabled={!!editingRate}
-                className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white disabled:opacity-50">
+                className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white disabled:opacity-40 disabled:cursor-not-allowed">
                 <option value="">Select...</option>
                 {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
@@ -427,18 +427,18 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
             <div>
               <label className={`block text-xs ${THEME.textMuted} mb-1`}>Start Date *</label>
               <input type="date" value={form.start_date} onChange={e => setForm(p => ({ ...p, start_date: e.target.value }))}
-                className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white" />
+                className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white" />
             </div>
             <div>
               <label className={`block text-xs ${THEME.textMuted} mb-1`}>End Date <span className={THEME.textDim}>(blank = ongoing)</span></label>
               <input type="date" value={form.end_date} onChange={e => setForm(p => ({ ...p, end_date: e.target.value }))}
-                className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white" />
+                className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white" />
             </div>
           </div>
 
           {/* Project Assignments */}
           {form.client_id && form.team_member_id && clientProjects.length > 0 && (
-            <div className="p-4 rounded-lg border border-blue-500/20 bg-blue-500/5">
+            <div className="p-4 rounded-lg border border-blue-500/15 bg-blue-950/20">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold text-blue-400">PROJECT ACCESS &mdash; Timesheet Visibility</p>
                 <div className="flex gap-2">
@@ -454,14 +454,14 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
               ) : (
                 <div className="space-y-1 max-h-40 overflow-y-auto">
                   {clientProjects.map(p => (
-                    <label key={p.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-800/30 cursor-pointer group">
+                    <label key={p.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-white/[0.03] cursor-pointer group">
                       <input type="checkbox" checked={selectedProjects.has(p.id)}
                         onChange={() => setSelectedProjects(prev => {
                           const next = new Set(prev)
                           next.has(p.id) ? next.delete(p.id) : next.add(p.id)
                           return next
                         })}
-                        className="w-3.5 h-3.5 rounded border-white/20 bg-slate-800/50 text-blue-500 focus:ring-blue-500/30" />
+                        className="w-3.5 h-3.5 rounded border-slate-700 bg-[#0c1220] text-teal-500 focus:ring-teal-500/20" />
                       <span className={`text-xs ${selectedProjects.has(p.id) ? "text-white" : "text-slate-500"}`}>{p.name}</span>
                     </label>
                   ))}
@@ -471,12 +471,12 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
             </div>
           )}
 
-          <div className="p-4 rounded-lg border border-orange-500/20 bg-orange-500/5">
+          <div className="p-4 rounded-lg border border-orange-500/15 bg-orange-950/20">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-semibold text-orange-400">COST SIDE &mdash; What You Pay</p>
               <button type="button" onClick={() => setForm(p => ({ ...p, customCost: !p.customCost }))}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                  form.customCost ? "border-orange-500 bg-orange-500/20 text-orange-400" : "border-slate-800/80 text-slate-400 hover:text-white"
+                  form.customCost ? "border-orange-500/50 bg-orange-950/30 text-orange-400" : "border-slate-800/50 text-slate-500 hover:text-white"
                 }`}>
                 {form.customCost ? "Custom cost for this client" : "Distributed from member total"}
               </button>
@@ -487,7 +487,7 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   {COST_TYPES.map(t => (
                     <button key={t.id} type="button" onClick={() => setForm(p=>({...p, cost_type: t.id as any}))}
-                      className={`p-2 rounded-lg border text-left transition-all ${form.cost_type===t.id ? "border-orange-500 bg-orange-500/10" : "border-slate-800/80 hover:border-slate-700"}`}>
+                      className={`p-2 rounded-lg border text-left transition-all ${form.cost_type===t.id ? "border-orange-500/50 bg-orange-950/30" : "border-slate-800/50 hover:border-slate-700"}`}>
                       <p className={`text-xs font-medium ${form.cost_type===t.id ? "text-orange-400" : THEME.textPrimary}`}>{t.label}</p>
                     </button>
                   ))}
@@ -496,13 +496,13 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
                   <div>
                     <label className={`block text-xs ${THEME.textDim} mb-1`}>{form.cost_type === "hourly" ? "Cost Rate ($/hr)" : "Monthly Amount ($/mo)"}</label>
                     <input type="number" value={form.cost_amount} onChange={e => setForm(p=>({...p,cost_amount:e.target.value}))}
-                      className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white" placeholder={form.cost_type==="hourly"?"35":"13525"} />
+                      className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white" placeholder={form.cost_type==="hourly"?"35":"13525"} />
                   </div>
                   {form.cost_type === "lump_sum" && (
                     <div>
                       <label className={`block text-xs ${THEME.textDim} mb-1`}>Baseline Hrs/mo</label>
                       <input type="number" value={form.baseline_hours} onChange={e => setForm(p=>({...p,baseline_hours:e.target.value}))}
-                        className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white" placeholder="340" />
+                        className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white" placeholder="340" />
                     </div>
                   )}
                 </div>
@@ -511,7 +511,7 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
                 )}
               </>
             ) : (
-              <div className="p-3 rounded-lg bg-slate-800/30">
+              <div className="p-4 rounded-xl bg-white/[0.02] border border-slate-800/30">
                 <p className={`text-xs ${THEME.textSecondary}`}>
                   Cost will be auto-distributed from {selectedMember?.name ? `${selectedMember.name}'s` : "member's"} total
                   {selectedMember?.cost_amount ? ` (${selectedMember.cost_type === "hourly" ? `$${selectedMember.cost_amount}/hr` : `${formatCurrency(selectedMember.cost_amount)}/mo`})` : ""}
@@ -521,12 +521,12 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
             )}
           </div>
 
-          <div className="p-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
+          <div className="p-4 rounded-lg border border-emerald-500/15 bg-emerald-950/20">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-semibold text-emerald-400">REVENUE SIDE &mdash; What You Charge</p>
               <button type="button" onClick={() => setForm(p => ({ ...p, revenue_type: p.revenue_type === "hourly" ? "lump_sum" : "hourly" }))}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                  form.revenue_type === "lump_sum" ? "border-emerald-500 bg-emerald-500/20 text-emerald-400" : "border-slate-800/80 text-slate-400 hover:text-white"
+                  form.revenue_type === "lump_sum" ? "border-emerald-500/50 bg-emerald-950/30 text-emerald-400" : "border-slate-800/50 text-slate-500 hover:text-white"
                 }`}>
                 {form.revenue_type === "lump_sum" ? "Lump Sum (fixed monthly)" : "Hourly (T&M)"}
               </button>
@@ -535,13 +535,13 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
               <div>
                 <label className={`block text-xs ${THEME.textDim} mb-1`}>Bill Rate ($/hr) *</label>
                 <input type="number" value={form.rate} onChange={e => setForm(p=>({...p,rate:e.target.value}))}
-                  className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white" placeholder="112" />
+                  className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white" placeholder="112" />
               </div>
             ) : (
               <div>
                 <label className={`block text-xs ${THEME.textDim} mb-1`}>Monthly Revenue Amount ($/mo) *</label>
                 <input type="number" value={form.revenue_amount} onChange={e => setForm(p=>({...p,revenue_amount:e.target.value}))}
-                  className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white" placeholder="6000" />
+                  className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white" placeholder="6000" />
                 {revenueAmount > 0 && (
                   <p className={`text-xs ${THEME.textDim} mt-2`}>Fixed {formatCurrency(revenueAmount)}/mo &mdash; no timesheet required for revenue</p>
                 )}
@@ -550,7 +550,7 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
           </div>
 
           {form.customCost && ((isLumpRevenue ? monthlyCost > 0 && monthlyRevenue > 0 : effCostRate > 0 && billRate > 0)) && (
-            <div className={`p-4 rounded-lg border ${margin >= 20 ? "bg-emerald-500/10 border-emerald-500/20" : margin >= 0 ? "bg-amber-500/10 border-amber-500/20" : "bg-rose-500/10 border-rose-500/20"}`}>
+            <div className={`p-4 rounded-lg border ${margin >= 20 ? "bg-emerald-950/30 border-emerald-800/30" : margin >= 0 ? "bg-amber-950/30 border-amber-800/30" : "bg-rose-950/30 border-rose-800/30"}`}>
               {isLumpRevenue ? (
                 <>
                   <div className="flex justify-between text-sm"><span className={THEME.textSecondary}>Monthly Cost</span><span className="text-orange-400">{formatCurrency(monthlyCost)}/mo</span></div>
@@ -577,7 +577,7 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
             </div>
           )}
           {!form.customCost && (billRate > 0 || revenueAmount > 0) && (
-            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+            <div className="p-3 rounded-lg bg-blue-950/30 border border-blue-800/30">
               <p className={`text-xs ${THEME.textSecondary}`}>Margin will be calculated from {isLumpRevenue ? "fixed monthly revenue" : "timesheet hours"} &mdash; member total cost distributed across clients by % of hours worked.</p>
             </div>
           )}
@@ -585,13 +585,13 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
           <div>
             <label className={`block text-xs ${THEME.textMuted} mb-1`}>Notes</label>
             <input value={form.notes} onChange={e => setForm(p=>({...p,notes:e.target.value}))}
-              className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white" placeholder="e.g. Covers PM + analyst, 2 FTEs..." />
+              className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white" placeholder="e.g. Covers PM + analyst, 2 FTEs..." />
           </div>
         </div>
         <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.border} bg-slate-800/30`}>
-          <button onClick={onClose} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white`}>Cancel</button>
+          <button onClick={onClose} className={`px-4 py-2 text-sm font-medium text-slate-500 hover:text-white transition-colors duration-200`}>Cancel</button>
           <button onClick={handleSave} disabled={!form.team_member_id||!form.client_id||(form.revenue_type === "hourly" ? !form.rate : !form.revenue_amount)||isSaving}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-500 disabled:opacity-50">
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-500 disabled:opacity-40 disabled:cursor-not-allowed">
             {isSaving && <RefreshCw size={14} className="animate-spin" />}{editingRate ? "Save Changes" : "Add Rate"}
           </button>
         </div>
@@ -624,20 +624,20 @@ function CostOverrideModal({ isOpen, onClose, onSave, billRates, teamMembers, cl
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
       <div className={`${THEME.card} border ${THEME.border} rounded-xl w-full max-w-lg`}>
         <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.border}`}>
           <div>
-            <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>Cost Override</h3>
+            <h3 className={`text-lg font-bold ${THEME.textPrimary}`}>Cost Override</h3>
             <p className={`text-xs ${THEME.textMuted}`}>Override auto-distribution for {formatMonth(selectedMonth)}</p>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-slate-800/50 rounded-lg"><X size={20} className={THEME.textMuted} /></button>
+          <button onClick={onClose} className="p-1 hover:bg-white/[0.04] rounded-lg"><X size={20} className={THEME.textMuted} /></button>
         </div>
         <div className="p-6 space-y-5">
           <div>
             <label className={`block text-xs ${THEME.textMuted} mb-1`}>Team Member (Lump-Sum Only) *</label>
             <select value={form.team_member_id} onChange={e => setForm(p=>({...p,team_member_id:e.target.value,client_id:""}))}
-              className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white">
+              className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white">
               <option value="">Select...</option>
               {eligibleMembers.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
@@ -645,7 +645,7 @@ function CostOverrideModal({ isOpen, onClose, onSave, billRates, teamMembers, cl
           <div>
             <label className={`block text-xs ${THEME.textMuted} mb-1`}>Client *</label>
             <select value={form.client_id} onChange={e => setForm(p=>({...p,client_id:e.target.value}))}
-              className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white">
+              className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white">
               <option value="">Select...</option>
               {eligibleClients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -653,19 +653,19 @@ function CostOverrideModal({ isOpen, onClose, onSave, billRates, teamMembers, cl
           <div>
             <label className={`block text-xs ${THEME.textMuted} mb-1`}>Fixed Amount ($) *</label>
             <input type="number" value={form.fixed_amount} onChange={e => setForm(p=>({...p,fixed_amount:e.target.value}))}
-              className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white" placeholder="20000" />
+              className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white" placeholder="20000" />
             <p className={`text-xs ${THEME.textDim} mt-1`}>Overrides auto-calculated allocation for this month only</p>
           </div>
           <div>
             <label className={`block text-xs ${THEME.textMuted} mb-1`}>Notes</label>
             <input value={form.notes} onChange={e => setForm(p=>({...p,notes:e.target.value}))}
-              className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white" placeholder="Per CEO request..." />
+              className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white" placeholder="Per CEO request..." />
           </div>
         </div>
         <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.border} bg-slate-800/30`}>
-          <button onClick={onClose} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white`}>Cancel</button>
+          <button onClick={onClose} className={`px-4 py-2 text-sm font-medium text-slate-500 hover:text-white transition-colors duration-200`}>Cancel</button>
           <button onClick={handleSave} disabled={!form.team_member_id||!form.client_id||!form.fixed_amount||isSaving}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50">
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed">
             {isSaving && <RefreshCw size={14} className="animate-spin" />}Set Override
           </button>
         </div>
@@ -731,47 +731,47 @@ function MemberModal({ isOpen, onClose, onSave, editingMember }: {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className={`${THEME.card} border ${THEME.border} rounded-xl w-full max-w-2xl my-8 flex flex-col max-h-[90vh]`}>
         <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.border}`}>
-          <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>{editingMember ? "Edit Team Member" : "Add Team Member"}</h3>
-          <button onClick={onClose} className="p-1 hover:bg-slate-800/50 rounded-lg"><X size={20} className={THEME.textMuted} /></button>
+          <h3 className={`text-lg font-bold ${THEME.textPrimary}`}>{editingMember ? "Edit Team Member" : "Add Team Member"}</h3>
+          <button onClick={onClose} className="p-1 hover:bg-white/[0.04] rounded-lg"><X size={20} className={THEME.textMuted} /></button>
         </div>
         <div className="p-6 space-y-4 overflow-y-auto flex-1">
           <div className="grid grid-cols-2 gap-4">
             <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Full Name *</label>
-              <input value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white" /></div>
+              <input value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white" /></div>
             <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Email *</label>
-              <input type="email" value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white" /></div>
+              <input type="email" value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white" /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Phone</label>
-              <input value={form.phone} onChange={e=>setForm(p=>({...p,phone:e.target.value}))} className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white" /></div>
+              <input value={form.phone} onChange={e=>setForm(p=>({...p,phone:e.target.value}))} className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white" /></div>
             <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Role / Title</label>
-              <input value={form.role} onChange={e=>setForm(p=>({...p,role:e.target.value}))} className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white" /></div>
+              <input value={form.role} onChange={e=>setForm(p=>({...p,role:e.target.value}))} className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white" /></div>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Employment Type</label>
               <select value={form.employment_type} onChange={e=>setForm(p=>({...p,employment_type:e.target.value}))}
-                className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white">
+                className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white">
                 {EMPLOYMENT_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
               </select></div>
             <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Status</label>
               <select value={form.status} onChange={e=>setForm(p=>({...p,status:e.target.value}))}
-                className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white">
+                className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white">
                 {STATUS_OPTIONS.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
               </select></div>
             <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Start Date</label>
               <input type="date" value={form.start_date} onChange={e=>setForm(p=>({...p,start_date:e.target.value}))}
-                className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white" /></div>
+                className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white" /></div>
           </div>
 
           <div className={`pt-4 border-t ${THEME.border}`}>
-            <h4 className={`text-sm font-medium ${THEME.textSecondary} mb-3`}>Default Cost (fallback when no rate card entry)</h4>
+            <h4 className={`text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500 mb-3`}>Default Cost (fallback when no rate card entry)</h4>
             <div className="grid grid-cols-2 gap-3 mb-4">
               {COST_TYPES.map(t=>(
                 <button key={t.id} type="button" onClick={()=>setForm(p=>({...p,cost_type:t.id as any}))}
-                  className={`p-3 rounded-lg border text-left transition-all ${form.cost_type===t.id?"border-orange-500 bg-orange-500/10":"border-slate-800/80 hover:border-slate-700"}`}>
+                  className={`p-3 rounded-lg border text-left transition-all ${form.cost_type===t.id?"border-orange-500/50 bg-orange-950/30":"border-slate-800/50 hover:border-slate-700"}`}>
                   <p className={`text-sm font-medium ${form.cost_type===t.id?"text-orange-400":THEME.textPrimary}`}>{t.label}</p>
                   <p className={`text-xs ${THEME.textDim} mt-0.5`}>{t.description}</p>
                 </button>
@@ -780,7 +780,7 @@ function MemberModal({ isOpen, onClose, onSave, editingMember }: {
             <div>
               <label className={`block text-xs ${THEME.textMuted} mb-1`}>{form.cost_type==="hourly"?"Hourly Rate ($/hr)":"Monthly Amount ($/mo)"}</label>
               <input type="number" value={form.cost_amount} onChange={e=>setForm(p=>({...p,cost_amount:e.target.value}))}
-                className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white"
+                className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white"
                 placeholder={form.cost_type==="hourly"?"75":"35000"} />
               {form.cost_type==="lump_sum" && form.cost_amount && (
                 <p className={`text-xs ${THEME.textDim} mt-1`}>Effective rate: ~${(parseFloat(form.cost_amount)/172).toFixed(2)}/hr (172 hrs/mo)</p>
@@ -791,44 +791,44 @@ function MemberModal({ isOpen, onClose, onSave, editingMember }: {
           {form.employment_type === "contractor" && (
             <>
               <div className={`pt-4 border-t ${THEME.border}`}>
-                <h4 className={`text-sm font-medium ${THEME.textSecondary} mb-3`}>Entity Information</h4>
+                <h4 className={`text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500 mb-3`}>Entity Information</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Entity Name</label>
                     <input value={form.entity_name} onChange={e=>setForm(p=>({...p,entity_name:e.target.value}))}
-                      className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white" placeholder="LLC or DBA" /></div>
+                      className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white" placeholder="LLC or DBA" /></div>
                   <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Entity Type</label>
                     <select value={form.entity_type} onChange={e=>setForm(p=>({...p,entity_type:e.target.value}))}
-                      className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white">
+                      className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white">
                       <option value="">Select...</option>{ENTITY_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
                     </select></div>
                 </div>
                 <div className="mt-4"><label className={`block text-xs ${THEME.textMuted} mb-1`}>Address</label>
                   <input value={form.address} onChange={e=>setForm(p=>({...p,address:e.target.value}))}
-                    className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white" /></div>
+                    className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white" /></div>
               </div>
               <div className={`pt-4 border-t ${THEME.border}`}>
-                <h4 className={`text-sm font-medium ${THEME.textSecondary} mb-3`}>Payment Information</h4>
+                <h4 className={`text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500 mb-3`}>Payment Information</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Bank Name</label>
                     <input value={form.bank_name} onChange={e=>setForm(p=>({...p,bank_name:e.target.value}))}
-                      className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white" /></div>
+                      className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white" /></div>
                   <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Account Type</label>
                     <select value={form.account_type} onChange={e=>setForm(p=>({...p,account_type:e.target.value}))}
-                      className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white">
+                      className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white">
                       <option value="">Select...</option>{ACCOUNT_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
                     </select></div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 mt-4">
                   <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Routing Number</label>
                     <input value={form.routing_number} onChange={e=>setForm(p=>({...p,routing_number:e.target.value}))}
-                      className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white font-mono" /></div>
+                      className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white font-mono" /></div>
                   <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Account Number</label>
                     <input value={form.account_number} onChange={e=>setForm(p=>({...p,account_number:e.target.value}))}
-                      className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white font-mono" /></div>
+                      className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white font-mono" /></div>
                 </div>
                 <div className="mt-4"><label className={`block text-xs ${THEME.textMuted} mb-1`}>Payment Method</label>
                   <select value={form.payment_method} onChange={e=>setForm(p=>({...p,payment_method:e.target.value}))}
-                    className="w-full px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm text-white">
+                    className="w-full px-3 py-2 bg-[#0c1220] border border-slate-800/60 rounded-lg text-sm text-white">
                     <option value="">Select...</option>{PAYMENT_METHODS.map(m=><option key={m.id} value={m.id}>{m.label}</option>)}
                   </select></div>
               </div>
@@ -836,9 +836,9 @@ function MemberModal({ isOpen, onClose, onSave, editingMember }: {
           )}
         </div>
         <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.border} bg-slate-800/30`}>
-          <button onClick={onClose} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white`}>Cancel</button>
+          <button onClick={onClose} className={`px-4 py-2 text-sm font-medium text-slate-500 hover:text-white transition-colors duration-200`}>Cancel</button>
           <button onClick={handleSave} disabled={!form.name||!form.email||isSaving}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-500 disabled:opacity-50">
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-500 disabled:opacity-40 disabled:cursor-not-allowed">
             {isSaving && <RefreshCw size={14} className="animate-spin" />}{editingMember ? "Save Changes" : "Add Member"}
           </button>
         </div>
@@ -1223,7 +1223,7 @@ export default function TeamPage() {
   if (loading) return (
     <div className="flex items-center justify-center h-[60vh]">
       <div className="text-center">
-        <RefreshCw className="w-8 h-8 text-teal-500 animate-spin mx-auto mb-3" />
+        <RefreshCw className="w-7 h-7 text-teal-400 animate-spin mx-auto mb-3" />
         <p className={`text-sm ${THEME.textMuted}`}>Loading team...</p>
       </div>
     </div>
@@ -1236,25 +1236,25 @@ export default function TeamPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-white tracking-tight">Team</h1>
+          <h1 className="text-xl font-bold text-white tracking-tight">Team</h1>
           <p className={`text-sm mt-0.5 ${THEME.textDim}`}>Manage team members, rates, and profitability</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={exportToCSV} className={`flex items-center gap-2 px-4 py-2 ${THEME.card} border hover:bg-slate-800/60 rounded-lg text-slate-300 text-sm transition-colors`}>
+          <button onClick={exportToCSV} className={`flex items-center gap-2 px-4 py-2 ${THEME.card} border hover:bg-white/[0.05] rounded-lg text-slate-400 text-sm font-medium transition-all duration-200`}>
             <Download size={14} /> Export
           </button>
           {activeTab === "directory" && (
-            <button onClick={() => { setEditingMember(null); setShowMemberModal(true) }} className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-500 transition-colors">
+            <button onClick={() => { setEditingMember(null); setShowMemberModal(true) }} className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-500 active:bg-teal-700 shadow-lg shadow-teal-950/30 transition-all duration-200">
               <Plus size={14} /> Add Member
             </button>
           )}
           {activeTab === "rates" && (
-            <button onClick={() => { setEditingRate(null); setShowRateModal(true) }} className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-500 transition-colors">
+            <button onClick={() => { setEditingRate(null); setShowRateModal(true) }} className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-500 active:bg-teal-700 shadow-lg shadow-teal-950/30 transition-all duration-200">
               <Plus size={14} /> Add Rate Card
             </button>
           )}
           {activeTab === "profitability" && (
-            <button onClick={() => setShowOverrideModal(true)} className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-500 transition-colors">
+            <button onClick={() => setShowOverrideModal(true)} className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-500 active:bg-amber-700 shadow-lg shadow-amber-950/30 transition-all duration-200">
               <Edit2 size={14} /> Cost Override
             </button>
           )}
@@ -1270,7 +1270,7 @@ export default function TeamPage() {
         ]).map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              activeTab === tab.id ? "border-teal-400 text-teal-400" : "border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600"
+              activeTab === tab.id ? "border-teal-400 text-teal-400" : "border-transparent text-slate-500 hover:text-slate-300 hover:border-slate-700"
             }`}>
             <tab.icon size={15} /> {tab.label}
           </button>
@@ -1326,12 +1326,12 @@ export default function TeamPage() {
             <div className="relative flex-1 max-w-sm">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
               <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search by name or email..."
-                className={`w-full pl-9 pr-4 py-2 bg-slate-800/60 border ${THEME.border} rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-teal-500/30`} />
+                className={`w-full pl-9 pr-4 py-2 bg-[#0c1220] border border-slate-800/50 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500/40 transition-all duration-200`} />
             </div>
-            <div className="flex items-center gap-0.5 p-0.5 bg-slate-800/50 rounded-lg border border-slate-800/80">
+            <div className="flex items-center gap-0.5 p-0.5 bg-[#0c1220] rounded-lg border border-slate-800/50">
               {(["all", "employee", "contractor"] as const).map(f => (
                 <button key={f} onClick={() => setEmploymentFilter(f)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${employmentFilter === f ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"}`}>
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${employmentFilter === f ? "bg-white/[0.08] text-white" : "text-slate-500 hover:text-slate-300"}`}>
                   {f === "all" ? "All" : f === "employee" ? "W-2" : "1099"}
                 </button>
               ))}
@@ -1341,7 +1341,7 @@ export default function TeamPage() {
           <div className={`${THEME.card} border ${THEME.border} rounded-xl overflow-hidden`}>
             <table className="w-full text-sm">
               <thead>
-                <tr className={`bg-slate-800/30 border-b ${THEME.border}`}>
+                <tr className={`bg-white/[0.02] border-b ${THEME.border}`}>
                   <th className={`px-4 py-2.5 text-left text-[11px] ${THEME.textDim} font-semibold uppercase tracking-wider`}>Name</th>
                   <th className={`px-4 py-2.5 text-left text-[11px] ${THEME.textDim} font-semibold uppercase tracking-wider`}>Type</th>
                   <th className={`px-4 py-2.5 text-left text-[11px] ${THEME.textDim} font-semibold uppercase tracking-wider`}>Role</th>
@@ -1356,14 +1356,14 @@ export default function TeamPage() {
                   const empStyle = getEmploymentStyle(m.employment_type)
                   const rateCount = billRates.filter(r => r.team_member_id === m.id && r.is_active).length
                   return (
-                    <tr key={m.id} className="border-b border-slate-800/60 hover:bg-slate-800/30 cursor-pointer"
+                    <tr key={m.id} className="border-b border-slate-800/40 hover:bg-white/[0.03] cursor-pointer transition-colors duration-150"
                       onClick={() => setSelectedMemberDetail(m)}>
                       <td className="px-4 py-3">
                         <p className={`font-medium ${THEME.textPrimary}`}>{m.name}</p>
                         <p className={`text-xs ${THEME.textDim}`}>{m.email}</p>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${empStyle.bg} ${empStyle.text}`}>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${empStyle.border} ${empStyle.bg} ${empStyle.text}`}>
                           {m.employment_type === "employee" ? "W-2" : "1099"}
                         </span>
                       </td>
@@ -1375,11 +1375,11 @@ export default function TeamPage() {
                         {rateCount > 0 && <p className={`text-xs ${THEME.textDim}`}>{rateCount} rate card{rateCount > 1 ? "s" : ""}</p>}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${stStyle.bg} ${stStyle.text}`}>{m.status}</span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${stStyle.border} ${stStyle.bg} ${stStyle.text}`}>{m.status}</span>
                       </td>
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-center">
-                          <button onClick={() => { setEditingMember(m); setShowMemberModal(true) }} className="p-1.5 rounded hover:bg-slate-800/60 text-slate-500 hover:text-slate-300">
+                          <button onClick={() => { setEditingMember(m); setShowMemberModal(true) }} className="p-1.5 rounded hover:bg-white/[0.05] text-slate-600 hover:text-slate-300 transition-colors duration-150">
                             <Edit2 size={14} />
                           </button>
                         </div>
@@ -1413,10 +1413,10 @@ export default function TeamPage() {
                   {expandedRateMembers.size > 0 ? "Collapse All" : "Expand All"}
                 </button>
               </div>
-              <div className="flex items-center gap-0.5 p-0.5 bg-slate-800/50 rounded-lg border border-slate-800/80">
+              <div className="flex items-center gap-0.5 p-0.5 bg-[#0c1220] rounded-lg border border-slate-800/50">
                 {(["active", "archived", "all"] as const).map(f => (
                   <button key={f} onClick={() => setRateStatusFilter(f)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${rateStatusFilter === f ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"}`}>
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${rateStatusFilter === f ? "bg-white/[0.08] text-white" : "text-slate-500 hover:text-slate-300"}`}>
                     {f === "active" ? `Active (${billRates.filter(r => r.is_active).length})` : f === "archived" ? `Archived (${billRates.filter(r => !r.is_active).length})` : `All (${billRates.length})`}
                   </button>
                 ))}
@@ -1469,11 +1469,11 @@ export default function TeamPage() {
                           next.has(memberId) ? next.delete(memberId) : next.add(memberId)
                           return next
                         })}
-                        className={`flex items-center px-4 py-3.5 cursor-pointer hover:bg-slate-800/40 transition-colors border-b border-slate-800/60 ${isExpanded ? "bg-slate-800/30" : ""}`}
+                        className={`flex items-center px-4 py-3.5 cursor-pointer hover:bg-white/[0.03] transition-all duration-150 border-b border-slate-800/40 ${isExpanded ? "bg-slate-800/30" : ""}`}
                       >
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <ChevronRight size={14} className={`${THEME.textDim} transition-transform ${isExpanded ? "rotate-90" : ""}`} />
-                          <div className="w-8 h-8 rounded-full bg-teal-600/15 border border-slate-800 flex items-center justify-center flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center flex-shrink-0">
                             <span className={`text-xs font-medium ${THEME.textSecondary}`}>{group.memberName.split(" ").map(n => n[0]).join("").slice(0, 2)}</span>
                           </div>
                           <div className="min-w-0">
@@ -1484,7 +1484,7 @@ export default function TeamPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-4 text-right">
-                          <span className={`text-xs px-2 py-1 rounded-md bg-slate-800/50 ${THEME.textMuted} hidden sm:inline-block`}>
+                          <span className={`text-xs px-2 py-1 rounded-md bg-white/[0.04] border border-slate-800/40 ${THEME.textMuted} hidden sm:inline-block`}>
                             Cost: {costLabel}
                           </span>
                         </div>
@@ -1492,7 +1492,7 @@ export default function TeamPage() {
 
                       {/* Expanded Rate Cards */}
                       {isExpanded && (
-                        <div className="bg-slate-800/30">
+                        <div className="bg-white/[0.02]">
                           <table className="w-full text-sm">
                             <thead>
                               <tr className={`border-b ${THEME.border}`}>
@@ -1517,11 +1517,11 @@ export default function TeamPage() {
                                 const startStr = r.start_date ? new Date(r.start_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "2-digit" }) : ""
                                 const endStr = r.end_date ? new Date(r.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "2-digit" }) : "Ongoing"
                                 return (
-                                  <tr key={r.id} className={`border-b border-slate-800/40 hover:bg-slate-800/30 ${!r.is_active ? "opacity-40" : ""}`}>
+                                  <tr key={r.id} className={`border-b border-slate-800/40 hover:bg-white/[0.03] ${!r.is_active ? "opacity-40" : ""}`}>
                                     <td className={`pl-14 pr-4 py-2.5 ${THEME.textSecondary}`}>
                                       {r.client_name}
                                       <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded ${
-                                        hasCustomCost ? (r.cost_type === "lump_sum" ? "bg-purple-500/10 text-purple-400" : "bg-blue-500/10 text-blue-400") : "bg-slate-500/10 text-slate-400"
+                                        hasCustomCost ? (r.cost_type === "lump_sum" ? "bg-purple-950/40 text-purple-400" : "bg-blue-950/40 text-blue-400") : "bg-slate-800/60 text-slate-500"
                                       }`}>{hasCustomCost ? (r.cost_type === "lump_sum" ? "Fixed" : "T&M") : "Dist"}</span>
                                     </td>
                                     <td className="px-4 py-2.5 text-center">
@@ -1535,7 +1535,7 @@ export default function TeamPage() {
                                           {r.cost_type === "lump_sum" && <p className={`text-[10px] ${THEME.textDim}`}>~${effCost.toFixed(2)}/hr</p>}
                                         </>
                                       ) : (
-                                        <span className={`text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400`}>
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded bg-blue-950/40 text-blue-400`}>
                                           From {member?.cost_type === "lump_sum" ? formatCurrency(member?.cost_amount || 0) + "/mo" : `$${member?.cost_amount || 0}/hr`}
                                         </span>
                                       )}
@@ -1562,11 +1562,11 @@ export default function TeamPage() {
                                     </td>
                                     <td className="px-4 py-2.5">
                                       <div className="flex items-center justify-center gap-1">
-                                        <button onClick={(e) => { e.stopPropagation(); setEditingRate(r); setShowRateModal(true) }} className="p-1 rounded hover:bg-slate-800/60 text-slate-500 hover:text-slate-300"><Edit2 size={13} /></button>
+                                        <button onClick={(e) => { e.stopPropagation(); setEditingRate(r); setShowRateModal(true) }} className="p-1 rounded hover:bg-white/[0.05] text-slate-600 hover:text-slate-300 transition-colors duration-150"><Edit2 size={13} /></button>
                                         {r.is_active ? (
-                                          <button onClick={(e) => { e.stopPropagation(); handleDeleteRate(r.id) }} title="Archive" className="p-1 rounded hover:bg-amber-500/20 text-slate-500 hover:text-amber-400"><Lock size={13} /></button>
+                                          <button onClick={(e) => { e.stopPropagation(); handleDeleteRate(r.id) }} title="Archive" className="p-1 rounded hover:bg-amber-500/10 text-slate-600 hover:text-amber-400 transition-colors duration-150"><Lock size={13} /></button>
                                         ) : (
-                                          <button onClick={(e) => { e.stopPropagation(); handleReactivateRate(r.id) }} title="Reactivate" className="p-1 rounded hover:bg-emerald-500/20 text-slate-500 hover:text-emerald-400"><Unlock size={13} /></button>
+                                          <button onClick={(e) => { e.stopPropagation(); handleReactivateRate(r.id) }} title="Reactivate" className="p-1 rounded hover:bg-emerald-500/10 text-slate-600 hover:text-emerald-400 transition-colors duration-150"><Unlock size={13} /></button>
                                         )}
                                       </div>
                                     </td>
@@ -1583,11 +1583,11 @@ export default function TeamPage() {
               </div>
             ) : (
             <div className={`px-6 py-12 text-center ${THEME.textMuted}`}>
-              <DollarSign size={48} className="mx-auto text-slate-600 mb-4" />
+              <DollarSign size={48} className="mx-auto text-slate-700 mb-4" />
               <p>No rate cards configured yet</p>
               <p className={`text-xs ${THEME.textDim} mt-1`}>Add rate cards to define cost + bill rates per client</p>
               <button onClick={() => { setEditingRate(null); setShowRateModal(true) }}
-                className="mt-4 px-4 py-2 bg-teal-500/10 text-teal-400 rounded-lg text-sm font-medium hover:bg-teal-500/20 border border-teal-500/20">
+                className="mt-4 px-4 py-2 bg-teal-950/40 text-teal-400 rounded-lg text-sm font-semibold hover:bg-teal-900/40 border border-teal-800/30 transition-all duration-200">
                 Add First Rate Card
               </button>
             </div>
@@ -1602,26 +1602,26 @@ export default function TeamPage() {
           {/* Period Selector + View Toggle */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-0.5 p-0.5 bg-slate-800/50 rounded-lg border border-slate-800/80">
+              <div className="flex items-center gap-0.5 p-0.5 bg-[#0c1220] rounded-lg border border-slate-800/50">
                 {(["month", "quarter", "year"] as PeriodType[]).map(pt => (
                   <button key={pt} onClick={() => handlePeriodTypeChange(pt)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${periodType === pt ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"}`}>
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${periodType === pt ? "bg-white/[0.08] text-white" : "text-slate-500 hover:text-slate-300"}`}>
                     {pt === "month" ? "Month" : pt === "quarter" ? "Quarter" : "Year"}
                   </button>
                 ))}
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={() => setSelectedPeriod(stepPeriod(selectedPeriod, periodType, -1))} className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-slate-800/60 text-slate-400 transition-colors`}>
+                <button onClick={() => setSelectedPeriod(stepPeriod(selectedPeriod, periodType, -1))} className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-white/[0.05] text-slate-600 hover:text-slate-300 transition-colors duration-150 transition-all duration-200`}>
                   <ChevronDown size={14} className="rotate-90" />
                 </button>
                 <span className={`text-white text-sm font-medium px-3 py-1.5 ${THEME.card} border rounded-lg min-w-[150px] text-center tabular-nums`}>{formatPeriodLabel(selectedPeriod, periodType)}</span>
-                <button onClick={() => setSelectedPeriod(stepPeriod(selectedPeriod, periodType, 1))} className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-slate-800/60 text-slate-400 transition-colors`}>
+                <button onClick={() => setSelectedPeriod(stepPeriod(selectedPeriod, periodType, 1))} className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-white/[0.05] text-slate-600 hover:text-slate-300 transition-colors duration-150 transition-all duration-200`}>
                   <ChevronDown size={14} className="-rotate-90" />
                 </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-0.5 p-0.5 bg-slate-800/50 rounded-lg border border-slate-800/80">
+            <div className="flex items-center gap-0.5 p-0.5 bg-[#0c1220] rounded-lg border border-slate-800/50">
               {([
                 { id: "summary" as const, label: "Summary", color: "text-teal-400" },
                 { id: "revenue" as const, label: "Revenue", color: "text-blue-400" },
@@ -1684,7 +1684,7 @@ export default function TeamPage() {
                   <BarChart data={profitabilityData} margin={{ left: 20, right: 20 }}>
                     <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => formatCompactCurrency(v)} />
-                    <Tooltip contentStyle={{ backgroundColor: "#111827", border: "1px solid rgba(51,65,85,0.5)", borderRadius: "8px" }} labelStyle={{ color: "#fff" }}
+                    <Tooltip contentStyle={{ backgroundColor: "#0f1623", border: "1px solid rgba(51,65,85,0.3)", borderRadius: "8px" }} labelStyle={{ color: "#fff" }}
                       formatter={(value: number, name: string) => [formatCurrency(value), name.toLowerCase() === "cost" ? "Cost" : "Revenue"]} cursor={false} />
                     <Legend wrapperStyle={{ paddingTop: "10px" }} />
                     <Bar dataKey="cost" name="Cost" fill={CHART_COLORS.cost} radius={[4, 4, 0, 0]} />
@@ -1699,12 +1699,12 @@ export default function TeamPage() {
           {profitView === "summary" && profitabilityData.length > 0 && (
             <div className={`${THEME.card} border ${THEME.border} rounded-xl overflow-hidden`}>
               <div className={`px-6 py-4 border-b ${THEME.border} flex items-center gap-2`}>
-                <div className="w-3 h-3 rounded bg-teal-400" />
+                <div className="w-2.5 h-2.5 rounded-full bg-teal-400" style={{ animationDuration: "3s" }} />
                 <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Direct Cost Analysis &mdash; {formatPeriodLabel(selectedPeriod, periodType)}</h3>
               </div>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className={`bg-slate-800/30 border-b ${THEME.border}`}>
+                  <tr className={`bg-white/[0.02] border-b ${THEME.border}`}>
                     <th className={`px-4 py-2.5 text-left text-[11px] ${THEME.textDim} font-semibold uppercase tracking-wider`}>Name</th>
                     <th className={`px-4 py-2.5 text-right text-[11px] ${THEME.textDim} font-semibold uppercase tracking-wider`}>Hours</th>
                     <th className={`px-4 py-2.5 text-right text-[11px] ${THEME.textDim} font-semibold uppercase tracking-wider`}>Total Cost</th>
@@ -1715,7 +1715,7 @@ export default function TeamPage() {
                 </thead>
                 <tbody>
                   {profitabilityData.map(row => (
-                    <tr key={row.id} className="border-b border-slate-800/60">
+                    <tr key={row.id} className="border-b border-slate-800/40">
                       <td className={`px-4 py-3 font-medium ${THEME.textPrimary}`}>
                         {row.name}
                         <span className={`ml-2 text-xs ${THEME.textDim}`}>{row.costLabel}</span>
@@ -1727,7 +1727,7 @@ export default function TeamPage() {
                       <td className={`px-4 py-3 text-right font-semibold tabular-nums ${row.marginPct >= 20 ? "text-emerald-400" : row.marginPct >= 0 ? "text-amber-400" : "text-rose-400"}`}>{row.marginPct.toFixed(1)}%</td>
                     </tr>
                   ))}
-                  <tr className={`bg-slate-800/30 border-t-2 ${THEME.border} font-bold`}>
+                  <tr className={`bg-white/[0.03] border-t-2 ${THEME.border} font-bold`}>
                     <td className={`px-4 py-3 ${THEME.textPrimary}`}>Total</td>
                     <td className={`px-4 py-3 text-right ${THEME.textSecondary} tabular-nums`}>{profitTotals.hours.toFixed(1)}</td>
                     <td className="px-4 py-3 text-right text-orange-400 tabular-nums">{formatCurrencyDecimal(profitTotals.cost)}</td>
@@ -1744,14 +1744,14 @@ export default function TeamPage() {
           {profitView === "revenue" && profitabilityData.length > 0 && (
             <div className={`${THEME.card} border ${THEME.border} rounded-xl overflow-hidden`}>
               <div className={`px-6 py-4 border-b ${THEME.border} flex items-center gap-2`}>
-                <div className="w-3 h-3 rounded bg-blue-400" />
+                <div className="w-2.5 h-2.5 rounded-full bg-blue-400" style={{ animationDuration: "3s" }} />
                 <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Revenue by Client &mdash; {formatPeriodLabel(selectedPeriod, periodType)}</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className={`bg-slate-800/30 border-b ${THEME.border}`}>
-                      <th className={`px-4 py-2.5 text-left text-[11px] ${THEME.textDim} font-semibold uppercase tracking-wider sticky left-0 bg-[#111827] z-10`}>Name</th>
+                    <tr className={`bg-white/[0.02] border-b ${THEME.border}`}>
+                      <th className={`px-4 py-2.5 text-left text-[11px] ${THEME.textDim} font-semibold uppercase tracking-wider sticky left-0 bg-[#0f1623] z-10`}>Name</th>
                       {profitClients.map(c => (
                         <th key={c.id} className={`px-4 py-3 text-right ${THEME.textDim} font-medium whitespace-nowrap`}>{c.name}</th>
                       ))}
@@ -1760,8 +1760,8 @@ export default function TeamPage() {
                   </thead>
                   <tbody>
                     {profitabilityData.map(row => (
-                      <tr key={row.id} className="border-b border-slate-800/60">
-                        <td className={`px-4 py-3 font-medium ${THEME.textPrimary} sticky left-0 bg-[#111827] z-10`}>{row.name}</td>
+                      <tr key={row.id} className="border-b border-slate-800/40">
+                        <td className={`px-4 py-3 font-medium ${THEME.textPrimary} sticky left-0 bg-[#0f1623] z-10`}>{row.name}</td>
                         {profitClients.map(c => {
                           const val = row.revenueByClient[c.id] || 0
                           return <td key={c.id} className={`px-4 py-3 text-right ${val > 0 ? "text-blue-400" : THEME.textDim}`}>{val > 0 ? formatCurrencyDecimal(val) : "\u2014"}</td>
@@ -1769,8 +1769,8 @@ export default function TeamPage() {
                         <td className="px-4 py-3 text-right text-blue-400 font-medium">{formatCurrencyDecimal(row.revenue)}</td>
                       </tr>
                     ))}
-                    <tr className={`bg-slate-800/30 border-t-2 ${THEME.border} font-bold`}>
-                      <td className={`px-4 py-3 ${THEME.textPrimary} sticky left-0 bg-[#111827] z-10`}>Total</td>
+                    <tr className={`bg-white/[0.03] border-t-2 ${THEME.border} font-bold`}>
+                      <td className={`px-4 py-3 ${THEME.textPrimary} sticky left-0 bg-[#0f1623] z-10`}>Total</td>
                       {profitClients.map(c => {
                         const total = profitabilityData.reduce((s, m) => s + (m.revenueByClient[c.id] || 0), 0)
                         return <td key={c.id} className="px-4 py-3 text-right text-blue-400 tabular-nums">{formatCurrencyDecimal(total)}</td>
@@ -1787,14 +1787,14 @@ export default function TeamPage() {
           {profitView === "cost" && profitabilityData.length > 0 && (
             <div className={`${THEME.card} border ${THEME.border} rounded-xl overflow-hidden`}>
               <div className={`px-6 py-4 border-b ${THEME.border} flex items-center gap-2`}>
-                <div className="w-3 h-3 rounded bg-orange-400" />
+                <div className="w-2.5 h-2.5 rounded-full bg-orange-400" style={{ animationDuration: "3s" }} />
                 <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Cost by Client &mdash; {formatPeriodLabel(selectedPeriod, periodType)}</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className={`bg-slate-800/30 border-b ${THEME.border}`}>
-                      <th className={`px-4 py-2.5 text-left text-[11px] ${THEME.textDim} font-semibold uppercase tracking-wider sticky left-0 bg-[#111827] z-10`}>Name</th>
+                    <tr className={`bg-white/[0.02] border-b ${THEME.border}`}>
+                      <th className={`px-4 py-2.5 text-left text-[11px] ${THEME.textDim} font-semibold uppercase tracking-wider sticky left-0 bg-[#0f1623] z-10`}>Name</th>
                       {profitClients.map(c => (
                         <th key={c.id} className={`px-4 py-3 text-right ${THEME.textDim} font-medium whitespace-nowrap`}>{c.name}</th>
                       ))}
@@ -1803,8 +1803,8 @@ export default function TeamPage() {
                   </thead>
                   <tbody>
                     {profitabilityData.map(row => (
-                      <tr key={row.id} className="border-b border-slate-800/60">
-                        <td className={`px-4 py-3 font-medium ${THEME.textPrimary} sticky left-0 bg-[#111827] z-10`}>{row.name}</td>
+                      <tr key={row.id} className="border-b border-slate-800/40">
+                        <td className={`px-4 py-3 font-medium ${THEME.textPrimary} sticky left-0 bg-[#0f1623] z-10`}>{row.name}</td>
                         {profitClients.map(c => {
                           const val = row.costByClient[c.id] || 0
                           const months = getMonthsInPeriod(selectedPeriod, periodType)
@@ -1819,8 +1819,8 @@ export default function TeamPage() {
                         <td className="px-4 py-3 text-right text-orange-400 font-medium tabular-nums">{formatCurrencyDecimal(row.cost)}</td>
                       </tr>
                     ))}
-                    <tr className={`bg-slate-800/30 border-t-2 ${THEME.border} font-bold`}>
-                      <td className={`px-4 py-3 ${THEME.textPrimary} sticky left-0 bg-[#111827] z-10`}>Total</td>
+                    <tr className={`bg-white/[0.03] border-t-2 ${THEME.border} font-bold`}>
+                      <td className={`px-4 py-3 ${THEME.textPrimary} sticky left-0 bg-[#0f1623] z-10`}>Total</td>
                       {profitClients.map(c => {
                         const total = profitabilityData.reduce((s, m) => s + (m.costByClient[c.id] || 0), 0)
                         return <td key={c.id} className="px-4 py-3 text-right text-orange-400 tabular-nums">{formatCurrencyDecimal(total)}</td>
@@ -1841,7 +1841,7 @@ export default function TeamPage() {
                     <p className={`text-xs font-medium ${THEME.textMuted} mb-2`}>&#9889; Active Overrides</p>
                     <div className="flex flex-wrap gap-2">
                       {activeOverrides.map(o => (
-                        <div key={o.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                        <div key={o.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-950/30 border border-amber-800/30">
                           <span className="text-xs text-amber-400">{o.team_member_name} &rarr; {o.client_name} ({o.month}): {formatCurrency(o.fixed_amount)}</span>
                           <button onClick={() => handleDeleteOverride(o.id)} className="text-amber-500/50 hover:text-rose-400"><X size={12} /></button>
                         </div>
@@ -1855,7 +1855,7 @@ export default function TeamPage() {
 
           {profitabilityData.length === 0 && (
             <div className={`${THEME.card} border ${THEME.border} rounded-xl p-12 text-center`}>
-              <BarChart3 size={48} className="mx-auto text-slate-600 mb-4" />
+              <BarChart3 size={48} className="mx-auto text-slate-700 mb-4" />
               <p className={THEME.textMuted}>No timesheet data for {formatPeriodLabel(selectedPeriod, periodType)}</p>
               <p className={`text-xs ${THEME.textDim} mt-1`}>Time entries and rate cards needed to calculate profitability</p>
             </div>
