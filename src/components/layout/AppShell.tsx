@@ -67,7 +67,6 @@ export default function AppShell({ children }: AppShellProps) {
         if (profile?.company_id) {
           setCompanyId(profile.company_id)
           
-          // Try company_settings first, then companies table
           const { data: settings } = await fetchCompanySettings(profile.company_id)
           if (settings?.company_name) {
             setCompanyName(settings.company_name)
@@ -86,7 +85,6 @@ export default function AppShell({ children }: AppShellProps) {
     
     checkAuth()
     
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         router.push('/login')
@@ -111,7 +109,7 @@ export default function AppShell({ children }: AppShellProps) {
     router.push('/login')
   }
 
-  // Skip shell for login page
+  // Skip shell for public/portal pages
   if (['/login', '/portal', '/timesheet', '/contractor-portal', '/expense-report', '/terms', '/privacy'].includes(pathname)) {
     return <>{children}</>
   }
@@ -119,8 +117,8 @@ export default function AppShell({ children }: AppShellProps) {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0B1120] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
+      <div className="min-h-screen bg-[#080c14] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 vUp">
           <svg width={40} height={40} viewBox="0 0 40 40" fill="none" className="animate-pulse">
             <defs>
               <linearGradient id="loadingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -137,14 +135,14 @@ export default function AppShell({ children }: AppShellProps) {
               fill="none"
             />
           </svg>
-          <p className="text-sm text-slate-500 font-medium">Loading VantageFP...</p>
+          <p className="text-sm text-slate-600 font-medium">Loading VantageFP...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#0B1120]">
+    <div className="min-h-screen bg-[#080c14]">
       {/* Sidebar */}
       <Sidebar
         collapsed={sidebarCollapsed}
@@ -170,11 +168,10 @@ export default function AppShell({ children }: AppShellProps) {
         )}
       >
         <div className="p-6">
-          {/* Pass context to children */}
           {React.Children.map(children, child => {
             if (React.isValidElement(child)) {
               return React.cloneElement(child, {
-                // @ts-ignore - passing props to page components
+                // @ts-ignore
                 companyId,
                 user,
                 profile
