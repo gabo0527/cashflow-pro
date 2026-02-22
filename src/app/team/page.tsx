@@ -14,47 +14,7 @@ import {
 import { supabase, getCurrentUser } from "@/lib/supabase"
 
 // ============ DESIGN SYSTEM — Mercury / Ramp / Carta tier ============
-const _V = "vantage-team-css"
-if (typeof document !== "undefined" && !document.getElementById(_V)) {
-  const _s = document.createElement("style"); _s.id = _V
-  _s.textContent = `
-    @keyframes vUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes vFade{from{opacity:0}to{opacity:1}}
-    @keyframes vScale{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
-    @keyframes vSlideR{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
-    @keyframes vSlideL{from{transform:translateX(100%)}to{transform:translateX(0)}}
-    @keyframes vPulse{0%,100%{opacity:.6}50%{opacity:1}}
-    .vUp{animation:vUp .5s cubic-bezier(.22,1,.36,1) both}
-    .vFade{animation:vFade .35s ease both}
-    .vScale{animation:vScale .3s cubic-bezier(.22,1,.36,1) both}
-    .vSlideR{animation:vSlideR .4s cubic-bezier(.22,1,.36,1) both}
-    .vSlideL{animation:vSlideL .4s cubic-bezier(.16,1,.3,1) both}
-    .vD1{animation-delay:40ms}.vD2{animation-delay:80ms}.vD3{animation-delay:120ms}
-    .vD4{animation-delay:160ms}.vD5{animation-delay:200ms}
-    .vCard{transition:all .25s cubic-bezier(.22,1,.36,1)}
-    .vCard:hover{transform:translateY(-2px);box-shadow:0 12px 32px -8px rgba(0,0,0,.5),0 0 0 1px rgba(148,163,184,.06)}
-    .vGlow:hover{box-shadow:0 12px 32px -8px rgba(0,0,0,.5),0 0 24px -4px rgba(20,184,166,.08)}
-    .vBtn{transition:all .2s cubic-bezier(.22,1,.36,1)}
-    .vBtn:active{transform:scale(.97)}
-    .vPri{box-shadow:0 1px 3px rgba(0,0,0,.3),0 4px 16px -2px rgba(13,148,136,.3)}
-    .vPri:hover{box-shadow:0 2px 4px rgba(0,0,0,.3),0 8px 24px -2px rgba(13,148,136,.4);transform:translateY(-1px)}
-    .vPri:active{transform:translateY(0) scale(.98)}
-    .vRow{transition:background-color .15s ease}
-    .vRow:hover{background-color:rgba(255,255,255,.025)}
-    .vInp{transition:all .2s ease}
-    .vInp:focus{box-shadow:0 0 0 3px rgba(20,184,166,.08),0 0 20px -6px rgba(20,184,166,.1)}
-    .vExp{overflow:hidden;animation:vUp .3s cubic-bezier(.22,1,.36,1) both}
-    .vSrch{transition:all .2s ease}
-    .vSrch:focus-within{box-shadow:0 0 0 3px rgba(20,184,166,.06);border-color:rgba(20,184,166,.25)}
-    .vKpi{position:relative;overflow:hidden}
-    .vKpi::after{content:"";position:absolute;top:0;right:0;bottom:0;width:35%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.008));pointer-events:none}
-    .vDot{width:7px;height:7px;border-radius:50%;animation:vPulse 3s ease-in-out infinite}
-    .vLbl{letter-spacing:.1em}
-    .vBdg{letter-spacing:.06em}
-    .vN{font-variant-numeric:vN}
-    @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
-  `; document.head.appendChild(_s)
-}
+// Animation classes now in globals.css
 
 const THEME = {
   card: "bg-[#0f1623] border-slate-800/50",
@@ -124,7 +84,7 @@ interface TimeEntry { id: string; contractor_id: string; project_id: string; hou
 const STATUS_OPTIONS = [{ id: "active", label: "Active" }, { id: "inactive", label: "Inactive" }]
 const EMPLOYMENT_TYPES = [
   { id: "employee", label: "W-2 Employee", icon: UserCheck, color: "blue" },
-  { id: "contractor", label: "1099 Contractor", icon: User, color: "purple" },
+  { id: "contractor", label: "1099 Contractor", icon: User, color: "amber" },
 ]
 const ENTITY_TYPES = [
   { id: "individual", label: "Individual" }, { id: "llc", label: "LLC" },
@@ -147,7 +107,7 @@ const formatCurrencyDecimal = (v: number) => new Intl.NumberFormat("en-US", { st
 const formatCompactCurrency = (v: number) => { if (v >= 1e6) return `$${(v/1e6).toFixed(1)}M`; if (v >= 1e3) return `$${(v/1e3).toFixed(0)}k`; return `$${v.toFixed(0)}` }
 const maskNumber = (num: string | null) => num ? "\u2022\u2022\u2022\u2022 " + num.slice(-4) : "\u2014"
 const getStatusStyle = (s: string) => s === "active" ? { bg: "bg-emerald-950/50", text: "text-emerald-400", border: "border-emerald-800/30" } : { bg: "bg-slate-900/50", text: "text-slate-500", border: "border-slate-700/30" }
-const getEmploymentStyle = (t: string) => t === "employee" ? { bg: "bg-blue-950/50", text: "text-blue-400", border: "border-blue-800/30" } : { bg: "bg-purple-950/50", text: "text-purple-400", border: "border-purple-800/30" }
+const getEmploymentStyle = (t: string) => t === "employee" ? { bg: "bg-blue-950/50", text: "text-blue-400", border: "border-blue-800/30" } : { bg: "bg-amber-950/50", text: "text-amber-400", border: "border-amber-800/30" }
 
 const getCurrentMonth = () => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}` }
 const formatMonth = (m: string) => { const [y, mo] = m.split("-"); return new Date(parseInt(y), parseInt(mo)-1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }) }
@@ -1279,13 +1239,13 @@ export default function TeamPage() {
   )
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <ToastContainer toasts={toasts} onDismiss={id => setToasts(prev => prev.filter(t => t.id !== id))} />
 
       {/* Header */}
       <div className="flex items-center justify-between vUp">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Team</h1>
+          <h1 className="text-[28px] font-bold text-white tracking-tight">Team</h1>
           <p className={`text-[13px] mt-1 ${THEME.textDim}`}>Manage team members, rates, and profitability</p>
         </div>
         <div className="flex items-center gap-2.5 vUp vD1">
@@ -1318,7 +1278,7 @@ export default function TeamPage() {
           { id: "profitability" as const, label: "Profitability", icon: BarChart3 },
         ]).map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={`vBtn flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-all duration-300 ${
+            className={`vBtn flex items-center gap-2 px-5 py-3.5 text-sm font-medium border-b-2 -mb-px transition-all duration-300 ${
               activeTab === tab.id ? "border-teal-400 text-teal-400" : "border-transparent text-slate-500 hover:text-slate-300 hover:border-slate-700"
             }`}>
             <tab.icon size={15} /> {tab.label}
@@ -1327,38 +1287,38 @@ export default function TeamPage() {
       </div>
 
       {/* Summary Cards — left-accent-bar */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 vUp vD3">
-        <div className={`vCard vKpi relative p-5 rounded-xl ${THEME.card} border overflow-hidden`}>
-          <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full bg-white/15" />
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 vUp vD3">
+        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
+          <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-white/15" />
           <div className="pl-2">
             <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>Total Members</span>
             <p className="text-2xl font-bold text-white vN mt-1.5">{summary.total}</p>
             <p className={`text-xs ${THEME.textDim} mt-0.5`}>{summary.active} active</p>
           </div>
         </div>
-        <div className={`vCard vKpi relative p-5 rounded-xl ${THEME.card} border overflow-hidden`}>
-          <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full bg-blue-500" />
+        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
+          <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-blue-500" />
           <div className="pl-2">
             <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>W-2 Employees</span>
             <p className="text-2xl font-bold text-blue-400 vN mt-1.5">{summary.employees}</p>
           </div>
         </div>
-        <div className={`vCard vKpi relative p-5 rounded-xl ${THEME.card} border overflow-hidden`}>
-          <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full bg-purple-500" />
+        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
+          <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-amber-500" />
           <div className="pl-2">
             <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>1099 Contractors</span>
-            <p className="text-2xl font-bold text-purple-400 vN mt-1.5">{summary.contractors}</p>
+            <p className="text-2xl font-bold text-amber-400 vN mt-1.5">{summary.contractors}</p>
           </div>
         </div>
-        <div className={`vCard vKpi relative p-5 rounded-xl ${THEME.card} border overflow-hidden`}>
-          <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full bg-teal-500" />
+        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
+          <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-teal-500" />
           <div className="pl-2">
             <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>Active Rate Cards</span>
             <p className="text-2xl font-bold text-teal-400 vN mt-1.5">{summary.activeRates}</p>
           </div>
         </div>
-        <div className={`vCard vKpi relative p-5 rounded-xl ${THEME.card} border overflow-hidden`}>
-          <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full bg-emerald-500" />
+        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
+          <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-emerald-500" />
           <div className="pl-2">
             <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>GM% ({formatPeriodLabel(selectedPeriod, periodType).split(" ")[0]})</span>
             <p className={`text-2xl font-bold vN mt-1.5 ${profitTotals.marginPct >= 20 ? "text-emerald-400" : profitTotals.marginPct >= 0 ? "text-amber-400" : "text-rose-400"}`}>
@@ -1375,7 +1335,7 @@ export default function TeamPage() {
             <div className="relative flex-1 max-w-sm vSrch rounded-lg border border-slate-800/40 bg-[#0a0f1a]">
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-600" />
               <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search by name or email..."
-                className={`w-full pl-10 pr-4 py-2.5 bg-transparent text-sm text-white placeholder-slate-600 focus:outline-none`} />
+                className={`w-full pl-10 pr-4 py-2.5 bg-transparent text-[13px] text-white placeholder-slate-600 focus:outline-none`} />
             </div>
             <div className="flex items-center gap-0.5 p-0.5 bg-[#0a0f1a] rounded-xl border border-slate-800/40">
               {(["all", "employee", "contractor"] as const).map(f => (
@@ -1387,10 +1347,10 @@ export default function TeamPage() {
             </div>
           </div>
 
-          <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-lg shadow-black/10`}>
+          <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-xl shadow-black/25`}>
             <table className="w-full text-sm">
               <thead>
-                <tr className={`bg-[#0a0f1a]/50 border-b ${THEME.border}`}>
+                <tr className={`bg-[#080c14]/60 border-b ${THEME.border}`}>
                   <th className={`px-4 py-2.5 text-left vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Name</th>
                   <th className={`px-4 py-2.5 text-left vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Type</th>
                   <th className={`px-4 py-2.5 text-left vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Role</th>
@@ -1447,7 +1407,7 @@ export default function TeamPage() {
 
       {/* ============ RATES TAB ============ */}
       {activeTab === "rates" && (
-        <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-lg shadow-black/10`}>
+        <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-xl shadow-black/25`}>
           <div className={`px-6 py-4 border-b ${THEME.border} flex items-center justify-between`}>
             <div>
               <h3 className={`text-[13px] font-bold ${THEME.textPrimary}`}>Rate Card</h3>
@@ -1570,7 +1530,7 @@ export default function TeamPage() {
                                     <td className={`pl-14 pr-4 py-2.5 ${THEME.textSecondary}`}>
                                       {r.client_name}
                                       <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded ${
-                                        hasCustomCost ? (r.cost_type === "lump_sum" ? "bg-purple-950/40 text-purple-400" : "bg-blue-950/40 text-blue-400") : "bg-slate-800/50 text-slate-500"
+                                        hasCustomCost ? (r.cost_type === "lump_sum" ? "bg-amber-950/40 text-amber-400" : "bg-blue-950/40 text-blue-400") : "bg-slate-800/50 text-slate-500"
                                       }`}>{hasCustomCost ? (r.cost_type === "lump_sum" ? "Fixed" : "T&M") : "Dist"}</span>
                                     </td>
                                     <td className="px-4 py-2.5 text-center">
@@ -1686,37 +1646,37 @@ export default function TeamPage() {
 
           {/* Period Totals Bar */}
           {profitabilityData.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              <div className={`vCard vKpi relative p-5 rounded-xl ${THEME.card} border overflow-hidden`}>
-                <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full bg-white/20" />
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
+                <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-white/20" />
                 <div className="pl-2">
                   <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>Hours</span>
                   <p className="text-2xl font-bold text-white vN mt-1.5">{profitTotals.hours.toFixed(1)}</p>
                 </div>
               </div>
-              <div className={`vCard vKpi relative p-5 rounded-xl ${THEME.card} border overflow-hidden`}>
-                <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full bg-teal-500" />
+              <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
+                <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-teal-500" />
                 <div className="pl-2">
                   <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>Revenue</span>
                   <p className="text-2xl font-bold text-teal-400 vN mt-1.5">{formatCurrency(profitTotals.revenue)}</p>
                 </div>
               </div>
-              <div className={`vCard vKpi relative p-5 rounded-xl ${THEME.card} border overflow-hidden`}>
-                <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full bg-slate-500" />
+              <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
+                <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-slate-500" />
                 <div className="pl-2">
                   <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>Cost</span>
                   <p className="text-2xl font-bold text-slate-300 vN mt-1.5">{formatCurrency(profitTotals.cost)}</p>
                 </div>
               </div>
-              <div className={`vCard vKpi relative p-5 rounded-xl ${THEME.card} border overflow-hidden`}>
-                <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full" style={{ backgroundColor: profitTotals.margin >= 0 ? '#059669' : '#f43f5e' }} />
+              <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
+                <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full" style={{ backgroundColor: profitTotals.margin >= 0 ? '#059669' : '#f43f5e' }} />
                 <div className="pl-2">
                   <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>Margin</span>
                   <p className={`text-2xl font-bold vN mt-1.5 ${profitTotals.margin >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{formatCurrency(profitTotals.margin)}</p>
                 </div>
               </div>
-              <div className={`vCard vKpi relative p-5 rounded-xl ${THEME.card} border overflow-hidden`}>
-                <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full" style={{ backgroundColor: profitTotals.marginPct >= 20 ? '#059669' : profitTotals.marginPct >= 0 ? '#d97706' : '#f43f5e' }} />
+              <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
+                <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full" style={{ backgroundColor: profitTotals.marginPct >= 20 ? '#059669' : profitTotals.marginPct >= 0 ? '#d97706' : '#f43f5e' }} />
                 <div className="pl-2">
                   <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>GM%</span>
                   <p className={`text-2xl font-bold vN mt-1.5 ${profitTotals.marginPct >= 20 ? "text-emerald-400" : profitTotals.marginPct >= 0 ? "text-amber-400" : "text-rose-400"}`}>{profitTotals.marginPct.toFixed(1)}%</p>
@@ -1727,7 +1687,7 @@ export default function TeamPage() {
 
           {/* Chart */}
           {profitabilityData.length > 0 && (
-            <div className={`${THEME.card} border ${THEME.border} rounded-2xl p-6 shadow-lg shadow-black/10`}>
+            <div className={`${THEME.card} border ${THEME.border} rounded-2xl p-6 shadow-xl shadow-black/25`}>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={profitabilityData} margin={{ left: 20, right: 20 }}>
@@ -1746,14 +1706,14 @@ export default function TeamPage() {
 
           {/* SUMMARY VIEW */}
           {profitView === "summary" && profitabilityData.length > 0 && (
-            <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-lg shadow-black/10`}>
+            <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-xl shadow-black/25`}>
               <div className={`px-6 py-4 border-b ${THEME.border} flex items-center gap-2`}>
                 <div className="vDot bg-teal-400" />
                 <h3 className={`text-[13px] font-bold ${THEME.textPrimary}`}>Direct Cost Analysis &mdash; {formatPeriodLabel(selectedPeriod, periodType)}</h3>
               </div>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className={`bg-[#0a0f1a]/50 border-b ${THEME.border}`}>
+                  <tr className={`bg-[#080c14]/60 border-b ${THEME.border}`}>
                     <th className={`px-4 py-2.5 text-left vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Name</th>
                     <th className={`px-4 py-2.5 text-right vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Hours</th>
                     <th className={`px-4 py-2.5 text-right vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Total Cost</th>
@@ -1791,7 +1751,7 @@ export default function TeamPage() {
 
           {/* REVENUE VIEW */}
           {profitView === "revenue" && profitabilityData.length > 0 && (
-            <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-lg shadow-black/10`}>
+            <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-xl shadow-black/25`}>
               <div className={`px-6 py-4 border-b ${THEME.border} flex items-center gap-2`}>
                 <div className="vDot bg-blue-400" />
                 <h3 className={`text-[13px] font-bold ${THEME.textPrimary}`}>Revenue by Client &mdash; {formatPeriodLabel(selectedPeriod, periodType)}</h3>
@@ -1799,7 +1759,7 @@ export default function TeamPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className={`bg-[#0a0f1a]/50 border-b ${THEME.border}`}>
+                    <tr className={`bg-[#080c14]/60 border-b ${THEME.border}`}>
                       <th className={`px-4 py-2.5 text-left vLbl text-[10px] ${THEME.textDim} font-bold uppercase sticky left-0 bg-[#0f1623] z-10`}>Name</th>
                       {profitClients.map(c => (
                         <th key={c.id} className={`px-4 py-3 text-right ${THEME.textDim} font-medium whitespace-nowrap`}>{c.name}</th>
@@ -1834,7 +1794,7 @@ export default function TeamPage() {
 
           {/* COST VIEW */}
           {profitView === "cost" && profitabilityData.length > 0 && (
-            <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-lg shadow-black/10`}>
+            <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-xl shadow-black/25`}>
               <div className={`px-6 py-4 border-b ${THEME.border} flex items-center gap-2`}>
                 <div className="vDot bg-orange-400" />
                 <h3 className={`text-[13px] font-bold ${THEME.textPrimary}`}>Cost by Client &mdash; {formatPeriodLabel(selectedPeriod, periodType)}</h3>
@@ -1842,7 +1802,7 @@ export default function TeamPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className={`bg-[#0a0f1a]/50 border-b ${THEME.border}`}>
+                    <tr className={`bg-[#080c14]/60 border-b ${THEME.border}`}>
                       <th className={`px-4 py-2.5 text-left vLbl text-[10px] ${THEME.textDim} font-bold uppercase sticky left-0 bg-[#0f1623] z-10`}>Name</th>
                       {profitClients.map(c => (
                         <th key={c.id} className={`px-4 py-3 text-right ${THEME.textDim} font-medium whitespace-nowrap`}>{c.name}</th>
