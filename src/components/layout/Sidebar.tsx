@@ -53,7 +53,6 @@ const navItems: NavItem[] = [
   { label: 'Forecast', href: '/forecast', icon: <Calculator size={18} />, adminOnly: true },
   { label: 'Sage', href: '/ai-assistant', icon: <MessageSquare size={18} />, section: 'Intelligence', adminOnly: true },
   { label: 'Settings', href: '/settings', icon: <Settings size={18} />, section: 'System', adminOnly: true },
-  // Employee-only items
   { label: 'My Timesheet', href: '/timesheet', icon: <Clock size={18} /> },
   { label: 'My Expenses', href: '/expense-report', icon: <Receipt size={18} /> },
 ]
@@ -63,13 +62,9 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
   
   const isLeadership = userRole === 'owner' || userRole === 'admin'
   
-  // Filter nav items based on role
   const visibleItems = navItems.filter(item => {
-    if (isLeadership) {
-      return item.adminOnly === true
-    } else {
-      return !item.adminOnly
-    }
+    if (isLeadership) return item.adminOnly === true
+    return !item.adminOnly
   })
 
   let currentSection = ''
@@ -78,13 +73,13 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
     <aside
       className={cn(
         'fixed left-0 top-0 h-full z-40 flex flex-col transition-all duration-300',
-        'bg-[#0B1120] border-r border-slate-800/80',
+        'bg-[#060a12] border-r border-slate-800/40',
         collapsed ? 'w-16' : 'w-60'
       )}
     >
       {/* Logo / Brand */}
       <div className={cn(
-        'flex items-center h-16 border-b border-slate-800/80',
+        'flex items-center h-16 border-b border-slate-800/40',
         collapsed ? 'justify-center px-2' : 'px-4'
       )}>
         <div className="flex items-center gap-3">
@@ -114,9 +109,9 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
           
           {!collapsed && (
             <div>
-              <h1 className="text-base font-semibold tracking-tight text-white">VantageFP</h1>
+              <h1 className="text-base font-bold tracking-tight text-white">VantageFP</h1>
               {companyName && (
-                <p className="text-[10px] text-slate-500 -mt-0.5 truncate max-w-32">{companyName}</p>
+                <p className="text-[10px] text-slate-600 -mt-0.5 truncate max-w-32">{companyName}</p>
               )}
             </div>
           )}
@@ -139,14 +134,14 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
                 {/* Section divider */}
                 {showSection && !collapsed && (
                   <li className="pt-6 pb-1.5 px-3">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+                    <span className="vLbl text-[10px] font-bold uppercase text-slate-600">
                       {item.section}
                     </span>
                   </li>
                 )}
                 {showSection && collapsed && (
                   <li className="pt-4 pb-2">
-                    <div className="mx-3 border-t border-slate-800/60" />
+                    <div className="mx-3 border-t border-slate-800/30" />
                   </li>
                 )}
                 
@@ -155,11 +150,11 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
                   <Link
                     href={item.href}
                     className={cn(
-                      'flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 relative',
+                      'vBtn flex items-center gap-3 px-3 py-2 rounded-lg relative',
                       collapsed && 'justify-center',
                       isActive 
-                        ? 'bg-teal-500/10 text-teal-400' 
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
+                        ? 'bg-teal-500/[0.08] text-teal-400' 
+                        : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'
                     )}
                     title={collapsed ? item.label : undefined}
                   >
@@ -168,7 +163,7 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
                       <div className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-teal-400" />
                     )}
                     <span className={cn(
-                      'flex-shrink-0 transition-colors',
+                      'flex-shrink-0',
                       isActive && 'text-teal-400'
                     )}>
                       {item.icon}
@@ -185,13 +180,13 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
       </nav>
 
       {/* Bottom section */}
-      <div className="border-t border-slate-800/80 p-2">
+      <div className="border-t border-slate-800/40 p-2">
         {/* Sign Out */}
         <button
           onClick={onSignOut}
           className={cn(
-            'w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150',
-            'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04]',
+            'vBtn w-full flex items-center gap-3 px-3 py-2 rounded-lg',
+            'text-slate-600 hover:text-slate-400 hover:bg-white/[0.03]',
             collapsed && 'justify-center'
           )}
           title={collapsed ? 'Sign Out' : undefined}
@@ -204,8 +199,8 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
         <button
           onClick={onToggle}
           className={cn(
-            'w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 mt-0.5',
-            'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04]',
+            'vBtn w-full flex items-center gap-3 px-3 py-2 rounded-lg mt-0.5',
+            'text-slate-600 hover:text-slate-400 hover:bg-white/[0.03]',
             collapsed && 'justify-center'
           )}
           title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
