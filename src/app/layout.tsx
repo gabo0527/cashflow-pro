@@ -27,18 +27,16 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  // Get the current path from headers
   const headersList = await headers()
   const pathname = headersList.get('x-pathname') || ''
   
-  // Public routes that don't need AppShell (sidebar)
   const isPublicRoute = pathname.startsWith('/timesheet')
 
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         {isPublicRoute ? (
-          <div className="min-h-screen bg-slate-900 text-slate-100">
+          <div className="min-h-screen bg-[#080c14] text-slate-100">
             {children}
           </div>
         ) : (
