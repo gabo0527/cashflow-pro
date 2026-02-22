@@ -2,77 +2,218 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ============ GLASSMORPHISM DARK THEME ============ */
+/* ============================================================
+   VANTAGE DESIGN SYSTEM — Mercury / Ramp / Carta tier
+   Single source of truth for the entire app
+   ============================================================ */
 
 :root {
-  /* Background gradient - deep navy to teal */
-  --bg-gradient-from: #0f172a;
-  --bg-gradient-via: #1e293b;
-  --bg-gradient-to: #0c4a6e;
-  
-  /* Glass effects */
-  --glass-bg: rgba(15, 23, 42, 0.7);
-  --glass-bg-light: rgba(255, 255, 255, 0.03);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-border-light: rgba(255, 255, 255, 0.12);
-  
-  /* Accent */
-  --accent: #10b981;
-  --accent-light: #34d399;
+  /* Core palette */
+  --v-bg: #080c14;
+  --v-surface: #0f1623;
+  --v-surface-raised: #131a2b;
+  --v-surface-recessed: #0a0f1a;
+  --v-border: rgba(148, 163, 184, 0.12);
+  --v-border-subtle: rgba(148, 163, 184, 0.08);
+
+  /* Accent — teal */
+  --v-accent: #14b8a6;
+  --v-accent-light: #2dd4bf;
+  --v-accent-dim: #0d9488;
+  --v-accent-glow: rgba(20, 184, 166, 0.12);
+  --v-accent-glow-sm: rgba(20, 184, 166, 0.06);
 }
 
-/* Base body gradient */
+/* Solid dark background — no gradient, no fighting */
 body {
-  background: linear-gradient(135deg, var(--bg-gradient-from) 0%, var(--bg-gradient-via) 50%, var(--bg-gradient-to) 100%);
-  background-attachment: fixed;
+  background: var(--v-bg);
+  color: #e2e8f0;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* ============ GLASS UTILITIES ============ */
+/* ============================================================
+   VANTAGE ANIMATION SYSTEM — shared across all pages
+   ============================================================ */
+
+/* Entrance animations */
+@keyframes vUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes vFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes vScale {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes vSlideR {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes vSlideL {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@keyframes vPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* Animation classes */
+.vUp { animation: vUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.vFade { animation: vFade 0.35s ease both; }
+.vScale { animation: vScale 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.vSlideR { animation: vSlideR 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.vSlideL { animation: vSlideL 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Stagger delays */
+.vD1 { animation-delay: 40ms; }
+.vD2 { animation-delay: 80ms; }
+.vD3 { animation-delay: 120ms; }
+.vD4 { animation-delay: 160ms; }
+.vD5 { animation-delay: 200ms; }
+.vD6 { animation-delay: 240ms; }
+
+/* Interactive components */
+.vCard {
+  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.vCard:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 12px 32px -8px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(148, 163, 184, 0.06);
+}
+.vGlow:hover {
+  box-shadow:
+    0 12px 32px -8px rgba(0, 0, 0, 0.5),
+    0 0 24px -4px var(--v-accent-glow-sm);
+}
+
+.vBtn {
+  transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.vBtn:active {
+  transform: scale(0.97);
+}
+
+.vPri {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 16px -2px rgba(13, 148, 136, 0.3);
+}
+.vPri:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 8px 24px -2px rgba(13, 148, 136, 0.4);
+  transform: translateY(-1px);
+}
+.vPri:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.vRow {
+  transition: background-color 0.15s ease;
+}
+.vRow:hover {
+  background-color: rgba(255, 255, 255, 0.025);
+}
+
+.vInp {
+  transition: all 0.2s ease;
+}
+.vInp:focus {
+  box-shadow: 0 0 0 3px var(--v-accent-glow-sm), 0 0 20px -6px var(--v-accent-glow);
+}
+
+.vExp {
+  overflow: hidden;
+  animation: vUp 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.vSrch {
+  transition: all 0.2s ease;
+}
+.vSrch:focus-within {
+  box-shadow: 0 0 0 3px var(--v-accent-glow-sm);
+  border-color: rgba(20, 184, 166, 0.25);
+}
+
+/* KPI card shimmer overlay */
+.vKpi {
+  position: relative;
+  overflow: hidden;
+}
+.vKpi::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 35%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.008));
+  pointer-events: none;
+}
+
+/* Pulsing dots */
+.vDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  animation: vPulse 3s ease-in-out infinite;
+}
+
+/* Typography utilities */
+.vLbl { letter-spacing: 0.1em; }
+.vBdg { letter-spacing: 0.06em; }
+.vN { font-variant-numeric: tabular-nums; }
+
+/* Accessibility: respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================================
+   COMPONENT LAYER
+   ============================================================ */
 @layer components {
-  .glass {
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--glass-border);
+  /* Card styles */
+  .v-card {
+    background: var(--v-surface);
+    border: 1px solid var(--v-border-subtle);
+    border-radius: 0.75rem;
   }
-
-  .glass-light {
-    background: var(--glass-bg-light);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--glass-border);
-  }
-
-  .glass-card {
-    @apply bg-slate-900/70 backdrop-blur-xl border border-white/[0.08] rounded-xl;
-  }
-
-  .glass-card-hover {
-    @apply glass-card transition-all duration-200 hover:bg-white/[0.05] hover:border-white/[0.12];
+  .v-card-raised {
+    background: var(--v-surface-raised);
+    border: 1px solid var(--v-border-subtle);
+    border-radius: 0.75rem;
   }
 }
 
-/* ============ SCROLLBAR ============ */
+/* ============================================================
+   SCROLLBAR — thin, unobtrusive
+   ============================================================ */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 3px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
 }
 
-/* ============ FORM ELEMENTS ============ */
+/* ============================================================
+   FORM ELEMENTS — teal focus rings
+   ============================================================ */
 input[type="text"],
 input[type="email"],
 input[type="password"],
@@ -81,83 +222,50 @@ input[type="date"],
 input[type="search"],
 select,
 textarea {
-  @apply bg-white/[0.05] border border-white/[0.1] text-slate-100 rounded-lg;
-  @apply focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50;
+  @apply bg-[#0a0f1a] border border-slate-800/50 text-slate-100 rounded-lg;
+  @apply focus:outline-none focus:ring-2 focus:ring-teal-500/15 focus:border-teal-500/30;
 }
 
 input::placeholder,
 textarea::placeholder {
-  @apply text-slate-500;
+  @apply text-slate-600;
 }
 
 select option {
-  @apply bg-slate-900 text-slate-200;
+  @apply bg-[#0f1623] text-slate-200;
 }
 
-/* ============ CHECKBOX ============ */
 input[type="checkbox"] {
-  @apply bg-white/[0.05] border border-white/[0.2] rounded;
+  @apply bg-[#0a0f1a] border border-slate-700/50 rounded;
 }
-
 input[type="checkbox"]:checked {
-  @apply bg-emerald-500 border-emerald-500;
+  @apply bg-teal-500 border-teal-500;
 }
 
-/* ============ CUSTOM UTILITIES ============ */
+/* ============================================================
+   UTILITY CLASSES
+   ============================================================ */
 @layer utilities {
   .text-shadow {
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
   }
-  
-  .glow-emerald {
-    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+  .glow-teal {
+    box-shadow: 0 0 20px var(--v-accent-glow);
   }
-  
-  .glow-emerald-sm {
-    box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
-  }
-
-  .gradient-text {
-    @apply bg-gradient-to-r from-emerald-400 to-emerald-500 bg-clip-text text-transparent;
+  .glow-teal-sm {
+    box-shadow: 0 0 10px var(--v-accent-glow-sm);
   }
 }
 
-/* ============ ANIMATIONS ============ */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from { transform: translateY(10px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 10px rgba(16, 185, 129, 0.3); }
-  50% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.5); }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.2s ease-out;
-}
-
-.animate-slide-up {
-  animation: slideUp 0.2s ease-out;
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-/* ============ LOADING SPINNER ============ */
+/* ============================================================
+   LOADING SPINNER
+   ============================================================ */
 .spinner {
-  border: 3px solid rgba(255, 255, 255, 0.1);
-  border-top-color: #10b981;
+  border: 3px solid rgba(255, 255, 255, 0.08);
+  border-top-color: var(--v-accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
-
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
