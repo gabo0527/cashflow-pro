@@ -18,11 +18,11 @@ const supabase = createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptYWhmZ3BidGplb211ZXBmb3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0OTAxNzcsImV4cCI6MjA4MTA2NjE3N30.3SVDvWCGIYYHV57BpKjpDJVCZLKzuRv8B_VietQDxUQ'
 )
 
-// ============ THEME (institutional — matches Time Tracking) ============
+// ============ DESIGN SYSTEM — styles in globals.css ============
 const THEME = {
-  card: 'bg-[#111827] border-slate-800/80',
-  cardHover: 'hover:bg-slate-800/40',
-  border: 'border-slate-800/80',
+  card: 'bg-[#0f1623] border-slate-800/50',
+  cardHover: 'hover:bg-white/[0.025]',
+  border: 'border-slate-800/50',
   textPrimary: 'text-white',
   textSecondary: 'text-slate-300',
   textMuted: 'text-slate-400',
@@ -87,11 +87,11 @@ const formatDate = (d: string) => { if (!d) return '—'; return new Date(d + 'T
 const formatDateCompact = (d: string) => { if (!d) return '—'; return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string; icon: any }> = {
-  submitted: { label: 'Submitted', bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20', icon: Clock },
-  pending: { label: 'Pending', bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', icon: Clock },
-  approved: { label: 'Approved', bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', icon: CheckCircle },
-  rejected: { label: 'Rejected', bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/20', icon: XCircle },
-  paid: { label: 'Paid', bg: 'bg-emerald-500/10', text: 'text-emerald-300', border: 'border-emerald-500/20', icon: DollarSign },
+  submitted: { label: 'Submitted', bg: 'bg-blue-950/50', text: 'text-blue-400', border: 'border-blue-800/30', icon: Clock },
+  pending: { label: 'Pending', bg: 'bg-amber-950/50', text: 'text-amber-400', border: 'border-amber-800/30', icon: Clock },
+  approved: { label: 'Approved', bg: 'bg-emerald-950/50', text: 'text-emerald-400', border: 'border-emerald-800/30', icon: CheckCircle },
+  rejected: { label: 'Rejected', bg: 'bg-red-950/50', text: 'text-red-400', border: 'border-red-800/30', icon: XCircle },
+  paid: { label: 'Paid', bg: 'bg-emerald-950/50', text: 'text-emerald-300', border: 'border-emerald-800/30', icon: DollarSign },
 }
 
 const EXPENSE_CATEGORIES: Record<string, { label: string }> = {
@@ -121,14 +121,14 @@ function StatusBadge({ status }: { status: string }) {
 // ============ METRIC CARD — Institutional left-accent-bar ============
 function MetricCard({ label, value, sub, icon: Icon, accentColor = '#0d9488' }: { label: string; value: string; sub?: string; icon: any; accentColor?: string }) {
   return (
-    <div className={`relative p-4 rounded-xl ${THEME.card} border overflow-hidden`}>
-      <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full" style={{ backgroundColor: accentColor }} />
+    <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
+      <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full" style={{ backgroundColor: accentColor }} />
       <div className="pl-2">
         <div className="flex items-center justify-between mb-2">
-          <span className={`text-[11px] font-semibold ${THEME.textDim} uppercase tracking-wider`}>{label}</span>
+          <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>{label}</span>
           <Icon size={15} className={THEME.textDim} />
         </div>
-        <p className="text-xl font-semibold text-white tabular-nums">{value}</p>
+        <p className="text-2xl font-bold text-white vN">{value}</p>
         {sub && <p className={`text-xs ${THEME.textDim} mt-0.5`}>{sub}</p>}
       </div>
     </div>
@@ -136,7 +136,7 @@ function MetricCard({ label, value, sub, icon: Icon, accentColor = '#0d9488' }: 
 }
 
 // ============ SHARED STYLES ============
-const selectClass = `px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-slate-300 text-sm focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 transition-colors`
+const selectClass = `px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 vInp rounded-lg text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/15 focus:border-teal-600/50 transition-colors`
 const invoiceGridCols = 'grid-cols-[1fr_140px_100px_120px_100px_100px_170px]'
 const expenseGridCols = 'grid-cols-[1fr_130px_100px_80px_100px_80px_180px]'
 
@@ -392,11 +392,11 @@ export default function ContractorManagement() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-white tracking-tight">Contractor Management</h1>
-          <p className={`text-sm mt-0.5 ${THEME.textDim}`}>AP invoices and expenses from your team</p>
+          <h1 className="text-[28px] font-bold text-white tracking-tight">Contractor Management</h1>
+          <p className={`text-[13px] mt-1 ${THEME.textDim}`}>AP invoices and expenses from your team</p>
         </div>
         <a href="/timesheet" target="_blank" rel="noopener noreferrer"
-          className={`flex items-center gap-2 px-4 py-2 ${THEME.card} border hover:bg-slate-800/60 rounded-lg text-slate-300 text-sm transition-colors`}>
+          className={`flex items-center gap-2 px-4 py-2 ${THEME.card} border hover:bg-white/[0.05] rounded-lg text-slate-300 text-sm transition-colors`}>
           <ExternalLink size={14} /> Contractor Portal
         </a>
       </div>
@@ -409,13 +409,13 @@ export default function ContractorManagement() {
             { id: 'expenses' as const, label: 'Expenses', icon: Receipt, count: expenseMetrics.pendingCount },
           ].map(tab => (
             <button key={tab.id} onClick={() => { setActiveTab(tab.id); setSearchQuery(''); setFilterStatus('all'); setFilterMember('all'); setFilterClient('all') }}
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                activeTab === tab.id ? 'border-teal-400 text-teal-400' : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium vBtn border-b-2 -mb-px transition-all duration-300 ${
+                activeTab === tab.id ? 'border-teal-400 text-teal-400' : 'border-transparent text-slate-500 hover:text-slate-300 hover:border-slate-600'
               }`}>
               <tab.icon size={15} />
               {tab.label}
               {tab.count > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">{tab.count}</span>
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-950/50 text-amber-400 border border-amber-800/30">{tab.count}</span>
               )}
             </button>
           ))}
@@ -423,7 +423,7 @@ export default function ContractorManagement() {
 
         {/* Date range selector */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-0.5 p-0.5 bg-slate-800/50 rounded-lg border border-slate-800/80">
+          <div className="flex items-center gap-0.5 p-0.5 bg-[#0a0f1a] rounded-lg border border-slate-800/50">
             {['month', 'quarter', 'year', 'all'].map(r => (
               <button key={r} onClick={() => setDateRange(r as any)}
                 className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${dateRange === r ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}>
@@ -433,9 +433,9 @@ export default function ContractorManagement() {
           </div>
           {dateRange !== 'all' && (
             <div className="flex items-center gap-1">
-              <button onClick={() => navigateDate(-1)} className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-slate-800/60 text-slate-400 transition-colors`}><ChevronLeft size={14} /></button>
-              <span className={`text-white text-sm font-medium px-3 py-1.5 ${THEME.card} border rounded-lg min-w-[120px] text-center tabular-nums`}>{dateFilter.label}</span>
-              <button onClick={() => navigateDate(1)} className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-slate-800/60 text-slate-400 transition-colors`}><ChevronRight size={14} /></button>
+              <button onClick={() => navigateDate(-1)} className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-white/[0.05] text-slate-400 transition-colors`}><ChevronLeft size={14} /></button>
+              <span className={`text-white text-sm font-medium px-3 py-1.5 ${THEME.card} border rounded-lg min-w-[120px] text-center vN`}>{dateFilter.label}</span>
+              <button onClick={() => navigateDate(1)} className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-white/[0.05] text-slate-400 transition-colors`}><ChevronRight size={14} /></button>
             </div>
           )}
         </div>
@@ -458,7 +458,7 @@ export default function ContractorManagement() {
               <div className="relative flex-1 max-w-xs">
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input type="text" placeholder="Search invoices..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                  className={`w-full pl-9 pr-3 py-2 bg-slate-800/60 border ${THEME.border} rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-teal-500/30`} />
+                  className={`w-full pl-9 pr-3 py-2 bg-slate-800/60 border ${THEME.border} rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/15`} />
               </div>
               <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={selectClass}>
                 <option value="all">All Statuses</option>
@@ -477,7 +477,7 @@ export default function ContractorManagement() {
               </select>
             </div>
             {/* Group by toggle */}
-            <div className="flex items-center gap-0.5 p-0.5 bg-slate-800/50 rounded-lg border border-slate-800/80 shrink-0">
+            <div className="flex items-center gap-0.5 p-0.5 bg-[#0a0f1a] rounded-lg border border-slate-800/50 shrink-0">
               <span className="text-[10px] text-slate-500 px-1.5 uppercase tracking-wider">Group:</span>
               {[{ id: 'none' as const, label: 'None' }, { id: 'contractor' as const, label: 'Contractor' }, { id: 'client' as const, label: 'Client' }].map(g => (
                 <button key={g.id} onClick={() => { setGroupBy(g.id); setCollapsedGroups(new Set()) }}
@@ -490,27 +490,27 @@ export default function ContractorManagement() {
 
           {/* Invoice List (grouped) */}
           {filteredInvoices.length > 0 ? groupedInvoices.map(group => (
-            <div key={group.key} className={`${THEME.card} border rounded-xl overflow-hidden`}>
+            <div key={group.key} className={`${THEME.card} border rounded-2xl overflow-hidden shadow-xl shadow-black/20`}>
               {groupBy !== 'none' && (
                 <button onClick={() => toggleGroup(group.key)}
-                  className={`w-full flex items-center justify-between px-5 py-3 bg-slate-800/40 ${THEME.cardHover} transition-colors border-b ${THEME.border}`}>
+                  className={`w-full flex items-center justify-between px-5 py-3 bg-[#0a0f1a]/80 ${THEME.cardHover} transition-colors border-b ${THEME.border}`}>
                   <div className="flex items-center gap-3">
                     {collapsedGroups.has(group.key) ? <ChevronRight size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
                     <span className="text-white text-sm font-semibold">{group.label}</span>
                     <span className={`${THEME.textDim} text-xs`}>{group.invoices.length} invoice{group.invoices.length !== 1 ? 's' : ''}</span>
                   </div>
-                  <span className="text-white text-sm font-semibold tabular-nums">{formatCurrency(group.total)}</span>
+                  <span className="text-white text-sm font-semibold vN">{formatCurrency(group.total)}</span>
                 </button>
               )}
               {!collapsedGroups.has(group.key) && (<>
-                <div className={`grid ${invoiceGridCols} gap-2 px-5 py-2.5 border-b ${THEME.border} bg-slate-800/30`}>
-                  <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Invoice</span>
-                  <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>{groupBy === 'contractor' ? 'Client' : 'Contractor'}</span>
-                  <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Period</span>
-                  <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider text-right`}>Amount</span>
-                  <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Status</span>
-                  <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Attachment</span>
-                  <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Actions</span>
+                <div className={`grid ${invoiceGridCols} gap-2 px-5 py-2.5 border-b ${THEME.border} bg-[#080c14]`}>
+                  <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Invoice</span>
+                  <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>{groupBy === 'contractor' ? 'Client' : 'Contractor'}</span>
+                  <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Period</span>
+                  <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase text-right`}>Amount</span>
+                  <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Status</span>
+                  <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Attachment</span>
+                  <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Actions</span>
                 </div>
                 {group.invoices.map(inv => {
                   const lines = inv.contractor_invoice_lines || []
@@ -523,7 +523,7 @@ export default function ContractorManagement() {
                     <div key={inv.id} className={`border-b ${THEME.border} border-opacity-40 last:border-0`}>
                       <div className={`grid ${invoiceGridCols} gap-2 px-5 py-3 items-center ${THEME.cardHover} transition-colors`}>
                         <div className="flex items-center gap-3 min-w-0">
-                          <button onClick={() => setExpandedInvoice(isExpanded ? null : inv.id)} className="text-slate-500 hover:text-white transition-colors">
+                          <button onClick={() => setExpandedInvoice(isExpanded ? null : inv.id)} className="text-slate-500 hover:text-white vBtn">
                             {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                           </button>
                           <div className="min-w-0">
@@ -532,13 +532,13 @@ export default function ContractorManagement() {
                           </div>
                         </div>
                         <span className="text-slate-300 text-sm truncate">{secondCol}</span>
-                        <span className={`${THEME.textDim} text-xs tabular-nums`}>{formatDateCompact(inv.period_start)} – {formatDateCompact(inv.period_end)}</span>
-                        <span className="text-white text-sm font-medium text-right tabular-nums">{formatCurrency(inv.total_amount)}</span>
+                        <span className={`${THEME.textDim} text-xs vN`}>{formatDateCompact(inv.period_start)} – {formatDateCompact(inv.period_end)}</span>
+                        <span className="text-white text-sm font-medium text-right vN">{formatCurrency(inv.total_amount)}</span>
                         <StatusBadge status={inv.status} />
                         <div>
                           {inv.receipt_url ? (
                             <button onClick={() => openPreview(inv.receipt_url!)}
-                              className="inline-flex items-center gap-1 text-teal-400 hover:text-teal-300 text-xs transition-colors">
+                              className="inline-flex items-center gap-1 text-teal-400 hover:text-teal-300 text-xs vBtn">
                               <Eye size={12} /> View
                             </button>
                           ) : <span className={`${THEME.textDim} text-xs`}>None</span>}
@@ -547,18 +547,18 @@ export default function ContractorManagement() {
                           {inv.status === 'submitted' && (
                             <>
                               <button onClick={() => updateInvoiceStatus(inv.id, 'approved')} disabled={isProcessing}
-                                className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 border border-emerald-500/20 disabled:opacity-50 transition-colors">
+                                className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 border border-emerald-500/20 disabled:opacity-50 vBtn">
                                 {isProcessing ? <Loader2 size={12} className="animate-spin" /> : 'Approve'}
                               </button>
                               <button onClick={() => updateInvoiceStatus(inv.id, 'rejected')} disabled={isProcessing}
-                                className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 text-xs font-medium hover:text-red-400 hover:bg-red-500/10 border border-slate-700 disabled:opacity-50 transition-colors">
+                                className="px-2.5 py-1 rounded-lg vBtn bg-[#0a0f1a] text-slate-500 text-xs font-medium hover:text-red-400 hover:bg-red-950/40 border border-slate-800/40 disabled:opacity-50 vBtn">
                                 Reject
                               </button>
                             </>
                           )}
                           {inv.status === 'approved' && (
                             <button onClick={() => updateInvoiceStatus(inv.id, 'paid')} disabled={isProcessing}
-                              className="px-2.5 py-1 rounded-lg bg-teal-500/10 text-teal-400 text-xs font-medium hover:bg-teal-500/20 border border-teal-500/20 disabled:opacity-50 transition-colors">
+                              className="px-2.5 py-1 rounded-lg vBtn bg-teal-950/50 text-teal-400 text-xs font-medium hover:bg-teal-900/50 border border-teal-800/30 disabled:opacity-50 vBtn">
                               Mark Paid
                             </button>
                           )}
@@ -568,8 +568,8 @@ export default function ContractorManagement() {
                         </div>
                       </div>
                       {isExpanded && lines.length > 0 && (
-                        <div className={`bg-slate-800/20 px-6 py-3 border-t ${THEME.border}`}>
-                          <p className={`text-[11px] ${THEME.textDim} font-semibold uppercase tracking-wider mb-2`}>Line Items</p>
+                        <div className={`bg-white/[0.02] px-6 py-3 border-t ${THEME.border}`}>
+                          <p className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase mb-2`}>Line Items</p>
                           <table className="w-full text-sm">
                             <thead>
                               <tr className={`${THEME.textDim} text-xs`}>
@@ -586,10 +586,10 @@ export default function ContractorManagement() {
                                 <tr key={i} className={`border-t ${THEME.border} border-opacity-40`}>
                                   <td className="py-1.5 text-slate-300">{clientMap[line.client_id] || line.description?.split(' - ')[0] || '—'}</td>
                                   <td className={`py-1.5 ${THEME.textMuted}`}>{line.description}</td>
-                                  <td className="py-1.5 text-right text-slate-300 tabular-nums">{line.hours ? line.hours.toFixed(1) : '—'}</td>
-                                  <td className={`py-1.5 text-right ${THEME.textMuted} tabular-nums`}>{line.rate ? formatCurrency(line.rate) : '—'}</td>
-                                  <td className={`py-1.5 text-right ${THEME.textMuted} tabular-nums`}>{line.allocation_pct ? `${line.allocation_pct}%` : '—'}</td>
-                                  <td className="py-1.5 text-right text-white font-medium tabular-nums">{formatCurrency(line.amount)}</td>
+                                  <td className="py-1.5 text-right text-slate-300 vN">{line.hours ? line.hours.toFixed(1) : '—'}</td>
+                                  <td className={`py-1.5 text-right ${THEME.textMuted} vN`}>{line.rate ? formatCurrency(line.rate) : '—'}</td>
+                                  <td className={`py-1.5 text-right ${THEME.textMuted} vN`}>{line.allocation_pct ? `${line.allocation_pct}%` : '—'}</td>
+                                  <td className="py-1.5 text-right text-white font-medium vN">{formatCurrency(line.amount)}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -627,7 +627,7 @@ export default function ContractorManagement() {
             <div className="relative flex-1 max-w-xs">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
               <input type="text" placeholder="Search expenses..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                className={`w-full pl-9 pr-3 py-2 bg-slate-800/60 border ${THEME.border} rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-teal-500/30`} />
+                className={`w-full pl-9 pr-3 py-2 bg-slate-800/60 border ${THEME.border} rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/15`} />
             </div>
             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={selectClass}>
               <option value="all">All Statuses</option>
@@ -646,15 +646,15 @@ export default function ContractorManagement() {
           </div>
 
           {/* Expense List */}
-          <div className={`${THEME.card} border rounded-xl overflow-hidden`}>
-            <div className={`grid ${expenseGridCols} gap-2 px-5 py-2.5 border-b ${THEME.border} bg-slate-800/30`}>
-              <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Description</span>
-              <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Contractor</span>
-              <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Date</span>
-              <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Category</span>
-              <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider text-right`}>Amount</span>
-              <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Status</span>
-              <span className={`text-[11px] ${THEME.textDim} font-medium uppercase tracking-wider`}>Actions</span>
+          <div className={`${THEME.card} border rounded-2xl overflow-hidden shadow-xl shadow-black/20`}>
+            <div className={`grid ${expenseGridCols} gap-2 px-5 py-2.5 border-b ${THEME.border} bg-[#080c14]`}>
+              <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Description</span>
+              <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Contractor</span>
+              <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Date</span>
+              <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Category</span>
+              <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase text-right`}>Amount</span>
+              <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Status</span>
+              <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Actions</span>
             </div>
 
             {filteredExpenses.length > 0 ? filteredExpenses.map(exp => {
@@ -667,16 +667,16 @@ export default function ContractorManagement() {
                     {exp.client_id && <p className={`${THEME.textDim} text-xs`}>{clientMap[exp.client_id] || '—'}</p>}
                   </div>
                   <span className="text-slate-300 text-sm truncate">{memberMap[exp.team_member_id] || '—'}</span>
-                  <span className={`${THEME.textDim} text-xs tabular-nums`}>{formatDate(exp.date)}</span>
+                  <span className={`${THEME.textDim} text-xs vN`}>{formatDate(exp.date)}</span>
                   <span className={`text-xs ${THEME.textMuted}`}>{cat.label}</span>
-                  <span className="text-white text-sm font-medium text-right tabular-nums">{formatCurrency(exp.amount)}</span>
+                  <span className="text-white text-sm font-medium text-right vN">{formatCurrency(exp.amount)}</span>
                   <StatusBadge status={exp.status} />
                   <div className="flex items-center gap-1.5">
                     {exp.receipt_url && (() => {
                       const files = exp.receipt_url!.split(',').filter(Boolean)
                       return (
                         <button onClick={() => openPreview(exp.receipt_url!)}
-                          className="p-1 rounded text-teal-400 hover:text-teal-300 flex items-center gap-1 transition-colors">
+                          className="p-1 rounded text-teal-400 hover:text-teal-300 flex items-center gap-1 vBtn">
                           <Eye size={12} />{files.length > 1 && <span className="text-xs">{files.length}</span>}
                         </button>
                       )
@@ -684,11 +684,11 @@ export default function ContractorManagement() {
                     {exp.status === 'pending' && (
                       <>
                         <button onClick={() => updateExpenseStatus(exp.id, 'approved')} disabled={isProcessing}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 border border-emerald-500/20 disabled:opacity-50 transition-colors">
+                          className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 border border-emerald-500/20 disabled:opacity-50 vBtn">
                           {isProcessing ? <Loader2 size={12} className="animate-spin" /> : 'Approve'}
                         </button>
                         <button onClick={() => updateExpenseStatus(exp.id, 'rejected')} disabled={isProcessing}
-                          className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 text-xs font-medium hover:text-red-400 hover:bg-red-500/10 border border-slate-700 disabled:opacity-50 transition-colors">
+                          className="px-2.5 py-1 rounded-lg vBtn bg-[#0a0f1a] text-slate-500 text-xs font-medium hover:text-red-400 hover:bg-red-950/40 border border-slate-800/40 disabled:opacity-50 vBtn">
                           Reject
                         </button>
                       </>
@@ -711,36 +711,36 @@ export default function ContractorManagement() {
 
       {/* ===================== ATTACHMENT PREVIEW MODAL — Multi-file ===================== */}
       {previewUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={closePreview}>
-          <div className={`relative bg-[#111827] border ${THEME.border} rounded-xl overflow-hidden shadow-2xl flex flex-col`} style={{ width: '80vw', height: '85vh', maxWidth: '1200px' }} onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md vFade" onClick={closePreview}>
+          <div className={`relative bg-[#0f1623] border ${THEME.border} rounded-xl overflow-hidden shadow-2xl flex flex-col`} style={{ width: '80vw', height: '85vh', maxWidth: '1200px' }} onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className={`flex items-center justify-between px-5 py-3 border-b ${THEME.border}`}>
               <div className="flex items-center gap-3">
                 <span className="text-white text-sm font-medium">Attachment Preview</span>
                 {previewFiles.length > 1 && (
-                  <span className={`text-xs ${THEME.textDim} tabular-nums`}>{previewIndex + 1} of {previewFiles.length}</span>
+                  <span className={`text-xs ${THEME.textDim} vN`}>{previewIndex + 1} of {previewFiles.length}</span>
                 )}
               </div>
               <div className="flex items-center gap-2">
                 {previewFiles.length > 1 && (
                   <div className="flex items-center gap-1 mr-2">
                     <button onClick={() => setPreviewIndex(i => Math.max(0, i - 1))} disabled={previewIndex === 0}
-                      className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-slate-800/60 text-slate-400 transition-colors disabled:opacity-30`}>
+                      className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-white/[0.05] text-slate-400 transition-colors disabled:opacity-30`}>
                       <ChevronLeft size={14} />
                     </button>
                     <button onClick={() => setPreviewIndex(i => Math.min(previewFiles.length - 1, i + 1))} disabled={previewIndex === previewFiles.length - 1}
-                      className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-slate-800/60 text-slate-400 transition-colors disabled:opacity-30`}>
+                      className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-white/[0.05] text-slate-400 transition-colors disabled:opacity-30`}>
                       <ChevronRight size={14} />
                     </button>
                   </div>
                 )}
-                <a href={previewUrl} target="_blank" rel="noopener noreferrer" className={`px-3 py-1.5 ${THEME.card} border hover:bg-slate-800/60 rounded-lg text-slate-300 text-xs flex items-center gap-1.5 transition-colors`}>
+                <a href={previewUrl} target="_blank" rel="noopener noreferrer" className={`px-3 py-1.5 ${THEME.card} border hover:bg-white/[0.05] rounded-lg text-slate-300 text-xs flex items-center gap-1.5 transition-colors`}>
                   <ExternalLink size={12} /> Open
                 </a>
-                <a href={previewUrl} download className={`px-3 py-1.5 ${THEME.card} border hover:bg-slate-800/60 rounded-lg text-slate-300 text-xs flex items-center gap-1.5 transition-colors`}>
+                <a href={previewUrl} download className={`px-3 py-1.5 ${THEME.card} border hover:bg-white/[0.05] rounded-lg text-slate-300 text-xs flex items-center gap-1.5 transition-colors`}>
                   <Download size={12} /> Download
                 </a>
-                <button onClick={closePreview} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
+                <button onClick={closePreview} className="p-1.5 rounded-lg hover:bg-[#0a0f1a] text-slate-400 hover:text-white vBtn">
                   <X size={16} />
                 </button>
               </div>
@@ -757,24 +757,24 @@ export default function ContractorManagement() {
               {/* Overlay arrows */}
               {previewFiles.length > 1 && previewIndex > 0 && (
                 <button onClick={() => setPreviewIndex(i => i - 1)}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors">
+                  className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white vBtn">
                   <ChevronLeft size={20} />
                 </button>
               )}
               {previewFiles.length > 1 && previewIndex < previewFiles.length - 1 && (
                 <button onClick={() => setPreviewIndex(i => i + 1)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors">
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white vBtn">
                   <ChevronRight size={20} />
                 </button>
               )}
             </div>
             {/* Thumbnail strip */}
             {previewFiles.length > 1 && (
-              <div className={`flex items-center gap-2 px-5 py-2.5 border-t ${THEME.border} bg-slate-900/50 overflow-x-auto`}>
+              <div className={`flex items-center gap-2 px-5 py-2.5 border-t ${THEME.border} bg-[#080c14]/60 overflow-x-auto`}>
                 {previewFiles.map((_, i) => (
                   <button key={i} onClick={() => setPreviewIndex(i)}
                     className={`flex-shrink-0 w-9 h-9 rounded-lg border-2 flex items-center justify-center text-xs font-medium transition-colors ${
-                      i === previewIndex ? 'border-teal-400 bg-teal-500/10 text-teal-400' : `${THEME.border} bg-slate-800/40 text-slate-500 hover:text-slate-300`
+                      i === previewIndex ? 'border-teal-400 bg-teal-500/10 text-teal-400' : `${THEME.border} bg-[#0a0f1a]/80 text-slate-500 hover:text-slate-300`
                     }`}>
                     {i + 1}
                   </button>
