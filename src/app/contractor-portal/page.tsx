@@ -283,13 +283,7 @@ export default function ContractorPortal() {
   }, [assignments])
 
   const contractorType = useMemo(() => {
-    // Priority 1: Member-level fixed cost (e.g., Travis $25K/mo, Emily $35K/mo)
-    if (member) {
-      const memberCostType = normalizeCostType(member.cost_type || '')
-      const isFixedMember = (memberCostType === 'lump_sum' || memberCostType === 'lumpsum' || memberCostType === 'fixed' || memberCostType === 'monthly') && (member.cost_amount || 0) > 0
-      if (isFixedMember) return 'pure_ls'
-    }
-    // Priority 2: Rate-card-level cost types
+    // Check rate-card-level cost types first (per-client costs take priority)
     const types: Record<string, { costType: string; costAmount: number }> = {}
     rateCards.forEach(rc => {
       types[rc.client_id] = {
@@ -298,6 +292,25 @@ export default function ContractorPortal() {
       }
     })
     const clients = Object.values(types)
+    const hasRateCardCosts = clients.some(c => c.costAmount > 0)
+    
+    // If rate cards have their own per-client costs, use rate card logic (e.g., Mary)
+    if (hasRateCardCosts) {
+      const allLS = clients.every(c => c.costType === 'lump_sum' || c.costType === 'monthly')
+      const allTM = clients.every(c => c.costType === 'hourly' || c.costType === 'tm')
+      if (allLS) return 'pure_ls'
+      if (allTM) return 'tm'
+      return 'mixed'
+    }
+    
+    // No rate-card-level costs → check member-level fixed cost (e.g., Travis $25K, Emily $35K)
+    if (member) {
+      const memberCostType = normalizeCostType(member.cost_type || '')
+      const isFixedMember = (memberCostType === 'lump_sum' || memberCostType === 'lumpsum' || memberCostType === 'fixed' || memberCostType === 'monthly') && (member.cost_amount || 0) > 0
+      if (isFixedMember) return 'pure_ls'
+    }
+    
+    // Default: T&M or rate-card based
     if (clients.length === 0) return 'tm'
     const allLS = clients.every(c => c.costType === 'lump_sum' || c.costType === 'monthly')
     const allTM = clients.every(c => c.costType === 'hourly' || c.costType === 'tm')
