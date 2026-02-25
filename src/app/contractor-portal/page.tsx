@@ -312,10 +312,22 @@ export default function ContractorPortal() {
       const cMap: Record<string, string> = {}; (clientsData || []).forEach((c: any) => { cMap[c.id] = c.name })
       setRateCards((rcData || []).map((r: any) => ({ team_member_id: r.team_member_id, client_id: r.client_id, client_name: cMap[r.client_id] || 'Unknown', cost_type: r.cost_type || 'hourly', cost_amount: r.cost_amount || 0, rate: r.rate || 0 })))
 
-      const { data: pa } = await supabase.from('team_project_assignments').select('project_id, payment_type, rate, bill_rate').eq('team_member_id', md.id).eq('is_active', true)
+      // Derive assignments from bill_rates → projects (matches Team page logic)
+      // Each rate card links contractor to a client; all active projects under that client become available
+      const ratesByClient: Record<string, { rate: number; cost_type: string }> = {}
+      ;(rcData || []).forEach((r: any) => { ratesByClient[r.client_id] = { rate: r.rate || 0, cost_type: r.cost_type || 'hourly' } })
+
       const { data: projects } = await supabase.from('projects').select('id, name, client_id, company_id').eq('status', 'active')
-      const pMap: Record<string, any> = {}; (projects || []).forEach((p: any) => { pMap[p.id] = p })
-      const assigns: Assignment[] = (pa || []).map((a: any) => { const p = pMap[a.project_id]; return { project_id: a.project_id, project_name: p?.name || 'Unknown', client_id: p?.client_id || '', client_name: p?.client_id ? cMap[p.client_id] || '' : '', payment_type: a.payment_type || 'tm', rate: a.bill_rate || a.rate || 0 } }).filter((a: Assignment) => a.project_name !== 'Unknown')
+      const assigns: Assignment[] = (projects || [])
+        .filter((p: any) => ratesByClient[p.client_id]) // only projects whose client has a rate card
+        .map((p: any) => ({
+          project_id: p.id,
+          project_name: p.name,
+          client_id: p.client_id,
+          client_name: cMap[p.client_id] || '',
+          payment_type: ratesByClient[p.client_id].cost_type === 'hourly' ? 'tm' : 'lump_sum',
+          rate: ratesByClient[p.client_id].rate
+        }))
 
       if (!md.company_id && projects && projects.length > 0) {
         const projectWithCompany = projects.find((p: any) => p.company_id)
