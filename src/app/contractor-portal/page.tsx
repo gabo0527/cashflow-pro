@@ -332,22 +332,43 @@ export default function ContractorPortal() {
       const cMap: Record<string, string> = {}; (clientsData || []).forEach((c: any) => { cMap[c.id] = c.name })
       setRateCards((rcData || []).map((r: any) => ({ team_member_id: r.team_member_id, client_id: r.client_id, client_name: cMap[r.client_id] || 'Unknown', cost_type: r.cost_type || 'hourly', cost_amount: r.cost_amount || 0, rate: r.rate || 0 })))
 
-      // Derive assignments from bill_rates → projects (matches Team page logic)
-      // Each rate card links contractor to a client; all active projects under that client become available
+      // Derive assignments: team_project_assignments for project visibility (set in Team page rate card)
+      // Fall back to bill_rates → all client projects if no assignments exist for this member
       const ratesByClient: Record<string, { rate: number; cost_type: string }> = {}
       ;(rcData || []).forEach((r: any) => { ratesByClient[r.client_id] = { rate: r.rate || 0, cost_type: r.cost_type || 'hourly' } })
 
+      const { data: pa } = await supabase.from('team_project_assignments').select('project_id, payment_type, rate, bill_rate').eq('team_member_id', md.id)
       const { data: projects } = await supabase.from('projects').select('id, name, client_id, company_id').eq('status', 'active')
-      const assigns: Assignment[] = (projects || [])
-        .filter((p: any) => ratesByClient[p.client_id]) // only projects whose client has a rate card
-        .map((p: any) => ({
-          project_id: p.id,
-          project_name: p.name,
-          client_id: p.client_id,
-          client_name: cMap[p.client_id] || '',
-          payment_type: ratesByClient[p.client_id].cost_type === 'hourly' ? 'tm' : 'lump_sum',
-          rate: ratesByClient[p.client_id].rate
-        }))
+      const pMap: Record<string, any> = {}; (projects || []).forEach((p: any) => { pMap[p.id] = p })
+
+      let assigns: Assignment[]
+      if (pa && pa.length > 0) {
+        // Use explicit project assignments (respects Team page visibility checkboxes)
+        assigns = pa.map((a: any) => {
+          const p = pMap[a.project_id]
+          const clientRate = p?.client_id ? ratesByClient[p.client_id] : null
+          return {
+            project_id: a.project_id,
+            project_name: p?.name || 'Unknown',
+            client_id: p?.client_id || '',
+            client_name: p?.client_id ? cMap[p.client_id] || '' : '',
+            payment_type: clientRate?.cost_type === 'hourly' ? 'tm' : (a.payment_type || 'tm'),
+            rate: clientRate?.rate || a.bill_rate || a.rate || 0
+          }
+        }).filter((a: Assignment) => a.project_name !== 'Unknown')
+      } else {
+        // No assignments → fall back to bill_rates: show all active projects for assigned clients
+        assigns = (projects || [])
+          .filter((p: any) => ratesByClient[p.client_id])
+          .map((p: any) => ({
+            project_id: p.id,
+            project_name: p.name,
+            client_id: p.client_id,
+            client_name: cMap[p.client_id] || '',
+            payment_type: ratesByClient[p.client_id].cost_type === 'hourly' ? 'tm' : 'lump_sum',
+            rate: ratesByClient[p.client_id].rate
+          }))
+      }
 
       if (!md.company_id && projects && projects.length > 0) {
         const projectWithCompany = projects.find((p: any) => p.company_id)
