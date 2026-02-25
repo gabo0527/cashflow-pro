@@ -283,6 +283,13 @@ export default function ContractorPortal() {
   }, [assignments])
 
   const contractorType = useMemo(() => {
+    // Priority 1: Member-level fixed cost (e.g., Travis $25K/mo, Emily $35K/mo)
+    if (member) {
+      const memberCostType = normalizeCostType(member.cost_type || '')
+      const isFixedMember = (memberCostType === 'lump_sum' || memberCostType === 'lumpsum' || memberCostType === 'fixed' || memberCostType === 'monthly') && (member.cost_amount || 0) > 0
+      if (isFixedMember) return 'pure_ls'
+    }
+    // Priority 2: Rate-card-level cost types
     const types: Record<string, { costType: string; costAmount: number }> = {}
     rateCards.forEach(rc => {
       types[rc.client_id] = {
@@ -297,7 +304,7 @@ export default function ContractorPortal() {
     if (allLS) return 'pure_ls'
     if (allTM) return 'tm'
     return 'mixed'
-  }, [rateCards])
+  }, [rateCards, member])
 
   // ============ LOOKUP EMAIL ============
   const lookupEmail = async () => {
@@ -858,7 +865,8 @@ export default function ContractorPortal() {
               </div>
               <button onClick={() => { 
                 const defaultClient = contractorType === 'pure_ls' ? 'all' : ''
-                setInvoiceForm(p => ({ ...p, client_id: defaultClient }))
+                const defaultAmount = contractorType === 'pure_ls' && member?.cost_amount ? String(member.cost_amount) : ''
+                setInvoiceForm(p => ({ ...p, client_id: defaultClient, amount: defaultAmount }))
                 setShowInvoiceForm(true) 
               }} className={T.btnPrimary}>
                 <Plus size={15} /> New Invoice
