@@ -40,17 +40,17 @@ export default function Header({
     <header
       className={cn(
         'fixed top-0 right-0 h-16 z-30 flex items-center justify-between px-6 transition-all duration-300',
-        'bg-[#080c14]/80 backdrop-blur-2xl border-b border-slate-800/40',
+        'bg-white/95 backdrop-blur-xl border-b border-gray-200',
         sidebarCollapsed ? 'left-16' : 'left-60'
       )}
     >
       {/* Left section - Search */}
       <div className="flex items-center gap-4 flex-1 max-w-md">
         <div className={cn(
-          'relative flex-1 vSrch rounded-lg border border-slate-800/40 bg-[#0a0f1a]',
-          searchFocused && 'scale-[1.01]'
+          'relative flex-1 vSrch rounded-lg border border-gray-200 bg-gray-50',
+          searchFocused && 'scale-[1.01] bg-white'
         )}>
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
             placeholder="Search..."
@@ -58,8 +58,8 @@ export default function Header({
             onBlur={() => setSearchFocused(false)}
             className={cn(
               'w-full pl-10 pr-4 py-2 rounded-lg text-sm',
-              'bg-transparent text-slate-200',
-              'placeholder:text-slate-600',
+              'bg-transparent text-gray-900',
+              'placeholder:text-gray-400',
               'focus:outline-none',
               'border-0'
             )}
@@ -74,8 +74,8 @@ export default function Header({
           onClick={onOpenChat}
           className={cn(
             'vBtn p-2.5 rounded-lg',
-            'text-slate-500 hover:text-teal-400',
-            'hover:bg-white/[0.04]'
+            'text-gray-400 hover:text-emerald-600',
+            'hover:bg-emerald-50'
           )}
           title="Open Sage AI"
         >
@@ -86,8 +86,8 @@ export default function Header({
         <button
           className={cn(
             'vBtn p-2.5 rounded-lg relative',
-            'text-slate-500 hover:text-slate-300',
-            'hover:bg-white/[0.04]'
+            'text-gray-400 hover:text-gray-600',
+            'hover:bg-gray-50'
           )}
           title="Notifications"
         >
@@ -95,7 +95,7 @@ export default function Header({
         </button>
 
         {/* Divider */}
-        <div className="w-px h-7 bg-slate-800/40 mx-2" />
+        <div className="w-px h-7 bg-gray-200 mx-2" />
 
         {/* User Menu */}
         <div className="relative" ref={menuRef}>
@@ -103,24 +103,24 @@ export default function Header({
             onClick={() => setUserMenuOpen(!userMenuOpen)}
             className={cn(
               'vBtn flex items-center gap-2.5 pl-1 pr-3 py-1.5 rounded-lg',
-              'hover:bg-white/[0.04]',
-              userMenuOpen && 'bg-white/[0.04]'
+              'hover:bg-gray-50',
+              userMenuOpen && 'bg-gray-50'
             )}
           >
             {/* Avatar */}
             <div className={cn(
               'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold',
-              'bg-gradient-to-br from-teal-500 to-teal-600 text-white'
+              'bg-emerald-100 text-emerald-700'
             )}>
               {initials}
             </div>
-            <span className="text-sm font-medium text-slate-300 hidden sm:block">
+            <span className="text-sm font-medium text-gray-700 hidden sm:block">
               {displayName}
             </span>
             <ChevronDown 
               size={14} 
               className={cn(
-                'text-slate-600 transition-transform duration-200',
+                'text-gray-400 transition-transform duration-200',
                 userMenuOpen && 'rotate-180'
               )} 
             />
@@ -130,14 +130,14 @@ export default function Header({
           {userMenuOpen && (
             <div className={cn(
               'vScale absolute right-0 top-full mt-2 w-56 rounded-xl overflow-hidden',
-              'bg-[#0f1623] border border-slate-800/50',
-              'shadow-2xl shadow-black/40'
+              'bg-white border border-gray-200',
+              'shadow-lg shadow-black/8'
             )}>
               {/* User info */}
-              <div className="px-4 py-3 border-b border-slate-800/40">
-                <p className="text-sm font-semibold text-white">{displayName}</p>
+              <div className="px-4 py-3 border-b border-gray-100">
+                <p className="text-sm font-semibold text-gray-900">{displayName}</p>
                 {userEmail && (
-                  <p className="text-xs text-slate-500 mt-0.5">{userEmail}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{userEmail}</p>
                 )}
               </div>
               
@@ -147,10 +147,10 @@ export default function Header({
                   href="/settings"
                   className={cn(
                     'vBtn flex items-center gap-3 px-4 py-2.5 text-sm',
-                    'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+                    'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   )}
                 >
-                  <Settings size={15} className="text-slate-600" />
+                  <Settings size={15} className="text-gray-400" />
                   Account Settings
                 </a>
                 {onSignOut && (
@@ -158,10 +158,10 @@ export default function Header({
                     onClick={onSignOut}
                     className={cn(
                       'vBtn w-full flex items-center gap-3 px-4 py-2.5 text-sm',
-                      'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+                      'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                     )}
                   >
-                    <LogOut size={15} className="text-slate-600" />
+                    <LogOut size={15} className="text-gray-400" />
                     Sign Out
                   </button>
                 )}
