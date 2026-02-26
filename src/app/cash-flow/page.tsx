@@ -322,8 +322,8 @@ export default function CashFlowPage() {
       : directCosts + overhead
     const runway = avgMonthlyBurn > 0 ? cashPosition / avgMonthlyBurn : Infinity
 
-    const dso = metrics.revenue > 0 ? Math.round((metrics.totalAR / (metrics.revenue / (periodRange.isFullYear ? 365 : 30))) * 1) : 0
-    const dpo = metrics.directCosts > 0 ? Math.round((metrics.totalAP / (metrics.directCosts / (periodRange.isFullYear ? 365 : 30))) * 1) : 0
+    const dso = revenue > 0 ? Math.round((totalAR / (revenue / (periodRange.isFullYear ? 365 : 30))) * 1) : 0
+    const dpo = directCosts > 0 ? Math.round((totalAP / (directCosts / (periodRange.isFullYear ? 365 : 30))) * 1) : 0
 
     return {
       cashPosition, totalAR, overdueAR, totalAP, netWorkingCapital,
@@ -633,7 +633,6 @@ export default function CashFlowPage() {
                   </div>
                 )
               })()}
-              </div>
             </div>
           </Section>
         </div>
