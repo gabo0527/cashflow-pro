@@ -22,7 +22,7 @@ const supabase = createClient(
 // ============ CHART PALETTE ============
 const CHART = {
   emerald: '#10b981', blue: '#3b82f6', gray: '#6b7280', rose: '#f43f5e',
-  amber: '#f59e0b', emerald: '#10b981', purple: '#8b5cf6', cyan: '#06b6d4',
+  amber: '#f59e0b', purple: '#8b5cf6', cyan: '#06b6d4',
   grid: '#f3f4f6', axis: '#6b7280',
 }
 
