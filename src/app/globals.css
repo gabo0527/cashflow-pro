@@ -212,33 +212,35 @@ body {
 }
 
 /* ============================================================
-   FORM ELEMENTS — teal focus rings
+   FORM ELEMENTS — dark theme, scoped to .v-app
+   Only applies inside the main app shell (dashboard, settings, etc.)
+   Contractor portal and other light-themed pages are NOT affected.
    ============================================================ */
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="number"],
-input[type="date"],
-input[type="search"],
-select,
-textarea {
+.v-app input[type="text"],
+.v-app input[type="email"],
+.v-app input[type="password"],
+.v-app input[type="number"],
+.v-app input[type="date"],
+.v-app input[type="search"],
+.v-app select,
+.v-app textarea {
   @apply bg-[#0a0f1a] border border-slate-800/50 text-slate-100 rounded-lg;
   @apply focus:outline-none focus:ring-2 focus:ring-teal-500/15 focus:border-teal-500/30;
 }
 
-input::placeholder,
-textarea::placeholder {
+.v-app input::placeholder,
+.v-app textarea::placeholder {
   @apply text-slate-600;
 }
 
-select option {
+.v-app select option {
   @apply bg-[#0f1623] text-slate-200;
 }
 
-input[type="checkbox"] {
+.v-app input[type="checkbox"] {
   @apply bg-[#0a0f1a] border border-slate-700/50 rounded;
 }
-input[type="checkbox"]:checked {
+.v-app input[type="checkbox"]:checked {
   @apply bg-teal-500 border-teal-500;
 }
 
