@@ -24,143 +24,199 @@ const supabase = createClient(
 
 const CHART_COLORS = ["#10B981", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444", "#EC4899", "#34D399", "#6366F1", "#F97316", "#06B6D4"]
 
-// ============ SAGE LOGO (Emerald gradient — light-theme compatible) ============
+// ============ NEW SAGE LOGO — Emerald Sphere with Neural Network + Chart ============
 function SageLogo({ size = 32, className = "" }: { size?: number, className?: string }) {
-  const id = React.useId().replace(/:/g, '')
-  const full = size >= 36
+  const id = React.useId().replace(/:/g, "")
+  const full = size >= 48
   const mid = size >= 28
+  const sm = size < 28
+
   return (
     <svg width={size} height={size} viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
       <defs>
-        <linearGradient id={`sg${id}`} x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#34D399" /><stop offset="50%" stopColor="#10B981" /><stop offset="100%" stopColor="#059669" /></linearGradient>
-        <linearGradient id={`ng${id}`} x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#10B981" /><stop offset="100%" stopColor="#3B82F6" /></linearGradient>
-        <filter id={`gw${id}`}><feGaussianBlur stdDeviation="2.5" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
-        <filter id={`gb${id}`}><feGaussianBlur stdDeviation="5" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+        {/* Sphere gradient — deep emerald core to bright edge */}
+        <radialGradient id={`sphere${id}`} cx="45%" cy="40%" r="50%" fx="35%" fy="35%">
+          <stop offset="0%" stopColor="#34d399" stopOpacity="0.35" />
+          <stop offset="40%" stopColor="#10b981" stopOpacity="0.20" />
+          <stop offset="70%" stopColor="#059669" stopOpacity="0.12" />
+          <stop offset="100%" stopColor="#047857" stopOpacity="0.04" />
+        </radialGradient>
+
+        {/* Sphere rim light */}
+        <radialGradient id={`rim${id}`} cx="50%" cy="50%" r="50%">
+          <stop offset="85%" stopColor="#10b981" stopOpacity="0" />
+          <stop offset="95%" stopColor="#10b981" stopOpacity="0.25" />
+          <stop offset="100%" stopColor="#34d399" stopOpacity="0.08" />
+        </radialGradient>
+
+        {/* Specular highlight */}
+        <radialGradient id={`spec${id}`} cx="38%" cy="30%" r="30%" fx="35%" fy="25%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.22" />
+          <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+        </radialGradient>
+
+        {/* Outer glow */}
+        <radialGradient id={`glow${id}`} cx="50%" cy="50%" r="50%">
+          <stop offset="60%" stopColor="#10b981" stopOpacity="0" />
+          <stop offset="100%" stopColor="#10b981" stopOpacity="0.12" />
+        </radialGradient>
+
+        {/* Bar chart gradient */}
+        <linearGradient id={`bar${id}`} x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stopColor="#059669" stopOpacity="0.7" />
+          <stop offset="100%" stopColor="#34d399" stopOpacity="0.9" />
+        </linearGradient>
+
+        {/* Arrow gradient */}
+        <linearGradient id={`arrow${id}`} x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0%" stopColor="#10b981" />
+          <stop offset="100%" stopColor="#6ee7b7" />
+        </linearGradient>
+
+        {/* Node glow filter */}
+        <filter id={`ng${id}`}><feGaussianBlur stdDeviation="1.5" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+
+        {/* Outer glow filter */}
+        <filter id={`og${id}`}><feGaussianBlur stdDeviation="6" /></filter>
       </defs>
 
-      {/* Ambient glow */}
-      {mid && <ellipse cx="60" cy="55" rx="35" ry="38" fill="#10B981" opacity="0.02" filter={`url(#gb${id})`} />}
+      {/* ====== OUTER GLOW ====== */}
+      {mid && <circle cx="60" cy="60" r="52" fill="#10b981" opacity="0.08" filter={`url(#og${id})`} />}
 
-      {/* Triangle mesh fills */}
-      {full && <>
-        <polygon points="60,12 38,28 52,18" fill="#10B981" opacity="0.015" />
-        <polygon points="60,12 72,22 52,18" fill="#10B981" opacity="0.012" />
-        <polygon points="48,38 62,36 60,50" fill="#10B981" opacity="0.018" />
-        <polygon points="38,28 48,38 26,52" fill="#10B981" opacity="0.012" />
-        <polygon points="62,36 76,48 60,50" fill="#10B981" opacity="0.012" />
-        <polygon points="26,52 48,38 36,62" fill="#10B981" opacity="0.02" />
-        <polygon points="48,38 60,50 36,62" fill="#10B981" opacity="0.025" />
-        <polygon points="60,50 76,48 70,64" fill="#10B981" opacity="0.02" />
-        <polygon points="60,50 36,62 54,68" fill="#10B981" opacity="0.022" />
-        <polygon points="60,50 70,64 54,68" fill="#10B981" opacity="0.02" />
-        <polygon points="36,62 54,68 44,82" fill="#10B981" opacity="0.012" />
-        <polygon points="54,68 70,64 66,80" fill="#10B981" opacity="0.012" />
-        <polygon points="44,82 54,68 66,80" fill="#10B981" opacity="0.01" />
-        <polygon points="44,82 66,80 56,96" fill="#10B981" opacity="0.008" />
-      </>}
+      {/* ====== SPHERE BASE ====== */}
+      <circle cx="60" cy="60" r={sm ? "48" : "46"} fill={`url(#sphere${id})`} />
+      <circle cx="60" cy="60" r={sm ? "48" : "46"} fill={`url(#rim${id})`} />
+      <circle cx="60" cy="60" r={sm ? "48" : "46"} fill={`url(#spec${id})`} />
 
-      {/* Connection web — inner */}
+      {/* Sphere edge ring */}
+      <circle cx="60" cy="60" r={sm ? "47" : "45"} fill="none" stroke="#10b981" strokeWidth={sm ? "1.5" : "1"} opacity="0.3" />
+      {mid && <circle cx="60" cy="60" r="45" fill="none" stroke="#34d399" strokeWidth="0.5" opacity="0.15" />}
+
+      {/* ====== NETWORK CONNECTIONS (surface lines) ====== */}
       {mid && <>
-        <line x1="60" y1="12" x2="38" y2="28" stroke="#10B981" strokeWidth="0.5" opacity="0.12" />
-        <line x1="60" y1="12" x2="72" y2="22" stroke="#10B981" strokeWidth="0.5" opacity="0.1" />
-        <line x1="38" y1="28" x2="48" y2="38" stroke="#10B981" strokeWidth="0.5" opacity="0.1" />
-        <line x1="72" y1="22" x2="62" y2="36" stroke="#10B981" strokeWidth="0.5" opacity="0.08" />
-        <line x1="48" y1="38" x2="62" y2="36" stroke="#10B981" strokeWidth="0.5" opacity="0.1" />
-        <line x1="48" y1="38" x2="60" y2="50" stroke="#10B981" strokeWidth="0.6" opacity="0.12" />
-        <line x1="62" y1="36" x2="60" y2="50" stroke="#10B981" strokeWidth="0.6" opacity="0.1" />
-        <line x1="60" y1="50" x2="36" y2="62" stroke="#10B981" strokeWidth="0.5" opacity="0.1" />
-        <line x1="60" y1="50" x2="70" y2="64" stroke="#10B981" strokeWidth="0.5" opacity="0.08" />
-        <line x1="60" y1="50" x2="54" y2="68" stroke="#10B981" strokeWidth="0.5" opacity="0.08" />
-        <line x1="36" y1="62" x2="44" y2="82" stroke="#10B981" strokeWidth="0.4" opacity="0.07" />
-        <line x1="70" y1="64" x2="66" y2="80" stroke="#10B981" strokeWidth="0.4" opacity="0.07" />
-        <line x1="44" y1="82" x2="56" y2="96" stroke="#10B981" strokeWidth="0.35" opacity="0.05" />
-        <line x1="66" y1="80" x2="56" y2="96" stroke="#10B981" strokeWidth="0.35" opacity="0.05" />
+        {/* Latitude-ish curves */}
+        <ellipse cx="60" cy="42" rx="34" ry="8" fill="none" stroke="#34d399" strokeWidth="0.4" opacity="0.15" />
+        <ellipse cx="60" cy="60" rx="40" ry="10" fill="none" stroke="#10b981" strokeWidth="0.3" opacity="0.10" />
+        <ellipse cx="60" cy="78" rx="32" ry="7" fill="none" stroke="#34d399" strokeWidth="0.4" opacity="0.12" />
       </>}
 
-      {/* Connection web — outer */}
       {full && <>
-        <line x1="38" y1="28" x2="26" y2="52" stroke="#10B981" strokeWidth="0.4" opacity="0.06" />
-        <line x1="72" y1="22" x2="76" y2="48" stroke="#10B981" strokeWidth="0.4" opacity="0.05" />
-        <line x1="26" y1="52" x2="36" y2="62" stroke="#10B981" strokeWidth="0.35" opacity="0.06" />
-        <line x1="76" y1="48" x2="70" y2="64" stroke="#10B981" strokeWidth="0.35" opacity="0.05" />
-        <line x1="60" y1="50" x2="26" y2="52" stroke="#10B981" strokeWidth="0.4" opacity="0.06" />
-        <line x1="60" y1="50" x2="76" y2="48" stroke="#10B981" strokeWidth="0.4" opacity="0.05" />
-        <line x1="38" y1="28" x2="18" y2="36" stroke="#10B981" strokeWidth="0.35" opacity="0.05" />
-        <line x1="72" y1="22" x2="80" y2="32" stroke="#10B981" strokeWidth="0.35" opacity="0.04" />
-        <line x1="38" y1="28" x2="72" y2="22" stroke="#10B981" strokeWidth="0.3" opacity="0.04" strokeDasharray="3 4" />
-        <line x1="36" y1="62" x2="70" y2="64" stroke="#10B981" strokeWidth="0.3" opacity="0.04" strokeDasharray="3 4" />
-        <line x1="26" y1="52" x2="76" y2="48" stroke="#10B981" strokeWidth="0.25" opacity="0.04" strokeDasharray="3 4" />
-        <line x1="16" y1="66" x2="54" y2="68" stroke="#10B981" strokeWidth="0.25" opacity="0.03" strokeDasharray="2 4" />
-        <line x1="88" y1="60" x2="54" y2="68" stroke="#10B981" strokeWidth="0.25" opacity="0.03" strokeDasharray="2 4" />
-        <line x1="16" y1="66" x2="24" y2="78" stroke="#10B981" strokeWidth="0.3" opacity="0.04" />
-        <line x1="88" y1="60" x2="82" y2="76" stroke="#10B981" strokeWidth="0.3" opacity="0.03" />
-        <line x1="24" y1="78" x2="44" y2="82" stroke="#10B981" strokeWidth="0.3" opacity="0.04" />
-        <line x1="82" y1="76" x2="66" y2="80" stroke="#10B981" strokeWidth="0.3" opacity="0.03" />
+        {/* Diagonal network lines */}
+        <line x1="30" y1="28" x2="52" y2="44" stroke="#34d399" strokeWidth="0.4" opacity="0.18" />
+        <line x1="90" y1="30" x2="70" y2="46" stroke="#34d399" strokeWidth="0.4" opacity="0.15" />
+        <line x1="25" y1="55" x2="42" y2="52" stroke="#10b981" strokeWidth="0.35" opacity="0.14" />
+        <line x1="95" y1="58" x2="78" y2="54" stroke="#10b981" strokeWidth="0.35" opacity="0.12" />
+        <line x1="32" y1="80" x2="48" y2="72" stroke="#34d399" strokeWidth="0.35" opacity="0.14" />
+        <line x1="88" y1="82" x2="72" y2="74" stroke="#34d399" strokeWidth="0.35" opacity="0.12" />
+        <line x1="52" y1="44" x2="70" y2="46" stroke="#10b981" strokeWidth="0.4" opacity="0.16" />
+        <line x1="42" y1="52" x2="78" y2="54" stroke="#10b981" strokeWidth="0.3" opacity="0.10" />
+        <line x1="48" y1="72" x2="72" y2="74" stroke="#10b981" strokeWidth="0.3" opacity="0.10" />
+        {/* Cross connections */}
+        <line x1="30" y1="28" x2="25" y2="55" stroke="#34d399" strokeWidth="0.3" opacity="0.10" />
+        <line x1="90" y1="30" x2="95" y2="58" stroke="#34d399" strokeWidth="0.3" opacity="0.08" />
+        <line x1="25" y1="55" x2="32" y2="80" stroke="#34d399" strokeWidth="0.3" opacity="0.10" />
+        <line x1="95" y1="58" x2="88" y2="82" stroke="#34d399" strokeWidth="0.3" opacity="0.08" />
+        <line x1="52" y1="44" x2="48" y2="72" stroke="#10b981" strokeWidth="0.25" opacity="0.08" strokeDasharray="2 3" />
+        <line x1="70" y1="46" x2="72" y2="74" stroke="#10b981" strokeWidth="0.25" opacity="0.08" strokeDasharray="2 3" />
       </>}
 
-      {/* S-curve glow layer */}
-      <path d="M68 18 C68 18, 72 14, 64 14 C52 14, 44 22, 44 32 C44 42, 54 46, 62 48 C72 51, 76 58, 76 68 C76 80, 64 90, 50 90 C40 90, 38 86, 38 86" stroke="#10B981" strokeWidth="6" strokeLinecap="round" fill="none" opacity="0.03" filter={`url(#gb${id})`} />
-      {/* S-curve primary */}
-      <path d="M68 18 C68 18, 72 14, 64 14 C52 14, 44 22, 44 32 C44 42, 54 46, 62 48 C72 51, 76 58, 76 68 C76 80, 64 90, 50 90 C40 90, 38 86, 38 86" stroke={`url(#sg${id})`} strokeWidth={mid ? "3" : "5"} strokeLinecap="round" fill="none" filter={`url(#gw${id})`} />
+      {/* ====== NETWORK NODES (glowing dots) ====== */}
+      {full && <>
+        {/* Outer ring nodes */}
+        <circle cx="30" cy="28" r="2.2" fill="#34d399" opacity="0.5" filter={`url(#ng${id})`} />
+        <circle cx="30" cy="28" r="1.2" fill="#6ee7b7" opacity="0.8" />
+        <circle cx="90" cy="30" r="2" fill="#34d399" opacity="0.4" filter={`url(#ng${id})`} />
+        <circle cx="90" cy="30" r="1" fill="#6ee7b7" opacity="0.7" />
+        <circle cx="25" cy="55" r="1.8" fill="#34d399" opacity="0.35" filter={`url(#ng${id})`} />
+        <circle cx="25" cy="55" r="0.9" fill="#6ee7b7" opacity="0.6" />
+        <circle cx="95" cy="58" r="1.8" fill="#34d399" opacity="0.3" filter={`url(#ng${id})`} />
+        <circle cx="95" cy="58" r="0.9" fill="#6ee7b7" opacity="0.55" />
+        <circle cx="32" cy="80" r="1.8" fill="#34d399" opacity="0.35" filter={`url(#ng${id})`} />
+        <circle cx="32" cy="80" r="0.9" fill="#6ee7b7" opacity="0.6" />
+        <circle cx="88" cy="82" r="1.8" fill="#34d399" opacity="0.3" filter={`url(#ng${id})`} />
+        <circle cx="88" cy="82" r="0.9" fill="#6ee7b7" opacity="0.55" />
 
-      {/* Primary S-curve nodes — [FIX #1] white fills for light theme */}
-      {/* Top */}
-      {mid && <><circle cx="64" cy="15" r="4.5" fill="#10B981" opacity="0.04" filter={`url(#gw${id})`} /><circle cx="64" cy="15" r="4" fill="#ffffff" stroke={`url(#ng${id})`} strokeWidth="2" /><circle cx="64" cy="15" r="1.8" fill={`url(#ng${id})`} /></>}
-      {/* Upper mid */}
-      {full && <><circle cx="44" cy="32" r="3" fill="#ffffff" stroke="#10B981" strokeWidth="1.3" /><circle cx="44" cy="32" r="1.2" fill="#10B981" /></>}
-      {/* CENTER BRAIN */}
-      <circle cx="60" cy="50" r={mid ? "8" : "7"} fill="#10B981" opacity="0.04" filter={`url(#gw${id})`} />
-      <circle cx="60" cy="50" r="6" fill="#ffffff" stroke={`url(#ng${id})`} strokeWidth={mid ? "2.2" : "4"} />
-      <circle cx="60" cy="50" r="2.8" fill={`url(#ng${id})`} />
-      {/* Lower mid */}
-      {full && <><circle cx="76" cy="68" r="3" fill="#ffffff" stroke="#10B981" strokeWidth="1.3" /><circle cx="76" cy="68" r="1.2" fill="#10B981" /></>}
-      {/* Base */}
-      {mid && <><circle cx="50" cy="89" r="4.5" fill="#10B981" opacity="0.04" filter={`url(#gw${id})`} /><circle cx="50" cy="89" r="4" fill="#ffffff" stroke={`url(#ng${id})`} strokeWidth="2" /><circle cx="50" cy="89" r="1.8" fill={`url(#ng${id})`} /></>}
+        {/* Inner ring nodes */}
+        <circle cx="52" cy="44" r="1.8" fill="#34d399" opacity="0.4" filter={`url(#ng${id})`} />
+        <circle cx="52" cy="44" r="0.9" fill="#6ee7b7" opacity="0.7" />
+        <circle cx="70" cy="46" r="1.8" fill="#34d399" opacity="0.35" filter={`url(#ng${id})`} />
+        <circle cx="70" cy="46" r="0.9" fill="#6ee7b7" opacity="0.65" />
+        <circle cx="42" cy="52" r="1.5" fill="#34d399" opacity="0.3" />
+        <circle cx="42" cy="52" r="0.7" fill="#6ee7b7" opacity="0.55" />
+        <circle cx="78" cy="54" r="1.5" fill="#34d399" opacity="0.28" />
+        <circle cx="78" cy="54" r="0.7" fill="#6ee7b7" opacity="0.5" />
+        <circle cx="48" cy="72" r="1.5" fill="#34d399" opacity="0.3" />
+        <circle cx="48" cy="72" r="0.7" fill="#6ee7b7" opacity="0.55" />
+        <circle cx="72" cy="74" r="1.5" fill="#34d399" opacity="0.28" />
+        <circle cx="72" cy="74" r="0.7" fill="#6ee7b7" opacity="0.5" />
 
-      {/* Secondary nodes */}
+        {/* Scattered small dust */}
+        <circle cx="40" cy="30" r="0.8" fill="#6ee7b7" opacity="0.3" />
+        <circle cx="80" cy="40" r="0.8" fill="#6ee7b7" opacity="0.25" />
+        <circle cx="22" cy="68" r="0.7" fill="#6ee7b7" opacity="0.2" />
+        <circle cx="98" cy="48" r="0.6" fill="#6ee7b7" opacity="0.15" />
+        <circle cx="60" cy="22" r="0.8" fill="#6ee7b7" opacity="0.25" />
+        <circle cx="60" cy="98" r="0.7" fill="#6ee7b7" opacity="0.2" />
+      </>}
+
+      {/* Mid-size simplified nodes */}
+      {mid && !full && <>
+        <circle cx="32" cy="34" r="1.8" fill="#34d399" opacity="0.4" filter={`url(#ng${id})`} />
+        <circle cx="32" cy="34" r="0.9" fill="#6ee7b7" opacity="0.7" />
+        <circle cx="88" cy="36" r="1.6" fill="#34d399" opacity="0.35" filter={`url(#ng${id})`} />
+        <circle cx="88" cy="36" r="0.8" fill="#6ee7b7" opacity="0.65" />
+        <circle cx="28" cy="65" r="1.5" fill="#34d399" opacity="0.3" />
+        <circle cx="28" cy="65" r="0.7" fill="#6ee7b7" opacity="0.55" />
+        <circle cx="92" cy="68" r="1.5" fill="#34d399" opacity="0.28" />
+        <circle cx="92" cy="68" r="0.7" fill="#6ee7b7" opacity="0.5" />
+        <circle cx="40" cy="85" r="1.3" fill="#34d399" opacity="0.25" />
+        <circle cx="80" cy="86" r="1.3" fill="#34d399" opacity="0.22" />
+      </>}
+
+      {/* ====== BAR CHART (center) ====== */}
       {mid && <>
-        <circle cx="38" cy="28" r="2.5" fill="#ffffff" stroke="#10B981" strokeWidth="1" opacity="0.5" /><circle cx="38" cy="28" r="0.9" fill="#10B981" opacity="0.55" />
-        <circle cx="72" cy="22" r="2.5" fill="#ffffff" stroke="#10B981" strokeWidth="1" opacity="0.45" /><circle cx="72" cy="22" r="0.9" fill="#10B981" opacity="0.5" />
-        <circle cx="36" cy="62" r="2.2" fill="#ffffff" stroke="#10B981" strokeWidth="0.9" opacity="0.4" /><circle cx="36" cy="62" r="0.8" fill="#10B981" opacity="0.45" />
-        <circle cx="70" cy="64" r="2.2" fill="#ffffff" stroke="#10B981" strokeWidth="0.9" opacity="0.35" /><circle cx="70" cy="64" r="0.8" fill="#10B981" opacity="0.4" />
+        {/* Bars — 5 ascending */}
+        <rect x="42" y="72" width={full ? "5" : "6"} height="10" rx="1" fill={`url(#bar${id})`} opacity="0.75" />
+        <rect x="49" y="67" width={full ? "5" : "6"} height="15" rx="1" fill={`url(#bar${id})`} opacity="0.80" />
+        <rect x="56" y="62" width={full ? "5" : "6"} height="20" rx="1" fill={`url(#bar${id})`} opacity="0.85" />
+        <rect x="63" y="56" width={full ? "5" : "6"} height="26" rx="1" fill={`url(#bar${id})`} opacity="0.90" />
+        <rect x="70" y="50" width={full ? "5" : "6"} height="32" rx="1" fill={`url(#bar${id})`} opacity="0.95" />
       </>}
 
-      {/* Inner secondary nodes */}
-      {full && <>
-        <circle cx="52" cy="18" r="2" fill="#ffffff" stroke="#10B981" strokeWidth="0.9" opacity="0.5" /><circle cx="52" cy="18" r="0.8" fill="#10B981" opacity="0.5" />
-        <circle cx="48" cy="38" r="2" fill="#ffffff" stroke="#10B981" strokeWidth="0.8" opacity="0.4" /><circle cx="48" cy="38" r="0.7" fill="#10B981" opacity="0.45" />
-        <circle cx="62" cy="36" r="2" fill="#ffffff" stroke="#10B981" strokeWidth="0.8" opacity="0.38" /><circle cx="62" cy="36" r="0.7" fill="#10B981" opacity="0.4" />
-        <circle cx="54" cy="68" r="2" fill="#ffffff" stroke="#10B981" strokeWidth="0.8" opacity="0.35" /><circle cx="54" cy="68" r="0.7" fill="#10B981" opacity="0.4" />
-        <circle cx="44" cy="82" r="2" fill="#ffffff" stroke="#10B981" strokeWidth="0.8" opacity="0.3" /><circle cx="44" cy="82" r="0.7" fill="#10B981" opacity="0.35" />
-        <circle cx="66" cy="80" r="2" fill="#ffffff" stroke="#10B981" strokeWidth="0.8" opacity="0.3" /><circle cx="66" cy="80" r="0.7" fill="#10B981" opacity="0.35" />
+      {/* Small size — 3 bars only */}
+      {sm && <>
+        <rect x="40" y="68" width="10" height="16" rx="2" fill={`url(#bar${id})`} opacity="0.75" />
+        <rect x="54" y="58" width="10" height="26" rx="2" fill={`url(#bar${id})`} opacity="0.85" />
+        <rect x="68" y="46" width="10" height="38" rx="2" fill={`url(#bar${id})`} opacity="0.95" />
       </>}
 
-      {/* Tertiary nodes */}
-      {full && <>
-        <circle cx="26" cy="52" r="1.8" fill="#ffffff" stroke="#10B981" strokeWidth="0.7" opacity="0.28" /><circle cx="26" cy="52" r="0.6" fill="#10B981" opacity="0.3" />
-        <circle cx="76" cy="48" r="1.8" fill="#ffffff" stroke="#10B981" strokeWidth="0.7" opacity="0.25" /><circle cx="76" cy="48" r="0.6" fill="#10B981" opacity="0.28" />
-        <circle cx="18" cy="36" r="1.5" fill="#ffffff" stroke="#10B981" strokeWidth="0.6" opacity="0.22" /><circle cx="18" cy="36" r="0.5" fill="#10B981" opacity="0.25" />
-        <circle cx="80" cy="32" r="1.5" fill="#ffffff" stroke="#10B981" strokeWidth="0.6" opacity="0.2" /><circle cx="80" cy="32" r="0.5" fill="#10B981" opacity="0.22" />
-        <circle cx="16" cy="66" r="1.3" fill="#ffffff" stroke="#10B981" strokeWidth="0.5" opacity="0.18" /><circle cx="16" cy="66" r="0.4" fill="#10B981" opacity="0.2" />
-        <circle cx="88" cy="60" r="1.3" fill="#ffffff" stroke="#10B981" strokeWidth="0.5" opacity="0.16" /><circle cx="88" cy="60" r="0.4" fill="#10B981" opacity="0.18" />
-        <circle cx="24" cy="78" r="1.3" fill="#ffffff" stroke="#10B981" strokeWidth="0.5" opacity="0.16" /><circle cx="24" cy="78" r="0.4" fill="#10B981" opacity="0.18" />
-        <circle cx="82" cy="76" r="1.3" fill="#ffffff" stroke="#10B981" strokeWidth="0.5" opacity="0.14" /><circle cx="82" cy="76" r="0.4" fill="#10B981" opacity="0.16" />
-        <circle cx="56" cy="96" r="1.5" fill="#ffffff" stroke="#10B981" strokeWidth="0.6" opacity="0.2" /><circle cx="56" cy="96" r="0.5" fill="#10B981" opacity="0.22" />
+      {/* ====== UPWARD ARROW ====== */}
+      {mid && (
+        <path
+          d="M45 68 C50 55, 58 48, 68 40 L74 38"
+          stroke={`url(#arrow${id})`}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          fill="none"
+          opacity="0.85"
+        />
+      )}
+      {mid && <>
+        {/* Arrowhead */}
+        <polygon points="74,38 68,36 71,42" fill="#6ee7b7" opacity="0.9" />
+        {/* Arrow glow */}
+        <path d="M45 68 C50 55, 58 48, 68 40 L74 38" stroke="#6ee7b7" strokeWidth="4" strokeLinecap="round" fill="none" opacity="0.08" filter={`url(#ng${id})`} />
       </>}
 
-      {/* Dust particles */}
-      {full && <>
-        <circle cx="28" cy="18" r="1" fill="#10B981" opacity="0.12" />
-        <circle cx="90" cy="26" r="1" fill="#10B981" opacity="0.1" />
-        <circle cx="10" cy="46" r="0.8" fill="#10B981" opacity="0.07" />
-        <circle cx="96" cy="44" r="0.8" fill="#10B981" opacity="0.06" />
-        <circle cx="8" cy="58" r="0.6" fill="#10B981" opacity="0.05" />
-        <circle cx="98" cy="54" r="0.6" fill="#10B981" opacity="0.04" />
-        <circle cx="34" cy="96" r="0.8" fill="#10B981" opacity="0.05" />
-        <circle cx="74" cy="94" r="0.8" fill="#10B981" opacity="0.04" />
-        <circle cx="42" cy="8" r="0.6" fill="#10B981" opacity="0.05" />
-        <circle cx="78" cy="10" r="0.6" fill="#10B981" opacity="0.04" />
-      </>}
+      {sm && (
+        <>
+          <path d="M42 72 C50 58, 58 50, 72 40" stroke={`url(#arrow${id})`} strokeWidth="3.5" strokeLinecap="round" fill="none" opacity="0.85" />
+          <polygon points="72,40 65,38 68,45" fill="#6ee7b7" opacity="0.9" />
+        </>
+      )}
+
+      {/* ====== TOP SPECULAR FLARE ====== */}
+      {mid && <ellipse cx="48" cy="30" rx="14" ry="6" fill="white" opacity="0.06" />}
     </svg>
   )
 }
@@ -896,30 +952,6 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, onRename 
   )
 }
 
-// ============ KPI CARD (Light theme) ============
-function KPICard({ label, value, sublabel, accentColor = "emerald", icon: Icon, trend }: { label: string, value: string, sublabel?: string, accentColor?: string, icon: any, trend?: "up" | "down" | "neutral" }) {
-  const cm: Record<string, { accent: string, iconBg: string, iconText: string }> = {
-    emerald: { accent: "border-l-emerald-500", iconBg: "bg-emerald-50",  iconText: "text-emerald-600" },
-    blue:    { accent: "border-l-blue-500",    iconBg: "bg-blue-50",    iconText: "text-blue-600" },
-    amber:   { accent: "border-l-amber-500",   iconBg: "bg-amber-50",   iconText: "text-amber-600" },
-    rose:    { accent: "border-l-rose-500",    iconBg: "bg-rose-50",    iconText: "text-rose-600" },
-    purple:  { accent: "border-l-purple-500",  iconBg: "bg-purple-50",  iconText: "text-purple-600" },
-  }
-  const c = cm[accentColor] || cm.emerald
-  return (
-    <div className={`bg-white rounded-lg border border-gray-200 border-l-[3px] ${c.accent} p-3.5 flex items-start gap-3 shadow-sm`}>
-      <div className={`w-9 h-9 rounded-lg ${c.iconBg} flex items-center justify-center flex-shrink-0`}>
-        <Icon size={18} className={c.iconText} />
-      </div>
-      <div className="min-w-0">
-        <p className="text-[11px] text-gray-400 uppercase tracking-wider font-medium">{label}</p>
-        <p className="text-lg font-semibold text-gray-900 mt-0.5 leading-tight">{value}</p>
-        {sublabel && <p className={`text-[11px] mt-0.5 ${trend === "up" ? "text-emerald-600" : trend === "down" ? "text-rose-500" : "text-gray-400"}`}>{trend === "up" && "\u2191 "}{trend === "down" && "\u2193 "}{sublabel}</p>}
-      </div>
-    </div>
-  )
-}
-
 // ============ ALERT BADGE (Light theme) ============
 function AlertCard({ icon: Icon, label, count, color, onClick }: { icon: any, label: string, count: number, color: string, onClick: () => void }) {
   const cm: Record<string, string> = {
@@ -1253,17 +1285,7 @@ export default function SageAssistantPage() {
                   </div>
                 </div>
 
-                {/* KPI Cards — always visible on welcome */}
-                {kpis && (
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-                    <KPICard label="Team Revenue" value={formatCurrency(kpis.teamRevenue)} icon={DollarSign} accentColor="emerald" sublabel={`${formatPercent(kpis.teamMarginPct)} GM`} trend={kpis.teamMarginPct >= 20 ? "up" : kpis.teamMarginPct >= 10 ? "neutral" : "down"} />
-                    <KPICard label="Cash Runway" value={`${kpis.runway.toFixed(1)}mo`} icon={Gauge} accentColor={kpis.runway >= 6 ? "emerald" : kpis.runway >= 3 ? "amber" : "rose"} sublabel={`${formatCurrency(kpis.burnRate)}/mo burn`} />
-                    <KPICard label="AR Outstanding" value={formatCurrency(kpis.arOutstanding)} icon={Receipt} accentColor="blue" sublabel={`${kpis.dso.toFixed(0)} day DSO`} />
-                    <KPICard label="Utilization" value={`${kpis.utilizationRate.toFixed(0)}%`} icon={Activity} accentColor="purple" sublabel={`${companyData?.teamMembers?.length || 0} team members`} />
-                  </div>
-                )}
-
-                {/* Alert Badges */}
+                {/* Alert Badges — actionable, not decorative */}
                 {dataStats && (dataStats.uncatTxns > 0 || dataStats.overdueInvs > 0 || (kpis && kpis.teamMarginPct > 0 && kpis.teamMarginPct < 15)) && (
                   <div className="flex flex-wrap gap-2 mb-6">
                     {dataStats.uncatTxns > 0 && <AlertCard icon={CreditCard} label="uncategorized transactions" count={dataStats.uncatTxns} color="amber" onClick={() => sendMessage("Categorize my recent bank transactions")} />}
@@ -1289,16 +1311,6 @@ export default function SageAssistantPage() {
                     })}
                   </div>
                 </div>
-
-                {/* Data context badge */}
-                {dataStats && (
-                  <div className="flex items-center justify-center mb-6">
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200 text-[11px] text-gray-400">
-                      <Brain size={12} className="text-emerald-500" />
-                      <span>Analyzing {dataStats.totalDataPoints.toLocaleString()} data points across {companyData?.clients?.length || 0} clients</span>
-                    </div>
-                  </div>
-                )}
 
                 {/* Input (welcome) */}
                 <div className="mt-auto w-full max-w-3xl mx-auto">
