@@ -10,7 +10,7 @@ import {
 import Link from 'next/link'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Area, AreaChart, ReferenceLine
+  Area, AreaChart, ReferenceLine, Line, ComposedChart
 } from 'recharts'
 import { createClient } from '@supabase/supabase-js'
 import { getCurrentUser } from '@/lib/supabase'
@@ -22,17 +22,16 @@ const supabase = createClient(
 
 // ============ INSTITUTIONAL THEME ============
 const CHART = {
-  teal: '#0d9488',
+  emerald: '#10b981',
   blue: '#3b82f6',
-  slate: '#64748b',
+  gray: '#6b7280',
   rose: '#f43f5e',
   amber: '#f59e0b',
-  emerald: '#10b981',
   orange: '#f97316',
   red: '#ef4444',
   darkRed: '#dc2626',
-  grid: 'rgba(255,255,255,0.04)',
-  axis: '#475569',
+  grid: '#f3f4f6',
+  axis: '#6b7280',
 }
 
 // ============ UTILITIES ============
@@ -54,29 +53,29 @@ const formatDate = (dateStr: string): string => {
 // ============ REUSABLE COMPONENTS ============
 
 // Left-accent MetricCard
-function MetricCard({ label, value, subValue, trend, trendLabel, icon: Icon, href, accentColor = 'bg-teal-500' }: { 
+function MetricCard({ label, value, subValue, trend, trendLabel, icon: Icon, href, accentColor = 'bg-emerald-500' }: { 
   label: string; value: string; subValue?: string; trend?: number; trendLabel?: string; icon: any; href?: string; accentColor?: string
 }) {
   const content = (
-    <div className="bg-[#111827] border border-slate-800/80 rounded-xl overflow-hidden transition-all hover:border-slate-700/80 group">
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:border-gray-300 hover:shadow-md group">
       <div className="flex">
         <div className={`w-1 ${accentColor} shrink-0`} />
         <div className="flex-1 p-5">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
-              <p className="text-2xl font-semibold tracking-tight text-white tabular-nums">{value}</p>
-              {subValue && <p className="text-xs text-slate-500">{subValue}</p>}
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">{label}</p>
+              <p className="text-2xl font-semibold tracking-tight text-gray-900 tabular-nums">{value}</p>
+              {subValue && <p className="text-xs text-gray-500">{subValue}</p>}
               {trend !== undefined && (
                 <div className="flex items-center gap-1.5 pt-0.5">
-                  {trend >= 0 ? <ArrowUpRight size={13} className="text-emerald-400" /> : <ArrowDownRight size={13} className="text-rose-400" />}
-                  <span className={`text-xs font-medium tabular-nums ${trend >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{Math.abs(trend).toFixed(1)}%</span>
-                  {trendLabel && <span className="text-xs text-slate-600">{trendLabel}</span>}
+                  {trend >= 0 ? <ArrowUpRight size={13} className="text-emerald-600" /> : <ArrowDownRight size={13} className="text-rose-600" />}
+                  <span className={`text-xs font-medium tabular-nums ${trend >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{Math.abs(trend).toFixed(1)}%</span>
+                  {trendLabel && <span className="text-xs text-gray-400">{trendLabel}</span>}
                 </div>
               )}
             </div>
-            <div className="p-2 rounded-lg bg-slate-800/40 group-hover:bg-slate-800/60 transition-colors">
-              <Icon size={18} className="text-slate-500" strokeWidth={1.5} />
+            <div className="p-2 rounded-lg bg-gray-50 group-hover:bg-gray-100 transition-colors">
+              <Icon size={18} className="text-gray-400" strokeWidth={1.5} />
             </div>
           </div>
         </div>
@@ -93,19 +92,19 @@ function Section({ title, subtitle, action, children, badge, noPadding = false, 
   badge?: string | number; noPadding?: boolean; fillHeight?: boolean
 }) {
   return (
-    <div className={`bg-[#111827] border border-slate-800/80 rounded-xl overflow-hidden ${fillHeight ? 'h-full flex flex-col' : ''}`}>
-      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/60">
+    <div className={`bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:shadow-md ${fillHeight ? 'h-full flex flex-col' : ''}`}>
+      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-white">{title}</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
             {badge !== undefined && (
-              <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded-md bg-slate-800/60 text-slate-400 border border-slate-800/80">{badge}</span>
+              <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded-md bg-gray-100 text-gray-500 border border-gray-200">{badge}</span>
             )}
           </div>
-          {subtitle && <p className="text-xs mt-0.5 text-slate-500">{subtitle}</p>}
+          {subtitle && <p className="text-xs mt-0.5 text-gray-500">{subtitle}</p>}
         </div>
         {action && (
-          <Link href={action.href} className="text-xs font-medium text-slate-500 hover:text-teal-400 flex items-center gap-0.5 transition-colors">
+          <Link href={action.href} className="text-xs font-medium text-gray-500 hover:text-emerald-600 flex items-center gap-0.5 transition-colors">
             {action.label}<ChevronRight size={14} />
           </Link>
         )}
@@ -126,23 +125,23 @@ function HealthRing({ score, size = 100 }: { score: number; size?: number }) {
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="transform -rotate-90">
-        <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={strokeWidth} />
+        <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke="#e5e7eb" strokeWidth={strokeWidth} />
         <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke={getColor(score)} strokeWidth={strokeWidth}
           strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-700 ease-out" />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold text-white">{score}</span>
-        <span className="text-[10px] font-medium text-slate-600">/ 100</span>
+        <span className="text-2xl font-bold text-gray-900">{score}</span>
+        <span className="text-[10px] font-medium text-gray-400">/ 100</span>
       </div>
     </div>
   )
 }
 
 // Progress Bar
-function ProgressBar({ value, max = 100, color = CHART.teal }: { value: number; max?: number; color?: string }) {
+function ProgressBar({ value, max = 100, color = CHART.emerald }: { value: number; max?: number; color?: string }) {
   const percentage = Math.min((value / max) * 100, 100)
   return (
-    <div className="w-full h-1.5 bg-slate-800/60 rounded-full overflow-hidden">
+    <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden relative">
       <div className="h-full rounded-full transition-all duration-500" style={{ width: `${percentage}%`, backgroundColor: color }} />
     </div>
   )
@@ -151,10 +150,10 @@ function ProgressBar({ value, max = 100, color = CHART.teal }: { value: number; 
 // Team Row
 function TeamRow({ name, hours, target = 40 }: { name: string; hours: number; target?: number }) {
   const utilization = (hours / target) * 100
-  const color = utilization >= 80 ? CHART.emerald : utilization >= 50 ? CHART.amber : CHART.slate
+  const color = utilization >= 80 ? CHART.emerald : utilization >= 50 ? CHART.amber : CHART.gray
   return (
-    <div className="flex items-center gap-4 py-3 border-b border-slate-800/40 last:border-0">
-      <div className="w-24 min-w-0"><p className="text-sm font-medium text-slate-300 truncate">{name}</p></div>
+    <div className="flex items-center gap-4 py-3 border-b border-gray-100 last:border-0">
+      <div className="w-24 min-w-0"><p className="text-sm font-medium text-gray-600 truncate">{name}</p></div>
       <div className="flex-1"><ProgressBar value={utilization} color={color} /></div>
       <div className="text-right w-16"><p className="text-sm font-semibold tabular-nums" style={{ color }}>{hours}h</p></div>
     </div>
@@ -166,19 +165,19 @@ function AlertRow({ type, message, detail, action }: {
   type: 'error' | 'warning' | 'success'; message: string; detail?: string; action?: { label: string; href: string }
 }) {
   const config = {
-    error: { icon: AlertCircle, color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20' },
-    warning: { icon: AlertTriangle, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
-    success: { icon: CheckCircle2, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+    error: { icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-200' },
+    warning: { icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200' },
+    success: { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
   }
   const { icon: Icon, color, bg, border } = config[type]
   return (
     <div className={`flex items-start gap-3 p-3 rounded-lg ${bg} border ${border}`}>
       <Icon size={16} className={`${color} mt-0.5 flex-shrink-0`} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-white">{message}</p>
-        {detail && <p className="text-xs mt-0.5 text-slate-400">{detail}</p>}
+        <p className="text-sm font-medium text-gray-900">{message}</p>
+        {detail && <p className="text-xs mt-0.5 text-gray-500">{detail}</p>}
       </div>
-      {action && <Link href={action.href} className="text-xs font-medium text-slate-500 hover:text-teal-400 transition-colors">{action.label}</Link>}
+      {action && <Link href={action.href} className="text-xs font-medium text-gray-500 hover:text-emerald-600 transition-colors">{action.label}</Link>}
     </div>
   )
 }
@@ -187,8 +186,8 @@ function AlertRow({ type, message, detail, action }: {
 const ChartTooltip = ({ active, payload, label, formatter }: any) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-[#111827] border border-slate-800/80 rounded-lg px-3 py-2 shadow-xl">
-      <p className="text-[11px] text-slate-500 mb-1">{label}</p>
+    <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-lg">
+      <p className="text-[11px] text-gray-500 mb-1">{label}</p>
       {payload.map((entry: any, i: number) => (
         <p key={i} className="text-sm font-medium" style={{ color: entry.color }}>{entry.name}: {formatter ? formatter(entry.value) : entry.value}</p>
       ))}
@@ -196,7 +195,7 @@ const ChartTooltip = ({ active, payload, label, formatter }: any) => {
   )
 }
 
-const selectClass = "appearance-none bg-slate-800/60 border border-slate-800/80 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 cursor-pointer transition-colors"
+const selectClass = "appearance-none bg-white border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer transition-colors"
 
 // ============ MAIN DASHBOARD ============
 export default function DashboardPage() {
@@ -321,9 +320,34 @@ export default function DashboardPage() {
       totalRevenue, directCosts, overhead, totalExpenses,
       grossProfit, grossMargin, netProfit, netMargin,
       totalAR, overdueAR, totalAP, openInvoicesCount: openInvoices.length,
-      totalHours, billableHours, billableRate, healthScore
+      totalHours, billableHours, billableRate, healthScore,
+      arScore, marginScore, utilizationScore
     }
   }, [filteredInvoices, filteredBills, filteredExpenses, filteredTimeEntries, invoices, bills])
+
+  // ============ PREVIOUS PERIOD TRENDS (#1) ============
+  const trends = useMemo(() => {
+    const duration = periodRange.endDate.getTime() - periodRange.startDate.getTime()
+    const prevStart = new Date(periodRange.startDate.getTime() - duration)
+    const prevEnd = new Date(periodRange.startDate.getTime() - 1)
+
+    const prevInv = invoices.filter(inv => { const d = new Date(inv.invoice_date); return d >= prevStart && d <= prevEnd })
+    const prevBills = bills.filter(bill => { const d = new Date(bill.date); return d >= prevStart && d <= prevEnd })
+    const prevExp = expenses.filter(exp => { const d = new Date(exp.date); return d >= prevStart && d <= prevEnd })
+    const prevTime = timeEntries.filter(te => { const d = new Date(te.date); return d >= prevStart && d <= prevEnd })
+
+    const prevRevenue = prevInv.reduce((s, inv) => s + (parseFloat(inv.amount) || 0), 0)
+    const prevExpenses = prevBills.reduce((s, b) => s + (parseFloat(b.amount) || 0), 0) + prevExp.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0)
+    const prevHours = prevTime.reduce((s, te) => s + (parseFloat(te.hours) || 0), 0)
+
+    const pct = (curr: number, prev: number) => prev > 0 ? ((curr - prev) / prev) * 100 : curr > 0 ? 100 : 0
+
+    return {
+      revenue: pct(metrics.totalRevenue, prevRevenue),
+      expenses: pct(metrics.totalExpenses, prevExpenses),
+      hours: pct(metrics.totalHours, prevHours),
+    }
+  }, [invoices, bills, expenses, timeEntries, periodRange, metrics])
 
   // ============ CHART DATA ============
   const revenueExpenseData = useMemo(() => {
@@ -344,7 +368,7 @@ export default function DashboardPage() {
       months[month].expenses += parseFloat(exp.amount) || 0
     })
     const monthOrder = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-    return Object.entries(months).map(([month, data]) => ({ month, revenue: data.revenue, expenses: data.expenses }))
+    return Object.entries(months).map(([month, data]) => ({ month, revenue: data.revenue, expenses: data.expenses, netIncome: data.revenue - data.expenses }))
       .sort((a, b) => monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month)).slice(-6)
   }, [filteredInvoices, filteredBills, filteredExpenses])
 
@@ -361,7 +385,7 @@ export default function DashboardPage() {
       else aging.days90plus += balance
     })
     return [
-      { name: 'Current', value: aging.current, color: CHART.teal },
+      { name: 'Current', value: aging.current, color: CHART.emerald },
       { name: '1-30 Days', value: aging.days1to30, color: CHART.amber },
       { name: '31-60 Days', value: aging.days31to60, color: CHART.orange },
       { name: '61-90 Days', value: aging.days61to90, color: CHART.red },
@@ -411,38 +435,63 @@ export default function DashboardPage() {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="flex flex-col items-center gap-3">
-          <RefreshCw size={24} className="text-teal-500 animate-spin" />
-          <p className="text-sm text-slate-500">Loading dashboard...</p>
+          <RefreshCw size={24} className="text-emerald-500 animate-spin" />
+          <p className="text-sm text-gray-500">Loading dashboard...</p>
         </div>
       </div>
     )
   }
 
   // ============ RENDER ============
+  const hasData = invoices.length > 0 || bills.length > 0 || expenses.length > 0 || timeEntries.length > 0
+
+  if (!hasData) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-gray-900">Dashboard</h1>
+          <p className="text-sm mt-0.5 text-gray-500">Financial overview</p>
+        </div>
+        <div className="bg-white border-2 border-dashed border-gray-200 rounded-xl p-16 text-center relative overflow-hidden">
+          <div className="absolute inset-0 opacity-[0.08]" style={{ backgroundImage: 'radial-gradient(circle, #9ca3af 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+          <div className="relative">
+            <Briefcase size={36} className="text-gray-300 mx-auto mb-4" />
+            <h2 className="text-lg font-semibold text-gray-700 mb-2">No financial data yet</h2>
+            <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">Connect QuickBooks or add your first invoice to populate your dashboard with live metrics, charts, and alerts.</p>
+            <div className="flex items-center justify-center gap-3">
+              <Link href="/settings" className="px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-500 transition-colors">Connect QuickBooks</Link>
+              <Link href="/invoices" className="px-5 py-2.5 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-lg hover:border-gray-300 transition-colors">Add Invoice</Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-white">Dashboard</h1>
-          <p className="text-sm mt-0.5 text-slate-500">Financial overview for {selectedYear}</p>
+          <h1 className="text-xl font-bold tracking-tight text-gray-900">Dashboard</h1>
+          <p className="text-sm mt-0.5 text-gray-500">Financial overview for {selectedYear}</p>
         </div>
 
         <div className="flex items-center gap-2">
           {/* Year */}
           <div className="relative">
             <select value={selectedYear} onChange={(e) => setSelectedYear(parseInt(e.target.value))} className={selectClass}>
-              {availableYears.map(year => <option key={year} value={year} className="bg-slate-900">{year}</option>)}
+              {availableYears.map(year => <option key={year} value={year} className="bg-white">{year}</option>)}
             </select>
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
           </div>
 
           {/* Period toggle — institutional pill */}
-          <div className="flex bg-slate-800/60 border border-slate-800/80 rounded-lg p-1">
+          <div className="flex bg-gray-100 border border-gray-200 rounded-lg p-0.5">
             {(['week', 'month', 'quarter', 'ytd'] as const).map((p) => (
               <button key={p} onClick={() => setPeriod(p)}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                  period === p ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  period === p ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
                 }`}>
                 {p === 'ytd' ? 'YTD' : p.charAt(0).toUpperCase() + p.slice(1)}
               </button>
@@ -451,16 +500,23 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* [FIX #8] Active date range indicator */}
+      <div className="flex items-center gap-2 -mt-3">
+        <span className="text-[11px] text-gray-400">
+          {periodRange.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} – {periodRange.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+        </span>
+      </div>
+
+      {/* KPI Cards — with trends (#1) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard label="Revenue" value={formatCurrency(metrics.totalRevenue)}
-          subValue={`Gross Margin: ${metrics.grossMargin.toFixed(1)}%`} icon={DollarSign} href="/invoices" accentColor="bg-teal-500" />
+          subValue={`Gross Margin: ${metrics.grossMargin.toFixed(1)}%`} trend={trends.revenue} trendLabel="vs prior" icon={DollarSign} href="/invoices" accentColor="bg-emerald-500" />
         <MetricCard label="Expenses" value={formatCurrency(metrics.totalExpenses)}
-          subValue={`Direct: ${formatCurrency(metrics.directCosts)} | OH: ${formatCurrency(metrics.overhead)}`} icon={Receipt} href="/expenses" accentColor="bg-rose-500" />
+          subValue={`Direct: ${formatCurrency(metrics.directCosts)} | OH: ${formatCurrency(metrics.overhead)}`} trend={trends.expenses} trendLabel="vs prior" icon={Receipt} href="/expenses" accentColor="bg-rose-500" />
         <MetricCard label="Outstanding AR" value={formatCurrency(metrics.totalAR)}
           subValue={`${metrics.openInvoicesCount} open invoices`} icon={FileText} href="/invoices" accentColor="bg-blue-500" />
         <MetricCard label="Team Hours" value={`${metrics.totalHours.toFixed(0)}h`}
-          subValue={`${metrics.billableRate.toFixed(0)}% billable`} icon={Users} href="/team" accentColor="bg-amber-500" />
+          subValue={`${metrics.billableRate.toFixed(0)}% billable`} trend={trends.hours} trendLabel="vs prior" icon={Users} href="/team" accentColor="bg-amber-500" />
       </div>
 
       {/* Charts Row 1 */}
@@ -471,22 +527,24 @@ export default function DashboardPage() {
             <div className="h-64">
               {revenueExpenseData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={revenueExpenseData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                  <ComposedChart data={revenueExpenseData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
                     <XAxis dataKey="month" tick={{ fill: CHART.axis, fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: CHART.axis, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-                    <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                    <Bar dataKey="revenue" name="Revenue" fill={CHART.teal} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="expenses" name="Expenses" fill={CHART.slate} radius={[4, 4, 0, 0]} />
-                  </BarChart>
+                    <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} cursor={{ fill: 'rgba(0,0,0,0.03)' }} />
+                    <Bar dataKey="revenue" name="Revenue" fill={CHART.emerald} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="expenses" name="Expenses" fill={CHART.gray} radius={[4, 4, 0, 0]} />
+                    <Line type="monotone" dataKey="netIncome" name="Net Income" stroke={CHART.amber} strokeWidth={2} dot={{ fill: CHART.amber, r: 3 }} />
+                  </ComposedChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-full text-slate-600 text-sm">No data for selected period</div>
+                <div className="flex items-center justify-center h-full text-gray-400 text-sm">No data for selected period</div>
               )}
             </div>
-            <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-800/60">
-              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: CHART.teal }} /><span className="text-xs text-slate-500">Revenue</span></div>
-              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: CHART.slate }} /><span className="text-xs text-slate-500">Expenses</span></div>
+            <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-200">
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: CHART.emerald }} /><span className="text-xs text-gray-500">Revenue</span></div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: CHART.gray }} /><span className="text-xs text-gray-500">Expenses</span></div>
+              <div className="flex items-center gap-2"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART.amber }} /><span className="text-xs text-gray-500">Net Income</span></div>
             </div>
           </Section>
         </div>
@@ -497,34 +555,70 @@ export default function DashboardPage() {
             <div className="flex items-center gap-5">
               <HealthRing score={metrics.healthScore} size={90} />
               <div className="flex-1 space-y-2">
-                <div className="flex justify-between text-sm"><span className="text-slate-400">Gross Margin</span><span className="font-medium text-white">{metrics.grossMargin.toFixed(1)}%</span></div>
-                <div className="flex justify-between text-sm"><span className="text-slate-400">Net Margin</span><span className="font-medium text-white">{metrics.netMargin.toFixed(1)}%</span></div>
-                <div className="flex justify-between text-sm"><span className="text-slate-400">Utilization</span><span className="font-medium text-white">{metrics.billableRate.toFixed(0)}%</span></div>
+                <div className="flex justify-between text-sm"><span className="text-gray-500">Gross Margin</span><span className="font-medium text-gray-900">{metrics.grossMargin.toFixed(1)}%</span></div>
+                <div className="flex justify-between text-sm"><span className="text-gray-500">Net Margin</span><span className="font-medium text-gray-900">{metrics.netMargin.toFixed(1)}%</span></div>
+                <div className="flex justify-between text-sm"><span className="text-gray-500">Utilization</span><span className="font-medium text-gray-900">{metrics.billableRate.toFixed(0)}%</span></div>
               </div>
+            </div>
+            {/* [FIX #3] Factor breakdown bars */}
+            <div className="mt-4 pt-4 border-t border-gray-100 space-y-2.5">
+              {[
+                { label: 'AR Health', score: metrics.arScore, weight: '30%' },
+                { label: 'Margin', score: metrics.marginScore, weight: '40%' },
+                { label: 'Utilization', score: metrics.utilizationScore, weight: '30%' },
+              ].map(f => (
+                <div key={f.label} className="flex items-center gap-3">
+                  <span className="text-[11px] text-gray-400 w-16 shrink-0">{f.label}</span>
+                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(f.score, 100)}%`, backgroundColor: f.score >= 70 ? CHART.emerald : f.score >= 40 ? CHART.amber : CHART.red }} />
+                  </div>
+                  <span className="text-[11px] font-semibold text-gray-600 tabular-nums w-8 text-right">{Math.round(f.score)}</span>
+                </div>
+              ))}
             </div>
           </Section>
 
           <Section title="AR Aging">
             {arAgingData.length > 0 ? (
               <div className="space-y-3">
+                {/* [FIX #4] Stacked proportion bar */}
+                <div className="flex w-full h-3 rounded-full overflow-hidden bg-gray-100">
+                  {arAgingData.map((item, i) => (
+                    <div key={i} className="h-full transition-all" style={{ width: `${(item.value / metrics.totalAR) * 100}%`, backgroundColor: item.color }} />
+                  ))}
+                </div>
+                {/* [FIX #4] Overdue warning */}
+                {(() => {
+                  const aged60 = arAgingData.filter(d => d.name === '31-60 Days' || d.name === '61-90 Days' || d.name === '90+ Days').reduce((s, d) => s + d.value, 0)
+                  const pct60 = metrics.totalAR > 0 ? (aged60 / metrics.totalAR) * 100 : 0
+                  return pct60 > 30 ? (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                      <AlertTriangle size={13} className="text-amber-600 shrink-0" />
+                      <span className="text-[11px] text-amber-700">{pct60.toFixed(0)}% of AR is past 60 days</span>
+                    </div>
+                  ) : null
+                })()}
                 {arAgingData.map((item, i) => (
                   <div key={i} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                      <span className="text-sm text-slate-300">{item.name}</span>
+                      <span className="text-sm text-gray-600">{item.name}</span>
                     </div>
-                    <span className="text-sm font-semibold text-white tabular-nums">{formatCurrency(item.value)}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-gray-400 tabular-nums">{metrics.totalAR > 0 ? ((item.value / metrics.totalAR) * 100).toFixed(0) : 0}%</span>
+                      <span className="text-sm font-semibold text-gray-900 tabular-nums">{formatCurrency(item.value)}</span>
+                    </div>
                   </div>
                 ))}
-                <div className="pt-3 mt-1 border-t border-slate-800/60">
+                <div className="pt-3 mt-1 border-t border-gray-200">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-500">Total AR</span>
-                    <span className="text-sm font-bold text-white tabular-nums">{formatCurrency(metrics.totalAR)}</span>
+                    <span className="text-sm font-medium text-gray-500">Total AR</span>
+                    <span className="text-sm font-bold text-gray-900 tabular-nums">{formatCurrency(metrics.totalAR)}</span>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-20 text-slate-600 text-sm">No outstanding AR</div>
+              <div className="flex items-center justify-center h-20 text-gray-400 text-sm">No outstanding AR</div>
             )}
           </Section>
         </div>
@@ -538,16 +632,13 @@ export default function DashboardPage() {
             {teamUtilization.length > 0 ? (
               <div>
                 {teamUtilization.map((member, i) => <TeamRow key={i} name={member.name} hours={member.hours} />)}
-                <div className="flex items-center justify-between pt-3 mt-2 border-t border-slate-800/60">
-                  <span className="text-xs text-slate-600">Team Average</span>
-                  <span className="text-sm font-medium text-slate-300">
-                    {(teamUtilization.reduce((sum, m) => sum + m.hours, 0) / teamUtilization.length).toFixed(0)}h
-                    <span className="text-slate-600 font-normal ml-1">/ 40h</span>
-                  </span>
+                <div className="flex items-center justify-between pt-3 mt-2 border-t border-gray-200">
+                  <span className="text-xs text-gray-400">Team avg {(teamUtilization.reduce((sum, m) => sum + m.hours, 0) / teamUtilization.length).toFixed(0)}h / 40h target</span>
+                  <span className="text-[10px] text-gray-400">{teamUtilization.length} member{teamUtilization.length !== 1 ? 's' : ''}</span>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-full text-slate-600 text-sm py-8">No time entries</div>
+              <div className="flex items-center justify-center h-full text-gray-400 text-sm py-8">No time entries</div>
             )}
           </Section>
         </div>
@@ -555,27 +646,34 @@ export default function DashboardPage() {
         {/* Cash Forecast */}
         <div className="col-span-12 lg:col-span-6">
           <Section title="90-Day Cash Forecast" subtitle="Projected cash position">
+            {/* [FIX #5] Breach warning */}
+            {cashForecastData.some(w => w.projected < 50000) && (
+              <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-rose-50 border border-rose-200 rounded-lg">
+                <AlertTriangle size={13} className="text-rose-600 shrink-0" />
+                <span className="text-[11px] text-rose-700">Cash drops below $50K threshold during forecast period</span>
+              </div>
+            )}
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={cashForecastData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                   <defs>
                     <linearGradient id="cashGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={CHART.teal} stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor={CHART.teal} stopOpacity={0}/>
+                      <stop offset="5%" stopColor={CHART.emerald} stopOpacity={0.15}/>
+                      <stop offset="95%" stopColor={CHART.emerald} stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
                   <XAxis dataKey="week" tick={{ fill: CHART.axis, fontSize: 10 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: CHART.axis, fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-                  <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }} />
-                  <ReferenceLine y={50000} stroke={CHART.amber} strokeDasharray="5 5" strokeWidth={1} />
-                  <Area type="monotone" dataKey="projected" name="Projected" stroke={CHART.teal} strokeWidth={2} fill="url(#cashGradient)" />
+                  <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} cursor={{ stroke: 'rgba(0,0,0,0.06)', strokeWidth: 1 }} />
+                  <ReferenceLine y={50000} stroke={CHART.amber} strokeDasharray="5 5" strokeWidth={1} label={{ value: 'Min $50K', position: 'right', fill: CHART.amber, fontSize: 10 }} />
+                  <Area type="monotone" dataKey="projected" name="Projected" stroke={CHART.emerald} strokeWidth={2} fill="url(#cashGradient)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-slate-800/60">
-              <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART.teal }} /><span className="text-xs text-slate-600">Projected</span></div>
-              <div className="flex items-center gap-1.5"><div className="w-3 border-t border-dashed" style={{ borderColor: CHART.amber }} /><span className="text-xs text-slate-600">Threshold</span></div>
+            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-gray-200">
+              <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART.emerald }} /><span className="text-xs text-gray-400">Projected</span></div>
+              <div className="flex items-center gap-1.5"><div className="w-3 border-t border-dashed" style={{ borderColor: CHART.amber }} /><span className="text-xs text-gray-400">Min Cash</span></div>
             </div>
           </Section>
         </div>
@@ -597,31 +695,36 @@ export default function DashboardPage() {
           <Section title="Open Invoices" badge={metrics.openInvoicesCount} action={{ label: 'View All', href: '/invoices' }} noPadding>
             {recentInvoices.length > 0 ? (
               <div>
-                <div className="flex items-center px-5 py-2 bg-slate-800/20 border-b border-slate-800/60">
-                  <div className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-slate-600">Client</div>
-                  <div className="w-24 text-[11px] font-semibold uppercase tracking-wider text-slate-600">Invoice</div>
-                  <div className="w-24 text-[11px] font-semibold uppercase tracking-wider text-slate-600">Due</div>
-                  <div className="w-28 text-[11px] font-semibold uppercase tracking-wider text-right text-slate-600">Balance</div>
-                  <div className="w-24 text-[11px] font-semibold uppercase tracking-wider text-right text-slate-600">Status</div>
+                {/* [FIX #6] Summary strip */}
+                <div className="flex items-center gap-4 px-5 py-2.5 bg-gray-50/50 border-b border-gray-200">
+                  <span className="text-xs text-gray-500">Total: <span className="font-semibold text-gray-900">{formatCurrency(metrics.totalAR)}</span></span>
+                  {metrics.overdueAR > 0 && <span className="text-xs text-rose-600">Overdue: <span className="font-semibold">{formatCurrency(metrics.overdueAR)}</span></span>}
+                </div>
+                <div className="flex items-center px-5 py-2 border-b border-gray-200">
+                  <div className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Client</div>
+                  <div className="w-24 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Invoice</div>
+                  <div className="w-24 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Due</div>
+                  <div className="w-28 text-[11px] font-semibold uppercase tracking-wider text-right text-gray-400">Balance</div>
+                  <div className="w-24 text-[11px] font-semibold uppercase tracking-wider text-right text-gray-400">Status</div>
                 </div>
                 {recentInvoices.map((inv) => (
-                  <div key={inv.id} className="flex items-center px-5 py-3 border-b border-slate-800/40 hover:bg-slate-800/20 transition-colors">
-                    <div className="flex-1 text-sm font-medium truncate text-slate-300">{inv.client || '—'}</div>
-                    <div className="w-24 text-sm text-slate-500">{inv.invoice_number || 'Draft'}</div>
-                    <div className="w-24 text-sm text-slate-500">{formatDate(inv.due_date)}</div>
-                    <div className="w-28 text-sm font-medium text-right tabular-nums text-white">{formatCurrency(parseFloat(inv.balance_due) || 0)}</div>
+                  <div key={inv.id} className="flex items-center px-5 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                    <div className="flex-1 text-sm font-medium truncate text-gray-600">{inv.client || '—'}</div>
+                    <div className="w-24 text-sm text-gray-500">{inv.invoice_number || 'Draft'}</div>
+                    <div className="w-24 text-sm text-gray-500">{formatDate(inv.due_date)}</div>
+                    <div className="w-28 text-sm font-medium text-right tabular-nums text-gray-900">{formatCurrency(parseFloat(inv.balance_due) || 0)}</div>
                     <div className="w-24 text-right">
                       {inv.daysOverdue > 0 ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wide bg-rose-500/10 text-rose-400 border border-rose-500/20">{inv.daysOverdue}d overdue</span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wide bg-rose-50 text-rose-600 border border-rose-200">{inv.daysOverdue}d overdue</span>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wide bg-slate-800/50 text-slate-400 border border-slate-800/80">Current</span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wide bg-gray-100 text-gray-500 border border-gray-200">Current</span>
                       )}
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="flex items-center justify-center h-full text-slate-600 text-sm py-12">No open invoices</div>
+              <div className="flex items-center justify-center h-full text-gray-400 text-sm py-12">No open invoices</div>
             )}
           </Section>
         </div>
