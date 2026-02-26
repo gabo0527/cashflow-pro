@@ -1169,8 +1169,8 @@ export default function SageAssistantPage() {
   if (dataLoading) return (
     <div className="flex items-center justify-center h-[calc(100vh-80px)] bg-[#f4f5f7]">
       <div className="text-center">
-        <div className="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto mb-4">
-          <SageLogo size={36} className="animate-pulse" />
+        <div className="mx-auto mb-4">
+          <SageLogo size={64} className="animate-pulse" />
         </div>
         <p className="text-sm text-gray-400">Loading financial data...</p>
       </div>
@@ -1219,7 +1219,7 @@ export default function SageAssistantPage() {
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-white">
           <div className="flex items-center gap-3">
             {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors mr-1" title="Open sidebar"><PanelLeft size={16} /></button>}
-            <div className="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center"><SageLogo size={24} /></div>
+            <SageLogo size={32} />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-sm font-semibold text-gray-900">Sage</h1>
@@ -1275,10 +1275,10 @@ export default function SageAssistantPage() {
           {!hasMessages ? (
             /* ===== WELCOME DASHBOARD ===== */
             <div className="h-full flex flex-col px-6 py-8 overflow-y-auto">
-              <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col">
+              <div className="max-w-4xl mx-auto w-full flex flex-col">
                 {/* [FIX #2] Compact hero — inline logo + heading */}
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center flex-shrink-0"><SageLogo size={30} /></div>
+                  <SageLogo size={56} className="flex-shrink-0" />
                   <div>
                     <h1 className="text-xl font-bold text-gray-900">Welcome back, Gabriel</h1>
                     <p className="text-sm text-gray-400">Here is your financial snapshot. Ask me anything about your business.</p>
@@ -1313,12 +1313,12 @@ export default function SageAssistantPage() {
                 </div>
 
                 {/* Input (welcome) */}
-                <div className="mt-auto w-full max-w-3xl mx-auto">
+                <div className="w-full max-w-3xl mx-auto mt-4">
                   <div className="relative">
-                    <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyPress} placeholder={smartPlaceholder} rows={1} className="w-full bg-white border border-gray-200 rounded-xl pl-5 pr-28 py-4 text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/20 text-sm transition-all shadow-sm" style={{ minHeight: "56px", maxHeight: "200px" }} />
+                    <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyPress} placeholder={smartPlaceholder} rows={2} className="w-full bg-white border border-gray-200 rounded-2xl pl-5 pr-28 py-5 text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 text-[15px] transition-all shadow-sm" style={{ minHeight: "72px", maxHeight: "200px" }} />
                     <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
                       <button onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-md hover:bg-gray-50" title="Attach file"><Paperclip size={16} /></button>
-                      <button onClick={() => sendMessage(input)} disabled={!input.trim() || loading} className="w-9 h-9 rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-100 disabled:cursor-not-allowed flex items-center justify-center transition-colors">
+                      <button onClick={() => sendMessage(input)} disabled={!input.trim() || loading} className="w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-100 disabled:cursor-not-allowed flex items-center justify-center transition-colors">
                         {loading ? <RefreshCw size={16} className="text-white animate-spin" /> : <Send size={16} className="text-white" />}
                       </button>
                     </div>
@@ -1369,10 +1369,10 @@ export default function SageAssistantPage() {
               </div>
             )}
             <div className="max-w-4xl mx-auto relative">
-              <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyPress} placeholder="Ask a follow-up..." rows={1} className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-5 pr-28 py-3.5 text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/20 text-sm transition-all" style={{ minHeight: "52px", maxHeight: "200px" }} />
+              <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyPress} placeholder="Ask a follow-up..." rows={2} className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-5 pr-28 py-4 text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 text-[15px] transition-all" style={{ minHeight: "64px", maxHeight: "200px" }} />
               <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
                 <button onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-md hover:bg-gray-100" title="Attach file"><Paperclip size={16} /></button>
-                <button onClick={() => sendMessage(input)} disabled={(!input.trim() && attachments.length === 0) || loading} className="w-9 h-9 rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-100 disabled:cursor-not-allowed flex items-center justify-center transition-colors">
+                <button onClick={() => sendMessage(input)} disabled={(!input.trim() && attachments.length === 0) || loading} className="w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-100 disabled:cursor-not-allowed flex items-center justify-center transition-colors">
                   {loading ? <RefreshCw size={16} className="text-white animate-spin" /> : <Send size={16} className="text-white" />}
                 </button>
               </div>
