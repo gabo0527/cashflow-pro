@@ -23,14 +23,13 @@ const supabase = createClient(
 
 // ============ INSTITUTIONAL THEME ============
 const CHART_COLORS = {
-  teal: '#0d9488',
+  emerald: '#10b981',
   blue: '#3b82f6',
-  slate: '#64748b',
+  gray: '#6b7280',
   rose: '#f43f5e',
   amber: '#f59e0b',
-  emerald: '#10b981',
-  grid: 'rgba(255,255,255,0.04)',
-  axis: '#475569',
+  grid: '#f3f4f6',
+  axis: '#6b7280',
 }
 
 // ============ UTILITIES ============
@@ -53,31 +52,31 @@ const formatDate = (dateStr: string): string => {
 
 // Left-accent MetricCard (institutional)
 function MetricCard({ 
-  label, value, subValue, trend, trendLabel, icon: Icon, href, accentColor = 'bg-teal-500'
+  label, value, subValue, trend, trendLabel, icon: Icon, href, accentColor = 'bg-emerald-500'
 }: { 
   label: string; value: string; subValue?: string; trend?: number; trendLabel?: string
   icon: any; href?: string; accentColor?: string
 }) {
   const content = (
-    <div className="bg-[#111827] border border-slate-800/80 rounded-xl overflow-hidden transition-all hover:border-slate-700/80 group">
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:border-gray-300 hover:shadow-md group">
       <div className="flex">
         <div className={`w-1 ${accentColor} shrink-0`} />
         <div className="flex-1 p-5">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
-              <p className="text-2xl font-semibold tracking-tight text-white tabular-nums">{value}</p>
-              {subValue && <p className="text-xs text-slate-500">{subValue}</p>}
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">{label}</p>
+              <p className="text-2xl font-semibold tracking-tight text-gray-900 tabular-nums">{value}</p>
+              {subValue && <p className="text-xs text-gray-500">{subValue}</p>}
               {trend !== undefined && (
                 <div className="flex items-center gap-1.5 pt-0.5">
-                  {trend >= 0 ? <ArrowUpRight size={13} className="text-emerald-400" /> : <ArrowDownRight size={13} className="text-rose-400" />}
-                  <span className={`text-xs font-medium tabular-nums ${trend >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{Math.abs(trend).toFixed(1)}%</span>
-                  {trendLabel && <span className="text-xs text-slate-600">{trendLabel}</span>}
+                  {trend >= 0 ? <ArrowUpRight size={13} className="text-emerald-600" /> : <ArrowDownRight size={13} className="text-rose-600" />}
+                  <span className={`text-xs font-medium tabular-nums ${trend >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{Math.abs(trend).toFixed(1)}%</span>
+                  {trendLabel && <span className="text-xs text-gray-400">{trendLabel}</span>}
                 </div>
               )}
             </div>
-            <div className="p-2 rounded-lg bg-slate-800/40 group-hover:bg-slate-800/60 transition-colors">
-              <Icon size={18} className="text-slate-500" strokeWidth={1.5} />
+            <div className="p-2 rounded-lg bg-gray-50 group-hover:bg-gray-100 transition-colors">
+              <Icon size={18} className="text-gray-400" strokeWidth={1.5} />
             </div>
           </div>
         </div>
@@ -98,34 +97,34 @@ function Section({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
 
   return (
-    <div className="bg-[#111827] border border-slate-800/80 rounded-xl overflow-hidden">
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:shadow-md">
       <div 
-        className={`flex items-center justify-between px-5 py-4 border-b border-slate-800/60 ${collapsible ? 'cursor-pointer hover:bg-slate-800/20 transition-colors' : ''}`}
+        className={`flex items-center justify-between px-5 py-4 border-b border-gray-200 ${collapsible ? 'cursor-pointer hover:bg-gray-50 transition-colors' : ''}`}
         onClick={collapsible ? () => setIsExpanded(!isExpanded) : undefined}
       >
         <div className="flex items-center gap-3">
           {collapsible && (
-            <div className="text-slate-500">
+            <div className="text-gray-500">
               {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             </div>
           )}
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-white">{title}</h3>
+              <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
               {badge !== undefined && (
-                <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded-md bg-slate-800/60 text-slate-400 border border-slate-800/80">{badge}</span>
+                <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded-md bg-gray-100 text-gray-500 border border-gray-200">{badge}</span>
               )}
             </div>
-            {subtitle && <p className="text-xs mt-0.5 text-slate-500">{subtitle}</p>}
+            {subtitle && <p className="text-xs mt-0.5 text-gray-500">{subtitle}</p>}
           </div>
         </div>
         {action && !collapsible && (
           action.onClick ? (
-            <button onClick={action.onClick} className="text-xs font-medium text-slate-500 hover:text-teal-400 flex items-center gap-0.5 transition-colors">
+            <button onClick={action.onClick} className="text-xs font-medium text-gray-500 hover:text-emerald-600 flex items-center gap-0.5 transition-colors">
               {action.label}<ChevronRight size={14} />
             </button>
           ) : (
-            <Link href={action.href || '#'} className="text-xs font-medium text-slate-500 hover:text-teal-400 flex items-center gap-0.5 transition-colors">
+            <Link href={action.href || '#'} className="text-xs font-medium text-gray-500 hover:text-emerald-600 flex items-center gap-0.5 transition-colors">
               {action.label}<ChevronRight size={14} />
             </Link>
           )
@@ -143,16 +142,17 @@ function PLRow({ label, value, percentage, type, indent = false, bold = false }:
   label: string; value: number; percentage?: number
   type: 'positive' | 'negative' | 'neutral' | 'muted'; indent?: boolean; bold?: boolean
 }) {
-  const colorMap = { positive: 'text-emerald-400', negative: 'text-rose-400', neutral: 'text-white', muted: 'text-slate-400' }
-  const barColorMap = { positive: CHART_COLORS.teal, negative: CHART_COLORS.rose, neutral: CHART_COLORS.slate, muted: 'rgba(255,255,255,0.06)' }
+  const colorMap = { positive: 'text-emerald-600', negative: 'text-rose-600', neutral: 'text-gray-900', muted: 'text-gray-500' }
+  const barColorMap = { positive: CHART_COLORS.emerald, negative: CHART_COLORS.rose, neutral: CHART_COLORS.gray, muted: '#e5e7eb' }
+  const isSubtotal = bold && (label === 'Gross Profit' || label === 'Net Profit')
 
   return (
-    <div className={`flex items-center justify-between py-3 ${indent ? 'pl-5' : ''}`}>
+    <div className={`flex items-center justify-between py-3 ${indent ? 'pl-5' : ''} ${isSubtotal ? 'border-l-[3px] border-l-emerald-500 bg-emerald-50/50 pl-4 -mx-5 px-5' : ''}`}>
       <div className="flex items-center gap-4 flex-1 min-w-0">
-        <span className={`text-sm ${bold ? 'font-semibold text-white' : indent ? 'text-slate-400' : 'font-medium text-slate-300'}`}>{label}</span>
+        <span className={`text-sm ${bold ? 'font-semibold text-gray-900' : indent ? 'text-gray-500' : 'font-medium text-gray-600'}`}>{label}</span>
         {percentage !== undefined && (
           <div className="flex-1 max-w-32 hidden sm:block">
-            <div className="h-1.5 bg-slate-800/60 rounded-full overflow-hidden">
+            <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
               <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(Math.abs(percentage), 100)}%`, backgroundColor: barColorMap[type] }} />
             </div>
           </div>
@@ -161,7 +161,7 @@ function PLRow({ label, value, percentage, type, indent = false, bold = false }:
       <div className="flex items-center gap-3 shrink-0">
         <span className={`text-sm tabular-nums ${bold ? 'font-bold' : 'font-semibold'} ${colorMap[type]}`}>{formatCurrency(value)}</span>
         {percentage !== undefined && (
-          <span className="text-xs w-12 text-right tabular-nums text-slate-600">{percentage.toFixed(1)}%</span>
+          <span className="text-xs w-12 text-right tabular-nums text-gray-400">{percentage.toFixed(1)}%</span>
         )}
       </div>
     </div>
@@ -172,8 +172,8 @@ function PLRow({ label, value, percentage, type, indent = false, bold = false }:
 const ChartTooltip = ({ active, payload, label, formatter }: any) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-[#111827] border border-slate-800/80 rounded-lg px-3 py-2 shadow-xl">
-      <p className="text-[11px] text-slate-500 mb-1">{label}</p>
+    <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-lg">
+      <p className="text-[11px] text-gray-500 mb-1">{label}</p>
       {payload.map((entry: any, i: number) => (
         <p key={i} className="text-sm font-medium" style={{ color: entry.color }}>
           {entry.name}: {formatter ? formatter(entry.value) : entry.value}
@@ -184,8 +184,8 @@ const ChartTooltip = ({ active, payload, label, formatter }: any) => {
 }
 
 // Styled selects
-const selectClass = "appearance-none bg-slate-800/60 border border-slate-800/80 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 cursor-pointer transition-colors"
-const inputClass = "w-full px-3.5 py-2.5 bg-slate-800/60 border border-slate-800/80 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 transition-colors"
+const selectClass = "appearance-none bg-white border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer transition-colors"
+const inputClass = "w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors"
 
 // ============ MAIN COMPONENT ============
 export default function CashFlowPage() {
@@ -201,6 +201,7 @@ export default function CashFlowPage() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [selectedMonth, setSelectedMonth] = useState('Full Year')
   const [showAllTransactions, setShowAllTransactions] = useState(false)
+  const [txFilter, setTxFilter] = useState<'all' | 'inflows' | 'outflows'>('all')
   const [showAddModal, setShowAddModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [newTransaction, setNewTransaction] = useState({
@@ -316,19 +317,29 @@ export default function CashFlowPage() {
     const periodOutflows = Math.abs(filteredTransactions.filter(tx => (parseFloat(tx.amount) || 0) < 0).reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0))
     const netCashFlow = periodInflows - periodOutflows
 
+    const avgMonthlyBurn = periodRange.isFullYear
+      ? (directCosts + overhead) / Math.max(new Date().getMonth() + 1, 1)
+      : directCosts + overhead
+    const runway = avgMonthlyBurn > 0 ? cashPosition / avgMonthlyBurn : Infinity
+
+    const dso = metrics.revenue > 0 ? Math.round((metrics.totalAR / (metrics.revenue / (periodRange.isFullYear ? 365 : 30))) * 1) : 0
+    const dpo = metrics.directCosts > 0 ? Math.round((metrics.totalAP / (metrics.directCosts / (periodRange.isFullYear ? 365 : 30))) * 1) : 0
+
     return {
       cashPosition, totalAR, overdueAR, totalAP, netWorkingCapital,
       revenue, directCosts, overhead, grossProfit, grossMargin, netProfit, netMargin, revenueChange,
       periodInflows, periodOutflows, netCashFlow,
-      openInvoicesCount: openInvoices.length, openBillsCount: openBills.length
+      openInvoicesCount: openInvoices.length, openBillsCount: openBills.length,
+      runway, avgMonthlyBurn, dso, dpo
     }
   }, [companySettings, transactions, invoices, bills, filteredInvoices, filteredBills, filteredExpenses, filteredTransactions, periodRange, selectedYear])
 
   // ============ CHART DATA ============
   const cashFlowTrendData = useMemo(() => {
-    const data: { month: string; inflows: number; outflows: number; net: number }[] = []
+    const data: { month: string; inflows: number; outflows: number; net: number; cumulative: number }[] = []
     const monthCount = periodRange.isFullYear ? 12 : 6
     const startMonth = periodRange.isFullYear ? 0 : periodRange.monthIndex - 5
+    let cumulative = parseFloat(companySettings?.beginning_balance) || 0
 
     for (let i = 0; i < monthCount; i++) {
       const monthIdx = periodRange.isFullYear ? i : startMonth + i
@@ -340,10 +351,11 @@ export default function CashFlowPage() {
       const monthTx = transactions.filter(tx => { const txDate = new Date(tx.date); return txDate >= monthStart && txDate <= monthEnd })
       const inflows = monthTx.filter(tx => (parseFloat(tx.amount) || 0) > 0).reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0)
       const outflows = Math.abs(monthTx.filter(tx => (parseFloat(tx.amount) || 0) < 0).reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0))
-      data.push({ month: monthName, inflows, outflows, net: inflows - outflows })
+      cumulative += (inflows - outflows)
+      data.push({ month: monthName, inflows, outflows, net: inflows - outflows, cumulative })
     }
     return data
-  }, [transactions, selectedYear, periodRange])
+  }, [transactions, selectedYear, periodRange, companySettings])
 
   const revenueVsCostsData = useMemo(() => {
     const data: { month: string; revenue: number; directCosts: number; overhead: number }[] = []
@@ -372,7 +384,7 @@ export default function CashFlowPage() {
       const name = project?.name || 'Unassigned'
       projectRevenue[name] = (projectRevenue[name] || 0) + (parseFloat(inv.amount) || 0)
     })
-    const colors = [CHART_COLORS.teal, CHART_COLORS.blue, CHART_COLORS.amber, CHART_COLORS.slate, '#94a3b8']
+    const colors = [CHART_COLORS.emerald, CHART_COLORS.blue, CHART_COLORS.amber, CHART_COLORS.gray, '#94a3b8']
     return Object.entries(projectRevenue).map(([name, value], i) => ({ name, value, color: colors[i % colors.length] })).filter(p => p.value > 0).sort((a, b) => b.value - a.value).slice(0, 5)
   }, [filteredInvoices, projects])
 
@@ -406,9 +418,12 @@ export default function CashFlowPage() {
   }, [bills])
 
   const displayTransactions = useMemo(() => {
-    const sorted = [...filteredTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    let filtered = [...filteredTransactions]
+    if (txFilter === 'inflows') filtered = filtered.filter(tx => (parseFloat(tx.amount) || 0) > 0)
+    if (txFilter === 'outflows') filtered = filtered.filter(tx => (parseFloat(tx.amount) || 0) < 0)
+    const sorted = filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     return showAllTransactions ? sorted : sorted.slice(0, 8)
-  }, [filteredTransactions, showAllTransactions])
+  }, [filteredTransactions, showAllTransactions, txFilter])
 
   // Handle adding new transaction
   const handleAddTransaction = async () => {
@@ -438,8 +453,8 @@ export default function CashFlowPage() {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="flex flex-col items-center gap-3">
-          <RefreshCw size={24} className="text-teal-500 animate-spin" />
-          <p className="text-sm text-slate-500">Loading cash flow...</p>
+          <RefreshCw size={24} className="text-emerald-500 animate-spin" />
+          <p className="text-sm text-gray-500">Loading cash flow...</p>
         </div>
       </div>
     )
@@ -451,25 +466,25 @@ export default function CashFlowPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-white">Cash Flow</h1>
-          <p className="text-sm mt-1 text-slate-500">Cash position, working capital & profitability</p>
+          <h1 className="text-xl font-bold tracking-tight text-gray-900">Cash Flow</h1>
+          <p className="text-sm mt-1 text-gray-500">Cash position, working capital & profitability</p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Year selector */}
           <div className="relative">
             <select value={selectedYear} onChange={(e) => setSelectedYear(parseInt(e.target.value))} className={selectClass}>
-              {years.map(y => <option key={y} value={y} className="bg-slate-900">{y}</option>)}
+              {years.map(y => <option key={y} value={y} className="bg-white">{y}</option>)}
             </select>
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
           </div>
 
           {/* Month selector */}
           <div className="relative">
             <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className={selectClass}>
-              {months.map(m => <option key={m} value={m} className="bg-slate-900">{m}</option>)}
+              {months.map(m => <option key={m} value={m} className="bg-white">{m}</option>)}
             </select>
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
           </div>
 
           {/* QBO Sync Button (real) */}
@@ -479,24 +494,33 @@ export default function CashFlowPage() {
 
           {/* Add Entry */}
           <button onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-500 transition-colors">
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-500 transition-colors">
             <Plus size={14} />
             Add Entry
           </button>
         </div>
       </div>
 
+      {/* [FIX #7] Active period display */}
+      <div className="flex items-center gap-2 -mt-3">
+        <span className="text-[11px] text-gray-400">
+          {periodRange.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} – {periodRange.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+        </span>
+      </div>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard label="Cash Position" value={formatCurrency(metrics.cashPosition)} subValue="Available cash" icon={Wallet}
+        <MetricCard label="Cash Position" value={formatCurrency(metrics.cashPosition)}
+          subValue={metrics.runway !== Infinity ? `~${metrics.runway.toFixed(1)} months runway` : 'Available cash'} icon={Wallet}
           accentColor={metrics.cashPosition >= 0 ? 'bg-emerald-500' : 'bg-rose-500'} />
         <MetricCard label="AR Outstanding" value={formatCurrency(metrics.totalAR)} subValue={`${metrics.openInvoicesCount} open invoices`}
           icon={FileText} href="/invoices" accentColor="bg-blue-500" />
         <MetricCard label="AP Outstanding" value={formatCurrency(metrics.totalAP)} subValue={`${metrics.openBillsCount} unpaid bills`}
           icon={Receipt} href="/invoices" accentColor="bg-amber-500" />
-        <MetricCard label="Net Working Capital" value={formatCurrency(metrics.netWorkingCapital)} subValue="AR - AP"
-          trend={metrics.revenueChange} trendLabel="vs last month" icon={TrendingUp}
-          accentColor={metrics.netWorkingCapital >= 0 ? 'bg-teal-500' : 'bg-rose-500'} />
+        <MetricCard label="Net Working Capital" value={formatCurrency(metrics.netWorkingCapital)}
+          subValue={`DSO: ${metrics.dso}d · DPO: ${metrics.dpo}d`}
+          trend={metrics.revenueChange} trendLabel="rev vs prior" icon={TrendingUp}
+          accentColor={metrics.netWorkingCapital >= 0 ? 'bg-emerald-500' : 'bg-rose-500'} />
       </div>
 
       {/* Charts */}
@@ -507,24 +531,33 @@ export default function CashFlowPage() {
             <div className="h-64">
               {cashFlowTrendData.some(d => d.inflows > 0 || d.outflows > 0) ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={cashFlowTrendData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                  <ComposedChart data={cashFlowTrendData} margin={{ top: 10, right: 40, left: -15, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="cumGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={CHART_COLORS.emerald} stopOpacity={0.08} />
+                        <stop offset="95%" stopColor={CHART_COLORS.emerald} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} vertical={false} />
                     <XAxis dataKey="month" tick={{ fill: CHART_COLORS.axis, fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: CHART_COLORS.axis, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-                    <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                    <Bar dataKey="inflows" name="Inflows" fill={CHART_COLORS.teal} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="outflows" name="Outflows" fill={CHART_COLORS.rose} radius={[4, 4, 0, 0]} />
-                    <Line type="monotone" dataKey="net" name="Net" stroke={CHART_COLORS.blue} strokeWidth={2} dot={{ fill: CHART_COLORS.blue, strokeWidth: 0, r: 4 }} />
+                    <YAxis yAxisId="left" tick={{ fill: CHART_COLORS.axis, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fill: CHART_COLORS.axis, fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                    <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} cursor={{ fill: 'rgba(0,0,0,0.03)' }} />
+                    <Bar yAxisId="left" dataKey="inflows" name="Inflows" fill={CHART_COLORS.emerald} radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="outflows" name="Outflows" fill={CHART_COLORS.rose} radius={[4, 4, 0, 0]} />
+                    <Line yAxisId="left" type="monotone" dataKey="net" name="Net" stroke={CHART_COLORS.blue} strokeWidth={2} dot={{ fill: CHART_COLORS.blue, strokeWidth: 0, r: 3 }} />
+                    <Area yAxisId="right" type="monotone" dataKey="cumulative" name="Cumulative" stroke={CHART_COLORS.gray} strokeWidth={1} strokeDasharray="4 4" fill="url(#cumGrad)" dot={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-full text-slate-600 text-sm">No transaction data available</div>
+                <div className="flex items-center justify-center h-full text-gray-400 text-sm">No transaction data available</div>
               )}
             </div>
-            <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-800/60">
-              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: CHART_COLORS.teal }} /><span className="text-xs text-slate-500">Inflows</span></div>
-              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: CHART_COLORS.rose }} /><span className="text-xs text-slate-500">Outflows</span></div>
-              <div className="flex items-center gap-2"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.blue }} /><span className="text-xs text-slate-500">Net</span></div>
+            <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-200">
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: CHART_COLORS.emerald }} /><span className="text-xs text-gray-500">Inflows</span></div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: CHART_COLORS.rose }} /><span className="text-xs text-gray-500">Outflows</span></div>
+              <div className="flex items-center gap-2"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.blue }} /><span className="text-xs text-gray-500">Net</span></div>
+              <div className="flex items-center gap-2"><div className="w-3 border-t border-dashed" style={{ borderColor: CHART_COLORS.gray }} /><span className="text-xs text-gray-500">Cumulative</span></div>
             </div>
           </Section>
         </div>
@@ -539,20 +572,20 @@ export default function CashFlowPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} vertical={false} />
                     <XAxis dataKey="month" tick={{ fill: CHART_COLORS.axis, fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: CHART_COLORS.axis, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-                    <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                    <Bar dataKey="revenue" name="Revenue" fill={CHART_COLORS.teal} radius={[4, 4, 0, 0]} />
+                    <Tooltip content={<ChartTooltip formatter={(v: number) => formatCurrency(v)} />} cursor={{ fill: 'rgba(0,0,0,0.03)' }} />
+                    <Bar dataKey="revenue" name="Revenue" fill={CHART_COLORS.emerald} radius={[4, 4, 0, 0]} />
                     <Bar dataKey="directCosts" name="Direct Costs" fill={CHART_COLORS.amber} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="overhead" name="Overhead" fill={CHART_COLORS.slate} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="overhead" name="Overhead" fill={CHART_COLORS.gray} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-full text-slate-600 text-sm">No revenue/cost data available</div>
+                <div className="flex items-center justify-center h-full text-gray-400 text-sm">No revenue/cost data available</div>
               )}
             </div>
-            <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-800/60">
-              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: CHART_COLORS.teal }} /><span className="text-xs text-slate-500">Revenue</span></div>
-              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: CHART_COLORS.amber }} /><span className="text-xs text-slate-500">Direct Costs</span></div>
-              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: CHART_COLORS.slate }} /><span className="text-xs text-slate-500">Overhead</span></div>
+            <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-200">
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: CHART_COLORS.emerald }} /><span className="text-xs text-gray-500">Revenue</span></div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: CHART_COLORS.amber }} /><span className="text-xs text-gray-500">Direct Costs</span></div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: CHART_COLORS.gray }} /><span className="text-xs text-gray-500">Overhead</span></div>
             </div>
           </Section>
         </div>
@@ -562,32 +595,44 @@ export default function CashFlowPage() {
       <div className="grid grid-cols-12 gap-4">
         <div className="col-span-12 lg:col-span-8">
           <Section title="Profit & Loss" subtitle={selectedMonth === 'Full Year' ? `${selectedYear}` : `${selectedMonth} ${selectedYear}`}>
-            <div className="divide-y divide-slate-800/40">
+            <div className="divide-y divide-gray-100">
               <PLRow label="Revenue" value={metrics.revenue} percentage={100} type="positive" bold />
               <PLRow label="Direct Costs (Contractors)" value={metrics.directCosts} percentage={metrics.revenue > 0 ? (metrics.directCosts / metrics.revenue) * 100 : 0} type="negative" indent />
-              <div className="h-px bg-slate-800/60 my-1" />
+              <div className="h-px bg-gray-200 my-1" />
               <PLRow label="Gross Profit" value={metrics.grossProfit} percentage={metrics.grossMargin} type={metrics.grossProfit >= 0 ? 'positive' : 'negative'} bold />
               <PLRow label="Overhead (Operating)" value={metrics.overhead} percentage={metrics.revenue > 0 ? (metrics.overhead / metrics.revenue) * 100 : 0} type="muted" indent />
-              <div className="h-px bg-slate-800/60 my-1" />
+              <div className="h-px bg-gray-200 my-1" />
               <PLRow label="Net Profit" value={metrics.netProfit} percentage={metrics.netMargin} type={metrics.netProfit >= 0 ? 'positive' : 'negative'} bold />
             </div>
 
             {/* Period Cash Flow Summary */}
-            <div className="mt-5 pt-5 border-t border-slate-800/60">
-              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-3">Period Cash Flow</h4>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-slate-800/30 border border-slate-800/60 rounded-lg p-3">
-                  <p className="text-[11px] text-slate-500 mb-1">Inflows</p>
-                  <p className="text-lg font-semibold text-emerald-400 tabular-nums">{formatCurrency(metrics.periodInflows)}</p>
-                </div>
-                <div className="bg-slate-800/30 border border-slate-800/60 rounded-lg p-3">
-                  <p className="text-[11px] text-slate-500 mb-1">Outflows</p>
-                  <p className="text-lg font-semibold text-rose-400 tabular-nums">{formatCurrency(metrics.periodOutflows)}</p>
-                </div>
-                <div className="bg-slate-800/30 border border-slate-800/60 rounded-lg p-3">
-                  <p className="text-[11px] text-slate-500 mb-1">Net Cash Flow</p>
-                  <p className={`text-lg font-semibold tabular-nums ${metrics.netCashFlow >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(metrics.netCashFlow)}</p>
-                </div>
+            <div className="mt-5 pt-5 border-t border-gray-200">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-3">Period Cash Flow</h4>
+              {/* [FIX #3] Waterfall bar */}
+              {(metrics.periodInflows > 0 || metrics.periodOutflows > 0) && (() => {
+                const max = Math.max(metrics.periodInflows, metrics.periodOutflows)
+                const inW = max > 0 ? (metrics.periodInflows / max) * 100 : 0
+                const outW = max > 0 ? (metrics.periodOutflows / max) * 100 : 0
+                return (
+                  <div className="space-y-1.5 mb-4">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] text-gray-400 w-10">In</span>
+                      <div className="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden"><div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${inW}%` }} /></div>
+                      <span className="text-xs font-semibold text-emerald-600 tabular-nums w-24 text-right">{formatCurrency(metrics.periodInflows)}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] text-gray-400 w-10">Out</span>
+                      <div className="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden"><div className="h-full rounded-full bg-rose-500 transition-all duration-500" style={{ width: `${outW}%` }} /></div>
+                      <span className="text-xs font-semibold text-rose-600 tabular-nums w-24 text-right">{formatCurrency(metrics.periodOutflows)}</span>
+                    </div>
+                    <div className="flex items-center gap-3 pt-1 border-t border-gray-100">
+                      <span className="text-[10px] text-gray-400 w-10">Net</span>
+                      <div className="flex-1" />
+                      <span className={`text-sm font-bold tabular-nums w-24 text-right ${metrics.netCashFlow >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCurrency(metrics.netCashFlow)}</span>
+                    </div>
+                  </div>
+                )
+              })()}
               </div>
             </div>
           </Section>
@@ -609,19 +654,24 @@ export default function CashFlowPage() {
                   </ResponsiveContainer>
                 </div>
                 <div className="space-y-2 mt-2">
-                  {revenueByProject.map((project, i) => (
+                  {revenueByProject.map((project, i) => {
+                    const total = revenueByProject.reduce((s, p) => s + p.value, 0)
+                    const pct = total > 0 ? (project.value / total) * 100 : 0
+                    return (
                     <div key={i} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: project.color }} />
-                        <span className="text-slate-300 truncate">{project.name}</span>
+                        <span className="text-gray-600 truncate">{project.name}</span>
+                        <span className="text-[10px] text-gray-400 tabular-nums shrink-0">{pct.toFixed(0)}%</span>
                       </div>
-                      <span className="font-semibold text-white tabular-nums shrink-0 ml-3">{formatCurrency(project.value)}</span>
+                      <span className="font-semibold text-gray-900 tabular-nums shrink-0 ml-3">{formatCurrency(project.value)}</span>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </>
             ) : (
-              <div className="flex items-center justify-center h-40 text-slate-600 text-sm">No project revenue this period</div>
+              <div className="flex items-center justify-center h-40 text-gray-400 text-sm">No project revenue this period</div>
             )}
           </Section>
         </div>
@@ -634,31 +684,38 @@ export default function CashFlowPage() {
           <Section title="Accounts Receivable" subtitle="Who owes you" badge={metrics.openInvoicesCount} action={{ label: 'View All', href: '/invoices' }} noPadding>
             {topAR.length > 0 ? (
               <div>
-                <div className="flex items-center px-5 py-2 bg-slate-800/20 border-b border-slate-800/60">
-                  <div className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-slate-600">Client</div>
-                  <div className="w-24 text-[11px] font-semibold uppercase tracking-wider text-right text-slate-600">Balance</div>
-                  <div className="w-20 text-[11px] font-semibold uppercase tracking-wider text-right text-slate-600">Status</div>
+                {/* [FIX #4] Concentration warning */}
+                {topAR.length > 0 && metrics.totalAR > 0 && topAR[0].amount / metrics.totalAR > 0.5 && (
+                  <div className="flex items-center gap-2 px-5 py-2.5 bg-amber-50 border-b border-amber-200">
+                    <AlertCircle size={13} className="text-amber-600 shrink-0" />
+                    <span className="text-[11px] text-amber-700">{topAR[0].name} is {((topAR[0].amount / metrics.totalAR) * 100).toFixed(0)}% of total AR — high concentration risk</span>
+                  </div>
+                )}
+                <div className="flex items-center px-5 py-2 bg-gray-50 border-b border-gray-200">
+                  <div className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Client</div>
+                  <div className="w-24 text-[11px] font-semibold uppercase tracking-wider text-right text-gray-400">Balance</div>
+                  <div className="w-20 text-[11px] font-semibold uppercase tracking-wider text-right text-gray-400">Status</div>
                 </div>
                 {topAR.map((item, i) => (
-                  <div key={i} className="flex items-center px-5 py-3 border-b border-slate-800/40 hover:bg-slate-800/20 transition-colors">
-                    <div className="flex-1 text-sm font-medium text-slate-300 truncate">{item.name}</div>
-                    <div className="w-24 text-sm font-semibold text-right tabular-nums text-white">{formatCurrency(item.amount)}</div>
+                  <div key={i} className="flex items-center px-5 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                    <div className="flex-1 text-sm font-medium text-gray-600 truncate">{item.name}</div>
+                    <div className="w-24 text-sm font-semibold text-right tabular-nums text-gray-900">{formatCurrency(item.amount)}</div>
                     <div className="w-20 text-right">
                       {item.daysOverdue > 0 ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wide bg-rose-500/10 text-rose-400 border border-rose-500/20">{item.daysOverdue}d late</span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wide bg-rose-50 text-rose-600 border border-rose-200">{item.daysOverdue}d late</span>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wide bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Current</span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wide bg-emerald-50 text-emerald-600 border border-emerald-200">Current</span>
                       )}
                     </div>
                   </div>
                 ))}
-                <div className="flex items-center justify-between px-5 py-3 bg-slate-800/10">
-                  <span className="text-sm font-medium text-slate-500">Total AR</span>
-                  <span className="text-sm font-bold text-white tabular-nums">{formatCurrency(metrics.totalAR)}</span>
+                <div className="flex items-center justify-between px-5 py-3 bg-gray-50">
+                  <span className="text-sm font-medium text-gray-500">Total AR</span>
+                  <span className="text-sm font-bold text-gray-900 tabular-nums">{formatCurrency(metrics.totalAR)}</span>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center py-12 text-slate-600 text-sm">No outstanding receivables</div>
+              <div className="flex items-center justify-center py-12 text-gray-400 text-sm">No outstanding receivables</div>
             )}
           </Section>
         </div>
@@ -668,31 +725,38 @@ export default function CashFlowPage() {
           <Section title="Accounts Payable" subtitle="Who you owe" badge={metrics.openBillsCount} action={{ label: 'View All', href: '/invoices' }} noPadding>
             {topAP.length > 0 ? (
               <div>
-                <div className="flex items-center px-5 py-2 bg-slate-800/20 border-b border-slate-800/60">
-                  <div className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-slate-600">Vendor</div>
-                  <div className="w-24 text-[11px] font-semibold uppercase tracking-wider text-right text-slate-600">Balance</div>
-                  <div className="w-20 text-[11px] font-semibold uppercase tracking-wider text-right text-slate-600">Status</div>
+                {/* [FIX #4] AP Concentration warning */}
+                {topAP.length > 0 && metrics.totalAP > 0 && topAP[0].amount / metrics.totalAP > 0.5 && (
+                  <div className="flex items-center gap-2 px-5 py-2.5 bg-amber-50 border-b border-amber-200">
+                    <AlertCircle size={13} className="text-amber-600 shrink-0" />
+                    <span className="text-[11px] text-amber-700">{topAP[0].name} is {((topAP[0].amount / metrics.totalAP) * 100).toFixed(0)}% of total AP — vendor concentration risk</span>
+                  </div>
+                )}
+                <div className="flex items-center px-5 py-2 bg-gray-50 border-b border-gray-200">
+                  <div className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Vendor</div>
+                  <div className="w-24 text-[11px] font-semibold uppercase tracking-wider text-right text-gray-400">Balance</div>
+                  <div className="w-20 text-[11px] font-semibold uppercase tracking-wider text-right text-gray-400">Status</div>
                 </div>
                 {topAP.map((item, i) => (
-                  <div key={i} className="flex items-center px-5 py-3 border-b border-slate-800/40 hover:bg-slate-800/20 transition-colors">
-                    <div className="flex-1 text-sm font-medium text-slate-300 truncate">{item.name}</div>
-                    <div className="w-24 text-sm font-semibold text-right tabular-nums text-amber-400">{formatCurrency(item.amount)}</div>
+                  <div key={i} className="flex items-center px-5 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                    <div className="flex-1 text-sm font-medium text-gray-600 truncate">{item.name}</div>
+                    <div className="w-24 text-sm font-semibold text-right tabular-nums text-amber-600">{formatCurrency(item.amount)}</div>
                     <div className="w-20 text-right">
                       {item.daysOverdue > 0 ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wide bg-rose-500/10 text-rose-400 border border-rose-500/20">{item.daysOverdue}d late</span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wide bg-rose-50 text-rose-600 border border-rose-200">{item.daysOverdue}d late</span>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wide bg-slate-800/50 text-slate-400 border border-slate-800/80">Current</span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wide bg-gray-100 text-gray-500 border border-gray-200">Current</span>
                       )}
                     </div>
                   </div>
                 ))}
-                <div className="flex items-center justify-between px-5 py-3 bg-slate-800/10">
-                  <span className="text-sm font-medium text-slate-500">Total AP</span>
-                  <span className="text-sm font-bold text-amber-400 tabular-nums">{formatCurrency(metrics.totalAP)}</span>
+                <div className="flex items-center justify-between px-5 py-3 bg-gray-50">
+                  <span className="text-sm font-medium text-gray-500">Total AP</span>
+                  <span className="text-sm font-bold text-amber-600 tabular-nums">{formatCurrency(metrics.totalAP)}</span>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center py-12 text-slate-600 text-sm">No outstanding payables</div>
+              <div className="flex items-center justify-center py-12 text-gray-400 text-sm">No outstanding payables</div>
             )}
           </Section>
         </div>
@@ -701,28 +765,39 @@ export default function CashFlowPage() {
       {/* Transactions */}
       <Section title="Recent Transactions" subtitle={`${filteredTransactions.length} this period`} collapsible defaultExpanded badge={filteredTransactions.length} noPadding>
         <div>
-          <div className="flex items-center px-5 py-2 bg-slate-800/20 border-b border-slate-800/60">
-            <div className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-slate-600">Description</div>
-            <div className="w-28 text-[11px] font-semibold uppercase tracking-wider text-slate-600 hidden sm:block">Category</div>
-            <div className="w-24 text-[11px] font-semibold uppercase tracking-wider text-slate-600 hidden sm:block">Date</div>
-            <div className="w-28 text-[11px] font-semibold uppercase tracking-wider text-right text-slate-600">Amount</div>
+          {/* [FIX #8] Filter chips */}
+          <div className="flex items-center gap-2 px-5 py-2.5 border-b border-gray-200">
+            {(['all', 'inflows', 'outflows'] as const).map(f => (
+              <button key={f} onClick={() => setTxFilter(f)}
+                className={`px-3 py-1 text-xs font-semibold rounded-full transition-all ${
+                  txFilter === f ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}>
+                {f === 'all' ? 'All' : f === 'inflows' ? 'Inflows' : 'Outflows'}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center px-5 py-2 bg-gray-50 border-b border-gray-200">
+            <div className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Description</div>
+            <div className="w-28 text-[11px] font-semibold uppercase tracking-wider text-gray-400 hidden sm:block">Category</div>
+            <div className="w-24 text-[11px] font-semibold uppercase tracking-wider text-gray-400 hidden sm:block">Date</div>
+            <div className="w-28 text-[11px] font-semibold uppercase tracking-wider text-right text-gray-400">Amount</div>
           </div>
 
           {displayTransactions.length > 0 ? (
             <>
               {displayTransactions.map((tx, i) => (
-                <div key={i} className="flex items-center px-5 py-3 border-b border-slate-800/40 hover:bg-slate-800/20 transition-colors">
+                <div key={i} className="flex items-center px-5 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-slate-300 truncate">{tx.description || tx.name || 'Transaction'}</p>
-                    <p className="text-xs text-slate-600 sm:hidden">{formatDate(tx.date)}</p>
+                    <p className="text-sm text-gray-600 truncate">{tx.description || tx.name || 'Transaction'}</p>
+                    <p className="text-xs text-gray-400 sm:hidden">{formatDate(tx.date)}</p>
                   </div>
                   <div className="w-28 hidden sm:block">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide bg-slate-800/50 text-slate-400 border border-slate-800/80">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide bg-gray-100 text-gray-500 border border-gray-200">
                       {tx.category || tx.type || 'Other'}
                     </span>
                   </div>
-                  <div className="w-24 text-sm text-slate-500 hidden sm:block">{formatDate(tx.date)}</div>
-                  <div className={`w-28 text-sm font-semibold text-right tabular-nums ${(parseFloat(tx.amount) || 0) < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  <div className="w-24 text-sm text-gray-500 hidden sm:block">{formatDate(tx.date)}</div>
+                  <div className={`w-28 text-sm font-semibold text-right tabular-nums ${(parseFloat(tx.amount) || 0) < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                     {formatCurrency(parseFloat(tx.amount) || 0)}
                   </div>
                 </div>
@@ -730,13 +805,13 @@ export default function CashFlowPage() {
 
               {filteredTransactions.length > 8 && (
                 <button onClick={() => setShowAllTransactions(!showAllTransactions)}
-                  className="w-full px-5 py-3 text-sm font-medium text-slate-500 hover:text-teal-400 hover:bg-slate-800/20 transition-colors flex items-center justify-center gap-1">
+                  className="w-full px-5 py-3 text-sm font-medium text-gray-500 hover:text-emerald-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1">
                   {showAllTransactions ? <>Show Less <ChevronUp size={14} /></> : <>Show All {filteredTransactions.length} Transactions <ChevronDown size={14} /></>}
                 </button>
               )}
             </>
           ) : (
-            <div className="flex items-center justify-center py-12 text-slate-600 text-sm">No transactions this period</div>
+            <div className="flex items-center justify-center py-12 text-gray-400 text-sm">No transactions this period</div>
           )}
         </div>
       </Section>
@@ -744,66 +819,66 @@ export default function CashFlowPage() {
       {/* Add Transaction Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
-          <div className="relative w-full max-w-md bg-[#111827] border border-slate-800/80 rounded-xl shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800/60">
-              <h2 className="text-lg font-semibold text-white">Add Transaction</h2>
-              <button onClick={() => setShowAddModal(false)} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800/50 transition-colors"><X size={18} /></button>
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
+          <div className="relative w-full max-w-md bg-white border border-gray-200 rounded-xl shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Add Transaction</h2>
+              <button onClick={() => setShowAddModal(false)} className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"><X size={18} /></button>
             </div>
 
             <div className="p-6 space-y-4">
               {/* Type Toggle */}
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Type</label>
-                <div className="flex bg-slate-800/40 border border-slate-800/80 rounded-lg p-1">
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-2">Type</label>
+                <div className="flex bg-gray-50 border border-gray-200 rounded-lg p-1">
                   <button type="button" onClick={() => setNewTransaction(prev => ({ ...prev, type: 'deposit' }))}
-                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${newTransaction.type === 'deposit' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${newTransaction.type === 'deposit' ? 'bg-emerald-600 text-white' : 'text-gray-500 hover:text-gray-900'}`}>
                     Income / Deposit
                   </button>
                   <button type="button" onClick={() => setNewTransaction(prev => ({ ...prev, type: 'withdrawal' }))}
-                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${newTransaction.type === 'withdrawal' ? 'bg-rose-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${newTransaction.type === 'withdrawal' ? 'bg-rose-600 text-white' : 'text-gray-500 hover:text-gray-900'}`}>
                     Expense / Withdrawal
                   </button>
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Description</label>
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-2">Description</label>
                 <input type="text" value={newTransaction.description} onChange={(e) => setNewTransaction(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="e.g., Client payment, Office supplies" className={inputClass} />
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Amount</label>
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-2">Amount</label>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm">$</span>
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
                   <input type="number" value={newTransaction.amount} onChange={(e) => setNewTransaction(prev => ({ ...prev, amount: e.target.value }))}
                     placeholder="0.00" min="0" step="0.01" className={`${inputClass} pl-7`} />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Date</label>
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-2">Date</label>
                 <input type="date" value={newTransaction.date} onChange={(e) => setNewTransaction(prev => ({ ...prev, date: e.target.value }))} className={inputClass} />
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Category</label>
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-2">Category</label>
                 <select value={newTransaction.category} onChange={(e) => setNewTransaction(prev => ({ ...prev, category: e.target.value }))} className={selectClass + ' w-full'}>
-                  <option value="income" className="bg-slate-900">Income</option>
-                  <option value="expense" className="bg-slate-900">Expense</option>
-                  <option value="payroll" className="bg-slate-900">Payroll</option>
-                  <option value="transfer" className="bg-slate-900">Transfer</option>
-                  <option value="refund" className="bg-slate-900">Refund</option>
-                  <option value="other" className="bg-slate-900">Other</option>
+                  <option value="income" className="bg-white">Income</option>
+                  <option value="expense" className="bg-white">Expense</option>
+                  <option value="payroll" className="bg-white">Payroll</option>
+                  <option value="transfer" className="bg-white">Transfer</option>
+                  <option value="refund" className="bg-white">Refund</option>
+                  <option value="other" className="bg-white">Other</option>
                 </select>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-800/60">
-              <button onClick={() => setShowAddModal(false)} className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancel</button>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
+              <button onClick={() => setShowAddModal(false)} className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors">Cancel</button>
               <button onClick={handleAddTransaction} disabled={saving || !newTransaction.description || !newTransaction.amount}
-                className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                 {saving ? <><RefreshCw size={14} className="animate-spin" />Saving...</> : <><Plus size={14} />Add Transaction</>}
               </button>
             </div>
