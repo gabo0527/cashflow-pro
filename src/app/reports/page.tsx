@@ -19,8 +19,8 @@ const supabase = createClient(
 
 // ============ CHART PALETTE ============
 const CHART = {
-  teal: '#0d9488', blue: '#3b82f6', slate: '#64748b', rose: '#f43f5e',
-  amber: '#f59e0b', emerald: '#10b981', purple: '#8b5cf6', cyan: '#06b6d4',
+  emerald: '#10b981', blue: '#3b82f6', gray: '#6b7280', rose: '#f43f5e',
+  amber: '#f59e0b', purple: '#8b5cf6', cyan: '#06b6d4', teal: '#0d9488',
 }
 
 // ============ UTILITIES ============
@@ -29,7 +29,7 @@ const fmtPct = (v: number) => `${v.toFixed(1)}%`
 const fmtNum = (v: number, d = 1) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: d }).format(v)
 const fmtDate = (s: string) => s ? new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
-const inputClass = "bg-slate-800/60 border border-slate-800/80 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 transition-colors"
+const inputClass = "bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors"
 
 // ============ SAVED TEMPLATE ============
 interface SavedTemplate {
@@ -103,12 +103,12 @@ interface ReportDef {
 }
 
 const REPORTS: ReportDef[] = [
-  { id: 'pnl', name: 'P&L Statement', description: 'Income statement with prior period comparison', icon: FileText, accent: 'bg-teal-500' },
+  { id: 'pnl', name: 'P&L Statement', description: 'Income statement with prior period comparison', icon: FileText, accent: 'bg-emerald-500' },
   { id: 'cash_flow', name: 'Cash Flow', description: 'Inflows, outflows, and ending balance', icon: DollarSign, accent: 'bg-blue-500' },
   { id: 'ar_aging', name: 'AR Aging', description: 'Receivables by aging bucket and client', icon: Receipt, accent: 'bg-amber-500' },
   { id: 'client_profit', name: 'Client Profitability', description: 'Revenue minus cost per client, margin %', icon: Building2, accent: 'bg-purple-500' },
   { id: 'project_profit', name: 'Project Profitability', description: 'Budget vs actual, hours, margin per project', icon: FolderOpen, accent: 'bg-cyan-500' },
-  { id: 'utilization', name: 'Team Utilization', description: 'Billable vs non-billable, utilization %, revenue per resource', icon: Users, accent: 'bg-emerald-500' },
+  { id: 'utilization', name: 'Team Utilization', description: 'Billable vs non-billable, utilization %, revenue per resource', icon: Users, accent: 'bg-emerald-600' },
   { id: 'expense', name: 'Expense Breakdown', description: 'Category spending with drill-down detail', icon: TrendingDown, accent: 'bg-rose-500' },
 ]
 
@@ -267,27 +267,27 @@ function PnLReport({ invoices, bills, expenses, teamMembers, timeEntries, projec
     <div className="space-y-4">
       {/* Basis toggle */}
       <div className="flex items-center gap-3">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Basis</span>
-        <div className="flex bg-slate-800/60 border border-slate-800/80 rounded-lg p-0.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Basis</span>
+        <div className="flex bg-gray-100 border border-gray-200 rounded-lg p-0.5">
           {(['accrual', 'cash'] as const).map(b => (
             <button key={b} onClick={() => setBasis(b)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md capitalize transition-all ${basis === b ? 'bg-teal-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}>{b}</button>
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md capitalize transition-all ${basis === b ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-600'}`}>{b}</button>
           ))}
         </div>
       </div>
 
       {/* P&L Table */}
-      <div className="bg-[#111827] border border-slate-800/80 rounded-xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-800/60">
-          <h3 className="text-sm font-semibold text-white">Profit & Loss — {basis === 'accrual' ? 'Accrual' : 'Cash'} Basis</h3>
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-200">
+          <h3 className="text-sm font-semibold text-gray-900">Profit & Loss — {basis === 'accrual' ? 'Accrual' : 'Cash'} Basis</h3>
         </div>
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-slate-800/20">
-              <th className="text-left px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600 w-1/2"></th>
-              <th className="text-right px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{periodLabel}</th>
-              <th className="text-right px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">{priorLabel}</th>
-              <th className="text-right px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600 w-20">Δ %</th>
+            <tr className="bg-gray-50">
+              <th className="text-left px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400 w-1/2"></th>
+              <th className="text-right px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">{periodLabel}</th>
+              <th className="text-right px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">{priorLabel}</th>
+              <th className="text-right px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400 w-20">Δ %</th>
             </tr>
           </thead>
           <tbody>
@@ -296,29 +296,29 @@ function PnLReport({ invoices, bills, expenses, teamMembers, timeEntries, projec
               if (row.current === 0 && row.prior === 0 && row.bold && !row.border && !row.highlight) {
                 // Section header
                 return (
-                  <tr key={i} className="bg-slate-800/10">
-                    <td colSpan={4} className="px-5 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">{row.label}</td>
+                  <tr key={i} className="bg-gray-50/50">
+                    <td colSpan={4} className="px-5 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">{row.label}</td>
                   </tr>
                 )
               }
               const delta = row.prior !== 0 ? ((row.current - row.prior) / Math.abs(row.prior)) * 100 : 0
               const valColor = (v: number) => {
-                if (row.isPct) return v >= 40 ? 'text-emerald-400' : v >= 20 ? 'text-amber-400' : v > 0 ? 'text-rose-400' : 'text-slate-500'
-                if (row.isNeg) return v > 0 ? 'text-rose-400' : 'text-slate-500'
-                return v > 0 ? 'text-emerald-400' : v < 0 ? 'text-rose-400' : 'text-slate-500'
+                if (row.isPct) return v >= 40 ? 'text-emerald-600' : v >= 20 ? 'text-amber-600' : v > 0 ? 'text-rose-600' : 'text-gray-500'
+                if (row.isNeg) return v > 0 ? 'text-rose-600' : 'text-gray-500'
+                return v > 0 ? 'text-emerald-600' : v < 0 ? 'text-rose-600' : 'text-gray-500'
               }
 
               return (
-                <tr key={i} className={`${row.border ? 'border-t border-slate-700' : ''} ${row.highlight ? 'bg-teal-500/5' : ''}`}>
-                  <td className={`px-5 py-2 ${row.bold ? 'font-semibold text-white' : 'text-slate-300'}`}
-                    style={{ paddingLeft: `${20 + (row.indent || 0) * 20}px` }}>{row.label}</td>
+                <tr key={i} className={`${row.border ? 'border-t border-gray-200' : ''} ${row.highlight ? 'bg-emerald-50/70' : ''}`}>
+                  <td className={`px-5 py-2 ${row.bold ? 'font-semibold text-gray-900' : 'text-gray-600'} ${row.highlight ? 'border-l-[3px] border-l-emerald-500' : ''}`}
+                    style={{ paddingLeft: `${(row.highlight ? 17 : 20) + (row.indent || 0) * 20}px` }}>{row.label}</td>
                   <td className={`px-5 py-2 text-right tabular-nums ${row.bold ? 'font-semibold' : ''} ${valColor(row.current)}`}>
                     {row.isPct ? fmtPct(row.current) : row.isNeg && row.current > 0 ? `(${fmtCurrency(row.current)})` : fmtCurrency(row.current)}
                   </td>
-                  <td className={`px-5 py-2 text-right tabular-nums text-slate-500`}>
+                  <td className={`px-5 py-2 text-right tabular-nums text-gray-500`}>
                     {row.isPct ? fmtPct(row.prior) : row.isNeg && row.prior > 0 ? `(${fmtCurrency(row.prior)})` : fmtCurrency(row.prior)}
                   </td>
-                  <td className={`px-5 py-2 text-right text-[11px] tabular-nums ${delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-rose-400' : 'text-slate-600'}`}>
+                  <td className={`px-5 py-2 text-right text-[11px] tabular-nums ${delta > 0 ? 'text-emerald-600' : delta < 0 ? 'text-rose-600' : 'text-gray-400'}`}>
                     {row.current === 0 && row.prior === 0 ? '—' : `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`}
                   </td>
                 </tr>
@@ -366,50 +366,67 @@ function ARAgingReport({ invoices, clients }: { invoices: any[]; clients: any[] 
     return { buckets, totalAR, clientRows }
   }, [invoices, clientMap])
 
-  const bucketColors = ['text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400', 'text-red-500']
+  const bucketColors = ['text-emerald-600', 'text-amber-600', 'text-orange-600', 'text-rose-600', 'text-red-600']
   const barColors = [CHART.emerald, CHART.amber, '#f97316', CHART.rose, '#dc2626']
 
   return (
     <div className="space-y-4">
+      {/* [FIX #4] Overdue concentration warning */}
+      {(() => {
+        const overdueAmt = agingData.buckets.filter(b => b.key === 'days60' || b.key === 'days90' || b.key === 'over90').reduce((s, b) => s + b.amount, 0)
+        const overduePct = agingData.totalAR > 0 ? (overdueAmt / agingData.totalAR) * 100 : 0
+        return overduePct > 30 ? (
+          <div className="flex items-center gap-2.5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
+            <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+            <p className="text-sm text-amber-800"><span className="font-semibold">{fmtPct(overduePct)}</span> of AR ({fmtCurrency(overdueAmt)}) is past 60 days — consider prioritizing collections.</p>
+          </div>
+        ) : null
+      })()}
+
       <div className="grid grid-cols-5 gap-3">
-        {agingData.buckets.map((b, i) => (
-          <div key={b.key} className="bg-[#111827] border border-slate-800/80 rounded-xl overflow-hidden">
+        {agingData.buckets.map((b, i) => {
+          const pctOfTotal = agingData.totalAR > 0 ? (b.amount / agingData.totalAR) * 100 : 0
+          return (
+          <div key={b.key} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="flex"><div className={`w-1 shrink-0`} style={{ backgroundColor: barColors[i] }} />
               <div className="p-3 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{b.label}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">{b.label}</p>
                 <p className={`text-lg font-bold mt-1 tabular-nums ${bucketColors[i]}`}>{fmtCurrency(b.amount)}</p>
-                <p className="text-[10px] text-slate-600 mt-0.5">{b.count} invoice{b.count !== 1 ? 's' : ''}</p>
+                <div className="flex items-center justify-between mt-0.5">
+                  <span className="text-[10px] text-gray-400">{b.count} invoice{b.count !== 1 ? 's' : ''}</span>
+                  <span className="text-[10px] font-medium text-gray-500">{pctOfTotal.toFixed(0)}%</span>
+                </div>
               </div>
             </div>
           </div>
-        ))}
+        )})}
       </div>
 
-      <div className="bg-[#111827] border border-slate-800/80 rounded-xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-800/60"><h3 className="text-sm font-semibold text-white">Aging by Client</h3></div>
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-200"><h3 className="text-sm font-semibold text-gray-900">Aging by Client</h3></div>
         <table className="w-full text-sm">
-          <thead><tr className="bg-slate-800/20">
-            <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Client</th>
-            {agingData.buckets.map(b => <th key={b.key} className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">{b.label}</th>)}
-            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Total</th>
+          <thead><tr className="bg-gray-50">
+            <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Client</th>
+            {agingData.buckets.map(b => <th key={b.key} className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">{b.label}</th>)}
+            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Total</th>
           </tr></thead>
           <tbody>
             {agingData.clientRows.map((row, i) => (
-              <tr key={i} className="border-t border-slate-800/40 hover:bg-slate-800/20 transition-colors">
-                <td className="px-4 py-2.5 font-medium text-slate-200">{row.name}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-slate-400">{row.current > 0 ? fmtCurrency(row.current) : '—'}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-slate-400">{row.days30 > 0 ? fmtCurrency(row.days30) : '—'}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-slate-400">{row.days60 > 0 ? fmtCurrency(row.days60) : '—'}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-rose-400">{row.days90 > 0 ? fmtCurrency(row.days90) : '—'}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-red-400">{row.over90 > 0 ? fmtCurrency(row.over90) : '—'}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-white">{fmtCurrency(row.total)}</td>
+              <tr key={i} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
+                <td className="px-4 py-2.5 font-medium text-gray-700">{row.name}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-gray-500">{row.current > 0 ? fmtCurrency(row.current) : '—'}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-gray-500">{row.days30 > 0 ? fmtCurrency(row.days30) : '—'}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-gray-500">{row.days60 > 0 ? fmtCurrency(row.days60) : '—'}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-rose-600">{row.days90 > 0 ? fmtCurrency(row.days90) : '—'}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-red-600">{row.over90 > 0 ? fmtCurrency(row.over90) : '—'}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-gray-900">{fmtCurrency(row.total)}</td>
               </tr>
             ))}
           </tbody>
-          <tfoot><tr className="border-t-2 border-slate-700 bg-slate-800/20">
-            <td className="px-4 py-2.5 font-semibold text-white">Total</td>
-            {agingData.buckets.map(b => <td key={b.key} className="px-4 py-2.5 text-right tabular-nums font-semibold text-white">{fmtCurrency(b.amount)}</td>)}
-            <td className="px-4 py-2.5 text-right tabular-nums font-bold text-white">{fmtCurrency(agingData.totalAR)}</td>
+          <tfoot><tr className="border-t-2 border-gray-300 bg-gray-50">
+            <td className="px-4 py-2.5 font-semibold text-gray-900">Total</td>
+            {agingData.buckets.map(b => <td key={b.key} className="px-4 py-2.5 text-right tabular-nums font-semibold text-gray-900">{fmtCurrency(b.amount)}</td>)}
+            <td className="px-4 py-2.5 text-right tabular-nums font-bold text-gray-900">{fmtCurrency(agingData.totalAR)}</td>
           </tr></tfoot>
         </table>
       </div>
@@ -453,38 +470,48 @@ function ClientProfitReport({ invoices, timeEntries, teamMembers, clients, proje
   }, [data])
 
   return (
-    <div className="bg-[#111827] border border-slate-800/80 rounded-xl overflow-hidden">
-      <div className="px-5 py-3 border-b border-slate-800/60"><h3 className="text-sm font-semibold text-white">Client Profitability</h3></div>
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="px-5 py-3 border-b border-gray-200"><h3 className="text-sm font-semibold text-gray-900">Client Profitability</h3></div>
       <table className="w-full text-sm">
-        <thead><tr className="bg-slate-800/20">
-          <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Client</th>
-          <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Revenue</th>
-          <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Cost</th>
-          <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Profit</th>
-          <th className="text-center px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Margin</th>
-          <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Hours</th>
-          <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Eff. Rate</th>
+        <thead><tr className="bg-gray-50">
+          <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Client</th>
+          <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Revenue</th>
+          <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Cost</th>
+          <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Profit</th>
+          <th className="text-center px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Margin</th>
+          <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Hours</th>
+          <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Eff. Rate</th>
         </tr></thead>
         <tbody>
           {data.map((c, i) => (
-            <tr key={i} className="border-t border-slate-800/40 hover:bg-slate-800/20">
-              <td className="px-4 py-2.5 font-medium text-slate-200">{c.name}</td>
-              <td className="px-4 py-2.5 text-right tabular-nums text-emerald-400">{fmtCurrency(c.revenue)}</td>
-              <td className="px-4 py-2.5 text-right tabular-nums text-rose-400">{fmtCurrency(c.cost)}</td>
-              <td className="px-4 py-2.5 text-right tabular-nums font-medium text-white">{fmtCurrency(c.profit)}</td>
-              <td className="px-4 py-2.5 text-center"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${c.margin >= 40 ? 'bg-emerald-500/15 text-emerald-400' : c.margin >= 20 ? 'bg-amber-500/15 text-amber-400' : 'bg-rose-500/15 text-rose-400'}`}>{fmtPct(c.margin)}</span></td>
-              <td className="px-4 py-2.5 text-right tabular-nums text-slate-400">{fmtNum(c.hours)}</td>
-              <td className="px-4 py-2.5 text-right tabular-nums text-slate-400">${fmtNum(c.effRate)}/hr</td>
+            <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
+              <td className="px-4 py-2.5 font-medium text-gray-700">{c.name}</td>
+              <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600">{fmtCurrency(c.revenue)}</td>
+              <td className="px-4 py-2.5 text-right tabular-nums text-rose-600">{fmtCurrency(c.cost)}</td>
+              <td className="px-4 py-2.5 text-right tabular-nums font-medium text-gray-900">{fmtCurrency(c.profit)}</td>
+              <td className="px-4 py-2.5">
+                <div className="flex items-center gap-2 justify-center">
+                  <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full rounded-full transition-all" style={{ width: `${Math.min(Math.max(c.margin, 0), 100)}%`, backgroundColor: c.margin >= 40 ? CHART.emerald : c.margin >= 20 ? CHART.amber : CHART.rose }} /></div>
+                  <span className={`text-[11px] font-semibold tabular-nums w-10 ${c.margin >= 40 ? 'text-emerald-600' : c.margin >= 20 ? 'text-amber-600' : 'text-rose-600'}`}>{fmtPct(c.margin)}</span>
+                </div>
+              </td>
+              <td className="px-4 py-2.5 text-right tabular-nums text-gray-500">{fmtNum(c.hours)}</td>
+              <td className="px-4 py-2.5 text-right tabular-nums text-gray-500">${fmtNum(c.effRate)}/hr</td>
             </tr>
           ))}
         </tbody>
-        <tfoot><tr className="border-t-2 border-slate-700 bg-slate-800/20">
-          <td className="px-4 py-2.5 font-semibold text-white">Total</td>
-          <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-emerald-400">{fmtCurrency(totals.revenue)}</td>
-          <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-rose-400">{fmtCurrency(totals.cost)}</td>
-          <td className="px-4 py-2.5 text-right tabular-nums font-bold text-white">{fmtCurrency(totals.profit)}</td>
-          <td className="px-4 py-2.5 text-center"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${totals.margin >= 40 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'}`}>{fmtPct(totals.margin)}</span></td>
-          <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-slate-300">{fmtNum(totals.hours)}</td>
+        <tfoot><tr className="border-t-2 border-gray-300 bg-gray-50">
+          <td className="px-4 py-2.5 font-semibold text-gray-900">Total</td>
+          <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-emerald-600">{fmtCurrency(totals.revenue)}</td>
+          <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-rose-600">{fmtCurrency(totals.cost)}</td>
+          <td className="px-4 py-2.5 text-right tabular-nums font-bold text-gray-900">{fmtCurrency(totals.profit)}</td>
+          <td className="px-4 py-2.5 text-center">
+            <div className="flex items-center gap-2 justify-center">
+              <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: `${Math.min(Math.max(totals.margin, 0), 100)}%`, backgroundColor: totals.margin >= 40 ? CHART.emerald : totals.margin >= 20 ? CHART.amber : CHART.rose }} /></div>
+              <span className={`text-[11px] font-bold tabular-nums w-10 ${totals.margin >= 40 ? 'text-emerald-600' : 'text-amber-600'}`}>{fmtPct(totals.margin)}</span>
+            </div>
+          </td>
+          <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-gray-600">{fmtNum(totals.hours)}</td>
           <td className="px-4 py-2.5" />
         </tr></tfoot>
       </table>
@@ -518,36 +545,41 @@ function ProjectProfitReport({ projects, timeEntries, teamMembers, expenses, inv
   }, [projects, timeEntries, teamMembers, expenses, invoices, dateRange])
 
   return (
-    <div className="bg-[#111827] border border-slate-800/80 rounded-xl overflow-hidden">
-      <div className="px-5 py-3 border-b border-slate-800/60"><h3 className="text-sm font-semibold text-white">Project Profitability</h3></div>
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="px-5 py-3 border-b border-gray-200"><h3 className="text-sm font-semibold text-gray-900">Project Profitability</h3></div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead><tr className="bg-slate-800/20">
-            <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Project</th>
-            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Budget</th>
-            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Revenue</th>
-            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Labor</th>
-            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Expenses</th>
-            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Profit</th>
-            <th className="text-center px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Margin</th>
-            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Hours</th>
-            <th className="text-center px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Budget Used</th>
+          <thead><tr className="bg-gray-50">
+            <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Project</th>
+            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Budget</th>
+            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Revenue</th>
+            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Labor</th>
+            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Expenses</th>
+            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Profit</th>
+            <th className="text-center px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Margin</th>
+            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Hours</th>
+            <th className="text-center px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Budget Used</th>
           </tr></thead>
           <tbody>
             {data.map((p, i) => (
-              <tr key={i} className="border-t border-slate-800/40 hover:bg-slate-800/20">
-                <td className="px-4 py-2.5 font-medium text-slate-200 max-w-[200px] truncate">{p.name}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-slate-400">{fmtCurrency(p.budget)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-emerald-400">{fmtCurrency(p.revenue)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-rose-400">{fmtCurrency(p.laborCost)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-rose-400">{fmtCurrency(p.expenseCost)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums font-medium text-white">{fmtCurrency(p.profit)}</td>
-                <td className="px-4 py-2.5 text-center"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${p.margin >= 40 ? 'bg-emerald-500/15 text-emerald-400' : p.margin >= 20 ? 'bg-amber-500/15 text-amber-400' : 'bg-rose-500/15 text-rose-400'}`}>{fmtPct(p.margin)}</span></td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-slate-400">{fmtNum(p.hours)}</td>
+              <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
+                <td className="px-4 py-2.5 font-medium text-gray-700 max-w-[200px] truncate">{p.name}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-gray-500">{fmtCurrency(p.budget)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600">{fmtCurrency(p.revenue)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-rose-600">{fmtCurrency(p.laborCost)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-rose-600">{fmtCurrency(p.expenseCost)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums font-medium text-gray-900">{fmtCurrency(p.profit)}</td>
+                <td className="px-4 py-2.5">
+                  <div className="flex items-center gap-2 justify-center">
+                    <div className="w-14 h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full rounded-full transition-all" style={{ width: `${Math.min(Math.max(p.margin, 0), 100)}%`, backgroundColor: p.margin >= 40 ? CHART.emerald : p.margin >= 20 ? CHART.amber : CHART.rose }} /></div>
+                    <span className={`text-[11px] font-semibold tabular-nums ${p.margin >= 40 ? 'text-emerald-600' : p.margin >= 20 ? 'text-amber-600' : 'text-rose-600'}`}>{fmtPct(p.margin)}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-gray-500">{fmtNum(p.hours)}</td>
                 <td className="px-4 py-2.5 text-center">
                   <div className="flex items-center gap-2 justify-center">
-                    <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: `${Math.min(p.budgetUsed, 100)}%`, backgroundColor: p.budgetUsed > 90 ? CHART.rose : p.budgetUsed > 70 ? CHART.amber : CHART.teal }} /></div>
-                    <span className="text-[10px] text-slate-500">{p.budgetUsed.toFixed(0)}%</span>
+                    <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full rounded-full transition-all" style={{ width: `${Math.min(p.budgetUsed, 100)}%`, backgroundColor: p.budgetUsed > 90 ? CHART.rose : p.budgetUsed > 70 ? CHART.amber : CHART.emerald }} /></div>
+                    <span className={`text-[11px] font-medium tabular-nums ${p.budgetUsed > 90 ? 'text-rose-600' : p.budgetUsed > 70 ? 'text-amber-600' : 'text-gray-500'}`}>{p.budgetUsed.toFixed(0)}%</span>
                   </div>
                 </td>
               </tr>
@@ -592,38 +624,45 @@ function UtilizationReport({ timeEntries, teamMembers, dateRange }: { timeEntrie
         {[
           { label: 'Billable Utilization', value: fmtPct(totals.billableUtil), accent: 'bg-emerald-500' },
           { label: 'Total Utilization', value: fmtPct(totals.utilization), accent: 'bg-blue-500' },
-          { label: 'Billable Value', value: fmtCurrency(totals.amount), accent: 'bg-teal-500' },
+          { label: 'Billable Value', value: fmtCurrency(totals.amount), accent: 'bg-emerald-500' },
           { label: 'Non-Billable Hours', value: fmtNum(totals.nonBillable), accent: 'bg-amber-500' },
         ].map((kpi, i) => (
-          <div key={i} className="bg-[#111827] border border-slate-800/80 rounded-xl overflow-hidden"><div className="flex"><div className={`w-1 ${kpi.accent} shrink-0`} /><div className="p-3 flex-1"><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{kpi.label}</p><p className="text-lg font-bold text-white mt-1 tabular-nums">{kpi.value}</p></div></div></div>
+          <div key={i} className="bg-white border border-gray-200 rounded-xl overflow-hidden"><div className="flex"><div className={`w-1 ${kpi.accent} shrink-0`} /><div className="p-3 flex-1"><p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">{kpi.label}</p><p className="text-lg font-bold text-gray-900 mt-1 tabular-nums">{kpi.value}</p></div></div></div>
         ))}
       </div>
 
-      <div className="bg-[#111827] border border-slate-800/80 rounded-xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-800/60"><h3 className="text-sm font-semibold text-white">Utilization by Team Member</h3></div>
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-900">Utilization by Team Member</h3>
+          <span className="text-[11px] text-gray-500">{fmtNum(data.available, 0)} hrs available per person · <span className="inline-block w-2 h-px bg-gray-400 align-middle mx-0.5" /> 70% target</span>
+        </div>
         <table className="w-full text-sm">
-          <thead><tr className="bg-slate-800/20">
-            <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Member</th>
-            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Billable</th>
-            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Non-Bill</th>
-            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Total</th>
-            <th className="text-center px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Utilization</th>
-            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Revenue</th>
+          <thead><tr className="bg-gray-50">
+            <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Member</th>
+            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Billable</th>
+            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Non-Bill</th>
+            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Total</th>
+            <th className="text-center px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Utilization</th>
+            <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Revenue</th>
           </tr></thead>
           <tbody>
             {data.members.map((m, i) => (
-              <tr key={i} className="border-t border-slate-800/40 hover:bg-slate-800/20">
-                <td className="px-4 py-2.5 font-medium text-slate-200">{m.name}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-emerald-400">{fmtNum(m.billable)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-amber-400">{fmtNum(m.nonBillable)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-slate-300">{fmtNum(m.total)}</td>
+              <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
+                <td className="px-4 py-2.5 font-medium text-gray-700">{m.name}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600">{fmtNum(m.billable)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-amber-600">{fmtNum(m.nonBillable)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">{fmtNum(m.total)}</td>
                 <td className="px-4 py-2.5 text-center">
                   <div className="flex items-center gap-2 justify-center">
-                    <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: `${Math.min(m.billableUtil, 100)}%`, backgroundColor: m.billableUtil >= 70 ? CHART.emerald : m.billableUtil >= 50 ? CHART.amber : CHART.rose }} /></div>
-                    <span className="text-[10px] text-slate-500">{fmtPct(m.billableUtil)}</span>
+                    <div className="relative w-20 h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(m.billableUtil, 100)}%`, backgroundColor: m.billableUtil >= 70 ? CHART.emerald : m.billableUtil >= 50 ? CHART.amber : CHART.rose }} />
+                      {/* 70% target tick */}
+                      <div className="absolute top-0 bottom-0 w-px bg-gray-400/60" style={{ left: '70%' }} />
+                    </div>
+                    <span className={`text-[11px] font-medium tabular-nums ${m.billableUtil >= 70 ? 'text-emerald-600' : m.billableUtil >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>{fmtPct(m.billableUtil)}</span>
                   </div>
                 </td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-white">{fmtCurrency(m.amount)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-gray-900">{fmtCurrency(m.amount)}</td>
               </tr>
             ))}
           </tbody>
@@ -649,35 +688,36 @@ function ExpenseReport({ expenses, dateRange }: { expenses: any[]; dateRange: { 
   }, [expenses, dateRange])
 
   return (
-    <div className="bg-[#111827] border border-slate-800/80 rounded-xl overflow-hidden">
-      <div className="px-5 py-3 border-b border-slate-800/60 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white">Expense Breakdown</h3>
-        <span className="text-sm font-bold text-white tabular-nums">{fmtCurrency(data.total)}</span>
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-900">Expense Breakdown</h3>
+        <span className="text-sm font-bold text-gray-900 tabular-nums">{fmtCurrency(data.total)}</span>
       </div>
-      <div className="divide-y divide-slate-800/40">
-        {data.cats.map(cat => (
+      <div className="divide-y divide-gray-100">
+        {data.cats.map((cat, catIdx) => (
           <div key={cat.name}>
-            <button onClick={() => setExpanded(expanded === cat.name ? null : cat.name)} className="w-full px-5 py-3 flex items-center justify-between hover:bg-slate-800/20 transition-colors">
+            <button onClick={() => setExpanded(expanded === cat.name ? null : cat.name)} className={`w-full px-5 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors ${catIdx < 3 ? 'bg-gray-50/40' : ''}`}>
               <div className="flex items-center gap-3">
-                {expanded === cat.name ? <ChevronDown size={14} className="text-slate-500" /> : <ChevronRight size={14} className="text-slate-600" />}
-                <span className="text-sm font-medium text-slate-200">{cat.name}</span>
-                <span className="text-[10px] text-slate-600">{cat.items.length} items</span>
+                {expanded === cat.name ? <ChevronDown size={14} className="text-gray-500" /> : <ChevronRight size={14} className="text-gray-400" />}
+                <span className="text-sm font-medium text-gray-700">{cat.name}</span>
+                <span className="text-[10px] text-gray-400">{cat.items.length} items</span>
+                {catIdx === 0 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 font-medium">Top</span>}
               </div>
               <div className="flex items-center gap-4">
-                <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-teal-600 rounded-full" style={{ width: `${cat.pct}%` }} /></div>
-                <span className="text-[10px] text-slate-500 w-10 text-right">{cat.pct.toFixed(0)}%</span>
-                <span className="text-sm font-semibold text-white w-24 text-right tabular-nums">{fmtCurrency(cat.amount)}</span>
+                <div className="w-32 h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${cat.pct}%` }} /></div>
+                <span className="text-[11px] font-medium text-gray-500 w-10 text-right tabular-nums">{cat.pct.toFixed(0)}%</span>
+                <span className="text-sm font-semibold text-gray-900 w-24 text-right tabular-nums">{fmtCurrency(cat.amount)}</span>
               </div>
             </button>
             {expanded === cat.name && (
-              <div className="bg-slate-800/10 px-8 py-2">
+              <div className="bg-gray-50/50 px-8 py-2">
                 {cat.items.slice(0, 15).map((e: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between py-1.5 border-t border-slate-800/30 first:border-0">
-                    <div className="flex items-center gap-3"><span className="text-xs text-slate-500">{fmtDate(e.date)}</span><span className="text-xs text-slate-300">{e.description || e.vendor || '—'}</span></div>
-                    <span className="text-xs text-rose-400 tabular-nums">{fmtCurrency(Math.abs(parseFloat(e.amount || 0)))}</span>
+                  <div key={i} className="flex items-center justify-between py-1.5 border-t border-gray-100 first:border-0">
+                    <div className="flex items-center gap-3"><span className="text-xs text-gray-500">{fmtDate(e.date)}</span><span className="text-xs text-gray-600">{e.description || e.vendor || '—'}</span></div>
+                    <span className="text-xs text-rose-600 tabular-nums">{fmtCurrency(Math.abs(parseFloat(e.amount || 0)))}</span>
                   </div>
                 ))}
-                {cat.items.length > 15 && <p className="text-[10px] text-slate-600 py-1.5 text-center">+ {cat.items.length - 15} more</p>}
+                {cat.items.length > 15 && <p className="text-[10px] text-gray-400 py-1.5 text-center">+ {cat.items.length - 15} more</p>}
               </div>
             )}
           </div>
@@ -700,22 +740,45 @@ function CashFlowReport({ invoices, bills, expenses, dateRange }: { invoices: an
 
   const rows = [
     { label: 'OPERATING ACTIVITIES', header: true },
-    { label: 'Client Payments Received', value: data.cashIn, color: 'text-emerald-400' },
-    { label: 'Bills Paid', value: -data.billsPaid, color: 'text-rose-400' },
-    { label: 'Expenses Paid', value: -data.expensesPaid, color: 'text-rose-400' },
+    { label: 'Client Payments Received', value: data.cashIn, color: 'text-emerald-600' },
+    { label: 'Bills Paid', value: -data.billsPaid, color: 'text-rose-600' },
+    { label: 'Expenses Paid', value: -data.expensesPaid, color: 'text-rose-600' },
     { label: 'Net Cash from Operations', value: data.net, bold: true, border: true },
   ]
 
   return (
-    <div className="bg-[#111827] border border-slate-800/80 rounded-xl overflow-hidden">
-      <div className="px-5 py-3 border-b border-slate-800/60"><h3 className="text-sm font-semibold text-white">Cash Flow Statement</h3></div>
+    <div className="space-y-4">
+      {/* [FIX #3] Cash Flow KPI summary cards */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="flex"><div className="w-1 bg-emerald-500 shrink-0" /><div className="p-3 flex-1">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Cash In</p>
+            <p className="text-lg font-bold text-emerald-600 mt-1 tabular-nums">{fmtCurrency(data.cashIn)}</p>
+          </div></div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="flex"><div className="w-1 bg-rose-500 shrink-0" /><div className="p-3 flex-1">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Cash Out</p>
+            <p className="text-lg font-bold text-rose-600 mt-1 tabular-nums">{fmtCurrency(data.cashOut)}</p>
+          </div></div>
+        </div>
+        <div className={`bg-white border rounded-xl overflow-hidden ${data.net >= 0 ? 'border-emerald-200' : 'border-rose-200'}`}>
+          <div className="flex"><div className={`w-1 ${data.net >= 0 ? 'bg-emerald-500' : 'bg-rose-500'} shrink-0`} /><div className="p-3 flex-1">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Net Cash</p>
+            <p className={`text-lg font-bold mt-1 tabular-nums ${data.net >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{fmtCurrency(data.net)}</p>
+          </div></div>
+        </div>
+      </div>
+
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="px-5 py-3 border-b border-gray-200"><h3 className="text-sm font-semibold text-gray-900">Cash Flow Statement</h3></div>
       <table className="w-full text-sm">
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i} className={`${row.border ? 'border-t border-slate-700' : ''} ${row.header ? 'bg-slate-800/10' : ''}`}>
-              <td className={`px-5 py-2.5 ${row.bold ? 'font-semibold text-white' : row.header ? 'text-[10px] font-bold uppercase tracking-wider text-slate-500' : 'text-slate-300 pl-10'}`}>{row.label}</td>
+            <tr key={i} className={`${row.border ? 'border-t border-gray-300' : ''} ${row.header ? 'bg-gray-50/50' : ''}`}>
+              <td className={`px-5 py-2.5 ${row.bold ? 'font-semibold text-gray-900' : row.header ? 'text-[10px] font-bold uppercase tracking-wider text-gray-500' : 'text-gray-600 pl-10'}`}>{row.label}</td>
               {!row.header && (
-                <td className={`px-5 py-2.5 text-right tabular-nums ${row.bold ? 'font-bold' : ''} ${row.color || ((row.value || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400')}`}>
+                <td className={`px-5 py-2.5 text-right tabular-nums ${row.bold ? 'font-bold' : ''} ${row.color || ((row.value || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600')}`}>
                   {fmtCurrency(row.value || 0)}
                 </td>
               )}
@@ -723,6 +786,7 @@ function CashFlowReport({ invoices, bills, expenses, dateRange }: { invoices: an
           ))}
         </tbody>
       </table>
+    </div>
     </div>
   )
 }
@@ -793,7 +857,7 @@ function ReportBuilder({ allData, dateRange, onSave, editingTemplate }: {
       case 'utilization': return <UtilizationReport timeEntries={allData.timeEntries} teamMembers={allData.teamMembers} dateRange={dateRange} />
       case 'expense': return <ExpenseReport expenses={allData.expenses} dateRange={dateRange} />
       case 'text_note': return (
-        <div className="bg-[#111827] border border-slate-800/80 rounded-xl p-5">
+        <div className="bg-white border border-gray-200 rounded-xl p-5">
           <textarea value={block.config?.text || ''} onChange={e => updateBlock(block.id, { config: { ...block.config, text: e.target.value } })}
             className={`${inputClass} w-full min-h-[80px] resize-y`} placeholder="Add notes, context, or section headers for your report..." />
         </div>
@@ -827,16 +891,16 @@ function ReportBuilder({ allData, dateRange, onSave, editingTemplate }: {
     <div className="space-y-4">
       <div className="flex items-center gap-4 mb-2">
         <input type="text" value={reportTitle} onChange={e => setReportTitle(e.target.value)}
-          className="bg-transparent text-lg font-bold text-white border-b border-transparent hover:border-slate-700 focus:border-teal-600 focus:outline-none pb-1 transition-colors flex-1" />
+          className="bg-transparent text-lg font-bold text-gray-900 border-b border-transparent hover:border-gray-300 focus:border-emerald-600 focus:outline-none pb-1 transition-colors flex-1" />
         <div className="flex items-center gap-2">
           {blocks.length > 0 && (
             <>
               <button onClick={handleExportBuilder}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-800/80 text-xs font-medium text-slate-300 hover:text-white hover:border-slate-700 transition-colors">
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-xs font-medium text-gray-600 hover:text-gray-900 hover:border-gray-300 transition-colors">
                 <FileDown size={13} /> Export
               </button>
               <button onClick={handleSave} disabled={saving}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-xs font-semibold text-white transition-colors disabled:opacity-50">
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white transition-colors disabled:opacity-50">
                 {saving ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={13} />}
                 {saving ? 'Saving...' : 'Save Template'}
               </button>
@@ -848,18 +912,18 @@ function ReportBuilder({ allData, dateRange, onSave, editingTemplate }: {
       <div className="grid grid-cols-12 gap-4">
         {/* Block palette — sidebar */}
         <div className="col-span-3">
-          <div className="bg-[#111827] border border-slate-800/80 rounded-xl p-4 sticky top-4">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-3">Data Blocks</p>
-            <p className="text-[10px] text-slate-600 mb-3">Click to add to canvas</p>
+          <div className="bg-white border border-gray-200 rounded-xl p-4 sticky top-4">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-3">Data Blocks</p>
+            <p className="text-[10px] text-gray-400 mb-3">Click to add to canvas</p>
             <div className="space-y-1.5">
               {BLOCK_PALETTE.map(b => {
                 const Icon = b.icon
                 return (
                   <button key={b.type} onClick={() => addBlock(b.type)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left bg-slate-800/30 hover:bg-slate-800/60 border border-transparent hover:border-slate-700 transition-all group">
-                    <Icon size={14} className="text-slate-500 group-hover:text-teal-400 transition-colors" />
-                    <span className="text-xs font-medium text-slate-300 group-hover:text-white transition-colors">{b.label}</span>
-                    <Plus size={12} className="ml-auto text-slate-600 group-hover:text-teal-400 transition-colors" />
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left bg-gray-50/50 hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all group">
+                    <Icon size={14} className="text-gray-500 group-hover:text-emerald-600 transition-colors" />
+                    <span className="text-xs font-medium text-gray-600 group-hover:text-gray-900 transition-colors">{b.label}</span>
+                    <Plus size={12} className="ml-auto text-gray-400 group-hover:text-emerald-600 transition-colors" />
                   </button>
                 )
               })}
@@ -870,10 +934,14 @@ function ReportBuilder({ allData, dateRange, onSave, editingTemplate }: {
         {/* Canvas */}
         <div className="col-span-9">
           {blocks.length === 0 ? (
-            <div className="bg-[#111827] border border-dashed border-slate-700 rounded-xl p-16 text-center">
-              <LayoutGrid size={32} className="text-slate-600 mx-auto mb-3" />
-              <p className="text-sm text-slate-400 mb-1">Empty canvas</p>
-              <p className="text-xs text-slate-600">Click data blocks on the left to start building your report. Arrange, rename, and export.</p>
+            <div className="bg-white border-2 border-dashed border-gray-200 rounded-xl p-16 text-center relative overflow-hidden">
+              {/* Subtle dot grid pattern */}
+              <div className="absolute inset-0 opacity-[0.15]" style={{ backgroundImage: 'radial-gradient(circle, #9ca3af 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+              <div className="relative">
+                <LayoutGrid size={32} className="text-gray-300 mx-auto mb-3" />
+                <p className="text-sm font-medium text-gray-600 mb-1">Start building your report</p>
+                <p className="text-xs text-gray-400">Click data blocks on the left to add sections. Drag to reorder, rename headers, and export when ready.</p>
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
@@ -881,15 +949,15 @@ function ReportBuilder({ allData, dateRange, onSave, editingTemplate }: {
                 <div key={block.id} className="relative group">
                   {/* Block controls */}
                   <div className="absolute -left-1 top-2 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                    <button onClick={() => moveBlock(block.id, -1)} disabled={idx === 0} className="p-1 bg-slate-800 border border-slate-700 rounded text-slate-400 hover:text-white disabled:opacity-20 transition-colors"><ArrowUp size={10} /></button>
-                    <button onClick={() => moveBlock(block.id, 1)} disabled={idx === blocks.length - 1} className="p-1 bg-slate-800 border border-slate-700 rounded text-slate-400 hover:text-white disabled:opacity-20 transition-colors"><ArrowDown size={10} /></button>
-                    <button onClick={() => removeBlock(block.id)} className="p-1 bg-slate-800 border border-slate-700 rounded text-slate-400 hover:text-rose-400 transition-colors"><Trash2 size={10} /></button>
+                    <button onClick={() => moveBlock(block.id, -1)} disabled={idx === 0} className="p-1 bg-white border border-gray-200 rounded shadow-sm text-gray-400 hover:text-gray-700 disabled:opacity-20 transition-colors"><ArrowUp size={10} /></button>
+                    <button onClick={() => moveBlock(block.id, 1)} disabled={idx === blocks.length - 1} className="p-1 bg-white border border-gray-200 rounded shadow-sm text-gray-400 hover:text-gray-700 disabled:opacity-20 transition-colors"><ArrowDown size={10} /></button>
+                    <button onClick={() => removeBlock(block.id)} className="p-1 bg-white border border-gray-200 rounded shadow-sm text-gray-400 hover:text-rose-500 transition-colors"><Trash2 size={10} /></button>
                   </div>
 
                   {/* Block title */}
                   <div className="flex items-center gap-2 mb-1.5 ml-5">
                     <input type="text" value={block.title} onChange={e => updateBlock(block.id, { title: e.target.value })}
-                      className="bg-transparent text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-transparent hover:border-slate-700 focus:border-teal-600 focus:outline-none transition-colors" />
+                      className="bg-transparent text-xs font-semibold uppercase tracking-wider text-gray-500 border-b border-transparent hover:border-gray-300 focus:border-emerald-600 focus:outline-none transition-colors" />
                   </div>
 
                   {/* Block content */}
@@ -957,6 +1025,34 @@ export default function ReportsPage() {
   }, [])
 
   const allData = { invoices, bills, expenses, projects, clients, timeEntries, teamMembers }
+
+  // [FIX #1] Live KPI previews for report cards
+  const reportPreviews = useMemo(() => {
+    if (loading) return {} as Record<string, string>
+    const totalRev = invoices.filter(inv => inRange(inv.invoice_date, dateRange)).reduce((s, inv) => s + parseFloat(inv.total_amount || inv.amount || 0), 0)
+    let totalCost = 0
+    const projMap: Record<string, string> = {}; projects.forEach(p => { projMap[p.id] = p.client_id })
+    timeEntries.filter(t => inRange(t.date || t.week_starting, dateRange)).forEach(t => {
+      const hrs = parseFloat(t.hours || t.total_hours || 0)
+      const m = teamMembers.find(mm => mm.id === (t.contractor_id || t.team_member_id))
+      totalCost += hrs * (m?.cost_rate || (m?.cost_amount ? m.cost_amount / 172 : 0))
+    })
+    const totalAR = invoices.filter(inv => parseFloat(inv.balance_due || 0) > 0).reduce((s, inv) => s + parseFloat(inv.balance_due || 0), 0)
+    const cashIn = invoices.filter(inv => inRange(inv.payment_date || inv.paid_date || inv.invoice_date, dateRange) && (inv.status === 'paid' || inv.status === 'Paid')).reduce((s, inv) => s + parseFloat(inv.total_amount || inv.amount || 0), 0)
+    const cashOut = bills.filter(b => inRange(b.date || b.bill_date, dateRange)).reduce((s, b) => s + Math.abs(parseFloat(b.amount || b.total_amount || 0)), 0) + expenses.filter(e => inRange(e.date, dateRange)).reduce((s, e) => s + Math.abs(parseFloat(e.amount || 0)), 0)
+    const totalExp = expenses.filter(e => inRange(e.date, dateRange)).reduce((s, e) => s + Math.abs(parseFloat(e.amount || 0)), 0)
+    const activeProjects = projects.filter(p => p.status === 'active').length
+
+    return {
+      pnl: fmtCurrency(totalRev - totalCost),
+      cash_flow: fmtCurrency(cashIn - cashOut),
+      ar_aging: fmtCurrency(totalAR),
+      client_profit: `${totalRev > 0 ? fmtPct(((totalRev - totalCost) / totalRev) * 100) : '0%'} margin`,
+      project_profit: `${activeProjects} active`,
+      utilization: `${fmtNum(timeEntries.filter(t => inRange(t.date || t.week_starting, dateRange)).reduce((s, t) => s + parseFloat(t.hours || t.total_hours || 0), 0))} hrs`,
+      expense: fmtCurrency(totalExp),
+    } as Record<string, string>
+  }, [invoices, bills, expenses, projects, timeEntries, teamMembers, dateRange, loading])
 
   // ============ TEMPLATE CRUD ============
   const saveTemplate = async (name: string, blocks: BuilderBlock[]) => {
@@ -1115,56 +1211,41 @@ export default function ReportsPage() {
 
   if (loading) return (
     <div className="flex items-center justify-center h-[60vh]">
-      <div className="text-center"><div className="w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" /><p className="text-sm text-slate-500">Loading reports...</p></div>
+      <div className="text-center"><div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" /><p className="text-sm text-gray-500">Loading reports...</p></div>
     </div>
   )
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Header */}
+      {/* Header + Date Controls — single row */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-white">Reports</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Financial statements, profitability, and custom reports</p>
+          <h1 className="text-xl font-bold tracking-tight text-gray-900">Reports</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Financial statements, profitability, and custom reports</p>
         </div>
-      </div>
-
-      {/* Controls */}
-      <div className="bg-[#111827] border border-slate-800/80 rounded-xl p-4">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Calendar size={16} className="text-slate-500" />
-            <select value={datePreset} onChange={e => setDatePreset(e.target.value as DatePreset)} className={inputClass}>
-              <option value="this_month">This Month</option>
-              <option value="last_month">Last Month</option>
-              <option value="this_quarter">This Quarter</option>
-              <option value="last_quarter">Last Quarter</option>
-              <option value="ytd">Year to Date</option>
-              <option value="last_year">Last Year</option>
-              <option value="custom">Custom Range</option>
-            </select>
-            {datePreset === 'custom' && (
-              <>
-                <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className={inputClass} />
-                <span className="text-slate-600 text-xs">to</span>
-                <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className={inputClass} />
-              </>
-            )}
-          </div>
-
-          {selectedReport && activeTab === 'reports' && (
+        <div className="flex items-center gap-2">
+          <Calendar size={15} className="text-gray-400" />
+          <select value={datePreset} onChange={e => setDatePreset(e.target.value as DatePreset)} className={`${inputClass} text-xs py-1.5`}>
+            <option value="this_month">This Month</option>
+            <option value="last_month">Last Month</option>
+            <option value="this_quarter">This Quarter</option>
+            <option value="last_quarter">Last Quarter</option>
+            <option value="ytd">Year to Date</option>
+            <option value="last_year">Last Year</option>
+            <option value="custom">Custom Range</option>
+          </select>
+          {datePreset === 'custom' && (
             <>
-              <div className="w-px h-8 bg-slate-800/60" />
-              <button onClick={() => setSelectedReport(null)} className="text-xs text-teal-400 hover:text-teal-300 transition-colors">
-                ← Back to all reports
-              </button>
+              <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className={`${inputClass} text-xs py-1.5`} />
+              <span className="text-gray-400 text-xs">to</span>
+              <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className={`${inputClass} text-xs py-1.5`} />
             </>
           )}
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-slate-800/60">
+      <div className="border-b border-gray-200">
         <div className="flex gap-0">
           {([
             { id: 'reports' as const, label: 'Quick Reports' },
@@ -1172,9 +1253,9 @@ export default function ReportsPage() {
             { id: 'saved' as const, label: `Saved${savedTemplates.length > 0 ? ` (${savedTemplates.length})` : ''}` },
           ]).map(tab => (
             <button key={tab.id} onClick={() => { setActiveTab(tab.id); setSelectedReport(null) }}
-              className={`relative px-5 py-3 text-sm font-medium transition-colors ${activeTab === tab.id ? 'text-teal-400' : 'text-slate-500 hover:text-slate-300'}`}>
+              className={`relative px-5 py-3 text-sm font-medium transition-colors ${activeTab === tab.id ? 'text-emerald-600' : 'text-gray-500 hover:text-gray-600'}`}>
               {tab.label}
-              {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500 rounded-t" />}
+              {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t" />}
             </button>
           ))}
         </div>
@@ -1185,16 +1266,20 @@ export default function ReportsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {REPORTS.map(report => {
             const Icon = report.icon
+            const preview = reportPreviews[report.id]
             return (
               <button key={report.id} onClick={() => setSelectedReport(report.id)}
-                className="text-left bg-[#111827] border border-slate-800/80 rounded-xl p-4 hover:border-slate-700 hover:bg-slate-800/30 transition-all group">
+                className="text-left bg-white border border-gray-200 rounded-xl p-4 hover:border-gray-300 hover:shadow-sm transition-all group">
                 <div className="flex items-start gap-3">
                   <div className={`w-9 h-9 ${report.accent} rounded-lg flex items-center justify-center shrink-0`}>
                     <Icon size={18} className="text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-white group-hover:text-teal-400 transition-colors">{report.name}</h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{report.description}</p>
+                    <h3 className="text-sm font-semibold text-gray-900 group-hover:text-emerald-600 transition-colors">{report.name}</h3>
+                    <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">{report.description}</p>
+                    {preview && (
+                      <p className="text-sm font-bold text-gray-900 mt-2 tabular-nums">{preview}</p>
+                    )}
                   </div>
                 </div>
               </button>
@@ -1207,12 +1292,12 @@ export default function ReportsPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm">
-              <button onClick={() => setSelectedReport(null)} className="text-slate-500 hover:text-slate-300 transition-colors">Reports</button>
-              <ChevronRight size={14} className="text-slate-600" />
-              <span className="text-white font-medium">{REPORTS.find(r => r.id === selectedReport)?.name}</span>
+              <button onClick={() => setSelectedReport(null)} className="text-gray-500 hover:text-gray-600 transition-colors">Reports</button>
+              <ChevronRight size={14} className="text-gray-400" />
+              <span className="text-gray-900 font-medium">{REPORTS.find(r => r.id === selectedReport)?.name}</span>
             </div>
             <button onClick={() => exportReport(selectedReport)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-800/80 text-xs font-medium text-slate-300 hover:text-white hover:border-slate-700 transition-colors">
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-xs font-medium text-gray-600 hover:text-gray-900 hover:border-gray-300 transition-colors">
               <Download size={13} /> Export CSV
             </button>
           </div>
@@ -1227,27 +1312,30 @@ export default function ReportsPage() {
       {activeTab === 'saved' && (
         <div className="space-y-4">
           {savedTemplates.length === 0 ? (
-            <div className="bg-[#111827] border border-dashed border-slate-700 rounded-xl p-16 text-center">
-              <Bookmark size={32} className="text-slate-600 mx-auto mb-3" />
-              <p className="text-sm text-slate-400 mb-1">No saved reports</p>
-              <p className="text-xs text-slate-600 mb-4">Build a custom report in the Report Builder tab and save it as a template.</p>
+            <div className="bg-white border-2 border-dashed border-gray-200 rounded-xl p-16 text-center relative overflow-hidden">
+              <div className="absolute inset-0 opacity-[0.1]" style={{ backgroundImage: 'radial-gradient(circle, #9ca3af 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+              <div className="relative">
+              <Bookmark size={32} className="text-gray-300 mx-auto mb-3" />
+              <p className="text-sm font-medium text-gray-600 mb-1">No saved reports</p>
+              <p className="text-xs text-gray-400 mb-4">Build a custom report in the Report Builder tab and save it as a template.</p>
               <button onClick={() => { setActiveTab('builder'); setEditingTemplate(null) }}
-                className="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-sm font-semibold text-white transition-colors">
+                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold text-white transition-colors">
                 <Plus size={14} className="inline mr-1.5" /> Create Report
               </button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {savedTemplates.map(tpl => (
-                <div key={tpl.id} className="bg-[#111827] border border-slate-800/80 rounded-xl p-4 group">
+                <div key={tpl.id} className="bg-white border border-gray-200 rounded-xl p-4 group">
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <h3 className="text-sm font-semibold text-white">{tpl.name}</h3>
-                      <p className="text-[10px] text-slate-500 mt-0.5">
+                      <h3 className="text-sm font-semibold text-gray-900">{tpl.name}</h3>
+                      <p className="text-[10px] text-gray-500 mt-0.5">
                         {tpl.blocks.length} block{tpl.blocks.length !== 1 ? 's' : ''} · Updated {tpl.updated_at ? fmtDate(tpl.updated_at) : '—'}
                       </p>
                     </div>
-                    <Bookmark size={14} className="text-teal-400 shrink-0 mt-0.5" />
+                    <Bookmark size={14} className="text-emerald-600 shrink-0 mt-0.5" />
                   </div>
 
                   {/* Block summary */}
@@ -1255,7 +1343,7 @@ export default function ReportsPage() {
                     {tpl.blocks.map((b, i) => {
                       const palette = BLOCK_PALETTE.find(p => p.type === b.type)
                       return (
-                        <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800/80 text-slate-400 border border-slate-800/60">
+                        <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200">
                           {palette?.label || b.type}
                         </span>
                       )
@@ -1263,17 +1351,17 @@ export default function ReportsPage() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 pt-2 border-t border-slate-800/60">
+                  <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
                     <button onClick={() => { setEditingTemplate(tpl); setActiveTab('builder') }}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 border border-teal-600/30 text-xs font-medium text-teal-400 hover:bg-teal-600/30 transition-colors">
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-medium text-emerald-600 hover:bg-emerald-100 transition-colors">
                       <Eye size={12} /> Open
                     </button>
                     <button onClick={() => duplicateTemplate(tpl)}
-                      className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/40 border border-slate-800/60 text-xs font-medium text-slate-400 hover:text-white transition-colors">
+                      className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors">
                       <Copy size={12} />
                     </button>
                     <button onClick={() => deleteTemplate(tpl.id)}
-                      className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/40 border border-slate-800/60 text-xs font-medium text-slate-400 hover:text-rose-400 transition-colors">
+                      className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-xs font-medium text-gray-500 hover:text-rose-600 transition-colors">
                       <Trash2 size={12} />
                     </button>
                   </div>
