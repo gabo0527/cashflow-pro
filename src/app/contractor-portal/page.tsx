@@ -10,6 +10,19 @@ import {
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 
+// Force light color scheme on all form elements
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style')
+  style.textContent = `
+    *, input, select, textarea { color-scheme: light !important; }
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; }
+    input[type="date"]::-webkit-calendar-picker-indicator { filter: none; }
+  `
+  document.head.appendChild(style)
+}
+
 const supabase = createClient(
   'https://jmahfgpbtjeomuepfozf.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptYWhmZ3BidGplb211ZXBmb3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0OTAxNzcsImV4cCI6MjA4MTA2NjE3N30.3SVDvWCGIYYHV57BpKjpDJVCZLKzuRv8B_VietQDxUQ'
@@ -67,8 +80,8 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 const T = {
   card: "bg-white border border-gray-200 rounded-xl shadow-sm",
   cardHover: "bg-white border border-gray-200 rounded-xl shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md",
-  input: "w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all duration-200",
-  select: "w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all duration-200 cursor-pointer appearance-none",
+  input: "w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all duration-200",
+  select: "w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all duration-200 cursor-pointer appearance-none",
   label: "block text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2",
   btnPrimary: "px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm shadow-emerald-500/20",
   btnGhost: "px-4 py-2 rounded-lg text-sm text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200",
@@ -698,9 +711,9 @@ export default function ContractorPortal() {
                               <div className="flex items-center px-4 sm:px-5 h-[48px] sm:h-[52px]">
                                 <span className={`flex-1 text-[13px] truncate ${hasHours ? 'text-gray-900 font-semibold' : 'text-gray-400'}`}>{p.project_name}</span>
                                 <div className="flex items-center gap-1.5">
-                                  <input type="number" placeholder="—" min="0" step="0.5" 
+                                  <input type="text" inputMode="decimal" placeholder="—"
                                     value={timeEntries[p.project_id]?.hours || ''} 
-                                    onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], hours: e.target.value } }))}
+                                    onChange={e => { const v = e.target.value; if (v === '' || /^\d*\.?\d*$/.test(v)) setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], hours: v } })) }}
                                     className="w-[50px] py-1 bg-transparent border-b-2 border-gray-200 text-gray-900 text-[15px] font-bold text-right tabular-nums focus:outline-none focus:border-emerald-500 transition-colors placeholder-gray-300" />
                                   <span className="text-gray-300 text-[10px] font-semibold w-4">h</span>
                                 </div>
@@ -711,7 +724,7 @@ export default function ContractorPortal() {
                                   <input type="text" placeholder="What did you work on?" 
                                     value={timeEntries[p.project_id]?.notes || ''} 
                                     onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], notes: e.target.value } }))}
-                                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 text-xs placeholder-gray-300 focus:outline-none focus:border-emerald-300 focus:bg-white transition-all" />
+                                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-600 text-xs placeholder-gray-300 focus:outline-none focus:border-emerald-300 transition-all" style={{ colorScheme: 'light' }} />
                                 </div>
                               )}
                             </div>
