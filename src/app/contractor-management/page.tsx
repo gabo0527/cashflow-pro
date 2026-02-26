@@ -18,15 +18,15 @@ const supabase = createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptYWhmZ3BidGplb211ZXBmb3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0OTAxNzcsImV4cCI6MjA4MTA2NjE3N30.3SVDvWCGIYYHV57BpKjpDJVCZLKzuRv8B_VietQDxUQ'
 )
 
-// ============ DESIGN SYSTEM — styles in globals.css ============
+// ============ DESIGN SYSTEM — Light Slate + Emerald ============
 const THEME = {
-  card: 'bg-[#0f1623] border-slate-800/50',
-  cardHover: 'hover:bg-white/[0.025]',
-  border: 'border-slate-800/50',
-  textPrimary: 'text-white',
-  textSecondary: 'text-slate-300',
-  textMuted: 'text-slate-400',
-  textDim: 'text-slate-500',
+  card: 'bg-white border-gray-200',
+  cardHover: 'hover:bg-gray-50',
+  border: 'border-gray-200',
+  textPrimary: 'text-gray-900',
+  textSecondary: 'text-gray-600',
+  textMuted: 'text-gray-500',
+  textDim: 'text-gray-400',
 }
 
 // ============ TYPES ============
@@ -86,12 +86,13 @@ const formatCurrency = (v: number) => new Intl.NumberFormat('en-US', { style: 'c
 const formatDate = (d: string) => { if (!d) return '—'; return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
 const formatDateCompact = (d: string) => { if (!d) return '—'; return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }
 
+// [FIX #1] Light-theme status badges
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string; icon: any }> = {
-  submitted: { label: 'Submitted', bg: 'bg-blue-950/50', text: 'text-blue-400', border: 'border-blue-800/30', icon: Clock },
-  pending: { label: 'Pending', bg: 'bg-amber-950/50', text: 'text-amber-400', border: 'border-amber-800/30', icon: Clock },
-  approved: { label: 'Approved', bg: 'bg-emerald-950/50', text: 'text-emerald-400', border: 'border-emerald-800/30', icon: CheckCircle },
-  rejected: { label: 'Rejected', bg: 'bg-red-950/50', text: 'text-red-400', border: 'border-red-800/30', icon: XCircle },
-  paid: { label: 'Paid', bg: 'bg-emerald-950/50', text: 'text-emerald-300', border: 'border-emerald-800/30', icon: DollarSign },
+  submitted: { label: 'Submitted', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: Clock },
+  pending: { label: 'Pending', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: Clock },
+  approved: { label: 'Approved', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: CheckCircle },
+  rejected: { label: 'Rejected', bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', icon: XCircle },
+  paid: { label: 'Paid', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200', icon: DollarSign },
 }
 
 const EXPENSE_CATEGORIES: Record<string, { label: string }> = {
@@ -118,27 +119,42 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-// ============ METRIC CARD — Institutional left-accent-bar ============
-function MetricCard({ label, value, sub, icon: Icon, accentColor = '#0d9488' }: { label: string; value: string; sub?: string; icon: any; accentColor?: string }) {
+// [FIX #1] MetricCard — compact, light theme, amber highlight for pending
+function MetricCard({ label, value, sub, icon: Icon, accentColor = '#059669', highlight = false }: {
+  label: string; value: string; sub?: string; icon: any; accentColor?: string; highlight?: boolean
+}) {
   return (
-    <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
-      <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full" style={{ backgroundColor: accentColor }} />
+    <div className={`vCard relative p-4 rounded-xl border overflow-hidden shadow-sm ${highlight ? 'bg-amber-50/50 border-amber-200' : 'bg-white border-gray-200'}`}>
+      <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full" style={{ backgroundColor: accentColor }} />
       <div className="pl-2">
-        <div className="flex items-center justify-between mb-2">
-          <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>{label}</span>
-          <Icon size={15} className={THEME.textDim} />
+        <div className="flex items-center justify-between mb-1.5">
+          <span className={`vLbl text-[10px] font-bold uppercase ${highlight ? 'text-amber-600' : THEME.textDim}`}>{label}</span>
+          <Icon size={15} className={highlight ? 'text-amber-500' : THEME.textDim} />
         </div>
-        <p className="text-2xl font-bold text-white vN">{value}</p>
-        {sub && <p className={`text-xs ${THEME.textDim} mt-0.5`}>{sub}</p>}
+        <p className={`text-2xl font-semibold vN ${highlight ? 'text-amber-700' : 'text-gray-900'}`}>{value}</p>
+        {sub && <p className={`text-xs mt-0.5 ${highlight ? 'text-amber-600' : THEME.textDim}`}>{sub}</p>}
       </div>
     </div>
   )
 }
 
 // ============ SHARED STYLES ============
-const selectClass = `px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 vInp rounded-lg text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/15 focus:border-teal-600/50 transition-colors`
-const invoiceGridCols = 'grid-cols-[1fr_140px_100px_120px_100px_100px_170px]'
-const expenseGridCols = 'grid-cols-[1fr_130px_100px_80px_100px_80px_180px]'
+// [FIX #10] Active filter gets emerald tint
+const getSelectClass = (isActive: boolean) =>
+  `px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-colors cursor-pointer ${
+    isActive ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-white border-gray-200 text-gray-700'
+  }`
+
+// [FIX #4] Optimized grid — merged Attachment into Actions
+const invoiceGridCols = 'grid-cols-[1fr_130px_90px_110px_100px_200px]'
+const expenseGridCols = 'grid-cols-[1fr_130px_100px_80px_100px_200px]'
+
+// [FIX #2] Row urgency border
+function getRowBorder(status: string): string {
+  if (status === 'submitted' || status === 'pending') return 'border-l-2 border-l-amber-400'
+  if (status === 'approved') return 'border-l-2 border-l-emerald-400'
+  return 'border-l-2 border-l-transparent'
+}
 
 // ============ MAIN COMPONENT ============
 export default function ContractorManagement() {
@@ -206,6 +222,10 @@ export default function ContractorManagement() {
     else if (dateRange === 'year') d.setFullYear(d.getFullYear() + dir)
     setRefDate(d)
   }
+
+  // [FIX #10] Check if any filter is active
+  const hasActiveFilters = filterStatus !== 'all' || filterMember !== 'all' || filterClient !== 'all' || searchQuery !== ''
+  const clearFilters = () => { setSearchQuery(''); setFilterStatus('all'); setFilterMember('all'); setFilterClient('all') }
 
   // ============ LOAD DATA ============
   useEffect(() => {
@@ -346,6 +366,34 @@ export default function ContractorManagement() {
     setProcessing(null)
   }
 
+  // [FIX #3] Bulk approve all pending invoices
+  const bulkApproveInvoices = async () => {
+    const pendingInvs = filteredInvoices.filter(i => i.status === 'submitted')
+    setProcessing('bulk')
+    for (const inv of pendingInvs) {
+      const updates = { status: 'approved', reviewed_at: new Date().toISOString() }
+      const { error } = await supabase.from('contractor_invoices').update(updates).eq('id', inv.id)
+      if (!error) {
+        setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, ...updates } : i))
+      }
+    }
+    setProcessing(null)
+  }
+
+  // [FIX #3] Bulk approve all pending expenses
+  const bulkApproveExpenses = async () => {
+    const pendingExps = filteredExpenses.filter(e => e.status === 'pending')
+    setProcessing('bulk')
+    for (const exp of pendingExps) {
+      const updates = { status: 'approved', reviewed_at: new Date().toISOString() }
+      const { error } = await supabase.from('contractor_expenses').update(updates).eq('id', exp.id)
+      if (!error) {
+        setExpenses(prev => prev.map(e => e.id === exp.id ? { ...e, ...updates } : e))
+      }
+    }
+    setProcessing(null)
+  }
+
   /** Resolve signed URLs for ALL files in a comma-separated receipt_url */
   const openPreview = async (path: string) => {
     const paths = path.split(',').map(p => p.trim()).filter(Boolean)
@@ -382,7 +430,7 @@ export default function ContractorManagement() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 size={22} className="text-teal-500 animate-spin" />
+        <Loader2 size={22} className="text-emerald-500 animate-spin" />
       </div>
     )
   }
@@ -392,124 +440,149 @@ export default function ContractorManagement() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[28px] font-bold text-white tracking-tight">Contractor Management</h1>
+          <h1 className="text-xl font-semibold text-gray-900 tracking-tight">Contractor Management</h1>
           <p className={`text-[13px] mt-1 ${THEME.textDim}`}>AP invoices and expenses from your team</p>
         </div>
         <a href="/timesheet" target="_blank" rel="noopener noreferrer"
-          className={`flex items-center gap-2 px-4 py-2 ${THEME.card} border hover:bg-white/[0.05] rounded-lg text-slate-300 text-sm transition-colors`}>
+          className={`flex items-center gap-2 px-4 py-2 ${THEME.card} border hover:bg-gray-50 rounded-lg text-gray-600 text-sm transition-colors`}>
           <ExternalLink size={14} /> Contractor Portal
         </a>
       </div>
 
-      {/* Tabs + Date Range */}
-      <div className="flex items-center justify-between">
-        <div className={`flex items-center gap-0 border-b ${THEME.border}`}>
-          {[
-            { id: 'invoices' as const, label: 'AP Invoices', icon: FileText, count: invoiceMetrics.pendingCount },
-            { id: 'expenses' as const, label: 'Expenses', icon: Receipt, count: expenseMetrics.pendingCount },
-          ].map(tab => (
-            <button key={tab.id} onClick={() => { setActiveTab(tab.id); setSearchQuery(''); setFilterStatus('all'); setFilterMember('all'); setFilterClient('all') }}
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium vBtn border-b-2 -mb-px transition-all duration-300 ${
-                activeTab === tab.id ? 'border-teal-400 text-teal-400' : 'border-transparent text-slate-500 hover:text-slate-300 hover:border-slate-600'
-              }`}>
-              <tab.icon size={15} />
-              {tab.label}
-              {tab.count > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-950/50 text-amber-400 border border-amber-800/30">{tab.count}</span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Date range selector */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-0.5 p-0.5 bg-[#0a0f1a] rounded-lg border border-slate-800/50">
-            {['month', 'quarter', 'year', 'all'].map(r => (
-              <button key={r} onClick={() => setDateRange(r as any)}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${dateRange === r ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}>
-                {r === 'all' ? 'All' : r.charAt(0).toUpperCase() + r.slice(1)}
-              </button>
-            ))}
-          </div>
-          {dateRange !== 'all' && (
-            <div className="flex items-center gap-1">
-              <button onClick={() => navigateDate(-1)} className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-white/[0.05] text-slate-400 transition-colors`}><ChevronLeft size={14} /></button>
-              <span className={`text-white text-sm font-medium px-3 py-1.5 ${THEME.card} border rounded-lg min-w-[120px] text-center vN`}>{dateFilter.label}</span>
-              <button onClick={() => navigateDate(1)} className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-white/[0.05] text-slate-400 transition-colors`}><ChevronRight size={14} /></button>
-            </div>
-          )}
-        </div>
+      {/* Tabs */}
+      <div className={`flex items-center gap-0 border-b ${THEME.border}`}>
+        {[
+          { id: 'invoices' as const, label: 'AP Invoices', icon: FileText, count: invoiceMetrics.pendingCount },
+          { id: 'expenses' as const, label: 'Expenses', icon: Receipt, count: expenseMetrics.pendingCount },
+        ].map(tab => (
+          <button key={tab.id} onClick={() => { setActiveTab(tab.id); clearFilters() }}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium vBtn border-b-2 -mb-px transition-all duration-300 ${
+              activeTab === tab.id ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300'
+            }`}>
+            <tab.icon size={15} />
+            {tab.label}
+            {tab.count > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">{tab.count}</span>
+            )}
+          </button>
+        ))}
       </div>
 
       {/* ===================== AP INVOICES TAB ===================== */}
       {activeTab === 'invoices' && (
         <div className="space-y-4">
-          {/* Metrics */}
+          {/* Metrics — [FIX #1] Pending card highlighted */}
           <div className="grid grid-cols-4 gap-3">
             <MetricCard label="Total AP" value={formatCurrency(invoiceMetrics.total)} icon={DollarSign} accentColor="#2563eb" sub={`${filteredInvoices.length} invoices`} />
-            <MetricCard label="Pending Review" value={formatCurrency(invoiceMetrics.pendingAmt)} icon={Clock} accentColor="#d97706" sub={`${invoiceMetrics.pendingCount} awaiting`} />
+            <MetricCard label="Pending Review" value={formatCurrency(invoiceMetrics.pendingAmt)} icon={Clock} accentColor="#d97706" sub={`${invoiceMetrics.pendingCount} awaiting`} highlight={invoiceMetrics.pendingCount > 0} />
             <MetricCard label="Approved" value={formatCurrency(invoiceMetrics.approvedAmt)} icon={CheckCircle} accentColor="#059669" />
-            <MetricCard label="Paid" value={formatCurrency(invoiceMetrics.paidAmt)} icon={CreditCard} accentColor="#0d9488" />
+            <MetricCard label="Paid" value={formatCurrency(invoiceMetrics.paidAmt)} icon={CreditCard} accentColor="#059669" />
           </div>
 
-          {/* Filters + Group By */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 flex-1">
-              <div className="relative flex-1 max-w-xs">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                <input type="text" placeholder="Search invoices..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                  className={`w-full pl-9 pr-3 py-2 bg-slate-800/60 border ${THEME.border} rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/15`} />
+          {/* [FIX #3] Batch action bar for pending invoices */}
+          {invoiceMetrics.pendingCount > 0 && (
+            <div className="flex items-center justify-between px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Clock size={14} className="text-amber-600" />
+                <span className="text-sm text-amber-800 font-medium">{invoiceMetrics.pendingCount} invoice{invoiceMetrics.pendingCount !== 1 ? 's' : ''} pending review — {formatCurrency(invoiceMetrics.pendingAmt)} total</span>
               </div>
-              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={selectClass}>
+              <button onClick={bulkApproveInvoices} disabled={processing === 'bulk'}
+                className="px-3 py-1.5 bg-emerald-500 text-white text-xs font-semibold rounded-lg hover:bg-emerald-600 disabled:opacity-50 vBtn flex items-center gap-1.5">
+                {processing === 'bulk' ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                Approve All
+              </button>
+            </div>
+          )}
+
+          {/* [FIX #7] Filters + Date Range + Group By — date moved inline */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-1">
+              <div className="relative flex-1 max-w-xs">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input type="text" placeholder="Search invoices..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+              </div>
+              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={getSelectClass(filterStatus !== 'all')}>
                 <option value="all">All Statuses</option>
                 <option value="submitted">Submitted</option>
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
                 <option value="paid">Paid</option>
               </select>
-              <select value={filterMember} onChange={e => setFilterMember(e.target.value)} className={selectClass}>
+              <select value={filterMember} onChange={e => setFilterMember(e.target.value)} className={getSelectClass(filterMember !== 'all')}>
                 <option value="all">All Contractors</option>
                 {teamMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
-              <select value={filterClient} onChange={e => setFilterClient(e.target.value)} className={selectClass}>
+              <select value={filterClient} onChange={e => setFilterClient(e.target.value)} className={getSelectClass(filterClient !== 'all')}>
                 <option value="all">All Clients</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
-            </div>
-            {/* Group by toggle */}
-            <div className="flex items-center gap-0.5 p-0.5 bg-[#0a0f1a] rounded-lg border border-slate-800/50 shrink-0">
-              <span className="text-[10px] text-slate-500 px-1.5 uppercase tracking-wider">Group:</span>
-              {[{ id: 'none' as const, label: 'None' }, { id: 'contractor' as const, label: 'Contractor' }, { id: 'client' as const, label: 'Client' }].map(g => (
-                <button key={g.id} onClick={() => { setGroupBy(g.id); setCollapsedGroups(new Set()) }}
-                  className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${groupBy === g.id ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}>
-                  {g.label}
+              {/* [FIX #10] Clear filters button */}
+              {hasActiveFilters && (
+                <button onClick={clearFilters} className="px-2.5 py-2 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 vBtn flex items-center gap-1">
+                  <X size={12} /> Clear
                 </button>
-              ))}
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Date range */}
+              <div className="flex items-center gap-0.5 p-0.5 bg-gray-100 rounded-lg border border-gray-200">
+                {['month', 'quarter', 'year', 'all'].map(r => (
+                  <button key={r} onClick={() => setDateRange(r as any)}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${dateRange === r ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}>
+                    {r === 'all' ? 'All' : r.charAt(0).toUpperCase() + r.slice(1)}
+                  </button>
+                ))}
+              </div>
+              {dateRange !== 'all' && (
+                <div className="flex items-center gap-1">
+                  <button onClick={() => navigateDate(-1)} className="p-1.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-500 transition-colors"><ChevronLeft size={14} /></button>
+                  <span className="text-gray-900 text-sm font-medium px-3 py-1.5 bg-white border border-gray-200 rounded-lg min-w-[120px] text-center vN">{dateFilter.label}</span>
+                  <button onClick={() => navigateDate(1)} className="p-1.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-500 transition-colors"><ChevronRight size={14} /></button>
+                </div>
+              )}
+              {/* Group by */}
+              <div className="flex items-center gap-0.5 p-0.5 bg-gray-100 rounded-lg border border-gray-200">
+                <span className="text-[10px] text-gray-400 px-1.5 uppercase tracking-wider">Group:</span>
+                {[{ id: 'none' as const, label: 'None' }, { id: 'contractor' as const, label: 'Contractor' }, { id: 'client' as const, label: 'Client' }].map(g => (
+                  <button key={g.id} onClick={() => { setGroupBy(g.id); setCollapsedGroups(new Set()) }}
+                    className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${groupBy === g.id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}>
+                    {g.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Invoice List (grouped) */}
-          {filteredInvoices.length > 0 ? groupedInvoices.map(group => (
-            <div key={group.key} className={`${THEME.card} border rounded-2xl overflow-hidden shadow-xl shadow-black/20`}>
+          {filteredInvoices.length > 0 ? groupedInvoices.map(group => {
+            // [FIX #6] Count pending in each group
+            const groupPending = group.invoices.filter(i => i.status === 'submitted').length
+            return (
+            <div key={group.key} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+              {/* [FIX #6] Group header with status breakdown */}
               {groupBy !== 'none' && (
                 <button onClick={() => toggleGroup(group.key)}
-                  className={`w-full flex items-center justify-between px-5 py-3 bg-[#0a0f1a]/80 ${THEME.cardHover} transition-colors border-b ${THEME.border}`}>
+                  className={`w-full flex items-center justify-between px-5 py-3 bg-gray-50 hover:bg-gray-100 transition-colors border-b border-gray-200`}>
                   <div className="flex items-center gap-3">
-                    {collapsedGroups.has(group.key) ? <ChevronRight size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
-                    <span className="text-white text-sm font-semibold">{group.label}</span>
-                    <span className={`${THEME.textDim} text-xs`}>{group.invoices.length} invoice{group.invoices.length !== 1 ? 's' : ''}</span>
+                    {collapsedGroups.has(group.key) ? <ChevronRight size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
+                    <span className="text-gray-900 text-sm font-semibold">{group.label}</span>
+                    <span className="text-gray-400 text-xs">{group.invoices.length} invoice{group.invoices.length !== 1 ? 's' : ''}</span>
+                    {groupPending > 0 && (
+                      <span className="text-amber-700 text-xs font-medium bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">{groupPending} pending</span>
+                    )}
                   </div>
-                  <span className="text-white text-sm font-semibold vN">{formatCurrency(group.total)}</span>
+                  <span className="text-gray-900 text-sm font-semibold vN">{formatCurrency(group.total)}</span>
                 </button>
               )}
               {!collapsedGroups.has(group.key) && (<>
-                <div className={`grid ${invoiceGridCols} gap-2 px-5 py-2.5 border-b ${THEME.border} bg-[#080c14]`}>
+                {/* [FIX #4] Optimized grid headers — Attachment merged into Actions */}
+                <div className={`grid ${invoiceGridCols} gap-2 px-5 py-2.5 border-b border-gray-200 bg-gray-50`}>
                   <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Invoice</span>
                   <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>{groupBy === 'contractor' ? 'Client' : 'Contractor'}</span>
                   <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Period</span>
                   <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase text-right`}>Amount</span>
                   <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Status</span>
-                  <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Attachment</span>
                   <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Actions</span>
                 </div>
                 {group.invoices.map(inv => {
@@ -520,59 +593,61 @@ export default function ContractorManagement() {
                     ? (lines.length > 0 ? clientMap[lines[0].client_id] || '—' : '—')
                     : (memberMap[inv.team_member_id] || '—')
                   return (
-                    <div key={inv.id} className={`border-b ${THEME.border} border-opacity-40 last:border-0`}>
-                      <div className={`grid ${invoiceGridCols} gap-2 px-5 py-3 items-center ${THEME.cardHover} transition-colors`}>
+                    <div key={inv.id} className={`border-b border-gray-100 last:border-0`}>
+                      {/* [FIX #2] Row urgency border */}
+                      <div className={`grid ${invoiceGridCols} gap-2 px-5 py-3 items-center ${THEME.cardHover} transition-colors ${getRowBorder(inv.status)}`}>
                         <div className="flex items-center gap-3 min-w-0">
-                          <button onClick={() => setExpandedInvoice(isExpanded ? null : inv.id)} className="text-slate-500 hover:text-white vBtn">
+                          <button onClick={() => setExpandedInvoice(isExpanded ? null : inv.id)} className="text-gray-400 hover:text-gray-700 vBtn">
                             {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                           </button>
                           <div className="min-w-0">
-                            <p className="text-white text-sm font-medium truncate">{inv.invoice_number}</p>
-                            <p className={`${THEME.textDim} text-xs`}>Submitted {formatDate(inv.submitted_at?.split('T')[0] || inv.invoice_date)}</p>
+                            <p className="text-gray-900 text-sm font-medium truncate">{inv.invoice_number}</p>
+                            <p className="text-gray-400 text-xs">Submitted {formatDate(inv.submitted_at?.split('T')[0] || inv.invoice_date)}</p>
                           </div>
                         </div>
-                        <span className="text-slate-300 text-sm truncate">{secondCol}</span>
-                        <span className={`${THEME.textDim} text-xs vN`}>{formatDateCompact(inv.period_start)} – {formatDateCompact(inv.period_end)}</span>
-                        <span className="text-white text-sm font-medium text-right vN">{formatCurrency(inv.total_amount)}</span>
+                        <span className="text-gray-600 text-sm truncate">{secondCol}</span>
+                        <span className="text-gray-400 text-xs vN">{formatDateCompact(inv.period_start)} – {formatDateCompact(inv.period_end)}</span>
+                        <span className="text-gray-900 text-sm font-medium text-right vN">{formatCurrency(inv.total_amount)}</span>
                         <StatusBadge status={inv.status} />
-                        <div>
-                          {inv.receipt_url ? (
+                        {/* [FIX #4] Merged actions + attachment column */}
+                        <div className="flex items-center gap-1.5">
+                          {inv.receipt_url && (
                             <button onClick={() => openPreview(inv.receipt_url!)}
-                              className="inline-flex items-center gap-1 text-teal-400 hover:text-teal-300 text-xs vBtn">
+                              className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-500 text-xs vBtn">
                               <Eye size={12} /> View
                             </button>
-                          ) : <span className={`${THEME.textDim} text-xs`}>None</span>}
-                        </div>
-                        <div className="flex items-center gap-1.5">
+                          )}
+                          {/* [FIX #3] Larger approve button */}
                           {inv.status === 'submitted' && (
                             <>
                               <button onClick={() => updateInvoiceStatus(inv.id, 'approved')} disabled={isProcessing}
-                                className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 border border-emerald-500/20 disabled:opacity-50 vBtn">
+                                className="px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 disabled:opacity-50 vBtn">
                                 {isProcessing ? <Loader2 size={12} className="animate-spin" /> : 'Approve'}
                               </button>
                               <button onClick={() => updateInvoiceStatus(inv.id, 'rejected')} disabled={isProcessing}
-                                className="px-2.5 py-1 rounded-lg vBtn bg-[#0a0f1a] text-slate-500 text-xs font-medium hover:text-red-400 hover:bg-red-950/40 border border-slate-800/40 disabled:opacity-50 vBtn">
+                                className="px-2.5 py-1.5 rounded-lg vBtn bg-white text-gray-500 text-xs font-medium hover:text-red-600 hover:bg-red-50 border border-gray-200 disabled:opacity-50">
                                 Reject
                               </button>
                             </>
                           )}
                           {inv.status === 'approved' && (
                             <button onClick={() => updateInvoiceStatus(inv.id, 'paid')} disabled={isProcessing}
-                              className="px-2.5 py-1 rounded-lg vBtn bg-teal-950/50 text-teal-400 text-xs font-medium hover:bg-teal-900/50 border border-teal-800/30 disabled:opacity-50 vBtn">
+                              className="px-3 py-1.5 rounded-lg vBtn bg-emerald-50 text-emerald-700 text-xs font-medium hover:bg-emerald-100 border border-emerald-200 disabled:opacity-50">
                               Mark Paid
                             </button>
                           )}
                           {(inv.status === 'paid' || inv.status === 'rejected') && (
-                            <span className={`${THEME.textDim} text-xs`}>{inv.status === 'paid' ? formatDate(inv.paid_at?.split('T')[0] || '') : 'Rejected'}</span>
+                            <span className="text-gray-400 text-xs">{inv.status === 'paid' ? formatDate(inv.paid_at?.split('T')[0] || '') : 'Rejected'}</span>
                           )}
                         </div>
                       </div>
+                      {/* [FIX #5] Expanded detail — clear bg, total row */}
                       {isExpanded && lines.length > 0 && (
-                        <div className={`bg-white/[0.02] px-6 py-3 border-t ${THEME.border}`}>
+                        <div className="bg-gray-50 px-6 py-3 border-t border-gray-200">
                           <p className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase mb-2`}>Line Items</p>
                           <table className="w-full text-sm">
                             <thead>
-                              <tr className={`${THEME.textDim} text-xs`}>
+                              <tr className="text-gray-400 text-xs">
                                 <th className="text-left pb-1.5 font-medium">Client</th>
                                 <th className="text-left pb-1.5 font-medium">Description</th>
                                 <th className="text-right pb-1.5 font-medium">Hours</th>
@@ -583,18 +658,23 @@ export default function ContractorManagement() {
                             </thead>
                             <tbody>
                               {lines.map((line: any, i: number) => (
-                                <tr key={i} className={`border-t ${THEME.border} border-opacity-40`}>
-                                  <td className="py-1.5 text-slate-300">{clientMap[line.client_id] || line.description?.split(' - ')[0] || '—'}</td>
-                                  <td className={`py-1.5 ${THEME.textMuted}`}>{line.description}</td>
-                                  <td className="py-1.5 text-right text-slate-300 vN">{line.hours ? line.hours.toFixed(1) : '—'}</td>
-                                  <td className={`py-1.5 text-right ${THEME.textMuted} vN`}>{line.rate ? formatCurrency(line.rate) : '—'}</td>
-                                  <td className={`py-1.5 text-right ${THEME.textMuted} vN`}>{line.allocation_pct ? `${line.allocation_pct}%` : '—'}</td>
-                                  <td className="py-1.5 text-right text-white font-medium vN">{formatCurrency(line.amount)}</td>
+                                <tr key={i} className="border-t border-gray-200">
+                                  <td className="py-1.5 text-gray-700">{clientMap[line.client_id] || line.description?.split(' - ')[0] || '—'}</td>
+                                  <td className="py-1.5 text-gray-500">{line.description}</td>
+                                  <td className="py-1.5 text-right text-gray-700 vN">{line.hours ? line.hours.toFixed(1) : '—'}</td>
+                                  <td className="py-1.5 text-right text-gray-500 vN">{line.rate ? formatCurrency(line.rate) : '—'}</td>
+                                  <td className="py-1.5 text-right text-gray-500 vN">{line.allocation_pct ? `${line.allocation_pct}%` : '—'}</td>
+                                  <td className="py-1.5 text-right text-gray-900 font-medium vN">{formatCurrency(line.amount)}</td>
                                 </tr>
                               ))}
+                              {/* [FIX #5] Total row */}
+                              <tr className="border-t-2 border-gray-300">
+                                <td colSpan={5} className="py-1.5 text-right text-gray-500 text-xs font-medium pr-4">Total</td>
+                                <td className="py-1.5 text-right text-gray-900 font-semibold vN">{formatCurrency(lines.reduce((s: number, l: any) => s + l.amount, 0))}</td>
+                              </tr>
                             </tbody>
                           </table>
-                          {inv.notes && <p className={`mt-2 text-xs ${THEME.textDim} italic`}>Note: {inv.notes}</p>}
+                          {inv.notes && <p className="mt-2 text-xs text-gray-400 italic">Note: {inv.notes}</p>}
                         </div>
                       )}
                     </div>
@@ -602,10 +682,16 @@ export default function ContractorManagement() {
                 })}
               </>)}
             </div>
-          )) : (
-            <div className={`${THEME.card} border rounded-xl text-center py-12 ${THEME.textDim}`}>
-              <FileText size={32} className="mx-auto mb-3 opacity-40" />
-              <p className="text-sm">No invoices found</p>
+          )}) : (
+            /* [FIX #8] Better empty state */
+            <div className="bg-white border border-gray-200 rounded-xl text-center py-12">
+              <FileText size={32} className="mx-auto mb-3 text-gray-300" />
+              <p className="text-sm text-gray-500 font-medium">No invoices for {dateFilter.label}</p>
+              <p className="text-xs text-gray-400 mt-1">Invoices appear here when contractors submit them through the Contractor Portal</p>
+              <a href="/timesheet" target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 mt-3 text-xs text-emerald-600 hover:text-emerald-500 font-medium">
+                <ExternalLink size={12} /> Open Contractor Portal
+              </a>
             </div>
           )}
         </div>
@@ -617,43 +703,82 @@ export default function ContractorManagement() {
           {/* Metrics */}
           <div className="grid grid-cols-4 gap-3">
             <MetricCard label="Total Expenses" value={formatCurrency(expenseMetrics.total)} icon={Receipt} accentColor="#2563eb" sub={`${filteredExpenses.length} items`} />
-            <MetricCard label="Pending Review" value={formatCurrency(expenseMetrics.pendingAmt)} icon={Clock} accentColor="#d97706" sub={`${expenseMetrics.pendingCount} awaiting`} />
+            <MetricCard label="Pending Review" value={formatCurrency(expenseMetrics.pendingAmt)} icon={Clock} accentColor="#d97706" sub={`${expenseMetrics.pendingCount} awaiting`} highlight={expenseMetrics.pendingCount > 0} />
             <MetricCard label="Approved" value={formatCurrency(expenseMetrics.approvedAmt)} icon={CheckCircle} accentColor="#059669" />
-            <MetricCard label="Billable" value={formatCurrency(filteredExpenses.filter(e => e.client_id && e.status === 'approved').reduce((s, e) => s + e.amount, 0))} icon={TrendingUp} accentColor="#0d9488" sub="Tagged to a client" />
+            <MetricCard label="Billable" value={formatCurrency(filteredExpenses.filter(e => e.client_id && e.status === 'approved').reduce((s, e) => s + e.amount, 0))} icon={TrendingUp} accentColor="#059669" sub="Tagged to a client" />
           </div>
 
-          {/* Filters */}
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-xs">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-              <input type="text" placeholder="Search expenses..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                className={`w-full pl-9 pr-3 py-2 bg-slate-800/60 border ${THEME.border} rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/15`} />
+          {/* [FIX #3] Batch action bar for pending expenses */}
+          {expenseMetrics.pendingCount > 0 && (
+            <div className="flex items-center justify-between px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Clock size={14} className="text-amber-600" />
+                <span className="text-sm text-amber-800 font-medium">{expenseMetrics.pendingCount} expense{expenseMetrics.pendingCount !== 1 ? 's' : ''} pending review — {formatCurrency(expenseMetrics.pendingAmt)} total</span>
+              </div>
+              <button onClick={bulkApproveExpenses} disabled={processing === 'bulk'}
+                className="px-3 py-1.5 bg-emerald-500 text-white text-xs font-semibold rounded-lg hover:bg-emerald-600 disabled:opacity-50 vBtn flex items-center gap-1.5">
+                {processing === 'bulk' ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                Approve All
+              </button>
             </div>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={selectClass}>
-              <option value="all">All Statuses</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-            </select>
-            <select value={filterMember} onChange={e => setFilterMember(e.target.value)} className={selectClass}>
-              <option value="all">All Contractors</option>
-              {teamMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-            <select value={filterClient} onChange={e => setFilterClient(e.target.value)} className={selectClass}>
-              <option value="all">All Clients</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+          )}
+
+          {/* Filters + Date Range */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-1">
+              <div className="relative flex-1 max-w-xs">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input type="text" placeholder="Search expenses..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+              </div>
+              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={getSelectClass(filterStatus !== 'all')}>
+                <option value="all">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+              <select value={filterMember} onChange={e => setFilterMember(e.target.value)} className={getSelectClass(filterMember !== 'all')}>
+                <option value="all">All Contractors</option>
+                {teamMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+              <select value={filterClient} onChange={e => setFilterClient(e.target.value)} className={getSelectClass(filterClient !== 'all')}>
+                <option value="all">All Clients</option>
+                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              {hasActiveFilters && (
+                <button onClick={clearFilters} className="px-2.5 py-2 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 vBtn flex items-center gap-1">
+                  <X size={12} /> Clear
+                </button>
+              )}
+            </div>
+            {/* Date range */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-0.5 p-0.5 bg-gray-100 rounded-lg border border-gray-200">
+                {['month', 'quarter', 'year', 'all'].map(r => (
+                  <button key={r} onClick={() => setDateRange(r as any)}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${dateRange === r ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}>
+                    {r === 'all' ? 'All' : r.charAt(0).toUpperCase() + r.slice(1)}
+                  </button>
+                ))}
+              </div>
+              {dateRange !== 'all' && (
+                <div className="flex items-center gap-1">
+                  <button onClick={() => navigateDate(-1)} className="p-1.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-500 transition-colors"><ChevronLeft size={14} /></button>
+                  <span className="text-gray-900 text-sm font-medium px-3 py-1.5 bg-white border border-gray-200 rounded-lg min-w-[120px] text-center vN">{dateFilter.label}</span>
+                  <button onClick={() => navigateDate(1)} className="p-1.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-500 transition-colors"><ChevronRight size={14} /></button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Expense List */}
-          <div className={`${THEME.card} border rounded-2xl overflow-hidden shadow-xl shadow-black/20`}>
-            <div className={`grid ${expenseGridCols} gap-2 px-5 py-2.5 border-b ${THEME.border} bg-[#080c14]`}>
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <div className={`grid ${expenseGridCols} gap-2 px-5 py-2.5 border-b border-gray-200 bg-gray-50`}>
               <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Description</span>
               <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Contractor</span>
               <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Date</span>
               <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Category</span>
               <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase text-right`}>Amount</span>
-              <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Status</span>
               <span className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Actions</span>
             </div>
 
@@ -661,22 +786,22 @@ export default function ContractorManagement() {
               const cat = EXPENSE_CATEGORIES[exp.category] || EXPENSE_CATEGORIES.other
               const isProcessing = processing === exp.id
               return (
-                <div key={exp.id} className={`grid ${expenseGridCols} gap-2 px-5 py-3 items-center border-b ${THEME.border} border-opacity-40 last:border-0 ${THEME.cardHover} transition-colors`}>
+                <div key={exp.id} className={`grid ${expenseGridCols} gap-2 px-5 py-3 items-center border-b border-gray-100 last:border-0 ${THEME.cardHover} transition-colors ${getRowBorder(exp.status)}`}>
                   <div className="min-w-0">
-                    <p className="text-white text-sm truncate">{exp.description}</p>
-                    {exp.client_id && <p className={`${THEME.textDim} text-xs`}>{clientMap[exp.client_id] || '—'}</p>}
+                    <p className="text-gray-900 text-sm truncate">{exp.description}</p>
+                    {exp.client_id && <p className="text-gray-400 text-xs">{clientMap[exp.client_id] || '—'}</p>}
                   </div>
-                  <span className="text-slate-300 text-sm truncate">{memberMap[exp.team_member_id] || '—'}</span>
-                  <span className={`${THEME.textDim} text-xs vN`}>{formatDate(exp.date)}</span>
-                  <span className={`text-xs ${THEME.textMuted}`}>{cat.label}</span>
-                  <span className="text-white text-sm font-medium text-right vN">{formatCurrency(exp.amount)}</span>
-                  <StatusBadge status={exp.status} />
+                  <span className="text-gray-600 text-sm truncate">{memberMap[exp.team_member_id] || '—'}</span>
+                  <span className="text-gray-400 text-xs vN">{formatDateCompact(exp.date)}</span>
+                  <span className="text-xs text-gray-500">{cat.label}</span>
+                  <span className="text-gray-900 text-sm font-medium text-right vN">{formatCurrency(exp.amount)}</span>
                   <div className="flex items-center gap-1.5">
+                    {/* [FIX #4] Attachment view merged into actions */}
                     {exp.receipt_url && (() => {
                       const files = exp.receipt_url!.split(',').filter(Boolean)
                       return (
                         <button onClick={() => openPreview(exp.receipt_url!)}
-                          className="p-1 rounded text-teal-400 hover:text-teal-300 flex items-center gap-1 vBtn">
+                          className="p-1 rounded text-emerald-600 hover:text-emerald-500 flex items-center gap-1 vBtn">
                           <Eye size={12} />{files.length > 1 && <span className="text-xs">{files.length}</span>}
                         </button>
                       )
@@ -684,72 +809,73 @@ export default function ContractorManagement() {
                     {exp.status === 'pending' && (
                       <>
                         <button onClick={() => updateExpenseStatus(exp.id, 'approved')} disabled={isProcessing}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 border border-emerald-500/20 disabled:opacity-50 vBtn">
+                          className="px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 disabled:opacity-50 vBtn">
                           {isProcessing ? <Loader2 size={12} className="animate-spin" /> : 'Approve'}
                         </button>
                         <button onClick={() => updateExpenseStatus(exp.id, 'rejected')} disabled={isProcessing}
-                          className="px-2.5 py-1 rounded-lg vBtn bg-[#0a0f1a] text-slate-500 text-xs font-medium hover:text-red-400 hover:bg-red-950/40 border border-slate-800/40 disabled:opacity-50 vBtn">
+                          className="px-2.5 py-1.5 rounded-lg vBtn bg-white text-gray-500 text-xs font-medium hover:text-red-600 hover:bg-red-50 border border-gray-200 disabled:opacity-50">
                           Reject
                         </button>
                       </>
                     )}
-                    {exp.status === 'approved' && (
-                      <span className={`${THEME.textDim} text-xs`}>Approved</span>
-                    )}
+                    {exp.status === 'approved' && <StatusBadge status={exp.status} />}
+                    {exp.status === 'rejected' && <StatusBadge status={exp.status} />}
                   </div>
                 </div>
               )
             }) : (
-              <div className={`text-center py-12 ${THEME.textDim}`}>
-                <Receipt size={32} className="mx-auto mb-3 opacity-40" />
-                <p className="text-sm">No expenses found</p>
+              <div className="text-center py-12">
+                <Receipt size={32} className="mx-auto mb-3 text-gray-300" />
+                <p className="text-sm text-gray-500 font-medium">No expenses for {dateFilter.label}</p>
+                <p className="text-xs text-gray-400 mt-1">Expenses appear here when contractors submit them through the portal</p>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* ===================== ATTACHMENT PREVIEW MODAL — Multi-file ===================== */}
+      {/* ===================== ATTACHMENT PREVIEW MODAL ===================== */}
       {previewUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md vFade" onClick={closePreview}>
-          <div className={`relative bg-[#0f1623] border ${THEME.border} rounded-xl overflow-hidden shadow-2xl flex flex-col`} style={{ width: '80vw', height: '85vh', maxWidth: '1200px' }} onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md vFade" onClick={closePreview}>
+          <div className="relative bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl flex flex-col" style={{ width: '80vw', height: '85vh', maxWidth: '1200px' }} onClick={e => e.stopPropagation()}>
             {/* Header */}
-            <div className={`flex items-center justify-between px-5 py-3 border-b ${THEME.border}`}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
               <div className="flex items-center gap-3">
-                <span className="text-white text-sm font-medium">Attachment Preview</span>
+                <span className="text-gray-900 text-sm font-medium">Attachment Preview</span>
                 {previewFiles.length > 1 && (
-                  <span className={`text-xs ${THEME.textDim} vN`}>{previewIndex + 1} of {previewFiles.length}</span>
+                  <span className="text-gray-400 text-xs vN">{previewIndex + 1} of {previewFiles.length}</span>
                 )}
               </div>
               <div className="flex items-center gap-2">
+                {/* [FIX #9] File navigation */}
                 {previewFiles.length > 1 && (
                   <div className="flex items-center gap-1 mr-2">
                     <button onClick={() => setPreviewIndex(i => Math.max(0, i - 1))} disabled={previewIndex === 0}
-                      className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-white/[0.05] text-slate-400 transition-colors disabled:opacity-30`}>
+                      className="p-1.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-500 transition-colors disabled:opacity-30">
                       <ChevronLeft size={14} />
                     </button>
                     <button onClick={() => setPreviewIndex(i => Math.min(previewFiles.length - 1, i + 1))} disabled={previewIndex === previewFiles.length - 1}
-                      className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-white/[0.05] text-slate-400 transition-colors disabled:opacity-30`}>
+                      className="p-1.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-500 transition-colors disabled:opacity-30">
                       <ChevronRight size={14} />
                     </button>
                   </div>
                 )}
-                <a href={previewUrl} target="_blank" rel="noopener noreferrer" className={`px-3 py-1.5 ${THEME.card} border hover:bg-white/[0.05] rounded-lg text-slate-300 text-xs flex items-center gap-1.5 transition-colors`}>
+                <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg text-gray-600 text-xs flex items-center gap-1.5 transition-colors">
                   <ExternalLink size={12} /> Open
                 </a>
-                <a href={previewUrl} download className={`px-3 py-1.5 ${THEME.card} border hover:bg-white/[0.05] rounded-lg text-slate-300 text-xs flex items-center gap-1.5 transition-colors`}>
+                <a href={previewUrl} download className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg text-gray-600 text-xs flex items-center gap-1.5 transition-colors">
                   <Download size={12} /> Download
                 </a>
-                <button onClick={closePreview} className="p-1.5 rounded-lg hover:bg-[#0a0f1a] text-slate-400 hover:text-white vBtn">
+                <button onClick={closePreview} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 vBtn">
                   <X size={16} />
                 </button>
               </div>
             </div>
             {/* Content */}
-            <div className="flex-1 bg-slate-950 overflow-hidden relative">
+            <div className="flex-1 bg-gray-100 overflow-hidden relative">
               {previewUrl.match(/\.(jpg|jpeg|png|gif|webp|heic)$/i) || previewUrl.includes('image') ? (
                 <div className="h-full flex items-center justify-center p-4">
-                  <img src={previewUrl} alt="Attachment" className="max-h-full max-w-full object-contain rounded-lg" />
+                  <img src={previewUrl} alt="Attachment" className="max-h-full max-w-full object-contain rounded-lg shadow-lg" />
                 </div>
               ) : (
                 <iframe src={previewUrl} className="w-full h-full" title="Document preview" />
@@ -757,28 +883,31 @@ export default function ContractorManagement() {
               {/* Overlay arrows */}
               {previewFiles.length > 1 && previewIndex > 0 && (
                 <button onClick={() => setPreviewIndex(i => i - 1)}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white vBtn">
+                  className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/80 hover:bg-white shadow-lg text-gray-600 vBtn">
                   <ChevronLeft size={20} />
                 </button>
               )}
               {previewFiles.length > 1 && previewIndex < previewFiles.length - 1 && (
                 <button onClick={() => setPreviewIndex(i => i + 1)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white vBtn">
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/80 hover:bg-white shadow-lg text-gray-600 vBtn">
                   <ChevronRight size={20} />
                 </button>
               )}
             </div>
-            {/* Thumbnail strip */}
+            {/* [FIX #9] Thumbnail strip with file type indicators */}
             {previewFiles.length > 1 && (
-              <div className={`flex items-center gap-2 px-5 py-2.5 border-t ${THEME.border} bg-[#080c14]/60 overflow-x-auto`}>
-                {previewFiles.map((_, i) => (
-                  <button key={i} onClick={() => setPreviewIndex(i)}
-                    className={`flex-shrink-0 w-9 h-9 rounded-lg border-2 flex items-center justify-center text-xs font-medium transition-colors ${
-                      i === previewIndex ? 'border-teal-400 bg-teal-500/10 text-teal-400' : `${THEME.border} bg-[#0a0f1a]/80 text-slate-500 hover:text-slate-300`
-                    }`}>
-                    {i + 1}
-                  </button>
-                ))}
+              <div className="flex items-center gap-2 px-5 py-2.5 border-t border-gray-200 bg-gray-50 overflow-x-auto">
+                {previewFiles.map((fileUrl, i) => {
+                  const isImage = fileUrl.match(/\.(jpg|jpeg|png|gif|webp|heic)/i) || fileUrl.includes('image')
+                  return (
+                    <button key={i} onClick={() => setPreviewIndex(i)}
+                      className={`flex-shrink-0 w-10 h-10 rounded-lg border-2 flex items-center justify-center text-xs font-medium transition-colors ${
+                        i === previewIndex ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 bg-white text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}>
+                      {isImage ? <Eye size={14} /> : <FileText size={14} />}
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>
