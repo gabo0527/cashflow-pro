@@ -117,7 +117,7 @@ export default function AppShell({ children }: AppShellProps) {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#080c14] flex items-center justify-center">
+      <div className="v-app min-h-screen bg-[#080c14] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 vUp">
           <svg width={40} height={40} viewBox="0 0 40 40" fill="none" className="animate-pulse">
             <defs>
@@ -142,7 +142,7 @@ export default function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#080c14]">
+    <div className="v-app min-h-screen bg-[#080c14]">
       {/* Sidebar */}
       <Sidebar
         collapsed={sidebarCollapsed}
