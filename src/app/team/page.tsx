@@ -17,16 +17,16 @@ import { supabase, getCurrentUser } from "@/lib/supabase"
 // Animation classes now in globals.css
 
 const THEME = {
-  card: "bg-[#0f1623] border-slate-800/50",
-  border: "border-slate-800/50",
-  textPrimary: "text-white",
-  textSecondary: "text-slate-300",
-  textMuted: "text-slate-400",
-  textDim: "text-slate-500",
+  card: "bg-white border-gray-200",
+  border: "border-gray-200",
+  textPrimary: "text-gray-900",
+  textSecondary: "text-gray-600",
+  textMuted: "text-gray-500",
+  textDim: "text-gray-400",
 }
 
-const inputClass = "w-full px-3.5 py-2.5 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500/15 focus:border-teal-500/30 vInp"
-const selectInputClass = "w-full px-3.5 py-2.5 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-500/15 focus:border-teal-500/30 vInp cursor-pointer"
+const inputClass = "w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 vInp"
+const selectInputClass = "w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 vInp cursor-pointer"
 
 // ============ TOAST ============
 interface Toast { id: number; type: "success" | "error" | "info"; message: string }
@@ -35,10 +35,10 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
   return (
     <div className="fixed bottom-4 right-4 z-50 space-y-2">
       {toasts.map(toast => (
-        <div key={toast.id} className={`flex items-center gap-3 px-4 py-3 vSlideR rounded-xl shadow-2xl border backdrop-blur-xl ${
-          toast.type === "success" ? "bg-emerald-950/90 border-emerald-800/25 text-emerald-400" :
-          toast.type === "error" ? "bg-rose-950/90 border-rose-800/25 text-rose-400" :
-          "bg-sky-950/90 border-sky-800/25 text-sky-400"
+        <div key={toast.id} className={`flex items-center gap-3 px-4 py-3 vSlideR rounded-xl shadow-lg border ${
+          toast.type === "success" ? "bg-emerald-50 border-emerald-200 text-emerald-700" :
+          toast.type === "error" ? "bg-rose-50 border-rose-200 text-rose-700" :
+          "bg-blue-50 border-blue-200 text-blue-700"
         }`}>
           {toast.type === "success" && <CheckCircle size={16} strokeWidth={2.5} />}
           {toast.type === "error" && <AlertCircle size={16} strokeWidth={2.5} />}
@@ -99,15 +99,15 @@ const PAYMENT_METHODS = [
   { id: "ach", label: "ACH Transfer" }, { id: "wire", label: "Wire Transfer" },
   { id: "check", label: "Check" }, { id: "zelle", label: "Zelle" },
 ]
-const CHART_COLORS = { cost: "#64748b", revenue: "#0d9488", margin: "#2563eb" }
+const CHART_COLORS = { cost: "#64748b", revenue: "#059669", margin: "#2563eb" }
 
 // ============ UTILITIES ============
 const formatCurrency = (v: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
 const formatCurrencyDecimal = (v: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)
 const formatCompactCurrency = (v: number) => { if (v >= 1e6) return `$${(v/1e6).toFixed(1)}M`; if (v >= 1e3) return `$${(v/1e3).toFixed(0)}k`; return `$${v.toFixed(0)}` }
 const maskNumber = (num: string | null) => num ? "\u2022\u2022\u2022\u2022 " + num.slice(-4) : "\u2014"
-const getStatusStyle = (s: string) => s === "active" ? { bg: "bg-emerald-950/50", text: "text-emerald-400", border: "border-emerald-800/30" } : { bg: "bg-slate-900/50", text: "text-slate-500", border: "border-slate-700/30" }
-const getEmploymentStyle = (t: string) => t === "employee" ? { bg: "bg-blue-950/50", text: "text-blue-400", border: "border-blue-800/30" } : { bg: "bg-amber-950/50", text: "text-amber-400", border: "border-amber-800/30" }
+const getStatusStyle = (s: string) => s === "active" ? { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" } : { bg: "bg-gray-100", text: "text-gray-500", border: "border-gray-200" }
+const getEmploymentStyle = (t: string) => t === "employee" ? { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" } : { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" }
 
 const getCurrentMonth = () => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}` }
 const formatMonth = (m: string) => { const [y, mo] = m.split("-"); return new Date(parseInt(y), parseInt(mo)-1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }) }
@@ -165,37 +165,37 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
   const empStyle = getEmploymentStyle(member.employment_type)
 
   return (
-    <div className="fixed inset-0 bg-black/60 vFade flex justify-end z-50" onClick={onClose}>
-      <div className="w-full max-w-xl h-full bg-[#0a0f1a] border-l border-slate-800/30 overflow-y-auto vSlideL" onClick={e => e.stopPropagation()}>
-        <div className="sticky top-0 bg-[#0a0f1a]/95 backdrop-blur-2xl border-b border-slate-800/30 px-7 py-5 z-10">
+    <div className="fixed inset-0 bg-black/30 vFade flex justify-end z-50" onClick={onClose}>
+      <div className="w-full max-w-xl h-full bg-white border-l border-gray-200 overflow-y-auto vSlideL" onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 bg-white/95 backdrop-blur-2xl border-b border-gray-200 px-7 py-5 z-10">
           <div className="flex items-start justify-between">
             <div className="vUp">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500/15 to-teal-500/5 border border-teal-500/20 flex items-center justify-center flex-shrink-0">
-                  <span className="text-sm font-bold text-teal-400">{member.name.split(" ").map(n => n[0]).join("").slice(0, 2)}</span>
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-bold text-emerald-700">{member.name.split(" ").map(n => n[0]).join("").slice(0, 2)}</span>
                 </div>
                 <div>
                   <div className="flex items-center gap-2.5">
-                    <h2 className="text-lg font-bold text-white tracking-tight">{member.name}</h2>
+                    <h2 className="text-lg font-bold text-gray-900 tracking-tight">{member.name}</h2>
                     <span className={`vBdg px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase border ${empStyle.border || ""} ${empStyle.bg} ${empStyle.text}`}>
                       {member.employment_type === "employee" ? "W-2" : "1099"}
                     </span>
                   </div>
-                  <p className="text-[13px] text-slate-500 mt-0.5">{member.role || "No role assigned"}</p>
+                  <p className="text-[13px] text-gray-400 mt-0.5">{member.role || "No role assigned"}</p>
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <button onClick={onEdit} className="vBtn p-2.5 rounded-lg hover:bg-white/[0.06]"><Edit2 size={15} className="text-slate-500" /></button>
-              <button onClick={onClose} className="vBtn p-2.5 rounded-lg hover:bg-white/[0.06]"><X size={15} className="text-slate-500" /></button>
+              <button onClick={onEdit} className="vBtn p-2.5 rounded-lg hover:bg-gray-100"><Edit2 size={15} className="text-gray-400" /></button>
+              <button onClick={onClose} className="vBtn p-2.5 rounded-lg hover:bg-gray-100"><X size={15} className="text-gray-400" /></button>
             </div>
           </div>
         </div>
         <div className="p-6 space-y-6">
           <div className="space-y-3">
-            <h3 className={`vLbl text-[11px] font-bold uppercase text-slate-500`}>Contact</h3>
+            <h3 className={`vLbl text-[11px] font-bold uppercase text-gray-400`}>Contact</h3>
             <div className="space-y-2">
-              <a href={`mailto:${member.email}`} className="flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm"><Mail size={14} /> {member.email}</a>
+              <a href={`mailto:${member.email}`} className="flex items-center gap-2 text-blue-600 hover:text-blue-500 text-sm"><Mail size={14} /> {member.email}</a>
               {member.phone && <p className={`flex items-center gap-2 text-sm ${THEME.textSecondary}`}><Phone size={14} /> {member.phone}</p>}
               {member.address && <p className={`flex items-center gap-2 text-sm ${THEME.textMuted}`}><MapPin size={14} /> {member.address}</p>}
               {member.start_date && <p className={`flex items-center gap-2 text-sm ${THEME.textMuted}`}><Calendar size={14} /> Started {new Date(member.start_date).toLocaleDateString()}</p>}
@@ -203,17 +203,17 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
           </div>
 
           <div className="space-y-3">
-            <h3 className={`vLbl text-[11px] font-bold uppercase text-slate-500`}>Default Cost (fallback)</h3>
-            <div className="p-4 rounded-xl bg-white/[0.02] border border-slate-800/25">
+            <h3 className={`vLbl text-[11px] font-bold uppercase text-gray-400`}>Default Cost (fallback)</h3>
+            <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
               <div className="flex justify-between">
                 <span className={THEME.textMuted}>{member.cost_type === "hourly" ? "T&M" : "Fixed"}</span>
-                <span className="text-orange-400 font-medium vN">{member.cost_amount ? (member.cost_type === "hourly" ? `$${member.cost_amount}/hr` : `${formatCurrency(member.cost_amount)}/mo`) : "\u2014"}</span>
+                <span className="text-orange-600 font-medium vN">{member.cost_amount ? (member.cost_type === "hourly" ? `$${member.cost_amount}/hr` : `${formatCurrency(member.cost_amount)}/mo`) : "\u2014"}</span>
               </div>
             </div>
           </div>
 
           <div className="space-y-3">
-            <h3 className={`vLbl text-[11px] font-bold uppercase text-slate-500`}>Rate Card ({memberRates.length} client{memberRates.length !== 1 ? "s" : ""})</h3>
+            <h3 className={`vLbl text-[11px] font-bold uppercase text-gray-400`}>Rate Card ({memberRates.length} client{memberRates.length !== 1 ? "s" : ""})</h3>
             {memberRates.length > 0 ? (
               <div className="space-y-2">
                 {memberRates.map(r => {
@@ -225,22 +225,22 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
                     ? (hasCustomCost && revAmt > 0 ? ((revAmt - (r.cost_type === "hourly" ? r.cost_amount * (r.baseline_hours || 172) : r.cost_amount)) / revAmt * 100) : 0)
                     : (hasCustomCost && r.rate > 0 ? ((r.rate - effCost) / r.rate * 100) : 0)
                   return (
-                    <div key={r.id} className="p-4 rounded-xl bg-white/[0.02] border border-slate-800/25">
+                    <div key={r.id} className="p-4 rounded-xl bg-gray-50 border border-gray-200">
                       <div className="flex items-center justify-between mb-1">
                         <p className={`text-sm font-medium ${THEME.textPrimary}`}>{r.client_name}</p>
                         {hasCustomCost || isLumpRev ? (
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded ${mg >= 20 ? "bg-emerald-500/10 text-emerald-400" : mg >= 0 ? "bg-amber-500/10 text-amber-400" : "bg-rose-500/10 text-rose-400"}`}>{mg.toFixed(0)}% GM</span>
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded ${mg >= 20 ? "bg-emerald-50 text-emerald-700" : mg >= 0 ? "bg-amber-50 text-amber-700" : "bg-rose-50 text-rose-700"}`}>{mg.toFixed(0)}% GM</span>
                         ) : (
-                          <span className="text-xs font-medium px-2 py-0.5 rounded bg-blue-950/40 text-blue-400">Distributed</span>
+                          <span className="text-xs font-medium px-2 py-0.5 rounded bg-blue-50 text-blue-600">Distributed</span>
                         )}
                       </div>
                       <div className="flex gap-4 text-xs">
-                        <span className="text-orange-400">
+                        <span className="text-orange-600">
                           Cost: {hasCustomCost
                             ? (r.cost_type === "hourly" ? `$${r.cost_amount}/hr` : `${formatCurrency(r.cost_amount)}/mo (${r.baseline_hours}h)`)
                             : "From member total"}
                         </span>
-                        <span className="text-emerald-400">{isLumpRev ? `Rev: ${formatCurrency(revAmt)}/mo` : `Bill: $${r.rate}/hr`}</span>
+                        <span className="text-emerald-600">{isLumpRev ? `Rev: ${formatCurrency(revAmt)}/mo` : `Bill: $${r.rate}/hr`}</span>
                       </div>
                     </div>
                   )
@@ -251,19 +251,19 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className={`vLbl text-[11px] font-bold uppercase text-slate-500`}>Banking</h3>
-              {member.bank_name && <button onClick={() => setShowBanking(!showBanking)} className={`text-xs ${THEME.textMuted} hover:text-white flex items-center gap-1`}>
+              <h3 className={`vLbl text-[11px] font-bold uppercase text-gray-400`}>Banking</h3>
+              {member.bank_name && <button onClick={() => setShowBanking(!showBanking)} className={`text-xs ${THEME.textMuted} hover:text-gray-900 flex items-center gap-1`}>
                 {showBanking ? <EyeOff size={14} /> : <Eye size={14} />} {showBanking ? "Hide" : "Show"}
               </button>}
             </div>
             {member.bank_name ? (
-              <div className="p-5 rounded-xl bg-white/[0.02] border border-slate-800/25 space-y-2">
+              <div className="p-5 rounded-xl bg-gray-50 border border-gray-200 space-y-2">
                 <div className="flex justify-between"><span className={THEME.textMuted}>Bank</span><span className={THEME.textPrimary}>{member.bank_name}</span></div>
                 <div className="flex justify-between"><span className={THEME.textMuted}>Routing</span><span className="font-mono text-sm">{showBanking?member.routing_number:maskNumber(member.routing_number)}</span></div>
                 <div className="flex justify-between"><span className={THEME.textMuted}>Account</span><span className="font-mono text-sm">{showBanking?member.account_number:maskNumber(member.account_number)}</span></div>
                 <div className="flex justify-between"><span className={THEME.textMuted}>Method</span><span className={THEME.textPrimary}>{PAYMENT_METHODS.find(m=>m.id===member.payment_method)?.label||"\u2014"}</span></div>
               </div>
-            ) : <p className={`text-sm ${THEME.textMuted} p-5 rounded-xl bg-white/[0.02] border border-slate-800/25 text-center`}>No banking info</p>}
+            ) : <p className={`text-sm ${THEME.textMuted} p-5 rounded-xl bg-gray-50 border border-gray-200 text-center`}>No banking info</p>}
           </div>
         </div>
       </div>
@@ -405,18 +405,18 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md vFade flex items-center justify-center z-50 p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-md vFade flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className={`${THEME.card} border ${THEME.border} rounded-xl w-full max-w-lg my-8`}>
         <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.border}`}>
           <h3 className={`text-lg font-bold ${THEME.textPrimary}`}>{editingRate ? "Edit Rate Card" : "Add Rate Card"}</h3>
-          <button onClick={onClose} className="vBtn p-2 hover:bg-white/[0.06] rounded-lg"><X size={20} className={THEME.textMuted} /></button>
+          <button onClick={onClose} className="vBtn p-2 hover:bg-gray-100 rounded-lg"><X size={20} className={THEME.textMuted} /></button>
         </div>
         <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={`block text-xs ${THEME.textMuted} mb-1`}>Team Member *</label>
               <select value={form.team_member_id} onChange={e => handleMemberChange(e.target.value)} disabled={!!editingRate}
-                className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp disabled:opacity-50">
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp disabled:opacity-50">
                 <option value="">Select...</option>
                 {teamMembers.filter(m=>m.status==="active").map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
@@ -424,7 +424,7 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
             <div>
               <label className={`block text-xs ${THEME.textMuted} mb-1`}>Client *</label>
               <select value={form.client_id} onChange={e => setForm(p=>({...p,client_id:e.target.value}))} disabled={!!editingRate}
-                className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp disabled:opacity-50">
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp disabled:opacity-50">
                 <option value="">Select...</option>
                 {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
@@ -436,30 +436,30 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
             <div>
               <label className={`block text-xs ${THEME.textMuted} mb-1`}>Start Date *</label>
               <input type="date" value={form.start_date} onChange={e => setForm(p => ({ ...p, start_date: e.target.value }))}
-                className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp" />
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp" />
             </div>
             <div>
               <label className={`block text-xs ${THEME.textMuted} mb-1`}>End Date <span className={THEME.textDim}>(blank = ongoing)</span></label>
               <input type="date" value={form.end_date} onChange={e => setForm(p => ({ ...p, end_date: e.target.value }))}
-                className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp" />
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp" />
             </div>
           </div>
 
           {/* Project Assignments */}
           {form.client_id && form.team_member_id && clientProjects.length > 0 && (
-            <div className="p-4 rounded-lg border border-blue-500/15 bg-blue-950/20 rounded-xl">
+            <div className="p-4 rounded-lg border border-blue-200 bg-blue-50 rounded-xl">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-blue-400">PROJECT ACCESS &mdash; Timesheet Visibility</p>
+                <p className="text-xs font-semibold text-blue-600">PROJECT ACCESS &mdash; Timesheet Visibility</p>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setSelectedProjects(new Set(clientProjects.map(p => p.id)))}
-                    className="text-[10px] text-blue-400 hover:text-blue-300">All</button>
-                  <span className="text-[10px] text-slate-600">|</span>
+                    className="text-[10px] text-blue-600 hover:text-blue-500">All</button>
+                  <span className="text-[10px] text-gray-400">|</span>
                   <button type="button" onClick={() => setSelectedProjects(new Set())}
-                    className="text-[10px] text-slate-400 hover:text-slate-300">None</button>
+                    className="text-[10px] text-gray-500 hover:text-gray-600">None</button>
                 </div>
               </div>
               {loadingAssignments ? (
-                <div className="flex items-center gap-2 py-2"><RefreshCw size={12} className="animate-spin text-blue-400" /><span className="text-xs text-slate-400">Loading...</span></div>
+                <div className="flex items-center gap-2 py-2"><RefreshCw size={12} className="animate-spin text-blue-600" /><span className="text-xs text-gray-500">Loading...</span></div>
               ) : (
                 <div className="space-y-1 max-h-40 overflow-y-auto">
                   {clientProjects.map(p => (
@@ -470,22 +470,22 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
                           next.has(p.id) ? next.delete(p.id) : next.add(p.id)
                           return next
                         })}
-                        className="w-3.5 h-3.5 rounded border-slate-700/50 bg-[#0a0f1a] text-teal-500 focus:ring-teal-500/15" />
-                      <span className={`text-xs ${selectedProjects.has(p.id) ? "text-white" : "text-slate-500"}`}>{p.name}</span>
+                        className="w-3.5 h-3.5 rounded border-gray-300 bg-gray-50 text-emerald-600 focus:ring-emerald-500/20" />
+                      <span className={`text-xs ${selectedProjects.has(p.id) ? "text-gray-900" : "text-gray-400"}`}>{p.name}</span>
                     </label>
                   ))}
                 </div>
               )}
-              <p className="text-[10px] text-slate-500 mt-2">{selectedProjects.size} of {clientProjects.length} projects &mdash; member will only see selected projects in timesheet</p>
+              <p className="text-[10px] text-gray-400 mt-2">{selectedProjects.size} of {clientProjects.length} projects &mdash; member will only see selected projects in timesheet</p>
             </div>
           )}
 
-          <div className="p-4 rounded-lg border border-orange-500/15 bg-orange-950/20 rounded-xl">
+          <div className="p-4 rounded-lg border border-orange-200 bg-orange-50 rounded-xl">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold text-orange-400">COST SIDE &mdash; What You Pay</p>
+              <p className="text-xs font-semibold text-orange-600">COST SIDE &mdash; What You Pay</p>
               <button type="button" onClick={() => setForm(p => ({ ...p, customCost: !p.customCost }))}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                  form.customCost ? "border-orange-500/40 bg-orange-950/30 text-orange-400" : "border-slate-800/40 text-slate-500 hover:text-white"
+                  form.customCost ? "border-orange-300 bg-orange-50 text-orange-600" : "border-gray-200 text-gray-400 hover:text-gray-900"
                 }`}>
                 {form.customCost ? "Custom cost for this client" : "Distributed from member total"}
               </button>
@@ -496,8 +496,8 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   {COST_TYPES.map(t => (
                     <button key={t.id} type="button" onClick={() => setForm(p=>({...p, cost_type: t.id as any}))}
-                      className={`p-2 rounded-lg border text-left transition-all ${form.cost_type===t.id ? "border-orange-500/40 bg-orange-950/30" : "border-slate-800/40 hover:border-slate-700/80"}`}>
-                      <p className={`text-xs font-medium ${form.cost_type===t.id ? "text-orange-400" : THEME.textPrimary}`}>{t.label}</p>
+                      className={`p-2 rounded-lg border text-left transition-all ${form.cost_type===t.id ? "border-orange-300 bg-orange-50" : "border-gray-200 hover:border-gray-300"}`}>
+                      <p className={`text-xs font-medium ${form.cost_type===t.id ? "text-orange-600" : THEME.textPrimary}`}>{t.label}</p>
                     </button>
                   ))}
                 </div>
@@ -505,13 +505,13 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
                   <div>
                     <label className={`block text-xs ${THEME.textDim} mb-1`}>{form.cost_type === "hourly" ? "Cost Rate ($/hr)" : "Monthly Amount ($/mo)"}</label>
                     <input type="number" value={form.cost_amount} onChange={e => setForm(p=>({...p,cost_amount:e.target.value}))}
-                      className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp" placeholder={form.cost_type==="hourly"?"35":"13525"} />
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp" placeholder={form.cost_type==="hourly"?"35":"13525"} />
                   </div>
                   {form.cost_type === "lump_sum" && (
                     <div>
                       <label className={`block text-xs ${THEME.textDim} mb-1`}>Baseline Hrs/mo</label>
                       <input type="number" value={form.baseline_hours} onChange={e => setForm(p=>({...p,baseline_hours:e.target.value}))}
-                        className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp" placeholder="340" />
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp" placeholder="340" />
                     </div>
                   )}
                 </div>
@@ -520,7 +520,7 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
                 )}
               </>
             ) : (
-              <div className="p-4 rounded-xl bg-white/[0.02] border border-slate-800/25">
+              <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
                 <p className={`text-xs ${THEME.textSecondary}`}>
                   Cost will be auto-distributed from {selectedMember?.name ? `${selectedMember.name}'s` : "member's"} total
                   {selectedMember?.cost_amount ? ` (${selectedMember.cost_type === "hourly" ? `$${selectedMember.cost_amount}/hr` : `${formatCurrency(selectedMember.cost_amount)}/mo`})` : ""}
@@ -530,12 +530,12 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
             )}
           </div>
 
-          <div className="p-4 rounded-lg border border-emerald-500/15 bg-emerald-950/20 rounded-xl">
+          <div className="p-4 rounded-lg border border-emerald-200 bg-emerald-50 rounded-xl">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold text-emerald-400">REVENUE SIDE &mdash; What You Charge</p>
+              <p className="text-xs font-semibold text-emerald-600">REVENUE SIDE &mdash; What You Charge</p>
               <button type="button" onClick={() => setForm(p => ({ ...p, revenue_type: p.revenue_type === "hourly" ? "lump_sum" : "hourly" }))}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                  form.revenue_type === "lump_sum" ? "border-emerald-500/40 bg-emerald-950/30 text-emerald-400" : "border-slate-800/40 text-slate-500 hover:text-white"
+                  form.revenue_type === "lump_sum" ? "border-emerald-400 bg-emerald-50 text-emerald-600" : "border-gray-200 text-gray-400 hover:text-gray-900"
                 }`}>
                 {form.revenue_type === "lump_sum" ? "Lump Sum (fixed monthly)" : "Hourly (T&M)"}
               </button>
@@ -544,13 +544,13 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
               <div>
                 <label className={`block text-xs ${THEME.textDim} mb-1`}>Bill Rate ($/hr) *</label>
                 <input type="number" value={form.rate} onChange={e => setForm(p=>({...p,rate:e.target.value}))}
-                  className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp" placeholder="112" />
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp" placeholder="112" />
               </div>
             ) : (
               <div>
                 <label className={`block text-xs ${THEME.textDim} mb-1`}>Monthly Revenue Amount ($/mo) *</label>
                 <input type="number" value={form.revenue_amount} onChange={e => setForm(p=>({...p,revenue_amount:e.target.value}))}
-                  className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp" placeholder="6000" />
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp" placeholder="6000" />
                 {revenueAmount > 0 && (
                   <p className={`text-xs ${THEME.textDim} mt-2`}>Fixed {formatCurrency(revenueAmount)}/mo &mdash; no timesheet required for revenue</p>
                 )}
@@ -559,25 +559,25 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
           </div>
 
           {form.customCost && ((isLumpRevenue ? monthlyCost > 0 && monthlyRevenue > 0 : effCostRate > 0 && billRate > 0)) && (
-            <div className={`p-4 rounded-lg border ${margin >= 20 ? "bg-emerald-950/30 border-emerald-800/25" : margin >= 0 ? "bg-amber-950/30 border-amber-800/25" : "bg-rose-950/30 border-rose-800/25"}`}>
+            <div className={`p-4 rounded-lg border ${margin >= 20 ? "bg-emerald-50 border-emerald-200" : margin >= 0 ? "bg-amber-50 border-amber-200" : "bg-rose-50 border-rose-200"}`}>
               {isLumpRevenue ? (
                 <>
-                  <div className="flex justify-between text-sm"><span className={THEME.textSecondary}>Monthly Cost</span><span className="text-orange-400">{formatCurrency(monthlyCost)}/mo</span></div>
-                  <div className="flex justify-between text-sm mt-1"><span className={THEME.textSecondary}>Monthly Revenue</span><span className="text-emerald-400">{formatCurrency(monthlyRevenue)}/mo</span></div>
+                  <div className="flex justify-between text-sm"><span className={THEME.textSecondary}>Monthly Cost</span><span className="text-orange-600">{formatCurrency(monthlyCost)}/mo</span></div>
+                  <div className="flex justify-between text-sm mt-1"><span className={THEME.textSecondary}>Monthly Revenue</span><span className="text-emerald-600">{formatCurrency(monthlyRevenue)}/mo</span></div>
                   <div className={`flex justify-between text-sm mt-2 pt-2 border-t ${THEME.border}`}>
-                    <span className="font-medium text-white">Gross Margin</span>
-                    <span className={`font-semibold ${margin >= 20 ? "text-emerald-400" : margin >= 0 ? "text-amber-400" : "text-rose-400"}`}>
+                    <span className="font-medium text-gray-900">Gross Margin</span>
+                    <span className={`font-semibold ${margin >= 20 ? "text-emerald-600" : margin >= 0 ? "text-amber-600" : "text-rose-600"}`}>
                       {margin.toFixed(1)}% ({formatCurrency(monthlyRevenue - monthlyCost)}/mo)
                     </span>
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="flex justify-between text-sm"><span className={THEME.textSecondary}>Eff. Cost</span><span className="text-orange-400">${effCostRate.toFixed(2)}/hr</span></div>
-                  <div className="flex justify-between text-sm mt-1"><span className={THEME.textSecondary}>Bill Rate</span><span className="text-emerald-400">${billRate.toFixed(2)}/hr</span></div>
+                  <div className="flex justify-between text-sm"><span className={THEME.textSecondary}>Eff. Cost</span><span className="text-orange-600">${effCostRate.toFixed(2)}/hr</span></div>
+                  <div className="flex justify-between text-sm mt-1"><span className={THEME.textSecondary}>Bill Rate</span><span className="text-emerald-600">${billRate.toFixed(2)}/hr</span></div>
                   <div className={`flex justify-between text-sm mt-2 pt-2 border-t ${THEME.border}`}>
-                    <span className="font-medium text-white">Gross Margin</span>
-                    <span className={`font-semibold ${margin >= 20 ? "text-emerald-400" : margin >= 0 ? "text-amber-400" : "text-rose-400"}`}>
+                    <span className="font-medium text-gray-900">Gross Margin</span>
+                    <span className={`font-semibold ${margin >= 20 ? "text-emerald-600" : margin >= 0 ? "text-amber-600" : "text-rose-600"}`}>
                       {margin.toFixed(1)}% (${(billRate - effCostRate).toFixed(2)}/hr)
                     </span>
                   </div>
@@ -586,7 +586,7 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
             </div>
           )}
           {!form.customCost && (billRate > 0 || revenueAmount > 0) && (
-            <div className="p-3 rounded-lg bg-blue-950/30 border border-blue-800/25">
+            <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
               <p className={`text-xs ${THEME.textSecondary}`}>Margin will be calculated from {isLumpRevenue ? "fixed monthly revenue" : "timesheet hours"} &mdash; member total cost distributed across clients by % of hours worked.</p>
             </div>
           )}
@@ -594,13 +594,13 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
           <div>
             <label className={`block text-xs ${THEME.textMuted} mb-1`}>Notes</label>
             <input value={form.notes} onChange={e => setForm(p=>({...p,notes:e.target.value}))}
-              className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp" placeholder="e.g. Covers PM + analyst, 2 FTEs..." />
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp" placeholder="e.g. Covers PM + analyst, 2 FTEs..." />
           </div>
         </div>
-        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.border} bg-[#080c14]`}>
-          <button onClick={onClose} className={`vBtn px-4 py-2.5 text-sm font-medium text-slate-500 hover:text-white rounded-lg hover:bg-white/[0.04]`}>Cancel</button>
+        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.border} bg-gray-50`}>
+          <button onClick={onClose} className={`vBtn px-4 py-2.5 text-sm font-medium text-gray-400 hover:text-gray-900 rounded-lg hover:bg-gray-50`}>Cancel</button>
           <button onClick={handleSave} disabled={!form.team_member_id||!form.client_id||(form.revenue_type === "hourly" ? !form.rate : !form.revenue_amount)||isSaving}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium vBtn vPri bg-teal-600 text-white rounded-lg hover:bg-teal-500 disabled:opacity-40 disabled:shadow-none">
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium vBtn vPri bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-40 disabled:shadow-none">
             {isSaving && <RefreshCw size={14} className="animate-spin" />}{editingRate ? "Save Changes" : "Add Rate"}
           </button>
         </div>
@@ -633,20 +633,20 @@ function CostOverrideModal({ isOpen, onClose, onSave, billRates, teamMembers, cl
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md vFade flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-md vFade flex items-center justify-center z-50 p-4">
       <div className={`${THEME.card} border ${THEME.border} rounded-xl w-full max-w-lg`}>
         <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.border}`}>
           <div>
             <h3 className={`text-lg font-bold ${THEME.textPrimary}`}>Cost Override</h3>
             <p className={`text-xs ${THEME.textMuted}`}>Override auto-distribution for {formatMonth(selectedMonth)}</p>
           </div>
-          <button onClick={onClose} className="vBtn p-2 hover:bg-white/[0.06] rounded-lg"><X size={20} className={THEME.textMuted} /></button>
+          <button onClick={onClose} className="vBtn p-2 hover:bg-gray-100 rounded-lg"><X size={20} className={THEME.textMuted} /></button>
         </div>
         <div className="p-6 space-y-5">
           <div>
             <label className={`block text-xs ${THEME.textMuted} mb-1`}>Team Member (Lump-Sum Only) *</label>
             <select value={form.team_member_id} onChange={e => setForm(p=>({...p,team_member_id:e.target.value,client_id:""}))}
-              className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp">
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp">
               <option value="">Select...</option>
               {eligibleMembers.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
@@ -654,7 +654,7 @@ function CostOverrideModal({ isOpen, onClose, onSave, billRates, teamMembers, cl
           <div>
             <label className={`block text-xs ${THEME.textMuted} mb-1`}>Client *</label>
             <select value={form.client_id} onChange={e => setForm(p=>({...p,client_id:e.target.value}))}
-              className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp">
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp">
               <option value="">Select...</option>
               {eligibleClients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -662,19 +662,19 @@ function CostOverrideModal({ isOpen, onClose, onSave, billRates, teamMembers, cl
           <div>
             <label className={`block text-xs ${THEME.textMuted} mb-1`}>Fixed Amount ($) *</label>
             <input type="number" value={form.fixed_amount} onChange={e => setForm(p=>({...p,fixed_amount:e.target.value}))}
-              className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp" placeholder="20000" />
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp" placeholder="20000" />
             <p className={`text-xs ${THEME.textDim} mt-1`}>Overrides auto-calculated allocation for this month only</p>
           </div>
           <div>
             <label className={`block text-xs ${THEME.textMuted} mb-1`}>Notes</label>
             <input value={form.notes} onChange={e => setForm(p=>({...p,notes:e.target.value}))}
-              className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp" placeholder="Per CEO request..." />
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp" placeholder="Per CEO request..." />
           </div>
         </div>
-        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.border} bg-[#080c14]`}>
-          <button onClick={onClose} className={`vBtn px-4 py-2.5 text-sm font-medium text-slate-500 hover:text-white rounded-lg hover:bg-white/[0.04]`}>Cancel</button>
+        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.border} bg-gray-50`}>
+          <button onClick={onClose} className={`vBtn px-4 py-2.5 text-sm font-medium text-gray-400 hover:text-gray-900 rounded-lg hover:bg-gray-50`}>Cancel</button>
           <button onClick={handleSave} disabled={!form.team_member_id||!form.client_id||!form.fixed_amount||isSaving}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium vBtn bg-orange-600 text-white rounded-lg hover:bg-orange-500 disabled:opacity-40 shadow-lg shadow-orange-950/25">
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium vBtn bg-orange-600 text-white rounded-lg hover:bg-orange-500 disabled:opacity-40 shadow-sm">
             {isSaving && <RefreshCw size={14} className="animate-spin" />}Set Override
           </button>
         </div>
@@ -740,48 +740,48 @@ function MemberModal({ isOpen, onClose, onSave, editingMember }: {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md vFade flex items-center justify-center z-50 p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-md vFade flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className={`vScale ${THEME.card} border ${THEME.border} rounded-2xl w-full max-w-2xl my-8 shadow-2xl flex flex-col max-h-[90vh]`}>
         <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.border}`}>
           <h3 className={`text-lg font-bold ${THEME.textPrimary}`}>{editingMember ? "Edit Team Member" : "Add Team Member"}</h3>
-          <button onClick={onClose} className="vBtn p-2 hover:bg-white/[0.06] rounded-lg"><X size={20} className={THEME.textMuted} /></button>
+          <button onClick={onClose} className="vBtn p-2 hover:bg-gray-100 rounded-lg"><X size={20} className={THEME.textMuted} /></button>
         </div>
         <div className="p-6 space-y-4 overflow-y-auto flex-1">
           <div className="grid grid-cols-2 gap-4">
             <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Full Name *</label>
-              <input value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp" /></div>
+              <input value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp" /></div>
             <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Email *</label>
-              <input type="email" value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp" /></div>
+              <input type="email" value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp" /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Phone</label>
-              <input value={form.phone} onChange={e=>setForm(p=>({...p,phone:e.target.value}))} className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp" /></div>
+              <input value={form.phone} onChange={e=>setForm(p=>({...p,phone:e.target.value}))} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp" /></div>
             <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Role / Title</label>
-              <input value={form.role} onChange={e=>setForm(p=>({...p,role:e.target.value}))} className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp" /></div>
+              <input value={form.role} onChange={e=>setForm(p=>({...p,role:e.target.value}))} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp" /></div>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Employment Type</label>
               <select value={form.employment_type} onChange={e=>setForm(p=>({...p,employment_type:e.target.value}))}
-                className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp">
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp">
                 {EMPLOYMENT_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
               </select></div>
             <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Status</label>
               <select value={form.status} onChange={e=>setForm(p=>({...p,status:e.target.value}))}
-                className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp">
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp">
                 {STATUS_OPTIONS.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
               </select></div>
             <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Start Date</label>
               <input type="date" value={form.start_date} onChange={e=>setForm(p=>({...p,start_date:e.target.value}))}
-                className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp" /></div>
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp" /></div>
           </div>
 
           <div className={`pt-4 border-t ${THEME.border}`}>
-            <h4 className={`vLbl text-[11px] font-bold uppercase text-slate-500 mb-3`}>Default Cost (fallback when no rate card entry)</h4>
+            <h4 className={`vLbl text-[11px] font-bold uppercase text-gray-400 mb-3`}>Default Cost (fallback when no rate card entry)</h4>
             <div className="grid grid-cols-2 gap-3 mb-4">
               {COST_TYPES.map(t=>(
                 <button key={t.id} type="button" onClick={()=>setForm(p=>({...p,cost_type:t.id as any}))}
-                  className={`p-3 rounded-lg border text-left transition-all ${form.cost_type===t.id?"border-orange-500/40 bg-orange-950/30":"border-slate-800/40 hover:border-slate-700/80"}`}>
-                  <p className={`text-sm font-medium ${form.cost_type===t.id?"text-orange-400":THEME.textPrimary}`}>{t.label}</p>
+                  className={`p-3 rounded-lg border text-left transition-all ${form.cost_type===t.id?"border-orange-300 bg-orange-50":"border-gray-200 hover:border-gray-300"}`}>
+                  <p className={`text-sm font-medium ${form.cost_type===t.id?"text-orange-600":THEME.textPrimary}`}>{t.label}</p>
                   <p className={`text-xs ${THEME.textDim} mt-0.5`}>{t.description}</p>
                 </button>
               ))}
@@ -789,7 +789,7 @@ function MemberModal({ isOpen, onClose, onSave, editingMember }: {
             <div>
               <label className={`block text-xs ${THEME.textMuted} mb-1`}>{form.cost_type==="hourly"?"Hourly Rate ($/hr)":"Monthly Amount ($/mo)"}</label>
               <input type="number" value={form.cost_amount} onChange={e=>setForm(p=>({...p,cost_amount:e.target.value}))}
-                className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp"
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp"
                 placeholder={form.cost_type==="hourly"?"75":"35000"} />
               {form.cost_type==="lump_sum" && form.cost_amount && (
                 <p className={`text-xs ${THEME.textDim} mt-1`}>Effective rate: ~${(parseFloat(form.cost_amount)/172).toFixed(2)}/hr (172 hrs/mo)</p>
@@ -800,54 +800,54 @@ function MemberModal({ isOpen, onClose, onSave, editingMember }: {
           {form.employment_type === "contractor" && (
             <>
               <div className={`pt-4 border-t ${THEME.border}`}>
-                <h4 className={`vLbl text-[11px] font-bold uppercase text-slate-500 mb-3`}>Entity Information</h4>
+                <h4 className={`vLbl text-[11px] font-bold uppercase text-gray-400 mb-3`}>Entity Information</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Entity Name</label>
                     <input value={form.entity_name} onChange={e=>setForm(p=>({...p,entity_name:e.target.value}))}
-                      className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp" placeholder="LLC or DBA" /></div>
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp" placeholder="LLC or DBA" /></div>
                   <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Entity Type</label>
                     <select value={form.entity_type} onChange={e=>setForm(p=>({...p,entity_type:e.target.value}))}
-                      className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp">
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp">
                       <option value="">Select...</option>{ENTITY_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
                     </select></div>
                 </div>
                 <div className="mt-4"><label className={`block text-xs ${THEME.textMuted} mb-1`}>Address</label>
                   <input value={form.address} onChange={e=>setForm(p=>({...p,address:e.target.value}))}
-                    className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp" /></div>
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp" /></div>
               </div>
               <div className={`pt-4 border-t ${THEME.border}`}>
-                <h4 className={`vLbl text-[11px] font-bold uppercase text-slate-500 mb-3`}>Payment Information</h4>
+                <h4 className={`vLbl text-[11px] font-bold uppercase text-gray-400 mb-3`}>Payment Information</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Bank Name</label>
                     <input value={form.bank_name} onChange={e=>setForm(p=>({...p,bank_name:e.target.value}))}
-                      className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp" /></div>
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp" /></div>
                   <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Account Type</label>
                     <select value={form.account_type} onChange={e=>setForm(p=>({...p,account_type:e.target.value}))}
-                      className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp">
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp">
                       <option value="">Select...</option>{ACCOUNT_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
                     </select></div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 mt-4">
                   <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Routing Number</label>
                     <input value={form.routing_number} onChange={e=>setForm(p=>({...p,routing_number:e.target.value}))}
-                      className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp font-mono" /></div>
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp font-mono" /></div>
                   <div><label className={`block text-xs ${THEME.textMuted} mb-1`}>Account Number</label>
                     <input value={form.account_number} onChange={e=>setForm(p=>({...p,account_number:e.target.value}))}
-                      className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp font-mono" /></div>
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp font-mono" /></div>
                 </div>
                 <div className="mt-4"><label className={`block text-xs ${THEME.textMuted} mb-1`}>Payment Method</label>
                   <select value={form.payment_method} onChange={e=>setForm(p=>({...p,payment_method:e.target.value}))}
-                    className="w-full px-3 py-2 bg-[#0a0f1a] border border-slate-800/50 rounded-lg text-sm text-white vInp">
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 vInp">
                     <option value="">Select...</option>{PAYMENT_METHODS.map(m=><option key={m.id} value={m.id}>{m.label}</option>)}
                   </select></div>
               </div>
             </>
           )}
         </div>
-        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.border} bg-[#080c14]`}>
-          <button onClick={onClose} className={`vBtn px-4 py-2.5 text-sm font-medium text-slate-500 hover:text-white rounded-lg hover:bg-white/[0.04]`}>Cancel</button>
+        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.border} bg-gray-50`}>
+          <button onClick={onClose} className={`vBtn px-4 py-2.5 text-sm font-medium text-gray-400 hover:text-gray-900 rounded-lg hover:bg-gray-50`}>Cancel</button>
           <button onClick={handleSave} disabled={!form.name||!form.email||isSaving}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium vBtn vPri bg-teal-600 text-white rounded-lg hover:bg-teal-500 disabled:opacity-40 disabled:shadow-none">
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium vBtn vPri bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-40 disabled:shadow-none">
             {isSaving && <RefreshCw size={14} className="animate-spin" />}{editingMember ? "Save Changes" : "Add Member"}
           </button>
         </div>
@@ -1232,7 +1232,7 @@ export default function TeamPage() {
   if (loading) return (
     <div className="flex items-center justify-center h-[60vh]">
       <div className="text-center">
-        <RefreshCw className="w-8 h-8 text-teal-400 animate-spin mx-auto mb-3" />
+        <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" />
         <p className={`text-sm ${THEME.textMuted}`}>Loading team...</p>
       </div>
     </div>
@@ -1245,25 +1245,25 @@ export default function TeamPage() {
       {/* Header */}
       <div className="flex items-center justify-between vUp">
         <div>
-          <h1 className="text-[28px] font-bold text-white tracking-tight">Team</h1>
+          <h1 className="text-[28px] font-bold text-gray-900 tracking-tight">Team</h1>
           <p className={`text-[13px] mt-1 ${THEME.textDim}`}>Manage team members, rates, and profitability</p>
         </div>
         <div className="flex items-center gap-2.5 vUp vD1">
-          <button onClick={exportToCSV} className={`flex items-center gap-2 px-4 py-2 ${THEME.card} border hover:bg-white/[0.05] rounded-lg text-slate-400 text-sm font-medium`}>
+          <button onClick={exportToCSV} className={`flex items-center gap-2 px-4 py-2 ${THEME.card} border hover:bg-gray-50 rounded-lg text-gray-500 text-sm font-medium`}>
             <Download size={14} /> Export
           </button>
           {activeTab === "directory" && (
-            <button onClick={() => { setEditingMember(null); setShowMemberModal(true) }} className="flex items-center gap-2 px-4 py-2 vBtn vPri bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-500">
+            <button onClick={() => { setEditingMember(null); setShowMemberModal(true) }} className="flex items-center gap-2 px-4 py-2 vBtn vPri bg-emerald-500 text-white rounded-lg text-sm font-semibold hover:bg-emerald-600">
               <Plus size={14} /> Add Member
             </button>
           )}
           {activeTab === "rates" && (
-            <button onClick={() => { setEditingRate(null); setShowRateModal(true) }} className="flex items-center gap-2 px-4 py-2 vBtn vPri bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-500">
+            <button onClick={() => { setEditingRate(null); setShowRateModal(true) }} className="flex items-center gap-2 px-4 py-2 vBtn vPri bg-emerald-500 text-white rounded-lg text-sm font-semibold hover:bg-emerald-600">
               <Plus size={14} /> Add Rate Card
             </button>
           )}
           {activeTab === "profitability" && (
-            <button onClick={() => setShowOverrideModal(true)} className="flex items-center gap-2 px-4 py-2 vBtn bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-500 shadow-lg shadow-amber-950/25">
+            <button onClick={() => setShowOverrideModal(true)} className="flex items-center gap-2 px-4 py-2 vBtn bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-500 shadow-sm">
               <Edit2 size={14} /> Cost Override
             </button>
           )}
@@ -1279,7 +1279,7 @@ export default function TeamPage() {
         ]).map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`vBtn flex items-center gap-2 px-5 py-3.5 text-sm font-medium border-b-2 -mb-px transition-all duration-300 ${
-              activeTab === tab.id ? "border-teal-400 text-teal-400" : "border-transparent text-slate-500 hover:text-slate-300 hover:border-slate-700"
+              activeTab === tab.id ? "border-emerald-500 text-emerald-600" : "border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300"
             }`}>
             <tab.icon size={15} /> {tab.label}
           </button>
@@ -1288,40 +1288,40 @@ export default function TeamPage() {
 
       {/* Summary Cards — left-accent-bar */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 vUp vD3">
-        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
-          <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-white/15" />
+        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
+          <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-gray-300" />
           <div className="pl-2">
             <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>Total Members</span>
-            <p className="text-2xl font-bold text-white vN mt-1.5">{summary.total}</p>
+            <p className="text-2xl font-bold text-gray-900 vN mt-1.5">{summary.total}</p>
             <p className={`text-xs ${THEME.textDim} mt-0.5`}>{summary.active} active</p>
           </div>
         </div>
-        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
+        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
           <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-blue-500" />
           <div className="pl-2">
             <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>W-2 Employees</span>
-            <p className="text-2xl font-bold text-blue-400 vN mt-1.5">{summary.employees}</p>
+            <p className="text-2xl font-bold text-blue-600 vN mt-1.5">{summary.employees}</p>
           </div>
         </div>
-        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
+        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
           <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-amber-500" />
           <div className="pl-2">
             <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>1099 Contractors</span>
-            <p className="text-2xl font-bold text-amber-400 vN mt-1.5">{summary.contractors}</p>
+            <p className="text-2xl font-bold text-amber-600 vN mt-1.5">{summary.contractors}</p>
           </div>
         </div>
-        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
-          <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-teal-500" />
+        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
+          <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-emerald-500" />
           <div className="pl-2">
             <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>Active Rate Cards</span>
-            <p className="text-2xl font-bold text-teal-400 vN mt-1.5">{summary.activeRates}</p>
+            <p className="text-2xl font-bold text-emerald-600 vN mt-1.5">{summary.activeRates}</p>
           </div>
         </div>
-        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
+        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
           <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-emerald-500" />
           <div className="pl-2">
             <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>GM% ({formatPeriodLabel(selectedPeriod, periodType).split(" ")[0]})</span>
-            <p className={`text-2xl font-bold vN mt-1.5 ${profitTotals.marginPct >= 20 ? "text-emerald-400" : profitTotals.marginPct >= 0 ? "text-amber-400" : "text-rose-400"}`}>
+            <p className={`text-2xl font-bold vN mt-1.5 ${profitTotals.marginPct >= 20 ? "text-emerald-600" : profitTotals.marginPct >= 0 ? "text-amber-600" : "text-rose-600"}`}>
               {profitTotals.revenue > 0 ? `${profitTotals.marginPct.toFixed(1)}%` : "\u2014"}
             </p>
           </div>
@@ -1332,25 +1332,25 @@ export default function TeamPage() {
       {activeTab === "directory" && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-sm vSrch rounded-lg border border-slate-800/40 bg-[#0a0f1a]">
-              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-600" />
+            <div className="relative flex-1 max-w-sm vSrch rounded-lg border border-gray-200 bg-gray-50">
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search by name or email..."
-                className={`w-full pl-10 pr-4 py-2.5 bg-transparent text-[13px] text-white placeholder-slate-600 focus:outline-none`} />
+                className={`w-full pl-10 pr-4 py-2.5 bg-transparent text-[13px] text-gray-900 placeholder-gray-400 focus:outline-none`} />
             </div>
-            <div className="flex items-center gap-0.5 p-0.5 bg-[#0a0f1a] rounded-xl border border-slate-800/40">
+            <div className="flex items-center gap-0.5 p-0.5 bg-gray-50 rounded-xl border border-gray-200">
               {(["all", "employee", "contractor"] as const).map(f => (
                 <button key={f} onClick={() => setEmploymentFilter(f)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${employmentFilter === f ? "bg-white/[0.08] text-white" : "text-slate-500 hover:text-slate-300"}`}>
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${employmentFilter === f ? "bg-white shadow-sm text-gray-900" : "text-gray-400 hover:text-gray-600"}`}>
                   {f === "all" ? "All" : f === "employee" ? "W-2" : "1099"}
                 </button>
               ))}
             </div>
           </div>
 
-          <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-xl shadow-black/25`}>
+          <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-sm`}>
             <table className="w-full text-sm">
               <thead>
-                <tr className={`bg-[#080c14]/60 border-b ${THEME.border}`}>
+                <tr className={`bg-gray-50 border-b ${THEME.border}`}>
                   <th className={`px-4 py-2.5 text-left vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Name</th>
                   <th className={`px-4 py-2.5 text-left vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Type</th>
                   <th className={`px-4 py-2.5 text-left vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Role</th>
@@ -1365,7 +1365,7 @@ export default function TeamPage() {
                   const empStyle = getEmploymentStyle(m.employment_type)
                   const rateCount = billRates.filter(r => r.team_member_id === m.id && r.is_active).length
                   return (
-                    <tr key={m.id} className="border-b border-slate-800/30 vRow cursor-pointer"
+                    <tr key={m.id} className="border-b border-gray-200 vRow cursor-pointer"
                       onClick={() => setSelectedMemberDetail(m)}>
                       <td className="px-4 py-3">
                         <p className={`font-medium ${THEME.textPrimary}`}>{m.name}</p>
@@ -1378,7 +1378,7 @@ export default function TeamPage() {
                       </td>
                       <td className={`px-4 py-3 ${THEME.textSecondary}`}>{m.role || "\u2014"}</td>
                       <td className="px-4 py-3 text-right">
-                        <span className="text-orange-400 font-medium vN">
+                        <span className="text-orange-600 font-medium vN">
                           {m.cost_amount ? (m.cost_type === "hourly" ? `$${m.cost_amount}/hr` : `${formatCurrency(m.cost_amount)}/mo`) : "\u2014"}
                         </span>
                         {rateCount > 0 && <p className={`text-xs ${THEME.textDim}`}>{rateCount} rate card{rateCount > 1 ? "s" : ""}</p>}
@@ -1388,7 +1388,7 @@ export default function TeamPage() {
                       </td>
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-center">
-                          <button onClick={() => { setEditingMember(m); setShowMemberModal(true) }} className="p-1.5 rounded hover:bg-white/[0.05] text-slate-500 hover:text-slate-300">
+                          <button onClick={() => { setEditingMember(m); setShowMemberModal(true) }} className="p-1.5 rounded hover:bg-gray-50 text-gray-400 hover:text-gray-600">
                             <Edit2 size={14} />
                           </button>
                         </div>
@@ -1407,7 +1407,7 @@ export default function TeamPage() {
 
       {/* ============ RATES TAB ============ */}
       {activeTab === "rates" && (
-        <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-xl shadow-black/25`}>
+        <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-sm`}>
           <div className={`px-6 py-4 border-b ${THEME.border} flex items-center justify-between`}>
             <div>
               <h3 className={`text-[13px] font-bold ${THEME.textPrimary}`}>Rate Card</h3>
@@ -1418,14 +1418,14 @@ export default function TeamPage() {
                 <button onClick={() => {
                   const allIds = new Set(billRates.map(r => r.team_member_id))
                   setExpandedRateMembers(prev => prev.size === allIds.size ? new Set() : allIds)
-                }} className={`text-[11px] ${THEME.textMuted} hover:text-white transition-colors`}>
+                }} className={`text-[11px] ${THEME.textMuted} hover:text-gray-900 transition-colors`}>
                   {expandedRateMembers.size > 0 ? "Collapse All" : "Expand All"}
                 </button>
               </div>
-              <div className="flex items-center gap-0.5 p-0.5 bg-[#0a0f1a] rounded-xl border border-slate-800/40">
+              <div className="flex items-center gap-0.5 p-0.5 bg-gray-50 rounded-xl border border-gray-200">
                 {(["active", "archived", "all"] as const).map(f => (
                   <button key={f} onClick={() => setRateStatusFilter(f)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${rateStatusFilter === f ? "bg-white/[0.08] text-white" : "text-slate-500 hover:text-slate-300"}`}>
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${rateStatusFilter === f ? "bg-white shadow-sm text-gray-900" : "text-gray-400 hover:text-gray-600"}`}>
                     {f === "active" ? `Active (${billRates.filter(r => r.is_active).length})` : f === "archived" ? `Archived (${billRates.filter(r => !r.is_active).length})` : `All (${billRates.length})`}
                   </button>
                 ))}
@@ -1478,11 +1478,11 @@ export default function TeamPage() {
                           next.has(memberId) ? next.delete(memberId) : next.add(memberId)
                           return next
                         })}
-                        className={`flex items-center px-4 py-3.5 cursor-pointer hover:bg-white/[0.03] transition-colors border-b border-slate-800/30 ${isExpanded ? "bg-slate-800/30" : ""}`}
+                        className={`flex items-center px-4 py-3.5 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-200 ${isExpanded ? "bg-gray-50" : ""}`}
                       >
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <ChevronRight size={14} className={`${THEME.textDim} transition-transform ${isExpanded ? "rotate-90" : ""}`} />
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500/15 to-teal-500/5 border border-teal-500/15 flex items-center justify-center flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center flex-shrink-0">
                             <span className={`text-xs font-medium ${THEME.textSecondary}`}>{group.memberName.split(" ").map(n => n[0]).join("").slice(0, 2)}</span>
                           </div>
                           <div className="min-w-0">
@@ -1493,7 +1493,7 @@ export default function TeamPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-4 text-right">
-                          <span className={`text-xs px-2 py-1 rounded-md bg-white/[0.03] border border-slate-800/30 ${THEME.textMuted} hidden sm:inline-block`}>
+                          <span className={`text-xs px-2 py-1 rounded-md bg-gray-100 border border-gray-200 ${THEME.textMuted} hidden sm:inline-block`}>
                             Cost: {costLabel}
                           </span>
                         </div>
@@ -1501,7 +1501,7 @@ export default function TeamPage() {
 
                       {/* Expanded Rate Cards */}
                       {isExpanded && (
-                        <div className="bg-[#0a0f1a]/30 vExp">
+                        <div className="bg-gray-50 vExp">
                           <table className="w-full text-sm">
                             <thead>
                               <tr className={`border-b ${THEME.border}`}>
@@ -1526,25 +1526,25 @@ export default function TeamPage() {
                                 const startStr = r.start_date ? new Date(r.start_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "2-digit" }) : ""
                                 const endStr = r.end_date ? new Date(r.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "2-digit" }) : "Ongoing"
                                 return (
-                                  <tr key={r.id} className={`border-b border-slate-800/40 vRow ${!r.is_active ? "opacity-40" : ""}`}>
+                                  <tr key={r.id} className={`border-b border-gray-200 vRow ${!r.is_active ? "opacity-40" : ""}`}>
                                     <td className={`pl-14 pr-4 py-2.5 ${THEME.textSecondary}`}>
                                       {r.client_name}
                                       <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded ${
-                                        hasCustomCost ? (r.cost_type === "lump_sum" ? "bg-amber-950/40 text-amber-400" : "bg-blue-950/40 text-blue-400") : "bg-slate-800/50 text-slate-500"
+                                        hasCustomCost ? (r.cost_type === "lump_sum" ? "bg-amber-50 text-amber-700" : "bg-blue-50 text-blue-600") : "bg-gray-100/50 text-gray-400"
                                       }`}>{hasCustomCost ? (r.cost_type === "lump_sum" ? "Fixed" : "T&M") : "Dist"}</span>
                                     </td>
                                     <td className="px-4 py-2.5 text-center">
                                       <span className={`text-xs ${THEME.textMuted}`}>{startStr} → {endStr}</span>
-                                      {!r.is_active && <p className="text-[10px] text-rose-400">Archived</p>}
+                                      {!r.is_active && <p className="text-[10px] text-rose-600">Archived</p>}
                                     </td>
                                     <td className="px-4 py-2.5 text-right">
                                       {hasCustomCost ? (
                                         <>
-                                          <span className="text-orange-400 text-xs">{r.cost_type === "hourly" ? `$${r.cost_amount}/hr` : `${formatCurrency(r.cost_amount)}/mo`}</span>
+                                          <span className="text-orange-600 text-xs">{r.cost_type === "hourly" ? `$${r.cost_amount}/hr` : `${formatCurrency(r.cost_amount)}/mo`}</span>
                                           {r.cost_type === "lump_sum" && <p className={`text-[10px] ${THEME.textDim}`}>~${effCost.toFixed(2)}/hr</p>}
                                         </>
                                       ) : (
-                                        <span className={`text-[10px] px-1.5 py-0.5 rounded bg-blue-950/40 text-blue-400`}>
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600`}>
                                           From {member?.cost_type === "lump_sum" ? formatCurrency(member?.cost_amount || 0) + "/mo" : `$${member?.cost_amount || 0}/hr`}
                                         </span>
                                       )}
@@ -1552,18 +1552,18 @@ export default function TeamPage() {
                                     <td className="px-4 py-2.5 text-right">
                                       {isLumpRev ? (
                                         <>
-                                          <span className="text-emerald-400 font-medium text-xs">{formatCurrency(revAmt)}/mo</span>
+                                          <span className="text-emerald-600 font-medium text-xs">{formatCurrency(revAmt)}/mo</span>
                                           <p className={`text-[10px] ${THEME.textDim}`}>Lump Sum</p>
                                         </>
                                       ) : (
-                                        <span className="text-emerald-400 font-medium text-xs">${r.rate}/hr</span>
+                                        <span className="text-emerald-600 font-medium text-xs">${r.rate}/hr</span>
                                       )}
                                     </td>
                                     <td className="px-4 py-2.5 text-right">
                                       {(hasCustomCost || isLumpRev) && margin !== 0 ? (
                                         <>
-                                          <span className={`text-xs font-medium ${margin >= 20 ? "text-emerald-400" : margin >= 0 ? "text-amber-400" : "text-rose-400"}`}>{margin.toFixed(0)}%</span>
-                                          {!isLumpRev && spread !== 0 && <p className={`text-[10px] ${spread >= 0 ? "text-emerald-400/60" : "text-rose-400/60"}`}>${spread.toFixed(2)}/hr</p>}
+                                          <span className={`text-xs font-medium ${margin >= 20 ? "text-emerald-600" : margin >= 0 ? "text-amber-600" : "text-rose-600"}`}>{margin.toFixed(0)}%</span>
+                                          {!isLumpRev && spread !== 0 && <p className={`text-[10px] ${spread >= 0 ? "text-emerald-600/60" : "text-rose-600/60"}`}>${spread.toFixed(2)}/hr</p>}
                                         </>
                                       ) : (
                                         <span className={`text-[10px] ${THEME.textDim}`}>By hours</span>
@@ -1571,11 +1571,11 @@ export default function TeamPage() {
                                     </td>
                                     <td className="px-4 py-2.5">
                                       <div className="flex items-center justify-center gap-1">
-                                        <button onClick={(e) => { e.stopPropagation(); setEditingRate(r); setShowRateModal(true) }} className="p-1 rounded hover:bg-white/[0.05] text-slate-500 hover:text-slate-300"><Edit2 size={13} /></button>
+                                        <button onClick={(e) => { e.stopPropagation(); setEditingRate(r); setShowRateModal(true) }} className="p-1 rounded hover:bg-gray-50 text-gray-400 hover:text-gray-600"><Edit2 size={13} /></button>
                                         {r.is_active ? (
-                                          <button onClick={(e) => { e.stopPropagation(); handleDeleteRate(r.id) }} title="Archive" className="p-1 rounded vBtn hover:bg-amber-500/10 text-slate-600 hover:text-amber-400"><Lock size={13} /></button>
+                                          <button onClick={(e) => { e.stopPropagation(); handleDeleteRate(r.id) }} title="Archive" className="p-1 rounded vBtn hover:bg-amber-50 text-gray-400 hover:text-amber-600"><Lock size={13} /></button>
                                         ) : (
-                                          <button onClick={(e) => { e.stopPropagation(); handleReactivateRate(r.id) }} title="Reactivate" className="p-1 rounded vBtn hover:bg-emerald-500/10 text-slate-600 hover:text-emerald-400"><Unlock size={13} /></button>
+                                          <button onClick={(e) => { e.stopPropagation(); handleReactivateRate(r.id) }} title="Reactivate" className="p-1 rounded vBtn hover:bg-emerald-50 text-gray-400 hover:text-emerald-600"><Unlock size={13} /></button>
                                         )}
                                       </div>
                                     </td>
@@ -1592,11 +1592,11 @@ export default function TeamPage() {
               </div>
             ) : (
             <div className={`px-6 py-12 text-center ${THEME.textMuted}`}>
-              <DollarSign size={48} className="mx-auto text-slate-700 mb-4" />
+              <DollarSign size={48} className="mx-auto text-gray-300 mb-4" />
               <p>No rate cards configured yet</p>
               <p className={`text-xs ${THEME.textDim} mt-1`}>Add rate cards to define cost + bill rates per client</p>
               <button onClick={() => { setEditingRate(null); setShowRateModal(true) }}
-                className="mt-4 px-4 py-2 vBtn vPri bg-teal-600/80 text-teal-50 rounded-lg text-sm font-semibold hover:bg-teal-600 border-0">
+                className="mt-4 px-4 py-2 vBtn vPri bg-emerald-500 text-white rounded-lg text-sm font-semibold hover:bg-emerald-500 border-0">
                 Add First Rate Card
               </button>
             </div>
@@ -1611,33 +1611,33 @@ export default function TeamPage() {
           {/* Period Selector + View Toggle */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-0.5 p-0.5 bg-[#0a0f1a] rounded-xl border border-slate-800/40">
+              <div className="flex items-center gap-0.5 p-0.5 bg-gray-50 rounded-xl border border-gray-200">
                 {(["month", "quarter", "year"] as PeriodType[]).map(pt => (
                   <button key={pt} onClick={() => handlePeriodTypeChange(pt)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${periodType === pt ? "bg-white/[0.08] text-white" : "text-slate-500 hover:text-slate-300"}`}>
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${periodType === pt ? "bg-white shadow-sm text-gray-900" : "text-gray-400 hover:text-gray-600"}`}>
                     {pt === "month" ? "Month" : pt === "quarter" ? "Quarter" : "Year"}
                   </button>
                 ))}
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={() => setSelectedPeriod(stepPeriod(selectedPeriod, periodType, -1))} className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-white/[0.05] text-slate-400 transition-colors`}>
+                <button onClick={() => setSelectedPeriod(stepPeriod(selectedPeriod, periodType, -1))} className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-gray-50 text-gray-500 transition-colors`}>
                   <ChevronDown size={14} className="rotate-90" />
                 </button>
-                <span className={`text-white text-sm font-medium px-3 py-1.5 ${THEME.card} border rounded-lg min-w-[150px] text-center vN`}>{formatPeriodLabel(selectedPeriod, periodType)}</span>
-                <button onClick={() => setSelectedPeriod(stepPeriod(selectedPeriod, periodType, 1))} className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-white/[0.05] text-slate-400 transition-colors`}>
+                <span className={`text-gray-900 text-sm font-medium px-3 py-1.5 ${THEME.card} border rounded-lg min-w-[150px] text-center vN`}>{formatPeriodLabel(selectedPeriod, periodType)}</span>
+                <button onClick={() => setSelectedPeriod(stepPeriod(selectedPeriod, periodType, 1))} className={`p-1.5 rounded-lg ${THEME.card} border hover:bg-gray-50 text-gray-500 transition-colors`}>
                   <ChevronDown size={14} className="-rotate-90" />
                 </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-0.5 p-0.5 bg-[#0a0f1a] rounded-xl border border-slate-800/40">
+            <div className="flex items-center gap-0.5 p-0.5 bg-gray-50 rounded-xl border border-gray-200">
               {([
-                { id: "summary" as const, label: "Summary", color: "text-teal-400" },
-                { id: "revenue" as const, label: "Revenue", color: "text-blue-400" },
-                { id: "cost" as const, label: "Cost", color: "text-orange-400" },
+                { id: "summary" as const, label: "Summary", color: "text-emerald-600" },
+                { id: "revenue" as const, label: "Revenue", color: "text-blue-600" },
+                { id: "cost" as const, label: "Cost", color: "text-orange-600" },
               ]).map(v => (
                 <button key={v.id} onClick={() => setProfitView(v.id)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${profitView === v.id ? `bg-slate-700 ${v.color}` : "text-slate-500 hover:text-slate-300"}`}>
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${profitView === v.id ? `bg-white shadow-sm ${v.color}` : "text-gray-400 hover:text-gray-600"}`}>
                   {v.label}
                 </button>
               ))}
@@ -1647,39 +1647,39 @@ export default function TeamPage() {
           {/* Period Totals Bar */}
           {profitabilityData.length > 0 && (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
-                <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-white/20" />
+              <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
+                <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-gray-300" />
                 <div className="pl-2">
                   <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>Hours</span>
-                  <p className="text-2xl font-bold text-white vN mt-1.5">{profitTotals.hours.toFixed(1)}</p>
+                  <p className="text-2xl font-bold text-gray-900 vN mt-1.5">{profitTotals.hours.toFixed(1)}</p>
                 </div>
               </div>
-              <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
-                <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-teal-500" />
+              <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
+                <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-emerald-500" />
                 <div className="pl-2">
                   <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>Revenue</span>
-                  <p className="text-2xl font-bold text-teal-400 vN mt-1.5">{formatCurrency(profitTotals.revenue)}</p>
+                  <p className="text-2xl font-bold text-emerald-600 vN mt-1.5">{formatCurrency(profitTotals.revenue)}</p>
                 </div>
               </div>
-              <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
-                <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-slate-500" />
+              <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
+                <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-gray-400" />
                 <div className="pl-2">
                   <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>Cost</span>
-                  <p className="text-2xl font-bold text-slate-300 vN mt-1.5">{formatCurrency(profitTotals.cost)}</p>
+                  <p className="text-2xl font-bold text-gray-600 vN mt-1.5">{formatCurrency(profitTotals.cost)}</p>
                 </div>
               </div>
-              <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
+              <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
                 <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full" style={{ backgroundColor: profitTotals.margin >= 0 ? '#059669' : '#f43f5e' }} />
                 <div className="pl-2">
                   <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>Margin</span>
-                  <p className={`text-2xl font-bold vN mt-1.5 ${profitTotals.margin >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{formatCurrency(profitTotals.margin)}</p>
+                  <p className={`text-2xl font-bold vN mt-1.5 ${profitTotals.margin >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{formatCurrency(profitTotals.margin)}</p>
                 </div>
               </div>
-              <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-lg shadow-black/20`}>
+              <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
                 <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full" style={{ backgroundColor: profitTotals.marginPct >= 20 ? '#059669' : profitTotals.marginPct >= 0 ? '#d97706' : '#f43f5e' }} />
                 <div className="pl-2">
                   <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>GM%</span>
-                  <p className={`text-2xl font-bold vN mt-1.5 ${profitTotals.marginPct >= 20 ? "text-emerald-400" : profitTotals.marginPct >= 0 ? "text-amber-400" : "text-rose-400"}`}>{profitTotals.marginPct.toFixed(1)}%</p>
+                  <p className={`text-2xl font-bold vN mt-1.5 ${profitTotals.marginPct >= 20 ? "text-emerald-600" : profitTotals.marginPct >= 0 ? "text-amber-600" : "text-rose-600"}`}>{profitTotals.marginPct.toFixed(1)}%</p>
                 </div>
               </div>
             </div>
@@ -1687,13 +1687,13 @@ export default function TeamPage() {
 
           {/* Chart */}
           {profitabilityData.length > 0 && (
-            <div className={`${THEME.card} border ${THEME.border} rounded-2xl p-6 shadow-xl shadow-black/25`}>
+            <div className={`${THEME.card} border ${THEME.border} rounded-2xl p-6 shadow-sm`}>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={profitabilityData} margin={{ left: 20, right: 20 }}>
-                    <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => formatCompactCurrency(v)} />
-                    <Tooltip contentStyle={{ backgroundColor: "#0c1220", border: "1px solid rgba(51,65,85,0.2)", borderRadius: "12px" }} labelStyle={{ color: "#fff" }}
+                    <XAxis dataKey="name" tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => formatCompactCurrency(v)} />
+                    <Tooltip contentStyle={{ backgroundColor: "#ffffff", border: "1px solid #e5e7eb", borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }} labelStyle={{ color: "#111827" }}
                       formatter={(value: number, name: string) => [formatCurrency(value), name.toLowerCase() === "cost" ? "Cost" : "Revenue"]} cursor={false} />
                     <Legend wrapperStyle={{ paddingTop: "10px" }} />
                     <Bar dataKey="cost" name="Cost" fill={CHART_COLORS.cost} radius={[4, 4, 0, 0]} />
@@ -1706,14 +1706,14 @@ export default function TeamPage() {
 
           {/* SUMMARY VIEW */}
           {profitView === "summary" && profitabilityData.length > 0 && (
-            <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-xl shadow-black/25`}>
+            <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-sm`}>
               <div className={`px-6 py-4 border-b ${THEME.border} flex items-center gap-2`}>
-                <div className="vDot bg-teal-400" />
+                <div className="vDot bg-emerald-500" />
                 <h3 className={`text-[13px] font-bold ${THEME.textPrimary}`}>Direct Cost Analysis &mdash; {formatPeriodLabel(selectedPeriod, periodType)}</h3>
               </div>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className={`bg-[#080c14]/60 border-b ${THEME.border}`}>
+                  <tr className={`bg-gray-50 border-b ${THEME.border}`}>
                     <th className={`px-4 py-2.5 text-left vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Name</th>
                     <th className={`px-4 py-2.5 text-right vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Hours</th>
                     <th className={`px-4 py-2.5 text-right vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Total Cost</th>
@@ -1724,25 +1724,25 @@ export default function TeamPage() {
                 </thead>
                 <tbody>
                   {profitabilityData.map(row => (
-                    <tr key={row.id} className="border-b border-slate-800/30">
+                    <tr key={row.id} className="border-b border-gray-200">
                       <td className={`px-4 py-3 font-medium ${THEME.textPrimary}`}>
                         {row.name}
                         <span className={`ml-2 text-xs ${THEME.textDim}`}>{row.costLabel}</span>
                       </td>
                       <td className={`px-4 py-3 text-right ${THEME.textSecondary} vN`}>{row.hours.toFixed(1)}</td>
-                      <td className="px-4 py-3 text-right text-orange-400 vN">{formatCurrencyDecimal(row.cost)}</td>
-                      <td className="px-4 py-3 text-right text-blue-400 vN">{formatCurrencyDecimal(row.revenue)}</td>
-                      <td className={`px-4 py-3 text-right font-medium ${row.margin >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{formatCurrencyDecimal(row.margin)}</td>
-                      <td className={`px-4 py-3 text-right font-semibold vN ${row.marginPct >= 20 ? "text-emerald-400" : row.marginPct >= 0 ? "text-amber-400" : "text-rose-400"}`}>{row.marginPct.toFixed(1)}%</td>
+                      <td className="px-4 py-3 text-right text-orange-600 vN">{formatCurrencyDecimal(row.cost)}</td>
+                      <td className="px-4 py-3 text-right text-blue-600 vN">{formatCurrencyDecimal(row.revenue)}</td>
+                      <td className={`px-4 py-3 text-right font-medium ${row.margin >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{formatCurrencyDecimal(row.margin)}</td>
+                      <td className={`px-4 py-3 text-right font-semibold vN ${row.marginPct >= 20 ? "text-emerald-600" : row.marginPct >= 0 ? "text-amber-600" : "text-rose-600"}`}>{row.marginPct.toFixed(1)}%</td>
                     </tr>
                   ))}
-                  <tr className={`bg-[#0a0f1a]/50 border-t-2 ${THEME.border} font-bold`}>
+                  <tr className={`bg-gray-50 border-t-2 ${THEME.border} font-bold`}>
                     <td className={`px-4 py-3 ${THEME.textPrimary}`}>Total</td>
                     <td className={`px-4 py-3 text-right ${THEME.textSecondary} vN`}>{profitTotals.hours.toFixed(1)}</td>
-                    <td className="px-4 py-3 text-right text-orange-400 vN">{formatCurrencyDecimal(profitTotals.cost)}</td>
-                    <td className="px-4 py-3 text-right text-blue-400 vN">{formatCurrencyDecimal(profitTotals.revenue)}</td>
-                    <td className={`px-4 py-3 text-right ${profitTotals.margin >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{formatCurrencyDecimal(profitTotals.margin)}</td>
-                    <td className={`px-4 py-3 text-right ${profitTotals.marginPct >= 20 ? "text-emerald-400" : "text-amber-400"}`}>{profitTotals.marginPct.toFixed(1)}%</td>
+                    <td className="px-4 py-3 text-right text-orange-600 vN">{formatCurrencyDecimal(profitTotals.cost)}</td>
+                    <td className="px-4 py-3 text-right text-blue-600 vN">{formatCurrencyDecimal(profitTotals.revenue)}</td>
+                    <td className={`px-4 py-3 text-right ${profitTotals.margin >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{formatCurrencyDecimal(profitTotals.margin)}</td>
+                    <td className={`px-4 py-3 text-right ${profitTotals.marginPct >= 20 ? "text-emerald-600" : "text-amber-600"}`}>{profitTotals.marginPct.toFixed(1)}%</td>
                   </tr>
                 </tbody>
               </table>
@@ -1751,7 +1751,7 @@ export default function TeamPage() {
 
           {/* REVENUE VIEW */}
           {profitView === "revenue" && profitabilityData.length > 0 && (
-            <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-xl shadow-black/25`}>
+            <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-sm`}>
               <div className={`px-6 py-4 border-b ${THEME.border} flex items-center gap-2`}>
                 <div className="vDot bg-blue-400" />
                 <h3 className={`text-[13px] font-bold ${THEME.textPrimary}`}>Revenue by Client &mdash; {formatPeriodLabel(selectedPeriod, periodType)}</h3>
@@ -1759,8 +1759,8 @@ export default function TeamPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className={`bg-[#080c14]/60 border-b ${THEME.border}`}>
-                      <th className={`px-4 py-2.5 text-left vLbl text-[10px] ${THEME.textDim} font-bold uppercase sticky left-0 bg-[#0f1623] z-10`}>Name</th>
+                    <tr className={`bg-gray-50 border-b ${THEME.border}`}>
+                      <th className={`px-4 py-2.5 text-left vLbl text-[10px] ${THEME.textDim} font-bold uppercase sticky left-0 bg-white z-10`}>Name</th>
                       {profitClients.map(c => (
                         <th key={c.id} className={`px-4 py-3 text-right ${THEME.textDim} font-medium whitespace-nowrap`}>{c.name}</th>
                       ))}
@@ -1769,22 +1769,22 @@ export default function TeamPage() {
                   </thead>
                   <tbody>
                     {profitabilityData.map(row => (
-                      <tr key={row.id} className="border-b border-slate-800/30">
-                        <td className={`px-4 py-3 font-medium ${THEME.textPrimary} sticky left-0 bg-[#0f1623] z-10`}>{row.name}</td>
+                      <tr key={row.id} className="border-b border-gray-200">
+                        <td className={`px-4 py-3 font-medium ${THEME.textPrimary} sticky left-0 bg-white z-10`}>{row.name}</td>
                         {profitClients.map(c => {
                           const val = row.revenueByClient[c.id] || 0
-                          return <td key={c.id} className={`px-4 py-3 text-right ${val > 0 ? "text-blue-400" : THEME.textDim}`}>{val > 0 ? formatCurrencyDecimal(val) : "\u2014"}</td>
+                          return <td key={c.id} className={`px-4 py-3 text-right ${val > 0 ? "text-blue-600" : THEME.textDim}`}>{val > 0 ? formatCurrencyDecimal(val) : "\u2014"}</td>
                         })}
-                        <td className="px-4 py-3 text-right text-blue-400 font-medium">{formatCurrencyDecimal(row.revenue)}</td>
+                        <td className="px-4 py-3 text-right text-blue-600 font-medium">{formatCurrencyDecimal(row.revenue)}</td>
                       </tr>
                     ))}
-                    <tr className={`bg-[#0a0f1a]/50 border-t-2 ${THEME.border} font-bold`}>
-                      <td className={`px-4 py-3 ${THEME.textPrimary} sticky left-0 bg-[#0f1623] z-10`}>Total</td>
+                    <tr className={`bg-gray-50 border-t-2 ${THEME.border} font-bold`}>
+                      <td className={`px-4 py-3 ${THEME.textPrimary} sticky left-0 bg-white z-10`}>Total</td>
                       {profitClients.map(c => {
                         const total = profitabilityData.reduce((s, m) => s + (m.revenueByClient[c.id] || 0), 0)
-                        return <td key={c.id} className="px-4 py-3 text-right text-blue-400 vN">{formatCurrencyDecimal(total)}</td>
+                        return <td key={c.id} className="px-4 py-3 text-right text-blue-600 vN">{formatCurrencyDecimal(total)}</td>
                       })}
-                      <td className="px-4 py-3 text-right text-blue-400 font-bold">{formatCurrencyDecimal(profitTotals.revenue)}</td>
+                      <td className="px-4 py-3 text-right text-blue-600 font-bold">{formatCurrencyDecimal(profitTotals.revenue)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1794,7 +1794,7 @@ export default function TeamPage() {
 
           {/* COST VIEW */}
           {profitView === "cost" && profitabilityData.length > 0 && (
-            <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-xl shadow-black/25`}>
+            <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-sm`}>
               <div className={`px-6 py-4 border-b ${THEME.border} flex items-center gap-2`}>
                 <div className="vDot bg-orange-400" />
                 <h3 className={`text-[13px] font-bold ${THEME.textPrimary}`}>Cost by Client &mdash; {formatPeriodLabel(selectedPeriod, periodType)}</h3>
@@ -1802,8 +1802,8 @@ export default function TeamPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className={`bg-[#080c14]/60 border-b ${THEME.border}`}>
-                      <th className={`px-4 py-2.5 text-left vLbl text-[10px] ${THEME.textDim} font-bold uppercase sticky left-0 bg-[#0f1623] z-10`}>Name</th>
+                    <tr className={`bg-gray-50 border-b ${THEME.border}`}>
+                      <th className={`px-4 py-2.5 text-left vLbl text-[10px] ${THEME.textDim} font-bold uppercase sticky left-0 bg-white z-10`}>Name</th>
                       {profitClients.map(c => (
                         <th key={c.id} className={`px-4 py-3 text-right ${THEME.textDim} font-medium whitespace-nowrap`}>{c.name}</th>
                       ))}
@@ -1812,29 +1812,29 @@ export default function TeamPage() {
                   </thead>
                   <tbody>
                     {profitabilityData.map(row => (
-                      <tr key={row.id} className="border-b border-slate-800/30">
-                        <td className={`px-4 py-3 font-medium ${THEME.textPrimary} sticky left-0 bg-[#0f1623] z-10`}>{row.name}</td>
+                      <tr key={row.id} className="border-b border-gray-200">
+                        <td className={`px-4 py-3 font-medium ${THEME.textPrimary} sticky left-0 bg-white z-10`}>{row.name}</td>
                         {profitClients.map(c => {
                           const val = row.costByClient[c.id] || 0
                           const months = getMonthsInPeriod(selectedPeriod, periodType)
                           const hasOverride = months.some(mo => costOverrides.some(o => o.team_member_id === row.id && o.client_id === c.id && o.month === mo))
                           return (
-                            <td key={c.id} className={`px-4 py-3 text-right ${val > 0 ? "text-orange-400" : THEME.textDim}`}>
+                            <td key={c.id} className={`px-4 py-3 text-right ${val > 0 ? "text-orange-600" : THEME.textDim}`}>
                               {val > 0 ? formatCurrencyDecimal(val) : "\u2014"}
-                              {hasOverride && <span className="ml-1 text-amber-500 text-xs" title="Manual override">&#9889;</span>}
+                              {hasOverride && <span className="ml-1 text-amber-600 text-xs" title="Manual override">&#9889;</span>}
                             </td>
                           )
                         })}
-                        <td className="px-4 py-3 text-right text-orange-400 font-medium vN">{formatCurrencyDecimal(row.cost)}</td>
+                        <td className="px-4 py-3 text-right text-orange-600 font-medium vN">{formatCurrencyDecimal(row.cost)}</td>
                       </tr>
                     ))}
-                    <tr className={`bg-[#0a0f1a]/50 border-t-2 ${THEME.border} font-bold`}>
-                      <td className={`px-4 py-3 ${THEME.textPrimary} sticky left-0 bg-[#0f1623] z-10`}>Total</td>
+                    <tr className={`bg-gray-50 border-t-2 ${THEME.border} font-bold`}>
+                      <td className={`px-4 py-3 ${THEME.textPrimary} sticky left-0 bg-white z-10`}>Total</td>
                       {profitClients.map(c => {
                         const total = profitabilityData.reduce((s, m) => s + (m.costByClient[c.id] || 0), 0)
-                        return <td key={c.id} className="px-4 py-3 text-right text-orange-400 vN">{formatCurrencyDecimal(total)}</td>
+                        return <td key={c.id} className="px-4 py-3 text-right text-orange-600 vN">{formatCurrencyDecimal(total)}</td>
                       })}
-                      <td className="px-4 py-3 text-right text-orange-400 font-bold">{formatCurrencyDecimal(profitTotals.cost)}</td>
+                      <td className="px-4 py-3 text-right text-orange-600 font-bold">{formatCurrencyDecimal(profitTotals.cost)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1850,9 +1850,9 @@ export default function TeamPage() {
                     <p className={`text-xs font-medium ${THEME.textMuted} mb-2`}>&#9889; Active Overrides</p>
                     <div className="flex flex-wrap gap-2">
                       {activeOverrides.map(o => (
-                        <div key={o.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-950/30 border border-amber-800/25 rounded-xl">
-                          <span className="text-xs text-amber-400">{o.team_member_name} &rarr; {o.client_name} ({o.month}): {formatCurrency(o.fixed_amount)}</span>
-                          <button onClick={() => handleDeleteOverride(o.id)} className="text-amber-500/50 hover:text-rose-400"><X size={12} /></button>
+                        <div key={o.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 rounded-xl">
+                          <span className="text-xs text-amber-600">{o.team_member_name} &rarr; {o.client_name} ({o.month}): {formatCurrency(o.fixed_amount)}</span>
+                          <button onClick={() => handleDeleteOverride(o.id)} className="text-amber-500 hover:text-rose-500"><X size={12} /></button>
                         </div>
                       ))}
                     </div>
@@ -1864,7 +1864,7 @@ export default function TeamPage() {
 
           {profitabilityData.length === 0 && (
             <div className={`${THEME.card} border ${THEME.border} rounded-2xl p-12 text-center`}>
-              <BarChart3 size={48} className="mx-auto text-slate-700 mb-4" />
+              <BarChart3 size={48} className="mx-auto text-gray-300 mb-4" />
               <p className={THEME.textMuted}>No timesheet data for {formatPeriodLabel(selectedPeriod, periodType)}</p>
               <p className={`text-xs ${THEME.textDim} mt-1`}>Time entries and rate cards needed to calculate profitability</p>
             </div>
