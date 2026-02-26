@@ -73,13 +73,13 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
     <aside
       className={cn(
         'fixed left-0 top-0 h-full z-40 flex flex-col transition-all duration-300',
-        'bg-[#060a12] border-r border-slate-800/40',
+        'bg-white border-r border-gray-200',
         collapsed ? 'w-16' : 'w-60'
       )}
     >
       {/* Logo / Brand */}
       <div className={cn(
-        'flex items-center h-16 border-b border-slate-800/40',
+        'flex items-center h-16 border-b border-gray-200',
         collapsed ? 'justify-center px-2' : 'px-4'
       )}>
         <div className="flex items-center gap-3">
@@ -90,15 +90,9 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
               viewBox="0 0 40 40" 
               fill="none"
             >
-              <defs>
-                <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#2dd4bf" />
-                  <stop offset="100%" stopColor="#0d9488" />
-                </linearGradient>
-              </defs>
               <path 
                 d="M8 8L20 32L32 8" 
-                stroke="url(#logoGradient)" 
+                stroke="#10b981" 
                 strokeWidth="3.5" 
                 strokeLinecap="round" 
                 strokeLinejoin="round" 
@@ -109,9 +103,9 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
           
           {!collapsed && (
             <div>
-              <h1 className="text-base font-bold tracking-tight text-white">VantageFP</h1>
+              <h1 className="text-base font-bold tracking-tight text-gray-900">VantageFP</h1>
               {companyName && (
-                <p className="text-[10px] text-slate-600 -mt-0.5 truncate max-w-32">{companyName}</p>
+                <p className="text-[10px] text-gray-400 -mt-0.5 truncate max-w-32">{companyName}</p>
               )}
             </div>
           )}
@@ -134,14 +128,14 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
                 {/* Section divider */}
                 {showSection && !collapsed && (
                   <li className="pt-6 pb-1.5 px-3">
-                    <span className="vLbl text-[10px] font-bold uppercase text-slate-600">
+                    <span className="vLbl text-[10px] font-bold uppercase text-gray-400">
                       {item.section}
                     </span>
                   </li>
                 )}
                 {showSection && collapsed && (
                   <li className="pt-4 pb-2">
-                    <div className="mx-3 border-t border-slate-800/30" />
+                    <div className="mx-3 border-t border-gray-100" />
                   </li>
                 )}
                 
@@ -153,18 +147,18 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
                       'vBtn flex items-center gap-3 px-3 py-2 rounded-lg relative',
                       collapsed && 'justify-center',
                       isActive 
-                        ? 'bg-teal-500/[0.08] text-teal-400' 
-                        : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'
+                        ? 'bg-emerald-50 text-emerald-700' 
+                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                     )}
                     title={collapsed ? item.label : undefined}
                   >
                     {/* Active indicator bar */}
                     {isActive && (
-                      <div className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-teal-400" />
+                      <div className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-emerald-500" />
                     )}
                     <span className={cn(
                       'flex-shrink-0',
-                      isActive && 'text-teal-400'
+                      isActive && 'text-emerald-600'
                     )}>
                       {item.icon}
                     </span>
@@ -180,13 +174,13 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
       </nav>
 
       {/* Bottom section */}
-      <div className="border-t border-slate-800/40 p-2">
+      <div className="border-t border-gray-200 p-2">
         {/* Sign Out */}
         <button
           onClick={onSignOut}
           className={cn(
             'vBtn w-full flex items-center gap-3 px-3 py-2 rounded-lg',
-            'text-slate-600 hover:text-slate-400 hover:bg-white/[0.03]',
+            'text-gray-400 hover:text-gray-600 hover:bg-gray-50',
             collapsed && 'justify-center'
           )}
           title={collapsed ? 'Sign Out' : undefined}
@@ -200,7 +194,7 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
           onClick={onToggle}
           className={cn(
             'vBtn w-full flex items-center gap-3 px-3 py-2 rounded-lg mt-0.5',
-            'text-slate-600 hover:text-slate-400 hover:bg-white/[0.03]',
+            'text-gray-400 hover:text-gray-600 hover:bg-gray-50',
             collapsed && 'justify-center'
           )}
           title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
