@@ -332,7 +332,7 @@ function PnLReport({ invoices, bills, expenses, teamMembers, timeEntries, projec
 }
 
 // ============ AR AGING REPORT ============
-function ARAgingReport({ invoices, clients }: { invoices: any[]; clients: any[] }) {
+function ARAgingReport({ invoices, clients, dateRange }: { invoices: any[]; clients: any[]; dateRange: { start: Date; end: Date } }) {
   const clientMap = useMemo(() => { const m: Record<string, string> = {}; clients.forEach(c => { m[c.id] = c.name }); return m }, [clients])
   const agingData = useMemo(() => {
     const buckets = [
@@ -345,7 +345,8 @@ function ARAgingReport({ invoices, clients }: { invoices: any[]; clients: any[] 
     type AgingRow = { current: number; days30: number; days60: number; days90: number; over90: number; total: number }
     const byClient: Record<string, AgingRow> = {}
 
-    invoices.filter(inv => (parseFloat(inv.balance_due || 0)) > 0).forEach(inv => {
+    // Filter by dateRange: only invoices issued within the selected period that still have balance
+    invoices.filter(inv => (parseFloat(inv.balance_due || 0)) > 0 && inRange(inv.invoice_date, dateRange)).forEach(inv => {
       const days = inv.days_overdue || 0
       const bal = parseFloat(inv.balance_due || 0)
       const cid = inv.client_id || 'unknown'
@@ -364,7 +365,7 @@ function ARAgingReport({ invoices, clients }: { invoices: any[]; clients: any[] 
     const totalAR = buckets.reduce((s, b) => s + b.amount, 0)
     const clientRows = Object.entries(byClient).map(([cid, data]) => ({ name: clientMap[cid] || 'Unknown', ...data })).sort((a, b) => b.total - a.total)
     return { buckets, totalAR, clientRows }
-  }, [invoices, clientMap])
+  }, [invoices, clientMap, dateRange])
 
   const bucketColors = ['text-emerald-600', 'text-amber-600', 'text-orange-600', 'text-rose-600', 'text-red-600']
   const barColors = [CHART.emerald, CHART.amber, '#f97316', CHART.rose, '#dc2626']
@@ -851,7 +852,7 @@ function ReportBuilder({ allData, dateRange, onSave, editingTemplate }: {
     switch (block.type) {
       case 'pnl': return <PnLReport {...allData} dateRange={dateRange} />
       case 'cash_flow': return <CashFlowReport invoices={allData.invoices} bills={allData.bills} expenses={allData.expenses} dateRange={dateRange} />
-      case 'ar_aging': return <ARAgingReport invoices={allData.invoices} clients={allData.clients} />
+      case 'ar_aging': return <ARAgingReport invoices={allData.invoices} clients={allData.clients} dateRange={dateRange} />
       case 'client_profit': return <ClientProfitReport {...allData} dateRange={dateRange} />
       case 'project_profit': return <ProjectProfitReport {...allData} dateRange={dateRange} />
       case 'utilization': return <UtilizationReport timeEntries={allData.timeEntries} teamMembers={allData.teamMembers} dateRange={dateRange} />
@@ -892,6 +893,10 @@ function ReportBuilder({ allData, dateRange, onSave, editingTemplate }: {
       <div className="flex items-center gap-4 mb-2">
         <input type="text" value={reportTitle} onChange={e => setReportTitle(e.target.value)}
           className="bg-transparent text-lg font-bold text-gray-900 border-b border-transparent hover:border-gray-300 focus:border-emerald-600 focus:outline-none pb-1 transition-colors flex-1" />
+        {/* Active period indicator */}
+        <span className="text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-2.5 py-1 shrink-0 tabular-nums">
+          {dateRange.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {dateRange.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+        </span>
         <div className="flex items-center gap-2">
           {blocks.length > 0 && (
             <>
@@ -1200,7 +1205,7 @@ export default function ReportsPage() {
     switch (id) {
       case 'pnl': return <PnLReport {...allData} dateRange={dateRange} />
       case 'cash_flow': return <CashFlowReport invoices={invoices} bills={bills} expenses={expenses} dateRange={dateRange} />
-      case 'ar_aging': return <ARAgingReport invoices={invoices} clients={clients} />
+      case 'ar_aging': return <ARAgingReport invoices={invoices} clients={clients} dateRange={dateRange} />
       case 'client_profit': return <ClientProfitReport {...allData} dateRange={dateRange} />
       case 'project_profit': return <ProjectProfitReport {...allData} dateRange={dateRange} />
       case 'utilization': return <UtilizationReport timeEntries={timeEntries} teamMembers={teamMembers} dateRange={dateRange} />
