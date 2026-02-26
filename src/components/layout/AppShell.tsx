@@ -117,32 +117,26 @@ export default function AppShell({ children }: AppShellProps) {
   // Loading state
   if (loading) {
     return (
-      <div className="v-app min-h-screen bg-[#080c14] flex items-center justify-center">
+      <div className="v-app min-h-screen bg-[#f4f5f7] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 vUp">
           <svg width={40} height={40} viewBox="0 0 40 40" fill="none" className="animate-pulse">
-            <defs>
-              <linearGradient id="loadingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#2dd4bf" />
-                <stop offset="100%" stopColor="#0d9488" />
-              </linearGradient>
-            </defs>
             <path 
               d="M8 8L20 32L32 8" 
-              stroke="url(#loadingGradient)" 
+              stroke="#10b981" 
               strokeWidth="3.5" 
               strokeLinecap="round" 
               strokeLinejoin="round" 
               fill="none"
             />
           </svg>
-          <p className="text-sm text-slate-600 font-medium">Loading VantageFP...</p>
+          <p className="text-sm text-gray-400 font-medium">Loading VantageFP...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="v-app min-h-screen bg-[#080c14]">
+    <div className="v-app min-h-screen bg-[#f4f5f7]">
       {/* Sidebar */}
       <Sidebar
         collapsed={sidebarCollapsed}
