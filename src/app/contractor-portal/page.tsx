@@ -10,19 +10,6 @@ import {
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 
-// Force light color scheme on all form elements
-if (typeof document !== 'undefined') {
-  const style = document.createElement('style')
-  style.textContent = `
-    *, input, select, textarea { color-scheme: light !important; }
-    input[type="number"]::-webkit-outer-spin-button,
-    input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-    input[type="number"] { -moz-appearance: textfield; }
-    input[type="date"]::-webkit-calendar-picker-indicator { filter: none; }
-  `
-  document.head.appendChild(style)
-}
-
 const supabase = createClient(
   'https://jmahfgpbtjeomuepfozf.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptYWhmZ3BidGplb211ZXBmb3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0OTAxNzcsImV4cCI6MjA4MTA2NjE3N30.3SVDvWCGIYYHV57BpKjpDJVCZLKzuRv8B_VietQDxUQ'
@@ -570,7 +557,7 @@ export default function ContractorPortal() {
   // ============ LOGIN SCREEN ============
   if (step === 'email') {
     return (
-      <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center p-4" style={{ colorScheme: 'light' }}>
         <div className="w-full max-w-[380px]">
           {/* Logo */}
           <div className="text-center mb-10">
@@ -609,7 +596,7 @@ export default function ContractorPortal() {
 
   // ============ PORTAL ============
   return (
-    <div className="min-h-screen bg-[#f4f5f7] text-gray-900">
+    <div className="min-h-screen bg-[#f4f5f7] text-gray-900" style={{ colorScheme: 'light' }}>
       {/* Top Bar */}
       <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/95 backdrop-blur-xl">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
