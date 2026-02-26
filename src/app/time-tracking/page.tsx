@@ -674,32 +674,42 @@ export default function TimeTrackingPage() {
   }, [])
 
   // ============ FILTERS ============
-  const filteredEntries = useMemo(() => entries.filter(entry => {
-    if (entry.date < dateRange.start || entry.date > dateRange.end) return false
-    if (selectedClient !== 'all' && entry.client_id !== selectedClient) return false
-    if (selectedEmployee !== 'all' && entry.team_member_id !== selectedEmployee) return false
-    if (selectedProject !== 'all' && entry.project_id !== selectedProject) return false
-    return true
-  }), [entries, dateRange, selectedClient, selectedEmployee, selectedProject])
+  // ============ DATE-ONLY FILTERED ENTRIES (for cost allocation) ============
+  // Cost allocation must see ALL entries in the date range to distribute LS costs proportionally.
+  // Display filters (client/project/employee) are applied AFTER cost adjustment.
+  const dateOnlyEntries = useMemo(() => entries.filter(entry =>
+    entry.date >= dateRange.start && entry.date <= dateRange.end
+  ), [entries, dateRange])
 
-  const priorPeriodEntries = useMemo(() => entries.filter(entry => {
-    if (entry.date < priorPeriod.start || entry.date > priorPeriod.end) return false
-    if (selectedClient !== 'all' && entry.client_id !== selectedClient) return false
-    if (selectedEmployee !== 'all' && entry.team_member_id !== selectedEmployee) return false
-    if (selectedProject !== 'all' && entry.project_id !== selectedProject) return false
-    return true
-  }), [entries, priorPeriod, selectedClient, selectedEmployee, selectedProject])
+  const dateOnlyPriorEntries = useMemo(() => entries.filter(entry =>
+    entry.date >= priorPeriod.start && entry.date <= priorPeriod.end
+  ), [entries, priorPeriod])
 
-  // ============ FIXED COST ADJUSTMENT ============
+  // ============ FIXED COST ADJUSTMENT (runs on ALL entries, unfiltered by client/project/employee) ============
   // Recalculate cost_rate for lump sum members so total cost = fixed monthly amount
-  const costAdjustedEntries = useMemo(() => 
-    adjustEntriesForFixedCosts(filteredEntries, teamMembers, billRates, dateRange.start, dateRange.end),
-    [filteredEntries, teamMembers, billRates, dateRange]
+  const allCostAdjustedEntries = useMemo(() => 
+    adjustEntriesForFixedCosts(dateOnlyEntries, teamMembers, billRates, dateRange.start, dateRange.end),
+    [dateOnlyEntries, teamMembers, billRates, dateRange]
   )
-  const costAdjustedPriorEntries = useMemo(() => 
-    adjustEntriesForFixedCosts(priorPeriodEntries, teamMembers, billRates, priorPeriod.start, priorPeriod.end),
-    [priorPeriodEntries, teamMembers, billRates, priorPeriod]
+  const allCostAdjustedPriorEntries = useMemo(() => 
+    adjustEntriesForFixedCosts(dateOnlyPriorEntries, teamMembers, billRates, priorPeriod.start, priorPeriod.end),
+    [dateOnlyPriorEntries, teamMembers, billRates, priorPeriod]
   )
+
+  // ============ DISPLAY FILTERS (applied AFTER cost allocation) ============
+  const costAdjustedEntries = useMemo(() => allCostAdjustedEntries.filter(entry => {
+    if (selectedClient !== 'all' && entry.client_id !== selectedClient) return false
+    if (selectedEmployee !== 'all' && entry.team_member_id !== selectedEmployee) return false
+    if (selectedProject !== 'all' && entry.project_id !== selectedProject) return false
+    return true
+  }), [allCostAdjustedEntries, selectedClient, selectedEmployee, selectedProject])
+
+  const costAdjustedPriorEntries = useMemo(() => allCostAdjustedPriorEntries.filter(entry => {
+    if (selectedClient !== 'all' && entry.client_id !== selectedClient) return false
+    if (selectedEmployee !== 'all' && entry.team_member_id !== selectedEmployee) return false
+    if (selectedProject !== 'all' && entry.project_id !== selectedProject) return false
+    return true
+  }), [allCostAdjustedPriorEntries, selectedClient, selectedEmployee, selectedProject])
 
   // ============ KPIs — DUAL LAYER ============
   const kpis = useMemo(() => {
