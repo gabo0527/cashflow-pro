@@ -173,7 +173,7 @@ function buildGroups(
     amount: (item: any) => number
   }
 ): GroupNode[] {
-  const filtered = dimensions.filter(d => d !== 'none')
+  const filtered: GroupDimension[] = dimensions.filter(d => d !== 'none')
   if (filtered.length === 0) {
     return [{ key: '_all', label: '', total: items.reduce((s, i) => s + resolvers.amount(i), 0), count: items.length, pendingCount: items.filter(i => ['pending', 'submitted'].includes(resolvers.status(i))).length, children: [], items }]
   }
@@ -271,9 +271,9 @@ function GroupBySelector({ dimensions, onChange }: { dimensions: GroupDimension[
     { id: 'status', label: 'Status' },
     { id: 'contractor', label: 'Contractor' },
   ]
-  const activeDims = dimensions.filter(d => d !== 'none')
+  const activeDims: GroupDimension[] = dimensions.filter(d => d !== 'none')
 
-  const addDim = (dim: 'client' | 'status' | 'contractor') => {
+  const addDim = (dim: GroupDimension) => {
     if (activeDims.includes(dim)) return
     onChange([...activeDims, dim])
   }
@@ -304,7 +304,7 @@ function GroupBySelector({ dimensions, onChange }: { dimensions: GroupDimension[
       {activeDims.length < 3 && (
         <div className="flex items-center gap-0.5 ml-1">
           {options.filter(o => !activeDims.includes(o.id)).map(o => (
-            <button key={o.id} onClick={() => addDim(o.id as 'client' | 'status' | 'contractor')}
+            <button key={o.id} onClick={() => addDim(o.id)}
               className="px-2 py-0.5 rounded-md text-[10px] font-medium text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors border border-transparent hover:border-gray-200">
               + {o.label}
             </button>
@@ -677,7 +677,7 @@ export default function ContractorManagement() {
   // ============ RENDER ============
   if (loading) return <div className="flex items-center justify-center h-64"><Loader2 size={22} className="text-emerald-500 animate-spin" /></div>
 
-  const isNoGroup = (dims: GroupDimension[]) => dims.length === 0 || dims.every(d => d === 'none')
+  const isNoGroup = (dims: GroupDimension[]) => dims.length === 0 || dims[0] === 'none'
 
   return (
     <div className="space-y-5">
