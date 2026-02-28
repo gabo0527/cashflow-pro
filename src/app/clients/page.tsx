@@ -18,13 +18,13 @@ import Link from 'next/link'
 
 // ============ INSTITUTIONAL THEME ============
 const THEME = {
-  glass: 'bg-[#111827]',
-  glassBorder: 'border-slate-800/80',
-  glassHover: 'hover:bg-white/[0.05] hover:border-slate-700',
-  textPrimary: 'text-white',
-  textSecondary: 'text-slate-300',
-  textMuted: 'text-slate-400',
-  textDim: 'text-slate-500',
+  glass: 'bg-white',
+  glassBorder: 'border-slate-200',
+  glassHover: 'hover:bg-slate-50 hover:border-slate-300',
+  textPrimary: 'text-slate-900',
+  textSecondary: 'text-slate-600',
+  textMuted: 'text-slate-500',
+  textDim: 'text-slate-400',
 }
 
 // ============ TOAST NOTIFICATION ============
@@ -41,9 +41,9 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
         <div
           key={toast.id}
           className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg backdrop-blur-xl border ${
-            toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' :
-            toast.type === 'error' ? 'bg-rose-500/20 border-rose-500/30 text-rose-400' :
-            'bg-blue-500/20 border-blue-500/30 text-blue-400'
+            toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+            toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-700' :
+            'bg-blue-50 border-blue-200 text-blue-700'
           }`}
         >
           {toast.type === 'success' && <CheckCircle size={18} />}
@@ -159,26 +159,26 @@ const PAYMENT_TERMS = [
 ]
 
 const TIER_CONFIG = {
-  A: { label: 'Tier A', color: 'text-amber-400', bg: 'bg-amber-500/20', border: 'border-amber-500/30', icon: Crown },
-  B: { label: 'Tier B', color: 'text-blue-400', bg: 'bg-blue-500/20', border: 'border-blue-500/30', icon: Star },
-  C: { label: 'Tier C', color: 'text-slate-400', bg: 'bg-slate-500/20', border: 'border-slate-500/30', icon: Building2 },
+  A: { label: 'Tier A', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', icon: Crown },
+  B: { label: 'Tier B', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', icon: Star },
+  C: { label: 'Tier C', color: 'text-slate-500', bg: 'bg-slate-100', border: 'border-slate-300', icon: Building2 },
 }
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
 
 const getStatusStyle = (status: string) => {
   const styles: Record<string, { bg: string; text: string; border: string }> = {
-    active: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30' },
-    inactive: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30' },
-    archived: { bg: 'bg-slate-500/10', text: 'text-slate-400', border: 'border-slate-500/30' },
+    active: { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
+    inactive: { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' },
+    archived: { bg: 'bg-slate-50', text: 'text-slate-500', border: 'border-slate-300' },
   }
   return styles[status] || styles.active
 }
 
 const getHealthColor = (score: number) => {
-  if (score >= 80) return { bg: 'bg-emerald-500/20', text: 'text-emerald-400', fill: '#10b981' }
-  if (score >= 60) return { bg: 'bg-amber-500/20', text: 'text-amber-400', fill: '#f59e0b' }
-  return { bg: 'bg-rose-500/20', text: 'text-rose-400', fill: '#ef4444' }
+  if (score >= 80) return { bg: 'bg-emerald-50', text: 'text-emerald-600', fill: '#10b981' }
+  if (score >= 60) return { bg: 'bg-amber-50', text: 'text-amber-600', fill: '#f59e0b' }
+  return { bg: 'bg-red-50', text: 'text-red-600', fill: '#ef4444' }
 }
 
 // ============ CLIENT HEALTH SCORE CALCULATION ============
@@ -296,13 +296,13 @@ function HealthBadge({ score }: { score: number }) {
 
 // Risk Indicator
 function RiskIndicator({ flags }: { flags: string[] }) {
-  if (flags.length === 0) return <CheckCircle size={16} className="text-emerald-400 mx-auto" />
+  if (flags.length === 0) return <CheckCircle size={16} className="text-emerald-600 mx-auto" />
   return (
     <div className="relative group">
-      <AlertTriangle size={16} className="text-rose-400 mx-auto cursor-help" />
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-slate-900 border border-white/10 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none">
-        <p className="text-xs text-rose-400 font-semibold mb-1">Risk Alerts</p>
-        {flags.map((f, i) => <p key={i} className="text-xs text-slate-400">• {f}</p>)}
+      <AlertTriangle size={16} className="text-red-600 mx-auto cursor-help" />
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-white border border-slate-200 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none">
+        <p className="text-xs text-red-600 font-semibold mb-1">Risk Alerts</p>
+        {flags.map((f, i) => <p key={i} className="text-xs text-slate-500">• {f}</p>)}
       </div>
     </div>
   )
@@ -312,8 +312,8 @@ function RiskIndicator({ flags }: { flags: string[] }) {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 shadow-xl">
-      <p className="text-xs text-slate-300">{payload[0]?.payload?.fullName || label}</p>
+    <div className="bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 shadow-lg">
+      <p className="text-xs text-slate-600">{payload[0]?.payload?.fullName || label}</p>
       {payload.map((entry: any, i: number) => (
         <p key={i} className="text-sm font-semibold text-white">
           {formatCurrency(entry.value)}
@@ -334,7 +334,7 @@ function ClientDetailFlyout({ client, projects, invoices, onClose }: {
   const healthColor = getHealthColor(client.healthScore)
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-end z-50" onClick={onClose}>
       <div 
         className={`w-full max-w-lg h-full ${THEME.glass} border-l ${THEME.glassBorder} overflow-y-auto`}
         onClick={e => e.stopPropagation()}
@@ -349,7 +349,7 @@ function ClientDetailFlyout({ client, projects, invoices, onClose }: {
               </div>
               <p className={`text-sm ${THEME.textMuted} mt-0.5`}>{client.contact_name || 'No contact'}</p>
             </div>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/[0.08] transition-colors">
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
               <X size={20} className={THEME.textMuted} />
             </button>
           </div>
@@ -365,7 +365,7 @@ function ClientDetailFlyout({ client, projects, invoices, onClose }: {
                 {client.healthScore >= 80 ? 'Excellent' : client.healthScore >= 60 ? 'Good' : 'Needs Attention'}
               </p>
             </div>
-            <div className="p-4 rounded-xl bg-slate-800/30 border border-white/[0.08]">
+            <div className="p-4 rounded-xl bg-slate-100/30 border border-slate-200">
               <p className={`text-xs font-medium ${THEME.textMuted}`}>Lifetime Value</p>
               <p className={`text-2xl font-bold ${THEME.textPrimary} mt-1`}>{formatCurrency(client.ltv)}</p>
               <p className={`text-xs ${THEME.textDim} mt-1`}>{formatPercent(client.concentration)} of portfolio</p>
@@ -374,15 +374,15 @@ function ClientDetailFlyout({ client, projects, invoices, onClose }: {
 
           {/* Quick Stats */}
           <div className="grid grid-cols-3 gap-3">
-            <div className="text-center p-3 rounded-lg bg-slate-800/30">
-              <p className={`text-lg font-semibold ${client.margin >= 20 ? 'text-emerald-400' : client.margin >= 10 ? 'text-amber-400' : 'text-rose-400'}`}>{formatPercent(client.margin)}</p>
+            <div className="text-center p-3 rounded-lg bg-slate-100/30">
+              <p className={`text-lg font-semibold ${client.margin >= 20 ? 'text-emerald-600' : client.margin >= 10 ? 'text-amber-600' : 'text-red-600'}`}>{formatPercent(client.margin)}</p>
               <p className={`text-xs ${THEME.textMuted}`}>Margin</p>
             </div>
-            <div className="text-center p-3 rounded-lg bg-slate-800/30">
-              <p className={`text-lg font-semibold ${client.avgPayDays > 45 ? 'text-rose-400' : client.avgPayDays > 30 ? 'text-amber-400' : THEME.textPrimary}`}>{client.avgPayDays > 0 ? `${Math.round(client.avgPayDays)}d` : '—'}</p>
+            <div className="text-center p-3 rounded-lg bg-slate-100/30">
+              <p className={`text-lg font-semibold ${client.avgPayDays > 45 ? 'text-red-600' : client.avgPayDays > 30 ? 'text-amber-600' : THEME.textPrimary}`}>{client.avgPayDays > 0 ? `${Math.round(client.avgPayDays)}d` : '—'}</p>
               <p className={`text-xs ${THEME.textMuted}`}>Avg Pay</p>
             </div>
-            <div className="text-center p-3 rounded-lg bg-slate-800/30">
+            <div className="text-center p-3 rounded-lg bg-slate-100/30">
               <p className={`text-lg font-semibold ${THEME.textPrimary}`}>{client.activeProjects}</p>
               <p className={`text-xs ${THEME.textMuted}`}>Active</p>
             </div>
@@ -390,10 +390,10 @@ function ClientDetailFlyout({ client, projects, invoices, onClose }: {
 
           {/* Risk Flags */}
           {client.riskFlags.length > 0 && (
-            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20">
+            <div className="p-4 rounded-xl bg-red-50 border border-rose-500/20">
               <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle size={16} className="text-rose-400" />
-                <p className="text-sm font-medium text-rose-400">Risk Alerts</p>
+                <AlertTriangle size={16} className="text-red-600" />
+                <p className="text-sm font-medium text-red-600">Risk Alerts</p>
               </div>
               <div className="space-y-1">
                 {client.riskFlags.map((flag, i) => (
@@ -408,7 +408,7 @@ function ClientDetailFlyout({ client, projects, invoices, onClose }: {
             <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Contact Information</h3>
             <div className="space-y-2">
               {client.email && (
-                <a href={`mailto:${client.email}`} className="flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm">
+                <a href={`mailto:${client.email}`} className="flex items-center gap-2 text-blue-600 hover:text-blue-300 text-sm">
                   <Mail size={14} /> {client.email}
                 </a>
               )}
@@ -427,7 +427,7 @@ function ClientDetailFlyout({ client, projects, invoices, onClose }: {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Projects ({clientProjects.length})</h3>
-              <Link href="/projects" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
+              <Link href="/projects" className="text-xs text-blue-600 hover:text-blue-300 flex items-center gap-1">
                 View all <ExternalLink size={12} />
               </Link>
             </div>
@@ -437,7 +437,7 @@ function ClientDetailFlyout({ client, projects, invoices, onClose }: {
                   const margin = project.budget > 0 ? ((project.budget - project.spent) / project.budget) * 100 : 0
                   const statusStyle = getStatusStyle(project.status)
                   return (
-                    <div key={project.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-800/30">
+                    <div key={project.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-100/30">
                       <div className="flex items-center gap-2">
                         <Briefcase size={14} className={THEME.textDim} />
                         <span className={`text-sm ${THEME.textPrimary}`}>{project.name}</span>
@@ -445,7 +445,7 @@ function ClientDetailFlyout({ client, projects, invoices, onClose }: {
                           {project.status}
                         </span>
                       </div>
-                      <span className={`text-sm font-medium ${margin >= 20 ? 'text-emerald-400' : margin >= 10 ? 'text-amber-400' : 'text-rose-400'}`}>
+                      <span className={`text-sm font-medium ${margin >= 20 ? 'text-emerald-600' : margin >= 10 ? 'text-amber-600' : 'text-red-600'}`}>
                         {formatPercent(margin)}
                       </span>
                     </div>
@@ -461,7 +461,7 @@ function ClientDetailFlyout({ client, projects, invoices, onClose }: {
           {client.notes && (
             <div className="space-y-2">
               <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Notes</h3>
-              <p className={`text-sm ${THEME.textMuted} p-3 rounded-lg bg-slate-800/30`}>{client.notes}</p>
+              <p className={`text-sm ${THEME.textMuted} p-3 rounded-lg bg-slate-100/30`}>{client.notes}</p>
             </div>
           )}
         </div>
@@ -557,11 +557,11 @@ function ImportModal({ onClose, onImport }: { onClose: () => void; onImport: (cl
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
       <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-2xl w-full max-w-lg mx-4 overflow-hidden`}>
         <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder}`}>
           <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>Import Clients</h3>
-          <button onClick={onClose} className="p-1 hover:bg-white/[0.05] rounded-lg transition-colors">
+          <button onClick={onClose} className="p-1 hover:bg-slate-50 rounded-lg transition-colors">
             <X size={20} className={THEME.textMuted} />
           </button>
         </div>
@@ -569,11 +569,11 @@ function ImportModal({ onClose, onImport }: { onClose: () => void; onImport: (cl
         <div className="p-6">
           {step === 'upload' && (
             <div className="space-y-4">
-              <div className="border-2 border-dashed border-white/[0.1] rounded-xl p-8 text-center hover:border-emerald-500/30 transition-colors">
+              <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-emerald-200 transition-colors">
                 <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" id="csv-upload" />
                 <label htmlFor="csv-upload" className="cursor-pointer">
-                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-3">
-                    <Upload size={24} className="text-emerald-400" />
+                  <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-3">
+                    <Upload size={24} className="text-emerald-600" />
                   </div>
                   <p className={`font-medium ${THEME.textSecondary}`}>Click to upload CSV</p>
                   <p className={`text-sm ${THEME.textDim} mt-1`}>or drag and drop</p>
@@ -581,14 +581,14 @@ function ImportModal({ onClose, onImport }: { onClose: () => void; onImport: (cl
               </div>
 
               {error && (
-                <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
+                <div className="p-3 rounded-lg bg-red-50 border border-rose-500/20 text-red-600 text-sm">
                   {error}
                 </div>
               )}
 
               <button
                 onClick={downloadTemplate}
-                className={`text-sm ${THEME.textMuted} hover:text-emerald-400 transition-colors flex items-center gap-1`}
+                className={`text-sm ${THEME.textMuted} hover:text-emerald-600 transition-colors flex items-center gap-1`}
               >
                 <Download size={14} /> Download template
               </button>
@@ -598,14 +598,14 @@ function ImportModal({ onClose, onImport }: { onClose: () => void; onImport: (cl
           {step === 'preview' && (
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm">
-                <FileText size={16} className="text-emerald-400" />
+                <FileText size={16} className="text-emerald-600" />
                 <span className={THEME.textSecondary}>{file?.name}</span>
                 <span className={THEME.textDim}>• {parsedData.length} clients</span>
               </div>
 
-              <div className="max-h-64 overflow-y-auto border border-white/[0.08] rounded-lg">
+              <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-lg">
                 <table className="w-full text-sm">
-                  <thead className={`bg-slate-800/30 sticky top-0`}>
+                  <thead className={`bg-slate-100/30 sticky top-0`}>
                     <tr>
                       <th className={`px-3 py-2 text-left ${THEME.textDim} font-medium`}>Name</th>
                       <th className={`px-3 py-2 text-left ${THEME.textDim} font-medium`}>Contact</th>
@@ -629,7 +629,7 @@ function ImportModal({ onClose, onImport }: { onClose: () => void; onImport: (cl
               )}
 
               {error && (
-                <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
+                <div className="p-3 rounded-lg bg-red-50 border border-rose-500/20 text-red-600 text-sm">
                   {error}
                 </div>
               )}
@@ -644,8 +644,8 @@ function ImportModal({ onClose, onImport }: { onClose: () => void; onImport: (cl
           )}
         </div>
 
-        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-slate-800/30`}>
-          <button onClick={onClose} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white transition-colors`}>
+        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-slate-100/30`}>
+          <button onClick={onClose} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-slate-900 transition-colors`}>
             Cancel
           </button>
           {step === 'preview' && (
@@ -1090,13 +1090,13 @@ export default function ClientsPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={exportToCSV}
-            className="flex items-center gap-2 px-4 py-2 border border-white/[0.1] rounded-lg text-sm font-medium text-slate-300 hover:bg-white/[0.05] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
           >
             <Download size={14} /> Export
           </button>
           <button
             onClick={() => setShowImportModal(true)}
-            className="flex items-center gap-2 px-4 py-2 border border-white/[0.1] rounded-lg text-sm font-medium text-slate-300 hover:bg-white/[0.05] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
           >
             <Upload size={14} /> Import
           </button>
@@ -1118,27 +1118,27 @@ export default function ClientsPage() {
         </div>
         <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4 border-l-2 border-l-emerald-500`}>
           <p className={`text-xs font-medium ${THEME.textMuted} uppercase tracking-wide`}>Lifetime Value</p>
-          <p className="text-2xl font-bold text-emerald-400 mt-1">{formatCompactCurrency(summary.totalLTV)}</p>
+          <p className="text-2xl font-bold text-emerald-600 mt-1">{formatCompactCurrency(summary.totalLTV)}</p>
           <p className={`text-xs ${THEME.textDim} mt-1`}>All time revenue</p>
         </div>
         <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4 border-l-2 border-l-amber-500`}>
           <p className={`text-xs font-medium ${THEME.textMuted} uppercase tracking-wide`}>Outstanding AR</p>
-          <p className="text-2xl font-bold text-amber-400 mt-1">{formatCompactCurrency(summary.totalAR)}</p>
+          <p className="text-2xl font-bold text-amber-600 mt-1">{formatCompactCurrency(summary.totalAR)}</p>
           <p className={`text-xs ${THEME.textDim} mt-1`}>Open balances</p>
         </div>
         <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4 border-l-2 border-l-blue-500`}>
           <p className={`text-xs font-medium ${THEME.textMuted} uppercase tracking-wide`}>Avg Margin</p>
-          <p className={`text-2xl font-bold ${summary.avgMargin >= 20 ? 'text-emerald-400' : summary.avgMargin >= 10 ? 'text-amber-400' : 'text-rose-400'} mt-1`}>{formatPercent(summary.avgMargin)}</p>
+          <p className={`text-2xl font-bold ${summary.avgMargin >= 20 ? 'text-emerald-600' : summary.avgMargin >= 10 ? 'text-amber-600' : 'text-red-600'} mt-1`}>{formatPercent(summary.avgMargin)}</p>
           <p className={`text-xs ${THEME.textDim} mt-1`}>Active clients</p>
         </div>
         <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4 border-l-2 border-l-amber-400`}>
           <p className={`text-xs font-medium ${THEME.textMuted} uppercase tracking-wide`}>Top Tier</p>
-          <p className="text-2xl font-bold text-amber-400 mt-1">{summary.topTierCount}</p>
+          <p className="text-2xl font-bold text-amber-600 mt-1">{summary.topTierCount}</p>
           <p className={`text-xs ${THEME.textDim} mt-1`}>A-tier clients</p>
         </div>
         <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4 border-l-2 ${summary.atRiskCount > 0 ? 'border-l-rose-500' : 'border-l-emerald-500'}`}>
           <p className={`text-xs font-medium ${THEME.textMuted} uppercase tracking-wide`}>At Risk</p>
-          <p className={`text-2xl font-bold ${summary.atRiskCount > 0 ? 'text-rose-400' : 'text-emerald-400'} mt-1`}>{summary.atRiskCount}</p>
+          <p className={`text-2xl font-bold ${summary.atRiskCount > 0 ? 'text-red-600' : 'text-emerald-600'} mt-1`}>{summary.atRiskCount}</p>
           <p className={`text-xs ${THEME.textDim} mt-1`}>Health &lt; 60</p>
         </div>
       </div>
@@ -1161,15 +1161,15 @@ export default function ClientsPage() {
                   onClick={() => setQuickFilter(filter.id as any)}
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-colors ${
                     quickFilter === filter.id
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                      : 'hover:bg-white/[0.05] text-slate-400'
+                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                      : 'hover:bg-slate-50 text-slate-500'
                   }`}
                 >
                   <div className="flex items-center gap-2">
                     <filter.icon size={16} />
                     <span className="text-sm font-medium">{filter.label}</span>
                   </div>
-                  <span className={`text-sm ${quickFilter === filter.id ? 'text-emerald-400' : THEME.textDim}`}>
+                  <span className={`text-sm ${quickFilter === filter.id ? 'text-emerald-600' : THEME.textDim}`}>
                     {filter.count}
                   </span>
                 </button>
@@ -1213,7 +1213,7 @@ export default function ClientsPage() {
           <div className="flex items-center gap-2">
             <FileText size={18} className={THEME.textMuted} />
             <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>Outstanding AR by Client</h3>
-            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-white/[0.08] text-slate-300">
+            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">
               {arChartData.length}
             </span>
           </div>
@@ -1242,32 +1242,32 @@ export default function ClientsPage() {
           <h3 className={`text-sm font-semibold ${THEME.textPrimary}`}>All Clients</h3>
           <div className="flex items-center gap-3">
             <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search clients..."
-                className="bg-white/[0.05] border border-white/[0.1] rounded-lg pl-9 pr-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 w-48 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                className="bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-sm text-slate-700 placeholder-slate-400 w-48 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
               />
             </div>
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none cursor-pointer"
+              className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none cursor-pointer"
             >
-              <option value="all" className="bg-slate-900">All Status</option>
-              {STATUS_OPTIONS.map(s => <option key={s.id} value={s.id} className="bg-slate-900">{s.label}</option>)}
+              <option value="all" className="bg-white">All Status</option>
+              {STATUS_OPTIONS.map(s => <option key={s.id} value={s.id} className="bg-white">{s.label}</option>)}
             </select>
             <select
               value={selectedTier}
               onChange={(e) => setSelectedTier(e.target.value)}
-              className="bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none cursor-pointer"
+              className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none cursor-pointer"
             >
-              <option value="all" className="bg-slate-900">All Tiers</option>
-              <option value="A" className="bg-slate-900">Tier A</option>
-              <option value="B" className="bg-slate-900">Tier B</option>
-              <option value="C" className="bg-slate-900">Tier C</option>
+              <option value="all" className="bg-white">All Tiers</option>
+              <option value="A" className="bg-white">Tier A</option>
+              <option value="B" className="bg-white">Tier B</option>
+              <option value="C" className="bg-white">Tier C</option>
             </select>
           </div>
         </div>
@@ -1275,7 +1275,7 @@ export default function ClientsPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className={`bg-slate-800/30 border-b ${THEME.glassBorder}`}>
+              <tr className={`bg-slate-100/30 border-b ${THEME.glassBorder}`}>
                 <th className={`px-4 py-3 text-left ${THEME.textDim} font-medium`}>Client</th>
                 <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium w-16`}>Tier</th>
                 <th className={`px-4 py-3 text-center ${THEME.textDim} font-medium w-16`}>Health</th>
@@ -1296,7 +1296,7 @@ export default function ClientsPage() {
                   return (
                     <tr
                       key={client.id}
-                      className={`border-b border-slate-800/60 hover:bg-slate-800/40 transition-colors cursor-pointer`}
+                      className={`border-b border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer`}
                       onClick={() => setSelectedClientDetail(client)}
                     >
                       <td className="px-4 py-3">
@@ -1314,13 +1314,13 @@ export default function ClientsPage() {
                       <td className={`px-4 py-3 text-right font-medium ${THEME.textPrimary}`}>
                         {formatCurrency(client.ltv)}
                       </td>
-                      <td className={`px-4 py-3 text-right font-medium ${client.margin >= 20 ? 'text-emerald-400' : client.margin >= 10 ? 'text-amber-400' : 'text-rose-400'}`}>
+                      <td className={`px-4 py-3 text-right font-medium ${client.margin >= 20 ? 'text-emerald-600' : client.margin >= 10 ? 'text-amber-600' : 'text-red-600'}`}>
                         {formatPercent(client.margin)}
                       </td>
-                      <td className={`px-4 py-3 text-center ${client.avgPayDays > 45 ? 'text-rose-400' : client.avgPayDays > 30 ? 'text-amber-400' : THEME.textMuted}`}>
+                      <td className={`px-4 py-3 text-center ${client.avgPayDays > 45 ? 'text-red-600' : client.avgPayDays > 30 ? 'text-amber-600' : THEME.textMuted}`}>
                         {client.avgPayDays > 0 ? `${Math.round(client.avgPayDays)}d` : '—'}
                       </td>
-                      <td className={`px-4 py-3 text-right ${client.outstandingAR > 0 ? 'text-amber-400' : THEME.textMuted}`}>
+                      <td className={`px-4 py-3 text-right ${client.outstandingAR > 0 ? 'text-amber-600' : THEME.textMuted}`}>
                         {client.outstandingAR > 0 ? formatCurrency(client.outstandingAR) : '—'}
                       </td>
                       <td className={`px-4 py-3 text-center ${THEME.textSecondary}`}>
@@ -1332,7 +1332,7 @@ export default function ClientsPage() {
                           onChange={(e) => updateStatus(client.id, e.target.value)}
                           className={`px-2 py-1 rounded-md text-xs font-medium cursor-pointer border ${statusStyle.bg} ${statusStyle.text} ${statusStyle.border} bg-transparent`}
                         >
-                          {STATUS_OPTIONS.map(s => <option key={s.id} value={s.id} className="bg-slate-900">{s.label}</option>)}
+                          {STATUS_OPTIONS.map(s => <option key={s.id} value={s.id} className="bg-white">{s.label}</option>)}
                         </select>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -1342,14 +1342,14 @@ export default function ClientsPage() {
                         <div className="flex items-center justify-center gap-1">
                           <button 
                             onClick={() => setSelectedClientDetail(client)}
-                            className="p-1.5 rounded hover:bg-white/[0.08] text-slate-500 hover:text-blue-400 transition-colors"
+                            className="p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-colors"
                             title="View Details"
                           >
                             <Eye size={14} />
                           </button>
                           <button 
                             onClick={() => openEditClient(client)}
-                            className="p-1.5 rounded hover:bg-white/[0.08] text-slate-500 hover:text-slate-300 transition-colors"
+                            className="p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
                             title="Edit"
                           >
                             <Edit2 size={14} />
@@ -1357,7 +1357,7 @@ export default function ClientsPage() {
                           {client.status !== 'archived' && (
                             <button 
                               onClick={() => archiveClient(client.id)}
-                              className="p-1.5 rounded hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 transition-colors"
+                              className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
                               title="Archive"
                             >
                               <Archive size={14} />
@@ -1380,13 +1380,13 @@ export default function ClientsPage() {
         </div>
 
         {/* Footer */}
-        <div className={`flex items-center justify-between px-6 py-3 border-t ${THEME.glassBorder} bg-slate-800/30`}>
+        <div className={`flex items-center justify-between px-6 py-3 border-t ${THEME.glassBorder} bg-slate-100/30`}>
           <p className={`text-sm ${THEME.textMuted}`}>
             {filteredClients.length} of {enrichedClients.length} clients
           </p>
           <div className="flex items-center gap-6 text-sm">
             <div><span className={THEME.textMuted}>LTV: </span><span className={`font-semibold ${THEME.textPrimary}`}>{formatCurrency(filteredClients.reduce((s, c) => s + c.ltv, 0))}</span></div>
-            <div><span className={THEME.textMuted}>AR: </span><span className="font-semibold text-amber-400">{formatCurrency(filteredClients.reduce((s, c) => s + c.outstandingAR, 0))}</span></div>
+            <div><span className={THEME.textMuted}>AR: </span><span className="font-semibold text-amber-600">{formatCurrency(filteredClients.reduce((s, c) => s + c.outstandingAR, 0))}</span></div>
           </div>
         </div>
       </div>
@@ -1411,13 +1411,13 @@ export default function ClientsPage() {
 
       {/* Client Modal */}
       {showClientModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
           <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-2xl w-full max-w-lg mx-4 overflow-hidden`}>
             <div className={`flex items-center justify-between px-6 py-4 border-b ${THEME.glassBorder}`}>
               <h3 className={`text-lg font-semibold ${THEME.textPrimary}`}>
                 {editingClient ? 'Edit Client' : 'Add Client'}
               </h3>
-              <button onClick={() => setShowClientModal(false)} className="p-1 hover:bg-white/[0.05] rounded-lg transition-colors">
+              <button onClick={() => setShowClientModal(false)} className="p-1 hover:bg-slate-50 rounded-lg transition-colors">
                 <X size={20} className={THEME.textMuted} />
               </button>
             </div>
@@ -1429,7 +1429,7 @@ export default function ClientsPage() {
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                   placeholder="Company name"
                 />
               </div>
@@ -1440,7 +1440,7 @@ export default function ClientsPage() {
                   type="text"
                   value={formData.contact_name}
                   onChange={(e) => setFormData(prev => ({ ...prev, contact_name: e.target.value }))}
-                  className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                   placeholder="Contact name"
                 />
               </div>
@@ -1452,7 +1452,7 @@ export default function ClientsPage() {
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                    className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                     placeholder="email@example.com"
                   />
                 </div>
@@ -1462,7 +1462,7 @@ export default function ClientsPage() {
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                    className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                     placeholder="(555) 123-4567"
                   />
                 </div>
@@ -1474,9 +1474,9 @@ export default function ClientsPage() {
                   <select
                     value={formData.payment_terms}
                     onChange={(e) => setFormData(prev => ({ ...prev, payment_terms: e.target.value }))}
-                    className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
                   >
-                    {PAYMENT_TERMS.map(p => <option key={p.id} value={p.id} className="bg-slate-900">{p.label}</option>)}
+                    {PAYMENT_TERMS.map(p => <option key={p.id} value={p.id} className="bg-white">{p.label}</option>)}
                   </select>
                 </div>
                 <div>
@@ -1484,9 +1484,9 @@ export default function ClientsPage() {
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                    className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
                   >
-                    {STATUS_OPTIONS.map(s => <option key={s.id} value={s.id} className="bg-slate-900">{s.label}</option>)}
+                    {STATUS_OPTIONS.map(s => <option key={s.id} value={s.id} className="bg-white">{s.label}</option>)}
                   </select>
                 </div>
               </div>
@@ -1496,15 +1496,15 @@ export default function ClientsPage() {
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                  className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2.5 text-sm text-slate-200 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                   rows={3}
                   placeholder="Additional notes..."
                 />
               </div>
             </div>
 
-            <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-slate-800/30`}>
-              <button onClick={() => setShowClientModal(false)} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-white transition-colors`}>
+            <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.glassBorder} bg-slate-100/30`}>
+              <button onClick={() => setShowClientModal(false)} className={`px-4 py-2 text-sm font-medium ${THEME.textMuted} hover:text-slate-900 transition-colors`}>
                 Cancel
               </button>
               <button 
