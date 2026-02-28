@@ -288,7 +288,7 @@ function GroupBySelector({ dimensions, onChange }: { dimensions: GroupDimension[
     <div className="flex items-center gap-1.5">
       <Layers size={13} className="text-gray-400" />
       <span className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Group:</span>
-      {activeDims.length === 0 || (activeDims.length === 1 && activeDims[0] === 'none') ? (
+      {activeDims.length === 0 ? (
         <span className="text-xs text-gray-400 italic">None</span>
       ) : (
         activeDims.map((dim, i) => (
@@ -304,14 +304,14 @@ function GroupBySelector({ dimensions, onChange }: { dimensions: GroupDimension[
       {activeDims.length < 3 && (
         <div className="flex items-center gap-0.5 ml-1">
           {options.filter(o => !activeDims.includes(o.id)).map(o => (
-            <button key={o.id} onClick={() => addDim(o.id)}
+            <button key={o.id} onClick={() => addDim(o.id as 'client' | 'status' | 'contractor')}
               className="px-2 py-0.5 rounded-md text-[10px] font-medium text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors border border-transparent hover:border-gray-200">
               + {o.label}
             </button>
           ))}
         </div>
       )}
-      {activeDims.length > 0 && activeDims[0] !== 'none' && (
+      {activeDims.length > 0 && (
         <button onClick={clearAll} className="text-[10px] text-gray-400 hover:text-gray-600 ml-1">Clear</button>
       )}
     </div>
@@ -677,7 +677,7 @@ export default function ContractorManagement() {
   // ============ RENDER ============
   if (loading) return <div className="flex items-center justify-center h-64"><Loader2 size={22} className="text-emerald-500 animate-spin" /></div>
 
-  const isNoGroup = (dims: GroupDimension[]) => dims.length === 0 || (dims.length === 1 && dims[0] === 'none')
+  const isNoGroup = (dims: GroupDimension[]) => dims.length === 0 || dims.every(d => d === 'none')
 
   return (
     <div className="space-y-5">
