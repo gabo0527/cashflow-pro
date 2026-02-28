@@ -38,15 +38,15 @@ const TIMEZONES = [
 
 // ============ SHARED UI (Institutional Theme) ============
 function SectionCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <div className={`bg-[#111827] rounded-xl border border-white/[0.06] ${className}`}>{children}</div>
+  return <div className={`bg-white rounded-xl border border-slate-200 ${className}`}>{children}</div>
 }
 
 function SectionHeader({ title, description, action }: { title: string; description?: string; action?: React.ReactNode }) {
   return (
-    <div className="px-5 py-4 border-b border-white/[0.04] flex items-center justify-between">
+    <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
       <div>
-        <h3 className="text-sm font-semibold text-white">{title}</h3>
-        {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
+        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        {description && <p className="text-xs text-slate-400 mt-0.5">{description}</p>}
       </div>
       {action}
     </div>
@@ -56,9 +56,9 @@ function SectionHeader({ title, description, action }: { title: string; descript
 function FormField({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
   return (
     <div className="space-y-1.5">
-      <label className="block text-xs font-medium text-slate-400">{label}</label>
+      <label className="block text-xs font-medium text-slate-500">{label}</label>
       {children}
-      {hint && <p className="text-[11px] text-slate-600">{hint}</p>}
+      {hint && <p className="text-[11px] text-slate-400">{hint}</p>}
     </div>
   )
 }
@@ -66,14 +66,14 @@ function FormField({ label, children, hint }: { label: string; children: React.R
 function Input({ value, onChange, placeholder, type = 'text', disabled = false }: { value: string; onChange: (v: string) => void; placeholder?: string; type?: string; disabled?: boolean }) {
   return (
     <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} disabled={disabled}
-      className="w-full px-3 py-2 bg-[#0B0F1A] border border-white/[0.08] rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-teal-500/40 focus:ring-1 focus:ring-teal-500/20 disabled:opacity-50 transition-colors" />
+      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500/20 disabled:opacity-50 transition-colors" />
   )
 }
 
 function Sel({ value, onChange, options, placeholder }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; placeholder?: string }) {
   return (
     <select value={value} onChange={e => onChange(e.target.value)}
-      className="w-full px-3 py-2 bg-[#0B0F1A] border border-white/[0.08] rounded-lg text-sm text-white focus:outline-none focus:border-teal-500/40 appearance-none cursor-pointer">
+      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-emerald-400 appearance-none cursor-pointer">
       {placeholder && <option value="">{placeholder}</option>}
       {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
@@ -82,7 +82,7 @@ function Sel({ value, onChange, options, placeholder }: { value: string; onChang
 
 function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean) => void }) {
   return (
-    <button onClick={() => onChange(!enabled)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? 'bg-teal-500' : 'bg-slate-700'}`}>
+    <button onClick={() => onChange(!enabled)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? 'bg-emerald-500' : 'bg-slate-200'}`}>
       <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
     </button>
   )
@@ -90,16 +90,16 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
 
 function StatusBadge({ status }: { status: string }) {
   const s: Record<string, string> = {
-    connected: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    active: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    connected: 'bg-emerald-50 text-emerald-600 border-emerald-500/20',
+    active: 'bg-emerald-50 text-emerald-600 border-emerald-500/20',
     inactive: 'bg-red-500/10 text-red-400 border-red-500/20',
-    invited: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    invited: 'bg-amber-50 text-amber-600 border-amber-200',
   }
-  return <span className={`px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide border ${s[status] || 'bg-slate-500/10 text-slate-400 border-slate-500/20'}`}>{status}</span>
+  return <span className={`px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide border ${s[status] || 'bg-slate-50 text-slate-500 border-slate-200'}`}>{status}</span>
 }
 
 function ComingSoonBadge() {
-  return <span className="px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded">Coming Soon</span>
+  return <span className="px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-amber-600 bg-amber-50 border border-amber-200 rounded">Coming Soon</span>
 }
 
 // ============ COMPANY PROFILE ============
@@ -148,7 +148,7 @@ function CompanyProfileSection({ company, onSave }: { company: Company | null; o
         </div></div>
       </SectionCard>
       <div className="flex justify-end">
-        <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 bg-teal-500 hover:bg-teal-600 disabled:bg-slate-700 text-white text-sm font-medium rounded-lg flex items-center gap-2 transition-colors">
+        <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-500 disabled:bg-slate-300 text-slate-900 text-sm font-medium rounded-lg flex items-center gap-2 transition-colors">
           {saving ? <RefreshCw size={14} className="animate-spin" /> : saved ? <CheckCircle2 size={14} /> : <Save size={14} />}{saved ? 'Saved!' : 'Save Changes'}
         </button>
       </div>
@@ -169,55 +169,55 @@ function TeamSection({ companyId }: { companyId: string }) {
   const removeMember = async (id: string) => { const m = members.find(x => x.id === id); if (!confirm(`Remove ${m?.name}? This cannot be undone.`)) return; setProcessing(id); const { error } = await supabase.from('team_members').delete().eq('id', id); if (!error) setMembers(p => p.filter(x => x.id !== id)); else alert(`Error: ${error.message}`); setProcessing(null) }
   const handleInvite = async () => { if (!inviteForm.name || !inviteForm.email) return; setProcessing('invite'); const { data, error } = await supabase.from('team_members').insert({ company_id: companyId, name: inviteForm.name, email: inviteForm.email, permission_role: inviteForm.permission_role, status: 'active' }).select().single(); if (!error && data) { setMembers(p => [...p, { ...data, permission_role: data.permission_role || 'employee' }]); setInviteForm({ name: '', email: '', permission_role: 'employee' }); setShowInvite(false) } else alert(`Error: ${error?.message}`); setProcessing(null) }
 
-  if (loading) return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 text-teal-400 animate-spin" /></div>
+  if (loading) return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 text-emerald-600 animate-spin" /></div>
   return (
     <div className="space-y-6">
       <SectionCard>
         <SectionHeader title="Team Members" description={`${members.length} members`} action={
-          <button onClick={() => setShowInvite(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 text-xs font-medium rounded-lg border border-teal-500/20 transition-colors"><UserPlus size={12} /> Add Member</button>
+          <button onClick={() => setShowInvite(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-50 text-emerald-600 text-xs font-medium rounded-lg border border-emerald-200 transition-colors"><UserPlus size={12} /> Add Member</button>
         } />
         <div className="divide-y divide-white/[0.04]">{members.map(member => { const perm = PERMISSION_MATRIX[member.permission_role] || PERMISSION_MATRIX.employee; return (
           <div key={member.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-white/[0.015] transition-colors group">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-xs font-semibold text-teal-400">{member.name.split(' ').map(n => n[0]).join('').substring(0, 2)}</div>
-              <div><div className="flex items-center gap-2"><span className="text-sm text-white font-medium">{member.name}</span>{member.role && <span className="text-[11px] text-slate-600">({member.role})</span>}</div><p className="text-xs text-slate-500">{member.email}</p></div>
+              <div className="w-8 h-8 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-xs font-semibold text-emerald-600">{member.name.split(' ').map(n => n[0]).join('').substring(0, 2)}</div>
+              <div><div className="flex items-center gap-2"><span className="text-sm text-slate-900 font-medium">{member.name}</span>{member.role && <span className="text-[11px] text-slate-400">({member.role})</span>}</div><p className="text-xs text-slate-400">{member.email}</p></div>
             </div>
             <div className="flex items-center gap-3">
               {editingRole === member.id ? (
-                <select value={member.permission_role} onChange={e => updatePermRole(member.id, e.target.value)} className="px-2 py-1 bg-[#0B0F1A] border border-white/[0.12] rounded-lg text-xs text-white focus:ring-1 focus:ring-teal-500/40" autoFocus onBlur={() => setEditingRole(null)}>
+                <select value={member.permission_role} onChange={e => updatePermRole(member.id, e.target.value)} className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:ring-1 focus:ring-emerald-500/40" autoFocus onBlur={() => setEditingRole(null)}>
                   {member.permission_role === 'owner' && <option value="owner">Owner</option>}
                   <option value="admin">Admin</option><option value="member">Member</option><option value="viewer">Viewer</option><option value="employee">Employee</option>
                 </select>
               ) : (
                 <button onClick={() => member.permission_role !== 'owner' ? setEditingRole(member.id) : null}
-                  className={`px-2 py-0.5 rounded text-[10px] font-medium flex items-center gap-1 uppercase tracking-wide border transition-colors ${member.permission_role === 'owner' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20 cursor-default' : member.permission_role === 'admin' ? 'bg-teal-500/10 text-teal-400 border-teal-500/20 hover:bg-teal-500/20 cursor-pointer' : member.permission_role === 'member' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20 cursor-pointer' : member.permission_role === 'viewer' ? 'bg-slate-500/10 text-slate-400 border-slate-500/20 hover:bg-slate-500/20 cursor-pointer' : 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20 cursor-pointer'}`}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium flex items-center gap-1 uppercase tracking-wide border transition-colors ${member.permission_role === 'owner' ? 'bg-purple-50 text-purple-600 border-purple-200 cursor-default' : member.permission_role === 'admin' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-50 cursor-pointer' : member.permission_role === 'member' ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-50 cursor-pointer' : member.permission_role === 'viewer' ? 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100 cursor-pointer' : 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-50 cursor-pointer'}`}
                   title={member.permission_role !== 'owner' ? 'Click to change role' : ''}>{perm.label}{member.permission_role !== 'owner' && <Edit2 size={9} />}</button>
               )}
               <StatusBadge status={member.status} />
               {member.permission_role !== 'owner' && <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                {member.status === 'active' ? <button onClick={() => updateStatus(member.id, 'inactive')} className="p-1.5 text-slate-500 hover:text-amber-400 rounded transition-colors" title="Deactivate"><EyeOff size={13} /></button> : <button onClick={() => updateStatus(member.id, 'active')} className="p-1.5 text-slate-500 hover:text-emerald-400 rounded transition-colors" title="Activate"><Eye size={13} /></button>}
-                <button onClick={() => removeMember(member.id)} className="p-1.5 text-slate-500 hover:text-red-400 rounded transition-colors" title="Remove">{processing === member.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}</button>
+                {member.status === 'active' ? <button onClick={() => updateStatus(member.id, 'inactive')} className="p-1.5 text-slate-400 hover:text-amber-600 rounded transition-colors" title="Deactivate"><EyeOff size={13} /></button> : <button onClick={() => updateStatus(member.id, 'active')} className="p-1.5 text-slate-400 hover:text-emerald-600 rounded transition-colors" title="Activate"><Eye size={13} /></button>}
+                <button onClick={() => removeMember(member.id)} className="p-1.5 text-slate-400 hover:text-red-400 rounded transition-colors" title="Remove">{processing === member.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}</button>
               </div>}
             </div>
           </div>) })}</div>
       </SectionCard>
 
-      {showInvite && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowInvite(false)}><div className="bg-[#111827] border border-white/[0.08] rounded-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
-        <h3 className="text-base font-semibold text-white mb-4">Add Team Member</h3>
+      {showInvite && <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowInvite(false)}><div className="bg-white border border-slate-200 rounded-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <h3 className="text-base font-semibold text-slate-900 mb-4">Add Team Member</h3>
         <div className="space-y-4">
           <FormField label="Full Name"><Input value={inviteForm.name} onChange={v => setInviteForm(p => ({ ...p, name: v }))} placeholder="John Smith" /></FormField>
           <FormField label="Email"><Input value={inviteForm.email} onChange={v => setInviteForm(p => ({ ...p, email: v }))} placeholder="john@company.com" type="email" /></FormField>
           <FormField label="Permission Role" hint="Controls which pages this person can access"><Sel value={inviteForm.permission_role} onChange={v => setInviteForm(p => ({ ...p, permission_role: v }))} options={[{ value: 'admin', label: 'Admin — Full access except billing' }, { value: 'member', label: 'Member — Edit data, view reports' }, { value: 'viewer', label: 'Viewer — Read-only dashboards' }, { value: 'employee', label: 'Employee — Timesheet & expenses only' }]} /></FormField>
         </div>
-        <div className="flex justify-end gap-3 mt-6"><button onClick={() => setShowInvite(false)} className="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">Cancel</button><button onClick={handleInvite} disabled={!inviteForm.name || !inviteForm.email || processing === 'invite'} className="px-4 py-2 bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg flex items-center gap-2 transition-colors">{processing === 'invite' ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add Member</button></div>
+        <div className="flex justify-end gap-3 mt-6"><button onClick={() => setShowInvite(false)} className="px-4 py-2 text-sm text-slate-500 hover:text-slate-900 transition-colors">Cancel</button><button onClick={handleInvite} disabled={!inviteForm.name || !inviteForm.email || processing === 'invite'} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-500 disabled:opacity-50 text-slate-900 text-sm font-medium rounded-lg flex items-center gap-2 transition-colors">{processing === 'invite' ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add Member</button></div>
       </div></div>}
 
       <SectionCard>
         <SectionHeader title="Role Permissions" description="What each role can access throughout the app" />
         <div className="p-5 overflow-x-auto">
-          <table className="w-full text-sm"><thead><tr className="border-b border-white/[0.06]"><th className="text-left py-2 pr-4 text-xs text-slate-500 font-medium">Role</th>{ALL_FEATURES.map(f => <th key={f.id} className="text-center px-1 py-2 text-[10px] text-slate-600 font-medium">{f.label}</th>)}</tr></thead>
-          <tbody>{Object.entries(PERMISSION_MATRIX).map(([k, p]) => <tr key={k} className="border-b border-white/[0.03]"><td className="py-2.5 pr-4"><span className={`text-xs font-medium ${p.color}`}>{p.label}</span><p className="text-[10px] text-slate-600 mt-0.5">{p.description}</p></td>{ALL_FEATURES.map(f => <td key={f.id} className="text-center px-1 py-2.5">{p.access.includes(f.id) ? <Check size={12} className="text-teal-400 mx-auto" /> : <X size={12} className="text-slate-700 mx-auto" />}</td>)}</tr>)}</tbody></table>
-          <p className="text-[11px] text-slate-600 mt-3 flex items-center gap-1"><Info size={10} /> Employees access /timesheet only — no admin interface.</p>
+          <table className="w-full text-sm"><thead><tr className="border-b border-slate-200"><th className="text-left py-2 pr-4 text-xs text-slate-400 font-medium">Role</th>{ALL_FEATURES.map(f => <th key={f.id} className="text-center px-1 py-2 text-[10px] text-slate-400 font-medium">{f.label}</th>)}</tr></thead>
+          <tbody>{Object.entries(PERMISSION_MATRIX).map(([k, p]) => <tr key={k} className="border-b border-slate-100"><td className="py-2.5 pr-4"><span className={`text-xs font-medium ${p.color}`}>{p.label}</span><p className="text-[10px] text-slate-400 mt-0.5">{p.description}</p></td>{ALL_FEATURES.map(f => <td key={f.id} className="text-center px-1 py-2.5">{p.access.includes(f.id) ? <Check size={12} className="text-emerald-600 mx-auto" /> : <X size={12} className="text-slate-300 mx-auto" />}</td>)}</tr>)}</tbody></table>
+          <p className="text-[11px] text-slate-400 mt-3 flex items-center gap-1"><Info size={10} /> Employees access /timesheet only — no admin interface.</p>
         </div>
       </SectionCard>
     </div>
@@ -254,30 +254,30 @@ function SecuritySection({ companyId }: { companyId: string }) {
       <SectionCard>
         <SectionHeader title="Authentication" description="Configure how users sign in" />
         <div className="p-5 divide-y divide-white/[0.04]">
-          <div className="flex items-center justify-between py-3"><div><p className="text-sm text-white font-medium">Two-Factor Authentication (2FA)</p><p className="text-xs text-slate-500">Require 2FA for all team members</p></div><Toggle enabled={twoFactor} onChange={setTwoFactor} /></div>
-          <div className="flex items-center justify-between py-3"><div><p className="text-sm text-white font-medium">Session Timeout</p><p className="text-xs text-slate-500">Auto-logout after inactivity</p></div><div className="w-40"><Sel value={timeout} onChange={setTimeout_} options={[{ value: '1', label: '1 hour' }, { value: '8', label: '8 hours' }, { value: '24', label: '24 hours' }, { value: '168', label: '7 days' }]} /></div></div>
-          <div className="flex items-center justify-between py-3"><div><p className="text-sm text-white font-medium">IP Whitelist</p><p className="text-xs text-slate-500">Restrict access to specific IPs</p></div><Toggle enabled={ipWhitelist} onChange={setIpWhitelist} /></div>
+          <div className="flex items-center justify-between py-3"><div><p className="text-sm text-slate-900 font-medium">Two-Factor Authentication (2FA)</p><p className="text-xs text-slate-400">Require 2FA for all team members</p></div><Toggle enabled={twoFactor} onChange={setTwoFactor} /></div>
+          <div className="flex items-center justify-between py-3"><div><p className="text-sm text-slate-900 font-medium">Session Timeout</p><p className="text-xs text-slate-400">Auto-logout after inactivity</p></div><div className="w-40"><Sel value={timeout} onChange={setTimeout_} options={[{ value: '1', label: '1 hour' }, { value: '8', label: '8 hours' }, { value: '24', label: '24 hours' }, { value: '168', label: '7 days' }]} /></div></div>
+          <div className="flex items-center justify-between py-3"><div><p className="text-sm text-slate-900 font-medium">IP Whitelist</p><p className="text-xs text-slate-400">Restrict access to specific IPs</p></div><Toggle enabled={ipWhitelist} onChange={setIpWhitelist} /></div>
         </div>
       </SectionCard>
-      <div className="flex justify-end"><button onClick={saveSettings} disabled={saving} className="px-5 py-2.5 bg-teal-500 hover:bg-teal-600 disabled:bg-slate-700 text-white text-sm font-medium rounded-lg flex items-center gap-2 transition-colors">{saving ? <RefreshCw size={14} className="animate-spin" /> : saved ? <CheckCircle2 size={14} /> : <Save size={14} />}{saved ? 'Saved!' : 'Save Security Settings'}</button></div>
+      <div className="flex justify-end"><button onClick={saveSettings} disabled={saving} className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-500 disabled:bg-slate-300 text-slate-900 text-sm font-medium rounded-lg flex items-center gap-2 transition-colors">{saving ? <RefreshCw size={14} className="animate-spin" /> : saved ? <CheckCircle2 size={14} /> : <Save size={14} />}{saved ? 'Saved!' : 'Save Security Settings'}</button></div>
 
       <SectionCard>
         <SectionHeader title="SSO / SAML" description="Enterprise authentication" />
-        <div className="p-5"><div className="flex items-center justify-between p-4 bg-[#0B0F1A] border border-white/[0.06] rounded-lg">
-          <div className="flex items-center gap-3"><div className="w-9 h-9 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center"><Key size={16} className="text-blue-400" /></div><div><p className="text-sm text-white font-medium">SAML 2.0 / SSO</p><p className="text-xs text-slate-500">Okta, Azure AD, Google Workspace</p></div></div>
+        <div className="p-5"><div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-lg">
+          <div className="flex items-center gap-3"><div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center"><Key size={16} className="text-blue-600" /></div><div><p className="text-sm text-slate-900 font-medium">SAML 2.0 / SSO</p><p className="text-xs text-slate-400">Okta, Azure AD, Google Workspace</p></div></div>
           <ComingSoonBadge />
         </div></div>
       </SectionCard>
 
       <SectionCard>
         <SectionHeader title="Audit Log" description={auditLogs.length > 0 ? `${auditLogs.length} recent events` : 'Activity tracking'} />
-        {loadingLogs ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 text-teal-400 animate-spin" /></div> : auditLogs.length > 0 ? (
+        {loadingLogs ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 text-emerald-600 animate-spin" /></div> : auditLogs.length > 0 ? (
           <div className="divide-y divide-white/[0.04]">{auditLogs.map((l: any) => (
             <div key={l.id} className="px-5 py-3 flex items-center justify-between hover:bg-white/[0.015] transition-colors">
-              <div className="flex items-center gap-3"><div className="w-7 h-7 rounded-lg bg-white/[0.03] flex items-center justify-center">{l.action === 'login' ? <Lock size={12} className="text-slate-400" /> : <FileText size={12} className="text-slate-400" />}</div><div><p className="text-xs text-white">{l.action}</p><p className="text-[11px] text-slate-500">{l.user_name}{l.details ? ` · ${l.details}` : ''}</p></div></div>
-              <div className="text-right"><p className="text-[11px] text-slate-500">{new Date(l.created_at).toLocaleString()}</p>{l.ip_address && <p className="text-[10px] text-slate-600">{l.ip_address}</p>}</div>
+              <div className="flex items-center gap-3"><div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center">{l.action === 'login' ? <Lock size={12} className="text-slate-500" /> : <FileText size={12} className="text-slate-500" />}</div><div><p className="text-xs text-slate-900">{l.action}</p><p className="text-[11px] text-slate-400">{l.user_name}{l.details ? ` · ${l.details}` : ''}</p></div></div>
+              <div className="text-right"><p className="text-[11px] text-slate-400">{new Date(l.created_at).toLocaleString()}</p>{l.ip_address && <p className="text-[10px] text-slate-400">{l.ip_address}</p>}</div>
             </div>))}</div>
-        ) : <div className="px-5 py-8 text-center"><p className="text-xs text-slate-500">No audit logs yet. Activity will be tracked as your team uses the platform.</p></div>}
+        ) : <div className="px-5 py-8 text-center"><p className="text-xs text-slate-400">No audit logs yet. Activity will be tracked as your team uses the platform.</p></div>}
       </SectionCard>
     </div>
   )
@@ -302,23 +302,23 @@ function IntegrationsSection({ companyId }: { companyId: string }) {
     <div className="space-y-6">
       <SectionCard>
         <SectionHeader title="Connected Integrations" />
-        <div className="p-5"><div className="flex items-center justify-between p-4 bg-[#0B0F1A] border border-white/[0.06] rounded-lg">
-          <div className="flex items-center gap-4"><div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-lg">📊</div><div><div className="flex items-center gap-2"><span className="text-sm text-white font-medium">QuickBooks Online</span><StatusBadge status="connected" /></div><p className="text-xs text-slate-500">{lastSync ? `Last synced ${new Date(lastSync).toLocaleString()}` : 'Connected'}</p></div></div>
-          <div className="flex items-center gap-2"><button onClick={() => triggerSync('all')} disabled={syncing !== null} className="p-2 text-slate-400 hover:text-teal-400 transition-colors disabled:opacity-50" title="Sync now"><RefreshCw size={15} className={syncing === 'all' ? 'animate-spin' : ''} /></button><button className="px-3 py-1.5 text-red-400 hover:bg-red-500/10 rounded-lg text-xs transition-colors">Disconnect</button></div>
+        <div className="p-5"><div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-lg">
+          <div className="flex items-center gap-4"><div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-500/20 flex items-center justify-center text-lg">📊</div><div><div className="flex items-center gap-2"><span className="text-sm text-slate-900 font-medium">QuickBooks Online</span><StatusBadge status="connected" /></div><p className="text-xs text-slate-400">{lastSync ? `Last synced ${new Date(lastSync).toLocaleString()}` : 'Connected'}</p></div></div>
+          <div className="flex items-center gap-2"><button onClick={() => triggerSync('all')} disabled={syncing !== null} className="p-2 text-slate-500 hover:text-emerald-600 transition-colors disabled:opacity-50" title="Sync now"><RefreshCw size={15} className={syncing === 'all' ? 'animate-spin' : ''} /></button><button className="px-3 py-1.5 text-red-400 hover:bg-red-500/10 rounded-lg text-xs transition-colors">Disconnect</button></div>
         </div></div>
       </SectionCard>
       <SectionCard>
         <SectionHeader title="Available Integrations" />
         <div className="p-5 space-y-3">{integrations.map(a => (
-          <div key={a.type} className="flex items-center justify-between p-4 bg-[#0B0F1A] border border-white/[0.06] rounded-lg">
-            <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-lg bg-white/[0.03] border border-white/[0.06] flex items-center justify-center text-lg">{a.icon}</div><div><p className="text-sm text-white font-medium">{a.name}</p><p className="text-xs text-slate-500">{a.desc}</p></div></div>
-            {a.connected ? <span className="flex items-center gap-1 text-xs text-emerald-400"><CheckCircle2 size={12} /> Connected</span> : <ComingSoonBadge />}
+          <div key={a.type} className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-lg">
+            <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-lg">{a.icon}</div><div><p className="text-sm text-slate-900 font-medium">{a.name}</p><p className="text-xs text-slate-400">{a.desc}</p></div></div>
+            {a.connected ? <span className="flex items-center gap-1 text-xs text-emerald-600"><CheckCircle2 size={12} /> Connected</span> : <ComingSoonBadge />}
           </div>
         ))}</div>
       </SectionCard>
       <SectionCard>
         <SectionHeader title="API Access" />
-        <div className="p-5"><div className="p-4 bg-[#0B0F1A] border border-white/[0.06] rounded-lg text-center"><Key size={20} className="text-slate-500 mx-auto mb-2" /><p className="text-sm text-slate-400">API access coming soon</p><p className="text-xs text-slate-600 mt-1">Programmatic access to your Vantage data</p></div></div>
+        <div className="p-5"><div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-center"><Key size={20} className="text-slate-400 mx-auto mb-2" /><p className="text-sm text-slate-500">API access coming soon</p><p className="text-xs text-slate-400 mt-1">Programmatic access to your Vantage data</p></div></div>
       </SectionCard>
     </div>
   )
@@ -330,7 +330,7 @@ function BillingSection() {
     <div className="space-y-6">
       <SectionCard>
         <SectionHeader title="Current Plan" />
-        <div className="p-5"><div className="flex items-center justify-between"><div><h4 className="text-lg font-semibold text-white">Founder Access</h4><p className="text-xs text-slate-500 mt-0.5">Full platform access during development</p></div><span className="px-2.5 py-1 bg-teal-500/10 text-teal-400 border border-teal-500/20 rounded text-[10px] font-medium uppercase tracking-wide">Active</span></div></div>
+        <div className="p-5"><div className="flex items-center justify-between"><div><h4 className="text-lg font-semibold text-slate-900">Founder Access</h4><p className="text-xs text-slate-400 mt-0.5">Full platform access during development</p></div><span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded text-[10px] font-medium uppercase tracking-wide">Active</span></div></div>
       </SectionCard>
       <SectionCard>
         <SectionHeader title="Plans & Pricing" description="Subscription tiers will be available at public launch" />
@@ -340,13 +340,13 @@ function BillingSection() {
             { name: 'Professional', price: 49, features: ['Up to 15 users', 'Unlimited projects', 'Advanced reports', 'Integrations'] },
             { name: 'Enterprise', price: 199, features: ['Unlimited users', 'Custom reports', 'SSO/SAML', 'API access', 'Priority support'] },
           ].map(p => (
-            <div key={p.name} className="p-5 bg-[#0B0F1A] border border-white/[0.06] rounded-lg">
-              <h4 className="text-sm font-semibold text-white">{p.name}</h4>
-              <div className="mt-2"><span className="text-2xl font-bold text-white">${p.price}</span><span className="text-xs text-slate-500">/mo</span></div>
-              <ul className="mt-3 space-y-1.5">{p.features.map(f => <li key={f} className="flex items-center gap-2 text-xs text-slate-400"><Check size={11} className="text-teal-400/60" />{f}</li>)}</ul>
+            <div key={p.name} className="p-5 bg-slate-50 border border-slate-200 rounded-lg">
+              <h4 className="text-sm font-semibold text-slate-900">{p.name}</h4>
+              <div className="mt-2"><span className="text-2xl font-bold text-slate-900">${p.price}</span><span className="text-xs text-slate-400">/mo</span></div>
+              <ul className="mt-3 space-y-1.5">{p.features.map(f => <li key={f} className="flex items-center gap-2 text-xs text-slate-500"><Check size={11} className="text-emerald-600/60" />{f}</li>)}</ul>
             </div>
           ))}</div>
-          <p className="text-[11px] text-slate-600 mt-4 flex items-center gap-1"><Info size={10} /> Billing will be enabled at public launch. You currently have full access.</p>
+          <p className="text-[11px] text-slate-400 mt-4 flex items-center gap-1"><Info size={10} /> Billing will be enabled at public launch. You currently have full access.</p>
         </div>
       </SectionCard>
     </div>
@@ -388,12 +388,12 @@ function DataPrivacySection({ companyId }: { companyId: string }) {
         <SectionHeader title="Data Export" description="Download your data in CSV format" />
         <div className="p-5 space-y-3">
           {EXPORT_TABLES.map(t => (
-            <div key={t.key} className="flex items-center justify-between p-3 bg-[#0B0F1A] border border-white/[0.06] rounded-lg">
-              <div className="flex items-center gap-2.5"><Database size={13} className="text-slate-500" /><span className="text-sm text-white">{t.label}</span></div>
-              <button onClick={() => exportTable(t.key)} disabled={exporting !== null} className="flex items-center gap-1.5 text-xs text-teal-400 hover:text-teal-300 disabled:opacity-50 transition-colors">{exporting === t.key ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />} Export CSV</button>
+            <div key={t.key} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg">
+              <div className="flex items-center gap-2.5"><Database size={13} className="text-slate-400" /><span className="text-sm text-slate-900">{t.label}</span></div>
+              <button onClick={() => exportTable(t.key)} disabled={exporting !== null} className="flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 disabled:opacity-50 transition-colors">{exporting === t.key ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />} Export CSV</button>
             </div>
           ))}
-          <button onClick={exportAll} disabled={exporting !== null} className="w-full py-2.5 border border-teal-500/20 text-teal-400 hover:bg-teal-500/10 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50"><Download size={14} /> Export All Tables</button>
+          <button onClick={exportAll} disabled={exporting !== null} className="w-full py-2.5 border border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50"><Download size={14} /> Export All Tables</button>
         </div>
       </SectionCard>
       <SectionCard>
@@ -402,13 +402,13 @@ function DataPrivacySection({ companyId }: { companyId: string }) {
       </SectionCard>
       <SectionCard>
         <SectionHeader title="Danger Zone" />
-        <div className="p-5"><div className="flex items-center justify-between p-4 border border-amber-500/20 rounded-lg bg-amber-500/[0.03]"><div><p className="text-sm text-white font-medium">Reset Financial Data</p><p className="text-xs text-slate-500 mt-0.5">Deletes transactions, invoices, time entries, expenses. Team, projects, clients preserved.</p></div><button onClick={() => setConfirmReset(true)} className="px-3 py-1.5 border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 rounded-lg text-xs font-medium transition-colors">Reset Data</button></div></div>
+        <div className="p-5"><div className="flex items-center justify-between p-4 border border-amber-200 rounded-lg bg-amber-500/[0.03]"><div><p className="text-sm text-slate-900 font-medium">Reset Financial Data</p><p className="text-xs text-slate-400 mt-0.5">Deletes transactions, invoices, time entries, expenses. Team, projects, clients preserved.</p></div><button onClick={() => setConfirmReset(true)} className="px-3 py-1.5 border border-amber-200 text-amber-600 hover:bg-amber-50 rounded-lg text-xs font-medium transition-colors">Reset Data</button></div></div>
       </SectionCard>
-      {confirmReset && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setConfirmReset(false)}><div className="bg-[#111827] border border-red-500/20 rounded-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center"><AlertTriangle size={20} className="text-red-400" /></div><div><h3 className="text-base font-semibold text-white">Reset All Financial Data</h3><p className="text-xs text-slate-500">This action cannot be undone</p></div></div>
-        <p className="text-sm text-slate-300 mb-4">This will permanently delete all transactions, invoices, time entries, and expense claims. Team members, projects, and clients will be preserved.</p>
+      {confirmReset && <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setConfirmReset(false)}><div className="bg-white border border-red-500/20 rounded-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center"><AlertTriangle size={20} className="text-red-400" /></div><div><h3 className="text-base font-semibold text-slate-900">Reset All Financial Data</h3><p className="text-xs text-slate-400">This action cannot be undone</p></div></div>
+        <p className="text-sm text-slate-600 mb-4">This will permanently delete all transactions, invoices, time entries, and expense claims. Team members, projects, and clients will be preserved.</p>
         <FormField label="Type DELETE ALL DATA to confirm"><Input value={resetInput} onChange={setResetInput} placeholder="DELETE ALL DATA" /></FormField>
-        <div className="flex justify-end gap-3 mt-6"><button onClick={() => { setConfirmReset(false); setResetInput('') }} className="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">Cancel</button><button onClick={handleReset} disabled={resetInput !== 'DELETE ALL DATA' || resetting} className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:bg-slate-700 text-white text-sm font-medium rounded-lg flex items-center gap-2 transition-colors">{resetting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Reset Data</button></div>
+        <div className="flex justify-end gap-3 mt-6"><button onClick={() => { setConfirmReset(false); setResetInput('') }} className="px-4 py-2 text-sm text-slate-500 hover:text-slate-900 transition-colors">Cancel</button><button onClick={handleReset} disabled={resetInput !== 'DELETE ALL DATA' || resetting} className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:bg-slate-300 text-slate-900 text-sm font-medium rounded-lg flex items-center gap-2 transition-colors">{resetting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Reset Data</button></div>
       </div></div>}
     </div>
   )
@@ -438,14 +438,14 @@ function NotificationsSection({ companyId }: { companyId: string }) {
   return (
     <div className="space-y-6">
       <SectionCard><SectionHeader title="Email Notifications" description="Choose what to be notified about" /><div className="divide-y divide-white/[0.04]">{opts.map(o => (
-        <div key={o.key} className="px-5 py-3.5 flex items-center justify-between"><div><p className="text-sm text-white font-medium">{o.label}</p><p className="text-xs text-slate-500">{o.desc}</p></div><Toggle enabled={notifs[o.key as keyof typeof notifs]} onChange={v => setNotifs(p => ({ ...p, [o.key]: v }))} /></div>
+        <div key={o.key} className="px-5 py-3.5 flex items-center justify-between"><div><p className="text-sm text-slate-900 font-medium">{o.label}</p><p className="text-xs text-slate-400">{o.desc}</p></div><Toggle enabled={notifs[o.key as keyof typeof notifs]} onChange={v => setNotifs(p => ({ ...p, [o.key]: v }))} /></div>
       ))}</div></SectionCard>
       <SectionCard><SectionHeader title="Channels" description="Where to receive notifications" /><div className="p-5 space-y-3">
-        <div className="flex items-center justify-between p-3.5 bg-[#0B0F1A] border border-white/[0.06] rounded-lg"><div className="flex items-center gap-3"><Mail size={16} className="text-teal-400" /><div><p className="text-sm text-white">Email</p><p className="text-xs text-slate-500">{email || 'Your login email'}</p></div></div><Toggle enabled={channels.email} onChange={v => setChannels(p => ({ ...p, email: v }))} /></div>
-        <div className="flex items-center justify-between p-3.5 bg-[#0B0F1A] border border-white/[0.06] rounded-lg"><div className="flex items-center gap-3"><Smartphone size={16} className="text-slate-400" /><div><p className="text-sm text-white">Push Notifications</p><p className="text-xs text-slate-500">Mobile app</p></div></div><ComingSoonBadge /></div>
-        <div className="flex items-center justify-between p-3.5 bg-[#0B0F1A] border border-white/[0.06] rounded-lg"><div className="flex items-center gap-3"><span className="text-base">💬</span><div><p className="text-sm text-white">Slack</p><p className="text-xs text-slate-500">Get alerts in Slack</p></div></div><ComingSoonBadge /></div>
+        <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-lg"><div className="flex items-center gap-3"><Mail size={16} className="text-emerald-600" /><div><p className="text-sm text-slate-900">Email</p><p className="text-xs text-slate-400">{email || 'Your login email'}</p></div></div><Toggle enabled={channels.email} onChange={v => setChannels(p => ({ ...p, email: v }))} /></div>
+        <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-lg"><div className="flex items-center gap-3"><Smartphone size={16} className="text-slate-500" /><div><p className="text-sm text-slate-900">Push Notifications</p><p className="text-xs text-slate-400">Mobile app</p></div></div><ComingSoonBadge /></div>
+        <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-lg"><div className="flex items-center gap-3"><span className="text-base">💬</span><div><p className="text-sm text-slate-900">Slack</p><p className="text-xs text-slate-400">Get alerts in Slack</p></div></div><ComingSoonBadge /></div>
       </div></SectionCard>
-      <div className="flex justify-end"><button onClick={savePrefs} disabled={saving} className="px-5 py-2.5 bg-teal-500 hover:bg-teal-600 disabled:bg-slate-700 text-white text-sm font-medium rounded-lg flex items-center gap-2 transition-colors">{saving ? <RefreshCw size={14} className="animate-spin" /> : saved ? <CheckCircle2 size={14} /> : <Save size={14} />}{saved ? 'Saved!' : 'Save Preferences'}</button></div>
+      <div className="flex justify-end"><button onClick={savePrefs} disabled={saving} className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-500 disabled:bg-slate-300 text-slate-900 text-sm font-medium rounded-lg flex items-center gap-2 transition-colors">{saving ? <RefreshCw size={14} className="animate-spin" /> : saved ? <CheckCircle2 size={14} /> : <Save size={14} />}{saved ? 'Saved!' : 'Save Preferences'}</button></div>
     </div>
   )
 }
@@ -457,20 +457,20 @@ function LegalSection() {
     <div className="space-y-6">
       <SectionCard><SectionHeader title="Legal Documents" description="Review our terms and policies" /><div className="divide-y divide-white/[0.04]">{docs.map(d => (
         <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between px-5 py-4 hover:bg-white/[0.015] transition-colors group">
-          <div className="flex items-center gap-3"><div className="w-9 h-9 rounded-lg bg-white/[0.03] border border-white/[0.06] flex items-center justify-center"><FileText size={15} className="text-slate-500 group-hover:text-teal-400 transition-colors" /></div><div><p className="text-sm text-white font-medium">{d.title}</p><p className="text-xs text-slate-500">{d.desc}</p></div></div>
-          <div className="flex items-center gap-3"><span className="text-[11px] text-slate-600">Updated {d.updated}</span><ExternalLink size={13} className="text-slate-600 group-hover:text-teal-400 transition-colors" /></div>
+          <div className="flex items-center gap-3"><div className="w-9 h-9 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center"><FileText size={15} className="text-slate-400 group-hover:text-emerald-600 transition-colors" /></div><div><p className="text-sm text-slate-900 font-medium">{d.title}</p><p className="text-xs text-slate-400">{d.desc}</p></div></div>
+          <div className="flex items-center gap-3"><span className="text-[11px] text-slate-400">Updated {d.updated}</span><ExternalLink size={13} className="text-slate-400 group-hover:text-emerald-600 transition-colors" /></div>
         </a>))}</div></SectionCard>
       <SectionCard><SectionHeader title="Contact" description="Reach our legal and privacy teams" /><div className="p-5 space-y-3">
-        <div className="flex items-center justify-between p-3.5 bg-[#0B0F1A] border border-white/[0.06] rounded-lg"><div className="flex items-center gap-3"><Mail size={15} className="text-slate-400" /><div><p className="text-sm text-white">Legal Inquiries</p><p className="text-xs text-slate-500">Terms, compliance, and general legal questions</p></div></div><a href="mailto:legal@vantagefp.co" className="text-teal-400 text-xs font-medium hover:underline">legal@vantagefp.co</a></div>
-        <div className="flex items-center justify-between p-3.5 bg-[#0B0F1A] border border-white/[0.06] rounded-lg"><div className="flex items-center gap-3"><Shield size={15} className="text-slate-400" /><div><p className="text-sm text-white">Privacy & Data Requests</p><p className="text-xs text-slate-500">Data access, deletion, and privacy concerns</p></div></div><a href="mailto:privacy@vantagefp.co" className="text-teal-400 text-xs font-medium hover:underline">privacy@vantagefp.co</a></div>
+        <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-lg"><div className="flex items-center gap-3"><Mail size={15} className="text-slate-500" /><div><p className="text-sm text-slate-900">Legal Inquiries</p><p className="text-xs text-slate-400">Terms, compliance, and general legal questions</p></div></div><a href="mailto:legal@vantagefp.co" className="text-emerald-600 text-xs font-medium hover:underline">legal@vantagefp.co</a></div>
+        <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-lg"><div className="flex items-center gap-3"><Shield size={15} className="text-slate-500" /><div><p className="text-sm text-slate-900">Privacy & Data Requests</p><p className="text-xs text-slate-400">Data access, deletion, and privacy concerns</p></div></div><a href="mailto:privacy@vantagefp.co" className="text-emerald-600 text-xs font-medium hover:underline">privacy@vantagefp.co</a></div>
       </div></SectionCard>
       <SectionCard><SectionHeader title="Data Processing" description="Infrastructure and compliance" /><div className="p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="p-4 bg-[#0B0F1A] border border-white/[0.06] rounded-lg text-center"><p className="text-teal-400 font-semibold text-base">TLS 1.2+</p><p className="text-[11px] text-slate-500 mt-1">Encryption in Transit</p></div>
-          <div className="p-4 bg-[#0B0F1A] border border-white/[0.06] rounded-lg text-center"><p className="text-teal-400 font-semibold text-base">AES-256</p><p className="text-[11px] text-slate-500 mt-1">Encryption at Rest</p></div>
-          <div className="p-4 bg-[#0B0F1A] border border-white/[0.06] rounded-lg text-center"><p className="text-teal-400 font-semibold text-base">RLS</p><p className="text-[11px] text-slate-500 mt-1">Row-Level Isolation</p></div>
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-center"><p className="text-emerald-600 font-semibold text-base">TLS 1.2+</p><p className="text-[11px] text-slate-400 mt-1">Encryption in Transit</p></div>
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-center"><p className="text-emerald-600 font-semibold text-base">AES-256</p><p className="text-[11px] text-slate-400 mt-1">Encryption at Rest</p></div>
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-center"><p className="text-emerald-600 font-semibold text-base">RLS</p><p className="text-[11px] text-slate-400 mt-1">Row-Level Isolation</p></div>
         </div>
-        <div className="p-4 bg-[#0B0F1A] border border-white/[0.06] rounded-lg"><p className="text-xs text-slate-400 leading-relaxed">Your financial data is stored on Supabase (PostgreSQL) with Row Level Security ensuring complete data isolation between organizations. Application hosted on Vercel. Authentication handled via Google OAuth 2.0 — we never store passwords. All connections are HTTPS-only.</p></div>
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg"><p className="text-xs text-slate-500 leading-relaxed">Your financial data is stored on Supabase (PostgreSQL) with Row Level Security ensuring complete data isolation between organizations. Application hosted on Vercel. Authentication handled via Google OAuth 2.0 — we never store passwords. All connections are HTTPS-only.</p></div>
       </div></SectionCard>
     </div>
   )
@@ -501,14 +501,14 @@ export default function SettingsPage() {
     default: return null
   }}
 
-  if (loading) return <div className="flex items-center justify-center h-[calc(100vh-120px)]"><Loader2 className="w-6 h-6 text-teal-400 animate-spin" /></div>
+  if (loading) return <div className="flex items-center justify-center h-[calc(100vh-120px)]"><Loader2 className="w-6 h-6 text-emerald-600 animate-spin" /></div>
 
   return (
     <div className="space-y-6">
-      <div><h1 className="text-xl font-bold text-white">Settings</h1><p className="text-xs text-slate-500 mt-1">Configure your account and preferences</p></div>
+      <div><h1 className="text-xl font-bold text-slate-900">Settings</h1><p className="text-xs text-slate-400 mt-1">Configure your account and preferences</p></div>
       <div className="flex gap-6">
-        <div className="w-56 flex-shrink-0"><nav className="bg-[#111827] rounded-xl border border-white/[0.06] overflow-hidden sticky top-6">
-          {SETTINGS_SECTIONS.map(s => <button key={s.id} onClick={() => setSection(s.id)} className={`w-full flex items-center gap-2.5 px-4 py-3 text-left text-sm transition-all ${section === s.id ? 'bg-teal-500/10 text-teal-400 border-l-2 border-teal-400' : 'text-slate-400 hover:bg-white/[0.03] hover:text-white border-l-2 border-transparent'}`}><s.icon size={15} /><span className="font-medium">{s.label}</span></button>)}
+        <div className="w-56 flex-shrink-0"><nav className="bg-white rounded-xl border border-slate-200 overflow-hidden sticky top-6">
+          {SETTINGS_SECTIONS.map(s => <button key={s.id} onClick={() => setSection(s.id)} className={`w-full flex items-center gap-2.5 px-4 py-3 text-left text-sm transition-all ${section === s.id ? 'bg-emerald-50 text-emerald-600 border-l-2 border-emerald-500' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-l-2 border-transparent'}`}><s.icon size={15} /><span className="font-medium">{s.label}</span></button>)}
         </nav></div>
         <div className="flex-1 min-w-0">{render()}</div>
       </div>
