@@ -315,7 +315,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     <div className="bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 shadow-lg">
       <p className="text-xs text-slate-600">{payload[0]?.payload?.fullName || label}</p>
       {payload.map((entry: any, i: number) => (
-        <p key={i} className="text-sm font-semibold text-white">
+        <p key={i} className="text-sm font-semibold text-slate-900">
           {formatCurrency(entry.value)}
         </p>
       ))}
@@ -1113,7 +1113,7 @@ export default function ClientsPage() {
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
         <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4 border-l-2 border-l-teal-500`}>
           <p className={`text-xs font-medium ${THEME.textMuted} uppercase tracking-wide`}>Total Clients</p>
-          <p className="text-2xl font-bold text-white mt-1">{summary.totalClients}</p>
+          <p className="text-2xl font-bold text-slate-900 mt-1">{summary.totalClients}</p>
           <p className={`text-xs ${THEME.textDim} mt-1`}>{summary.activeClients} active</p>
         </div>
         <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-4 border-l-2 border-l-emerald-500`}>
