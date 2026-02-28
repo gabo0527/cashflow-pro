@@ -173,10 +173,11 @@ function buildGroups(
     amount: (item: any) => number
   }
 ): GroupNode[] {
-  const [dim, ...rest] = dimensions.filter(d => d !== 'none')
-  if (dim === undefined || dim === 'none') {
+  const filtered = dimensions.filter(d => d !== 'none')
+  if (filtered.length === 0) {
     return [{ key: '_all', label: '', total: items.reduce((s, i) => s + resolvers.amount(i), 0), count: items.length, pendingCount: items.filter(i => ['pending', 'submitted'].includes(resolvers.status(i))).length, children: [], items }]
   }
+  const [dim, ...rest] = filtered
 
   const groups: Record<string, { label: string; isOverhead?: boolean; items: any[] }> = {}
   items.forEach(item => {
