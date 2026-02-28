@@ -5,7 +5,7 @@ import {
   FileText, Receipt, Search, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
   CheckCircle, XCircle, Clock, DollarSign, Download, Eye, Paperclip, User, Building2,
   AlertCircle, Loader2, X, MoreHorizontal, Calendar, TrendingUp, TrendingDown,
-  CreditCard, ArrowUpRight, ExternalLink, Tag, Ban, CircleDollarSign
+  CreditCard, ArrowUpRight, ExternalLink, Tag, Ban
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -87,15 +87,14 @@ const formatCurrency = (v: number) => new Intl.NumberFormat('en-US', { style: 'c
 const formatDate = (d: string) => { if (!d) return '—'; return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
 const formatDateCompact = (d: string) => { if (!d) return '—'; return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }
 
-// ============ 4-STATUS WORKFLOW ============
-// Pending → Awaiting Payment → Scheduled → Paid
+// ============ 5-STATUS WORKFLOW (both AP Invoices & Expenses) ============
+// Pending → Approved → Scheduled → Paid  (+ Rejected at any pre-paid stage)
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string; icon: any }> = {
   submitted: { label: 'Pending', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: Clock },
   pending: { label: 'Pending', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: Clock },
-  approved: { label: 'Awaiting Payment', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: CircleDollarSign },
-  awaiting_payment: { label: 'Awaiting Payment', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: CircleDollarSign },
+  approved: { label: 'Approved', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: CheckCircle },
   scheduled: { label: 'Scheduled', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', icon: Calendar },
-  paid: { label: 'Paid', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200', icon: CheckCircle },
+  paid: { label: 'Paid', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200', icon: DollarSign },
   rejected: { label: 'Rejected', bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', icon: XCircle },
 }
 
@@ -185,7 +184,7 @@ const expenseGridCols = 'grid-cols-[1fr_120px_120px_80px_75px_85px_85px_170px]'
 // Row urgency border
 function getRowBorder(status: string): string {
   if (status === 'submitted' || status === 'pending') return 'border-l-2 border-l-amber-400'
-  if (status === 'approved' || status === 'awaiting_payment') return 'border-l-2 border-l-blue-400'
+  if (status === 'approved') return 'border-l-2 border-l-blue-400'
   if (status === 'scheduled') return 'border-l-2 border-l-purple-400'
   return 'border-l-2 border-l-transparent'
 }
@@ -196,7 +195,7 @@ function ClientAccordion({ clientName, clientId, invoices, isOverhead, isExpande
 }) {
   const total = invoices.reduce((s, i) => s + i.total_amount, 0)
   const pendingCount = invoices.filter(i => ['submitted', 'pending'].includes(i.status)).length
-  const awaitingCount = invoices.filter(i => ['approved', 'awaiting_payment'].includes(i.status)).length
+  const approvedCount = invoices.filter(i => i.status === 'approved').length
   const scheduledCount = invoices.filter(i => i.status === 'scheduled').length
   const paidCount = invoices.filter(i => i.status === 'paid').length
 
@@ -224,9 +223,9 @@ function ClientAccordion({ clientName, clientId, invoices, isOverhead, isExpande
                 {pendingCount} pending
               </span>
             )}
-            {awaitingCount > 0 && (
+            {approvedCount > 0 && (
               <span className="text-blue-700 text-[10px] font-semibold bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
-                {awaitingCount} awaiting
+                {approvedCount} approved
               </span>
             )}
             {scheduledCount > 0 && (
@@ -413,9 +412,7 @@ export default function ContractorManagement() {
       )
     }
     if (filterStatus !== 'all') result = result.filter(inv => {
-      // Map combined statuses
       if (filterStatus === 'submitted') return ['submitted', 'pending'].includes(inv.status)
-      if (filterStatus === 'approved') return ['approved', 'awaiting_payment'].includes(inv.status)
       return inv.status === filterStatus
     })
     if (filterMember !== 'all') result = result.filter(inv => inv.team_member_id === filterMember)
@@ -493,7 +490,7 @@ export default function ContractorManagement() {
   // ============ METRICS ============
   const invoiceMetrics = useMemo(() => {
     const pending = filteredInvoices.filter(i => ['submitted', 'pending'].includes(i.status))
-    const awaiting = filteredInvoices.filter(i => ['approved', 'awaiting_payment'].includes(i.status))
+    const approved = filteredInvoices.filter(i => i.status === 'approved')
     const scheduled = filteredInvoices.filter(i => i.status === 'scheduled')
     const paid = filteredInvoices.filter(i => i.status === 'paid')
     const total = filteredInvoices.reduce((s, i) => s + i.total_amount, 0)
@@ -501,8 +498,8 @@ export default function ContractorManagement() {
       total,
       pendingCount: pending.length,
       pendingAmt: pending.reduce((s, i) => s + i.total_amount, 0),
-      awaitingAmt: awaiting.reduce((s, i) => s + i.total_amount, 0),
-      awaitingCount: awaiting.length,
+      approvedAmt: approved.reduce((s, i) => s + i.total_amount, 0),
+      approvedCount: approved.length,
       scheduledAmt: scheduled.reduce((s, i) => s + i.total_amount, 0),
       scheduledCount: scheduled.length,
       paidAmt: paid.reduce((s, i) => s + i.total_amount, 0),
@@ -512,6 +509,8 @@ export default function ContractorManagement() {
   const expenseMetrics = useMemo(() => {
     const pending = filteredExpenses.filter(e => e.status === 'pending')
     const approved = filteredExpenses.filter(e => e.status === 'approved')
+    const scheduled = filteredExpenses.filter(e => e.status === 'scheduled')
+    const paid = filteredExpenses.filter(e => e.status === 'paid')
     const billable = filteredExpenses.filter(e => e.is_billable && e.status !== 'rejected')
     const total = filteredExpenses.reduce((s, e) => s + e.amount, 0)
     return {
@@ -519,6 +518,11 @@ export default function ContractorManagement() {
       pendingCount: pending.length,
       pendingAmt: pending.reduce((s, e) => s + e.amount, 0),
       approvedAmt: approved.reduce((s, e) => s + e.amount, 0),
+      approvedCount: approved.length,
+      scheduledAmt: scheduled.reduce((s, e) => s + e.amount, 0),
+      scheduledCount: scheduled.length,
+      paidAmt: paid.reduce((s, e) => s + e.amount, 0),
+      paidCount: paid.length,
       billableAmt: billable.reduce((s, e) => s + e.amount, 0),
       billableCount: billable.length,
     }
@@ -559,7 +563,7 @@ export default function ContractorManagement() {
     const pendingInvs = filteredInvoices.filter(i => ['submitted', 'pending'].includes(i.status))
     setProcessing('bulk')
     for (const inv of pendingInvs) {
-      const updates = { status: 'awaiting_payment', reviewed_at: new Date().toISOString() }
+      const updates = { status: 'approved', reviewed_at: new Date().toISOString() }
       const { error } = await supabase.from('contractor_invoices').update(updates).eq('id', inv.id)
       if (!error) {
         setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, ...updates } : i))
@@ -661,7 +665,7 @@ export default function ContractorManagement() {
           <div className="grid grid-cols-4 gap-3">
             <MetricCard label="Total AP" value={formatCurrency(invoiceMetrics.total)} icon={DollarSign} accentColor="#2563eb" sub={`${filteredInvoices.length} invoices`} />
             <MetricCard label="Pending Review" value={formatCurrency(invoiceMetrics.pendingAmt)} icon={Clock} accentColor="#d97706" sub={`${invoiceMetrics.pendingCount} awaiting`} highlight={invoiceMetrics.pendingCount > 0} />
-            <MetricCard label="Awaiting Payment" value={formatCurrency(invoiceMetrics.awaitingAmt)} icon={CircleDollarSign} accentColor="#3b82f6" sub={`${invoiceMetrics.awaitingCount} approved`} />
+            <MetricCard label="Approved" value={formatCurrency(invoiceMetrics.approvedAmt)} icon={CheckCircle} accentColor="#3b82f6" sub={`${invoiceMetrics.approvedCount} approved`} />
             <MetricCard label="Scheduled" value={formatCurrency(invoiceMetrics.scheduledAmt)} icon={Calendar} accentColor="#8b5cf6" sub={`${invoiceMetrics.scheduledCount} queued`} />
           </div>
 
@@ -691,7 +695,7 @@ export default function ContractorManagement() {
               <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={getSelectClass(filterStatus !== 'all')}>
                 <option value="all">All Statuses</option>
                 <option value="submitted">Pending</option>
-                <option value="approved">Awaiting Payment</option>
+                <option value="approved">Approved</option>
                 <option value="scheduled">Scheduled</option>
                 <option value="paid">Paid</option>
                 <option value="rejected">Rejected</option>
@@ -777,9 +781,10 @@ export default function ContractorManagement() {
                                 <Eye size={12} /> View
                               </button>
                             )}
+                            {/* Pending → Approve or Reject */}
                             {['submitted', 'pending'].includes(inv.status) && (
                               <>
-                                <button onClick={() => updateInvoiceStatus(inv.id, 'awaiting_payment')} disabled={isProcessing}
+                                <button onClick={() => updateInvoiceStatus(inv.id, 'approved')} disabled={isProcessing}
                                   className="px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 disabled:opacity-50 vBtn">
                                   {isProcessing ? <Loader2 size={12} className="animate-spin" /> : 'Approve'}
                                 </button>
@@ -789,16 +794,24 @@ export default function ContractorManagement() {
                                 </button>
                               </>
                             )}
-                            {['approved', 'awaiting_payment'].includes(inv.status) && (
-                              <button onClick={() => updateInvoiceStatus(inv.id, 'scheduled')} disabled={isProcessing}
-                                className="px-3 py-1.5 rounded-lg vBtn bg-purple-50 text-purple-700 text-xs font-medium hover:bg-purple-100 border border-purple-200 disabled:opacity-50 flex items-center gap-1">
-                                <Calendar size={11} /> Schedule
-                              </button>
+                            {/* Approved → Schedule or Reject */}
+                            {inv.status === 'approved' && (
+                              <>
+                                <button onClick={() => updateInvoiceStatus(inv.id, 'scheduled')} disabled={isProcessing}
+                                  className="px-3 py-1.5 rounded-lg vBtn bg-purple-50 text-purple-700 text-xs font-medium hover:bg-purple-100 border border-purple-200 disabled:opacity-50 flex items-center gap-1">
+                                  <Calendar size={11} /> Schedule
+                                </button>
+                                <button onClick={() => updateInvoiceStatus(inv.id, 'rejected')} disabled={isProcessing}
+                                  className="px-2.5 py-1.5 rounded-lg vBtn bg-white text-gray-500 text-xs font-medium hover:text-red-600 hover:bg-red-50 border border-gray-200 disabled:opacity-50">
+                                  Reject
+                                </button>
+                              </>
                             )}
+                            {/* Scheduled → Mark Paid */}
                             {inv.status === 'scheduled' && (
                               <button onClick={() => updateInvoiceStatus(inv.id, 'paid')} disabled={isProcessing}
                                 className="px-3 py-1.5 rounded-lg vBtn bg-emerald-50 text-emerald-700 text-xs font-medium hover:bg-emerald-100 border border-emerald-200 disabled:opacity-50 flex items-center gap-1">
-                                <CheckCircle size={11} /> Mark Paid
+                                <DollarSign size={11} /> Mark Paid
                               </button>
                             )}
                             {(inv.status === 'paid' || inv.status === 'rejected') && (
@@ -864,10 +877,11 @@ export default function ContractorManagement() {
       {activeTab === 'expenses' && (
         <div className="space-y-4">
           {/* Metrics */}
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-5 gap-3">
             <MetricCard label="Total Expenses" value={formatCurrency(expenseMetrics.total)} icon={Receipt} accentColor="#2563eb" sub={`${filteredExpenses.length} items`} />
             <MetricCard label="Pending Review" value={formatCurrency(expenseMetrics.pendingAmt)} icon={Clock} accentColor="#d97706" sub={`${expenseMetrics.pendingCount} awaiting`} highlight={expenseMetrics.pendingCount > 0} />
-            <MetricCard label="Approved" value={formatCurrency(expenseMetrics.approvedAmt)} icon={CheckCircle} accentColor="#059669" />
+            <MetricCard label="Approved" value={formatCurrency(expenseMetrics.approvedAmt)} icon={CheckCircle} accentColor="#3b82f6" sub={`${expenseMetrics.approvedCount} approved`} />
+            <MetricCard label="Paid" value={formatCurrency(expenseMetrics.paidAmt)} icon={DollarSign} accentColor="#059669" sub={`${expenseMetrics.paidCount} paid`} />
             <MetricCard label="Billable" value={formatCurrency(expenseMetrics.billableAmt)} icon={Tag} accentColor="#059669" sub={`${expenseMetrics.billableCount} items tagged`} />
           </div>
 
@@ -898,6 +912,8 @@ export default function ContractorManagement() {
                 <option value="all">All Statuses</option>
                 <option value="pending">Pending</option>
                 <option value="approved">Approved</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="paid">Paid</option>
                 <option value="rejected">Rejected</option>
               </select>
               <select value={filterMember} onChange={e => setFilterMember(e.target.value)} className={getSelectClass(filterMember !== 'all')}>
@@ -999,6 +1015,7 @@ export default function ContractorManagement() {
                               </button>
                             )
                           })()}
+                          {/* Pending → Approve or Reject */}
                           {exp.status === 'pending' && (
                             <>
                               <button onClick={() => updateExpenseStatus(exp.id, 'approved', billable)} disabled={isProcessing}
@@ -1011,8 +1028,29 @@ export default function ContractorManagement() {
                               </button>
                             </>
                           )}
-                          {exp.status === 'approved' && <StatusBadge status={exp.status} />}
-                          {exp.status === 'rejected' && <StatusBadge status={exp.status} />}
+                          {/* Approved → Schedule or Reject */}
+                          {exp.status === 'approved' && (
+                            <>
+                              <button onClick={() => updateExpenseStatus(exp.id, 'scheduled')} disabled={isProcessing}
+                                className="px-2.5 py-1.5 rounded-lg vBtn bg-purple-50 text-purple-700 text-xs font-medium hover:bg-purple-100 border border-purple-200 disabled:opacity-50 flex items-center gap-1">
+                                <Calendar size={11} /> Schedule
+                              </button>
+                              <button onClick={() => updateExpenseStatus(exp.id, 'rejected')} disabled={isProcessing}
+                                className="px-2 py-1.5 rounded-lg vBtn bg-white text-gray-500 text-xs font-medium hover:text-red-600 hover:bg-red-50 border border-gray-200 disabled:opacity-50">
+                                Reject
+                              </button>
+                            </>
+                          )}
+                          {/* Scheduled → Mark Paid */}
+                          {exp.status === 'scheduled' && (
+                            <button onClick={() => updateExpenseStatus(exp.id, 'paid')} disabled={isProcessing}
+                              className="px-2.5 py-1.5 rounded-lg vBtn bg-emerald-50 text-emerald-700 text-xs font-medium hover:bg-emerald-100 border border-emerald-200 disabled:opacity-50 flex items-center gap-1">
+                              <DollarSign size={11} /> Mark Paid
+                            </button>
+                          )}
+                          {/* Terminal states */}
+                          {exp.status === 'paid' && <StatusBadge status="paid" />}
+                          {exp.status === 'rejected' && <StatusBadge status="rejected" />}
                         </div>
                       </div>
                     )
