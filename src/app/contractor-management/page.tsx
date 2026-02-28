@@ -273,7 +273,7 @@ function GroupBySelector({ dimensions, onChange }: { dimensions: GroupDimension[
   ]
   const activeDims = dimensions.filter(d => d !== 'none')
 
-  const addDim = (dim: GroupDimension) => {
+  const addDim = (dim: 'client' | 'status' | 'contractor') => {
     if (activeDims.includes(dim)) return
     onChange([...activeDims, dim])
   }
