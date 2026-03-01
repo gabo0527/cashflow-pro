@@ -94,7 +94,7 @@ const daysSince = (date: string | null): number => {
   return Math.floor((Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24))
 }
 
-const formatDateShort = (date: string | null) => {
+const formatDateShort = (date: string | null | undefined) => {
   if (!date) return '—'
   return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
