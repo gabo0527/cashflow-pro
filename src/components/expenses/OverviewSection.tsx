@@ -29,20 +29,18 @@ interface OverviewSectionProps {
   categories?: typeof EXPENSE_CATEGORIES
 }
 
-// Quarter helpers
 const QUARTERS = [
   { label: 'Q1', months: [0, 1, 2] },
   { label: 'Q2', months: [3, 4, 5] },
   { label: 'Q3', months: [6, 7, 8] },
   { label: 'Q4', months: [9, 10, 11] },
 ]
-
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 const VIEW_COLORS = [
-  '#0d9488', '#10b981', '#3b82f6', '#8b5cf6', '#f59e0b',
-  '#f43f5e', '#06b6d4', '#f97316', '#22c55e', '#64748b',
-  '#ec4899', '#14b8a6', '#a855f7', '#eab308', '#6366f1',
+  '#059669', '#0d9488', '#2563eb', '#7c3aed', '#d97706',
+  '#e11d48', '#0891b2', '#ea580c', '#16a34a', '#64748b',
+  '#db2777', '#14b8a6', '#8b5cf6', '#ca8a04', '#4f46e5',
 ]
 
 export default function OverviewSection({
@@ -50,7 +48,6 @@ export default function OverviewSection({
 }: OverviewSectionProps) {
   const CATS = categories
 
-  // View & period state
   const [activeView, setActiveView] = useState<ViewType>('category')
   const [periodType, setPeriodType] = useState<PeriodType>('monthly')
   const [selectedQuarter, setSelectedQuarter] = useState<string>('Q1')
@@ -63,9 +60,7 @@ export default function OverviewSection({
       const d = new Date(item[dateField])
       const year = d.getFullYear()
       const month = d.getMonth()
-
       if (year !== selectedYear && periodType !== 'custom') return false
-
       switch (periodType) {
         case 'monthly':
           if (selectedMonth !== 'all') {
@@ -77,18 +72,14 @@ export default function OverviewSection({
           const q = QUARTERS.find(q => q.label === selectedQuarter)
           return q ? q.months.includes(month) : true
         }
-        case 'ytd': {
-          const now = new Date()
-          return d <= now
-        }
+        case 'ytd': return d <= new Date()
         case 'custom': {
           const start = new Date(customStart)
           const end = new Date(customEnd)
           end.setHours(23, 59, 59, 999)
           return d >= start && d <= end
         }
-        default:
-          return true
+        default: return true
       }
     })
   }
@@ -99,58 +90,47 @@ export default function OverviewSection({
   // ============ CORE METRICS ============
   const metrics = useMemo(() => {
     const total = filteredExpenses.reduce((s, e) => s + e.amount, 0)
-    const directCosts = filteredExpenses.filter(e => e.category === 'directCosts').reduce((s, e) => s + e.amount, 0)
+    const directCost = filteredExpenses.filter(e => e.category === 'directCost').reduce((s, e) => s + e.amount, 0)
     const overhead = filteredExpenses.filter(e => e.category === 'overhead').reduce((s, e) => s + e.amount, 0)
-    const otherBusiness = filteredExpenses.filter(e => e.category === 'otherBusiness').reduce((s, e) => s + e.amount, 0)
-    const personal = filteredExpenses.filter(e => e.category === 'personal').reduce((s, e) => s + e.amount, 0)
+    const ownersDraw = filteredExpenses.filter(e => e.category === 'ownersDraw').reduce((s, e) => s + e.amount, 0)
+    const investmentExp = filteredExpenses.filter(e => e.category === 'investmentExp').reduce((s, e) => s + e.amount, 0)
+    const investmentCap = filteredExpenses.filter(e => e.category === 'investmentCap').reduce((s, e) => s + e.amount, 0)
 
-    // Transaction-level metrics
     const allTxn = filteredTransactions
     const totalInflows = allTxn.filter(t => t.amount >= 0).reduce((s, t) => s + t.amount, 0)
     const totalOutflows = allTxn.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
     const netCashFlow = totalInflows - totalOutflows
 
-    return { total, directCosts, overhead, otherBusiness, personal, totalInflows, totalOutflows, netCashFlow }
+    // P&L items: directCost + overhead + investmentExp hit P&L; ownersDraw + investmentCap do NOT
+    const plExpenses = directCost + overhead + investmentExp
+
+    return { total, directCost, overhead, ownersDraw, investmentExp, investmentCap, totalInflows, totalOutflows, netCashFlow, plExpenses }
   }, [filteredExpenses, filteredTransactions])
 
-  // ============ VIEW-SPECIFIC DATA ============
-
-  // By Category
+  // ============ VIEW DATA ============
   const byCategoryData = useMemo(() => {
-    const cats = [
-      { name: CATS.directCosts?.label || 'Direct Costs', amount: metrics.directCosts, color: CATS.directCosts?.hex || COLORS.rose },
+    return [
+      { name: CATS.directCost?.label || 'Direct Cost', amount: metrics.directCost, color: CATS.directCost?.hex || COLORS.rose },
       { name: CATS.overhead?.label || 'Overhead', amount: metrics.overhead, color: CATS.overhead?.hex || COLORS.amber },
-      { name: CATS.otherBusiness?.label || 'Other Business', amount: metrics.otherBusiness, color: CATS.otherBusiness?.hex || COLORS.blue },
-      { name: CATS.personal?.label || 'Personal', amount: metrics.personal, color: CATS.personal?.hex || COLORS.cyan },
+      { name: CATS.ownersDraw?.label || "Owner's Draw", amount: metrics.ownersDraw, color: CATS.ownersDraw?.hex || COLORS.purple },
+      { name: CATS.investmentExp?.label || 'Invest (Exp)', amount: metrics.investmentExp, color: CATS.investmentExp?.hex || COLORS.blue },
+      { name: CATS.investmentCap?.label || 'Invest (Cap)', amount: metrics.investmentCap, color: CATS.investmentCap?.hex || COLORS.cyan },
     ].filter(d => d.amount > 0)
-    return cats
   }, [metrics, CATS])
 
-  // By Client
   const byClientData = useMemo(() => {
     const map: Record<string, { name: string; amount: number }> = {}
-    // From expenses with client_id
     filteredExpenses.filter(e => e.client_id).forEach(e => {
       const c = clients.find(cl => cl.id === e.client_id)
       const name = c?.name || 'Unknown'
       if (!map[name]) map[name] = { name, amount: 0 }
       map[name].amount += e.amount
     })
-    // From categorized transactions with client_id
-    filteredTransactions.filter(t => t.client_id && t.amount < 0).forEach(t => {
-      const c = clients.find(cl => cl.id === t.client_id)
-      const name = c?.name || 'Unknown'
-      // Only add if not already counted via expenses
-      if (!map[name]) map[name] = { name, amount: 0 }
-      // Avoid double-counting: skip if transaction was already linked to an expense
-      // The expense path already counted it, so we skip here
-    })
     const noClient = filteredExpenses.filter(e => !e.client_id).reduce((s, e) => s + e.amount, 0)
     if (noClient > 0) map['General / Unassigned'] = { name: 'General / Unassigned', amount: noClient }
     return Object.values(map).sort((a, b) => b.amount - a.amount)
-  }, [filteredExpenses, filteredTransactions, clients])
+  }, [filteredExpenses, clients])
 
-  // By Project
   const byProjectData = useMemo(() => {
     const map: Record<string, { name: string; amount: number; client: string }> = {}
     filteredExpenses.filter(e => e.project_id).forEach(e => {
@@ -163,7 +143,6 @@ export default function OverviewSection({
     return Object.values(map).sort((a, b) => b.amount - a.amount)
   }, [filteredExpenses, projects, clients])
 
-  // By Account
   const byAccountData = useMemo(() => {
     const map: Record<string, { name: string; inflows: number; outflows: number }> = {}
     filteredTransactions.forEach(t => {
@@ -175,7 +154,6 @@ export default function OverviewSection({
     return Object.values(map).sort((a, b) => (b.inflows + b.outflows) - (a.inflows + a.outflows))
   }, [filteredTransactions])
 
-  // By Cardholder
   const byCardholderData = useMemo(() => {
     const map: Record<string, { name: string; amount: number; count: number }> = {}
     filteredTransactions.filter(t => t.cardholder && t.amount < 0).forEach(t => {
@@ -188,7 +166,7 @@ export default function OverviewSection({
     return Object.values(map).sort((a, b) => b.amount - a.amount)
   }, [filteredTransactions])
 
-  // Monthly chart data
+  // Monthly chart
   const monthlyChartData = useMemo(() => {
     return MONTH_NAMES.map((month, i) => {
       const me = expenses.filter(e => {
@@ -197,15 +175,15 @@ export default function OverviewSection({
       })
       return {
         month,
-        directCosts: me.filter(e => e.category === 'directCosts').reduce((s, e) => s + e.amount, 0),
+        directCost: me.filter(e => e.category === 'directCost').reduce((s, e) => s + e.amount, 0),
         overhead: me.filter(e => e.category === 'overhead').reduce((s, e) => s + e.amount, 0),
-        otherBusiness: me.filter(e => e.category === 'otherBusiness').reduce((s, e) => s + e.amount, 0),
-        personal: me.filter(e => e.category === 'personal').reduce((s, e) => s + e.amount, 0),
+        ownersDraw: me.filter(e => e.category === 'ownersDraw').reduce((s, e) => s + e.amount, 0),
+        investmentExp: me.filter(e => e.category === 'investmentExp').reduce((s, e) => s + e.amount, 0),
+        investmentCap: me.filter(e => e.category === 'investmentCap').reduce((s, e) => s + e.amount, 0),
       }
     })
   }, [expenses, selectedYear])
 
-  // Quarterly chart data
   const quarterlyChartData = useMemo(() => {
     return QUARTERS.map(q => {
       const qExpenses = expenses.filter(e => {
@@ -214,10 +192,11 @@ export default function OverviewSection({
       })
       return {
         quarter: q.label,
-        directCosts: qExpenses.filter(e => e.category === 'directCosts').reduce((s, e) => s + e.amount, 0),
+        directCost: qExpenses.filter(e => e.category === 'directCost').reduce((s, e) => s + e.amount, 0),
         overhead: qExpenses.filter(e => e.category === 'overhead').reduce((s, e) => s + e.amount, 0),
-        otherBusiness: qExpenses.filter(e => e.category === 'otherBusiness').reduce((s, e) => s + e.amount, 0),
-        personal: qExpenses.filter(e => e.category === 'personal').reduce((s, e) => s + e.amount, 0),
+        ownersDraw: qExpenses.filter(e => e.category === 'ownersDraw').reduce((s, e) => s + e.amount, 0),
+        investmentExp: qExpenses.filter(e => e.category === 'investmentExp').reduce((s, e) => s + e.amount, 0),
+        investmentCap: qExpenses.filter(e => e.category === 'investmentCap').reduce((s, e) => s + e.amount, 0),
       }
     })
   }, [expenses, selectedYear])
@@ -225,7 +204,6 @@ export default function OverviewSection({
   const chartData = periodType === 'quarterly' ? quarterlyChartData : monthlyChartData
   const chartKey = periodType === 'quarterly' ? 'quarter' : 'month'
 
-  // Period label
   const periodLabel = useMemo(() => {
     switch (periodType) {
       case 'monthly': return selectedMonth === 'all' ? `${selectedYear}` : `${selectedMonth.charAt(0).toUpperCase() + selectedMonth.slice(1)} ${selectedYear}`
@@ -235,22 +213,18 @@ export default function OverviewSection({
     }
   }, [periodType, selectedYear, selectedMonth, selectedQuarter, customStart, customEnd])
 
-  // ============ PILL HELPER ============
+  // ============ PILL HELPERS ============
   const pillClass = (active: boolean) =>
-    `px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-      active ? 'bg-teal-500/15 text-teal-400 border border-teal-500/25' : 'bg-slate-800/40 text-slate-500 border border-slate-800/60 hover:text-slate-300 hover:bg-slate-800/60'
+    `px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+      active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm' : 'bg-white text-slate-500 border border-slate-200 hover:text-slate-700 hover:bg-slate-50'
     }`
 
-  const selectClass = "appearance-none bg-slate-800/60 border border-slate-800/80 rounded-lg pl-3 pr-8 py-1.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500/30 cursor-pointer"
-
-  // ============ RENDER ============
   return (
     <div className="space-y-5">
 
       {/* Period Controls */}
       <div className={`${THEME.card} px-5 py-3.5`}>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          {/* Period type pills */}
           <div className="flex items-center gap-2">
             <span className={`text-[11px] font-semibold uppercase tracking-wider ${THEME.textDim} mr-1`}>Period:</span>
             {(['monthly', 'quarterly', 'ytd', 'custom'] as PeriodType[]).map(p => (
@@ -259,28 +233,22 @@ export default function OverviewSection({
               </button>
             ))}
           </div>
-
-          {/* Period-specific controls */}
           <div className="flex items-center gap-2">
             {periodType === 'quarterly' && (
               <div className="flex items-center gap-1">
                 {QUARTERS.map(q => (
-                  <button key={q.label} onClick={() => setSelectedQuarter(q.label)} className={pillClass(selectedQuarter === q.label)}>
-                    {q.label}
-                  </button>
+                  <button key={q.label} onClick={() => setSelectedQuarter(q.label)} className={pillClass(selectedQuarter === q.label)}>{q.label}</button>
                 ))}
               </div>
             )}
             {periodType === 'custom' && (
               <div className="flex items-center gap-2">
-                <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)}
-                  className={`${THEME.input} px-2 py-1.5 text-xs`} />
+                <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className={`${THEME.input} px-2 py-1.5 text-xs`} />
                 <span className={`text-xs ${THEME.textDim}`}>to</span>
-                <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)}
-                  className={`${THEME.input} px-2 py-1.5 text-xs`} />
+                <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className={`${THEME.input} px-2 py-1.5 text-xs`} />
               </div>
             )}
-            <span className={`text-xs ${THEME.textMuted} ml-2`}>{periodLabel}</span>
+            <span className={`text-xs ${THEME.textMuted} ml-2 font-medium`}>{periodLabel}</span>
           </div>
         </div>
       </div>
@@ -288,8 +256,8 @@ export default function OverviewSection({
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <MetricCard label="Total Outflows" value={formatCurrency(metrics.total)} subtitle={periodLabel} icon={ArrowUpRight} color="rose" />
-        <MetricCard label="Direct Costs" value={formatCurrency(metrics.directCosts)} subtitle="Affects Gross Margin" icon={Briefcase} color="rose" />
-        <MetricCard label="Overhead" value={formatCurrency(metrics.overhead)} subtitle="Operating expenses" icon={DollarSign} color="amber" />
+        <MetricCard label="Direct Costs" value={formatCurrency(metrics.directCost)} subtitle="COGS → Gross Margin" icon={Briefcase} color="rose" />
+        <MetricCard label="Overhead" value={formatCurrency(metrics.overhead)} subtitle="OpEx → Net Profit" icon={DollarSign} color="amber" />
         <MetricCard label="Total Inflows" value={formatCurrency(metrics.totalInflows)} subtitle="Payments received" icon={ArrowDownLeft} color="emerald" />
         <MetricCard label="Net Cash Flow" value={formatCurrency(metrics.netCashFlow)} subtitle={periodLabel} icon={TrendingUp}
           color={metrics.netCashFlow >= 0 ? 'emerald' : 'rose'} />
@@ -309,10 +277,11 @@ export default function OverviewSection({
               </div>
               <div className="flex items-center gap-3 text-xs">
                 {[
-                  { label: 'Direct', hex: CATS.directCosts?.hex || COLORS.rose },
+                  { label: 'Direct', hex: CATS.directCost?.hex || COLORS.rose },
                   { label: 'Overhead', hex: CATS.overhead?.hex || COLORS.amber },
-                  { label: 'Other', hex: CATS.otherBusiness?.hex || COLORS.blue },
-                  { label: 'Personal', hex: CATS.personal?.hex || COLORS.cyan },
+                  { label: "Owner's", hex: CATS.ownersDraw?.hex || COLORS.purple },
+                  { label: 'Inv (Exp)', hex: CATS.investmentExp?.hex || COLORS.blue },
+                  { label: 'Inv (Cap)', hex: CATS.investmentCap?.hex || COLORS.cyan },
                 ].map(l => (
                   <div key={l.label} className="flex items-center gap-1.5">
                     <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: l.hex }} />
@@ -324,23 +293,23 @@ export default function OverviewSection({
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} barCategoryGap="20%">
-                  <XAxis dataKey={chartKey} tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip content={<CustomTooltip formatter={(v: number) => formatCurrency(v)} />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                  <Bar dataKey="directCosts" name="Direct Costs" stackId="a" fill={CATS.directCosts?.hex || COLORS.rose} />
+                  <XAxis dataKey={chartKey} tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip content={<CustomTooltip formatter={(v: number) => formatCurrency(v)} />} cursor={{ fill: 'rgba(0,0,0,0.03)' }} />
+                  <Bar dataKey="directCost" name="Direct Cost" stackId="a" fill={CATS.directCost?.hex || COLORS.rose} />
                   <Bar dataKey="overhead" name="Overhead" stackId="a" fill={CATS.overhead?.hex || COLORS.amber} />
-                  <Bar dataKey="otherBusiness" name="Other Business" stackId="a" fill={CATS.otherBusiness?.hex || COLORS.blue} />
-                  <Bar dataKey="personal" name="Personal" stackId="a" fill={CATS.personal?.hex || COLORS.cyan} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="ownersDraw" name="Owner's Draw" stackId="a" fill={CATS.ownersDraw?.hex || COLORS.purple} />
+                  <Bar dataKey="investmentExp" name="Invest (Exp)" stackId="a" fill={CATS.investmentExp?.hex || COLORS.blue} />
+                  <Bar dataKey="investmentCap" name="Invest (Cap)" stackId="a" fill={CATS.investmentCap?.hex || COLORS.cyan} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
         </div>
 
-        {/* View Selector + Breakdown Panel */}
+        {/* Breakdown Panel */}
         <div className="col-span-12 lg:col-span-4">
           <div className={`${THEME.card} p-5 h-full flex flex-col`}>
-            {/* View tabs */}
             <div className="flex flex-wrap gap-1 mb-4">
               {([
                 { id: 'category', label: 'Category', icon: PieIcon },
@@ -350,10 +319,10 @@ export default function OverviewSection({
                 { id: 'cardholder', label: 'Cardholder', icon: CreditCard },
               ] as { id: ViewType; label: string; icon: any }[]).map(v => (
                 <button key={v.id} onClick={() => setActiveView(v.id)}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
                     activeView === v.id
-                      ? 'bg-teal-500/15 text-teal-400 border border-teal-500/25'
-                      : 'bg-slate-800/40 text-slate-500 border border-slate-800/60 hover:text-slate-300'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm'
+                      : 'bg-white text-slate-400 border border-slate-200 hover:text-slate-600'
                   }`}>
                   <v.icon size={11} />
                   {v.label}
@@ -361,73 +330,43 @@ export default function OverviewSection({
               ))}
             </div>
 
-            {/* Breakdown content */}
             <div className="flex-1 overflow-y-auto">
               {activeView === 'category' && (
-                <BreakdownList
-                  items={byCategoryData.map((d, i) => ({ name: d.name, value: d.amount, color: d.color }))}
-                  total={metrics.total}
-                  emptyMessage="No categorized expenses"
-                />
+                <BreakdownList items={byCategoryData.map(d => ({ name: d.name, value: d.amount, color: d.color }))} total={metrics.total} emptyMessage="No categorized expenses" />
               )}
-
               {activeView === 'client' && (
-                <BreakdownList
-                  items={byClientData.map((d, i) => ({ name: d.name, value: d.amount, color: VIEW_COLORS[i % VIEW_COLORS.length] }))}
-                  total={metrics.total}
-                  emptyMessage="No client-assigned expenses"
-                />
+                <BreakdownList items={byClientData.map((d, i) => ({ name: d.name, value: d.amount, color: VIEW_COLORS[i % VIEW_COLORS.length] }))} total={metrics.total} emptyMessage="No client-assigned expenses" />
               )}
-
               {activeView === 'project' && (
-                <BreakdownList
-                  items={byProjectData.map((d, i) => ({
-                    name: d.name,
-                    subtitle: d.client,
-                    value: d.amount,
-                    color: VIEW_COLORS[i % VIEW_COLORS.length]
-                  }))}
-                  total={metrics.total}
-                  emptyMessage="No project-assigned expenses"
-                />
+                <BreakdownList items={byProjectData.map((d, i) => ({ name: d.name, subtitle: d.client, value: d.amount, color: VIEW_COLORS[i % VIEW_COLORS.length] }))} total={metrics.total} emptyMessage="No project-assigned expenses" />
               )}
-
               {activeView === 'account' && (
                 <div className="space-y-3">
                   {byAccountData.length > 0 ? byAccountData.map((acct, i) => (
-                    <div key={i} className="bg-slate-800/30 border border-slate-800/60 rounded-lg p-3">
+                    <div key={i} className="bg-slate-50 border border-slate-200 rounded-lg p-3">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <Landmark size={14} className="text-teal-400" />
+                          <Landmark size={14} className="text-emerald-600" />
                           <span className={`text-sm font-medium ${THEME.textPrimary}`}>{acct.name}</span>
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <p className={`text-[10px] uppercase tracking-wider ${THEME.textDim}`}>Inflows</p>
-                          <p className="text-sm font-semibold text-emerald-400 tabular-nums">{formatCurrency(acct.inflows)}</p>
+                          <p className="text-sm font-semibold text-emerald-600 tabular-nums">{formatCurrency(acct.inflows)}</p>
                         </div>
                         <div>
                           <p className={`text-[10px] uppercase tracking-wider ${THEME.textDim}`}>Outflows</p>
-                          <p className="text-sm font-semibold text-rose-400 tabular-nums">{formatCurrency(acct.outflows)}</p>
+                          <p className="text-sm font-semibold text-rose-600 tabular-nums">{formatCurrency(acct.outflows)}</p>
                         </div>
                       </div>
                     </div>
                   )) : <EmptyState message="No account data" />}
                 </div>
               )}
-
               {activeView === 'cardholder' && (
-                <BreakdownList
-                  items={byCardholderData.map((d, i) => ({
-                    name: d.name,
-                    subtitle: `${d.count} transactions`,
-                    value: d.amount,
-                    color: VIEW_COLORS[i % VIEW_COLORS.length]
-                  }))}
-                  total={byCardholderData.reduce((s, d) => s + d.amount, 0)}
-                  emptyMessage="No cardholder data — assign cardholders in Bank Feed"
-                />
+                <BreakdownList items={byCardholderData.map((d, i) => ({ name: d.name, subtitle: `${d.count} transactions`, value: d.amount, color: VIEW_COLORS[i % VIEW_COLORS.length] }))}
+                  total={byCardholderData.reduce((s, d) => s + d.amount, 0)} emptyMessage="No cardholder data — assign in Bank Feed" />
               )}
             </div>
           </div>
@@ -436,7 +375,6 @@ export default function OverviewSection({
 
       {/* Detail Tables Row */}
       <div className="grid grid-cols-12 gap-5">
-        {/* Top Expense Types */}
         <div className="col-span-12 lg:col-span-6">
           <div className={`${THEME.card} p-6`}>
             <h2 className={`text-sm font-semibold ${THEME.textPrimary} mb-4`}>Top Expense Types</h2>
@@ -460,23 +398,21 @@ export default function OverviewSection({
             ) : <EmptyState message="No expenses yet" />}
           </div>
         </div>
-
-        {/* By Project */}
         <div className="col-span-12 lg:col-span-6">
           <div className={`${THEME.card} p-6`}>
             <h2 className={`text-sm font-semibold ${THEME.textPrimary} mb-4`}>By Project</h2>
             {byProjectData.length > 0 ? (
               <div className="grid grid-cols-2 gap-3">
                 {byProjectData.slice(0, 6).map((proj, i) => (
-                  <div key={i} className="bg-slate-800/30 border border-slate-800/60 rounded-lg p-4 hover:bg-slate-800/40 transition-colors">
+                  <div key={i} className="bg-slate-50 border border-slate-200 rounded-lg p-4 hover:bg-slate-100 transition-colors">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-teal-500/10 flex items-center justify-center shrink-0">
-                        <Briefcase size={18} className="text-teal-400" />
+                      <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
+                        <Briefcase size={18} className="text-emerald-600" />
                       </div>
                       <div className="min-w-0">
                         <p className={`text-sm font-medium ${THEME.textSecondary} truncate`}>{proj.name}</p>
                         {proj.client && <p className={`text-[10px] ${THEME.textDim} truncate`}>{proj.client}</p>}
-                        <p className="text-lg font-bold text-teal-400 tabular-nums">{formatCurrency(proj.amount)}</p>
+                        <p className="text-lg font-bold text-emerald-600 tabular-nums">{formatCurrency(proj.amount)}</p>
                       </div>
                     </div>
                   </div>
@@ -490,17 +426,13 @@ export default function OverviewSection({
   )
 }
 
-// ============ REUSABLE BREAKDOWN LIST ============
+// ============ BREAKDOWN LIST ============
 function BreakdownList({ items, total, emptyMessage }: {
   items: { name: string; subtitle?: string; value: number; color: string }[]
-  total: number
-  emptyMessage: string
+  total: number; emptyMessage: string
 }) {
   if (!items.length) return <EmptyState message={emptyMessage} />
-
-  // Mini donut
   const pieData = items.slice(0, 6).map(d => ({ name: d.name, value: d.value, color: d.color }))
-
   return (
     <div>
       {pieData.length > 1 && (
