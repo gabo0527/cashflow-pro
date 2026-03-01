@@ -5,8 +5,8 @@ import { createClient } from '@supabase/supabase-js'
 import { Search, ChevronDown, ChevronUp, Trash2, Receipt, Plus, X } from 'lucide-react'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://jmahfgpbtjeomuepfozf.supabase.co',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptYWhmZ3BidGplb211ZXBmb3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0OTAxNzcsImV4cCI6MjA4MTA2NjE3N30.3SVDvWCGIYYHV57BpKjpDJVCZLKzuRv8B_VietQDxUQ'
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 import {
   THEME, EXPENSE_CATEGORIES, getCategoryConfig, getSubcategoryConfig,
