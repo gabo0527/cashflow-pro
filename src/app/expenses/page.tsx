@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import { getCurrentUser } from '@/lib/supabase'
-import { EXPENSE_CATEGORIES, CategoryManager, hydrateCategories } from '@/components/expenses/shared'
+import { THEME, EXPENSE_CATEGORIES, CategoryManager, hydrateCategories } from '@/components/expenses/shared'
 import OverviewSection from '@/components/expenses/OverviewSection'
 import ExpensesSection, { ExpensesSectionHandle } from '@/components/expenses/ExpensesSection'
 import BankFeedSection from '@/components/expenses/BankFeedSection'
@@ -17,8 +17,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
-
-const selectClass = "appearance-none bg-slate-800/60 border border-slate-800/80 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-600/50 cursor-pointer transition-colors"
 
 type TabType = 'overview' | 'expenses' | 'bankfeed'
 
@@ -271,7 +269,7 @@ export default function BankingPage() {
     const a = document.createElement('a'); a.href = url; a.download = 'banking-export.csv'; a.click()
   }
 
-  // Pending bank feed count — now includes BOTH inflows and outflows
+  // Pending bank feed count
   const pendingTransactions = transactions.filter(t => {
     if (t.skipped || t.category) return false
     const linkedIds = new Set(expenses.filter(e => e.transaction_id).map(e => e.transaction_id))
@@ -283,7 +281,7 @@ export default function BankingPage() {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="text-center">
-          <RefreshCw className="w-8 h-8 text-teal-500 animate-spin mx-auto mb-3" />
+          <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" />
           <p className="text-sm text-slate-500">Loading banking data...</p>
         </div>
       </div>
@@ -296,27 +294,27 @@ export default function BankingPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-white">Banking</h1>
-          <p className="text-sm text-slate-500 mt-1">Categorize transactions, track cash flow, manage accounts</p>
+          <h1 className={`text-xl font-bold tracking-tight ${THEME.textPrimary}`}>Cash Management</h1>
+          <p className={`text-sm ${THEME.textMuted} mt-1`}>Categorize transactions, track cash flow, manage accounts</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Year */}
           <div className="relative">
-            <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))} className={selectClass}>
-              {[2026, 2025, 2024, 2023].map(year => <option key={year} value={year} className="bg-slate-900">{year}</option>)}
+            <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))} className={THEME.selectClass}>
+              {[2026, 2025, 2024, 2023].map(year => <option key={year} value={year}>{year}</option>)}
             </select>
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
 
           {/* Month */}
           <div className="relative">
-            <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className={selectClass}>
-              <option value="all" className="bg-slate-900">All Months</option>
+            <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className={THEME.selectClass}>
+              <option value="all">All Months</option>
               {['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].map((m, i) => (
-                <option key={m} value={m} className="bg-slate-900">{new Date(2000, i).toLocaleString('default', { month: 'long' })}</option>
+                <option key={m} value={m}>{new Date(2000, i).toLocaleString('default', { month: 'long' })}</option>
               ))}
             </select>
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
 
           {/* QBO Sync (real) */}
@@ -326,58 +324,58 @@ export default function BankingPage() {
 
           {/* Export */}
           <button onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:border-slate-700 transition-colors">
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-sm">
             <Download size={14} /> Export
           </button>
 
           {/* Category Manager */}
           <button onClick={() => setShowCategoryManager(true)} title="Manage Categories"
-            className="flex items-center gap-2 px-3 py-2 bg-slate-800/60 border border-slate-800/80 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:border-slate-700 transition-colors">
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-sm">
             <Settings size={14} />
           </button>
 
           {/* Add Expense */}
           <button onClick={() => { setActiveTab('expenses'); setTimeout(() => expensesSectionRef.current?.openAddModal(), 100) }}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-500 transition-colors">
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm">
             <Plus size={14} /> Add Expense
           </button>
         </div>
       </div>
 
       {/* Tab Navigation — underline style */}
-      <div className="border-b border-slate-800/60">
+      <div className="border-b border-slate-200">
         <div className="flex gap-0">
           <button onClick={() => setActiveTab('overview')}
             className={`relative flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'overview' ? 'text-teal-400' : 'text-slate-500 hover:text-slate-300'
+              activeTab === 'overview' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'
             }`}>
             <PieChart size={15} />
             Overview
-            {activeTab === 'overview' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500 rounded-t" />}
+            {activeTab === 'overview' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t" />}
           </button>
           <button onClick={() => setActiveTab('expenses')}
             className={`relative flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'expenses' ? 'text-teal-400' : 'text-slate-500 hover:text-slate-300'
+              activeTab === 'expenses' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'
             }`}>
             <LayoutList size={15} />
             Transactions
             <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md ${
-              activeTab === 'expenses' ? 'bg-teal-500/15 text-teal-400 border border-teal-500/20' : 'bg-slate-800/60 text-slate-400 border border-slate-800/80'
+              activeTab === 'expenses' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-100 text-slate-400 border border-slate-200'
             }`}>{expenses.length}</span>
-            {activeTab === 'expenses' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500 rounded-t" />}
+            {activeTab === 'expenses' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t" />}
           </button>
           <button onClick={() => setActiveTab('bankfeed')}
             className={`relative flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'bankfeed' ? 'text-teal-400' : 'text-slate-500 hover:text-slate-300'
+              activeTab === 'bankfeed' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'
             }`}>
             <Landmark size={15} />
             Bank Feed
             {pendingTransactions > 0 && (
               <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md ${
-                activeTab === 'bankfeed' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                activeTab === 'bankfeed' ? 'bg-amber-50 text-amber-600 border border-amber-200' : 'bg-amber-50 text-amber-500 border border-amber-200'
               }`}>{pendingTransactions}</span>
             )}
-            {activeTab === 'bankfeed' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500 rounded-t" />}
+            {activeTab === 'bankfeed' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t" />}
           </button>
         </div>
       </div>
