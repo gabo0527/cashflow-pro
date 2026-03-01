@@ -192,12 +192,12 @@ export default function ImportSection({
         {['select', 'upload', 'map', 'preview', 'complete'].map((s, i) => (
           <React.Fragment key={s}>
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
-              step === s ? 'bg-emerald-500/20 text-emerald-400' :
-              ['select', 'upload', 'map', 'preview', 'complete'].indexOf(step) > i ? 'text-emerald-400' : THEME.textDim
+              step === s ? 'bg-emerald-100 text-emerald-600' :
+              ['select', 'upload', 'map', 'preview', 'complete'].indexOf(step) > i ? 'text-emerald-600' : THEME.textDim
             }`}>
               <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
                 step === s ? 'bg-emerald-500 text-white' :
-                ['select', 'upload', 'map', 'preview', 'complete'].indexOf(step) > i ? 'bg-emerald-500/30' : 'bg-white/[0.08]'
+                ['select', 'upload', 'map', 'preview', 'complete'].indexOf(step) > i ? 'bg-emerald-200' : 'bg-slate-100'
               }`}>{i + 1}</span>
               <span className="text-sm font-medium capitalize">{s}</span>
             </div>
@@ -220,10 +220,10 @@ export default function ImportSection({
                 <button
                   key={type.id}
                   onClick={() => { setSelectedType(type.id); setStep('upload'); }}
-                  className={`p-6 rounded-xl border ${THEME.glassBorder} hover:bg-white/[0.05] hover:border-emerald-500/30 transition-all text-left group`}
+                  className={`p-6 rounded-xl border ${THEME.glassBorder} hover:bg-slate-100 hover:border-emerald-300 transition-all text-left group`}
                 >
-                  <div className="w-12 h-12 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-4 group-hover:bg-emerald-500/20 transition-colors">
-                    <type.icon size={24} className="text-emerald-400" />
+                  <div className="w-12 h-12 rounded-lg bg-emerald-50 flex items-center justify-center mb-4 group-hover:bg-emerald-100 transition-colors">
+                    <type.icon size={24} className="text-emerald-600" />
                   </div>
                   <h3 className={`font-semibold ${THEME.textPrimary}`}>{type.label}</h3>
                   <p className={`text-sm ${THEME.textDim} mt-1`}>{type.description}</p>
@@ -243,13 +243,13 @@ export default function ImportSection({
               </div>
               <button
                 onClick={downloadTemplate}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-emerald-600 hover:text-emerald-300 transition-colors"
               >
                 <Download size={14} /> Download Template
               </button>
             </div>
 
-            <div className="border-2 border-dashed border-white/[0.1] rounded-xl p-12 text-center hover:border-emerald-500/30 transition-colors">
+            <div className="border-2 border-dashed border-slate-200 rounded-xl p-12 text-center hover:border-emerald-300 transition-colors">
               <input
                 type="file"
                 accept=".csv"
@@ -258,19 +258,19 @@ export default function ImportSection({
                 id="file-upload"
               />
               <label htmlFor="file-upload" className="cursor-pointer">
-                <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
-                  <Upload size={28} className="text-emerald-400" />
+                <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4">
+                  <Upload size={28} className="text-emerald-600" />
                 </div>
                 <p className={`font-medium ${THEME.textSecondary}`}>Click to upload or drag and drop</p>
                 <p className={`text-sm ${THEME.textDim} mt-1`}>CSV files only</p>
               </label>
             </div>
 
-            <div className={`p-4 rounded-lg bg-blue-500/10 border border-blue-500/20`}>
+            <div className={`p-4 rounded-lg bg-blue-50 border border-blue-200`}>
               <div className="flex items-start gap-3">
-                <AlertCircle size={18} className="text-blue-400 mt-0.5" />
+                <AlertCircle size={18} className="text-blue-600 mt-0.5" />
                 <div>
-                  <p className={`text-sm font-medium text-blue-400`}>Expected columns:</p>
+                  <p className={`text-sm font-medium text-blue-600`}>Expected columns:</p>
                   <p className={`text-sm ${THEME.textMuted} mt-1`}>
                     {currentType.fields.map(f => f.replace(/_/g, ' ')).join(', ')}
                   </p>
@@ -284,7 +284,7 @@ export default function ImportSection({
             <div className="flex justify-between">
               <button
                 onClick={handleReset}
-                className={`px-4 py-2 text-sm ${THEME.textMuted} hover:text-white transition-colors`}
+                className={`px-4 py-2 text-sm ${THEME.textMuted} hover:text-slate-700 transition-colors`}
               >
                 Back
               </button>
@@ -301,7 +301,7 @@ export default function ImportSection({
             </div>
 
             <div className="flex items-center gap-2 text-sm">
-              <FileText size={16} className="text-emerald-400" />
+              <FileText size={16} className="text-emerald-600" />
               <span className={THEME.textSecondary}>{file?.name}</span>
               <span className={THEME.textDim}>• {parsedData.length} rows</span>
             </div>
@@ -316,22 +316,22 @@ export default function ImportSection({
                     <div className="w-40">
                       <span className={`text-sm ${THEME.textSecondary}`}>
                         {field.replace(/_/g, ' ')}
-                        {isRequired && <span className="text-rose-400 ml-1">*</span>}
+                        {isRequired && <span className="text-rose-600 ml-1">*</span>}
                       </span>
                     </div>
                     <ChevronRight size={16} className={THEME.textDim} />
                     <select
                       value={columnMapping[field] || ''}
                       onChange={(e) => setColumnMapping(prev => ({ ...prev, [field]: e.target.value }))}
-                      className="flex-1 bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                      className="flex-1 bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
                     >
-                      <option value="" className="bg-slate-900">-- Select column --</option>
+                      <option value="" className="">-- Select column --</option>
                       {headers.map(h => (
-                        <option key={h} value={h} className="bg-slate-900">{h}</option>
+                        <option key={h} value={h} className="">{h}</option>
                       ))}
                     </select>
                     {columnMapping[field] && (
-                      <Check size={16} className="text-emerald-400" />
+                      <Check size={16} className="text-emerald-600" />
                     )}
                   </div>
                 )
@@ -341,7 +341,7 @@ export default function ImportSection({
             <div className="flex justify-between">
               <button
                 onClick={() => setStep('upload')}
-                className={`px-4 py-2 text-sm ${THEME.textMuted} hover:text-white transition-colors`}
+                className={`px-4 py-2 text-sm ${THEME.textMuted} hover:text-slate-700 transition-colors`}
               >
                 Back
               </button>
@@ -378,7 +378,7 @@ export default function ImportSection({
                 </thead>
                 <tbody>
                   {parsedData.slice(0, 5).map((row, i) => (
-                    <tr key={i} className={`border-b border-white/[0.05]`}>
+                    <tr key={i} className={`border-b border-slate-100`}>
                       <td className={`px-3 py-2 ${THEME.textDim}`}>{i + 1}</td>
                       {currentType.fields.map(field => (
                         <td key={field} className={`px-3 py-2 ${THEME.textSecondary}`}>
@@ -398,8 +398,8 @@ export default function ImportSection({
             )}
 
             {importResult && importResult.errors.length > 0 && (
-              <div className="p-4 rounded-lg bg-rose-500/10 border border-rose-500/20">
-                <p className="text-sm font-medium text-rose-400 mb-2">Validation Errors:</p>
+              <div className="p-4 rounded-lg bg-rose-50 border border-rose-200">
+                <p className="text-sm font-medium text-rose-600 mb-2">Validation Errors:</p>
                 <ul className="space-y-1">
                   {importResult.errors.map((err, i) => (
                     <li key={i} className={`text-sm ${THEME.textMuted}`}>• {err}</li>
@@ -411,7 +411,7 @@ export default function ImportSection({
             <div className="flex justify-between">
               <button
                 onClick={() => setStep('map')}
-                className={`px-4 py-2 text-sm ${THEME.textMuted} hover:text-white transition-colors`}
+                className={`px-4 py-2 text-sm ${THEME.textMuted} hover:text-slate-700 transition-colors`}
               >
                 Back
               </button>
@@ -430,8 +430,8 @@ export default function ImportSection({
         {/* Step 5: Complete */}
         {step === 'complete' && importResult && (
           <div className="text-center py-8">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
-              <Check size={32} className="text-emerald-400" />
+            <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+              <Check size={32} className="text-emerald-600" />
             </div>
             <h2 className={`text-lg font-semibold ${THEME.textPrimary}`}>Import Complete!</h2>
             <p className={`text-sm ${THEME.textMuted} mt-2`}>
@@ -439,7 +439,7 @@ export default function ImportSection({
             </p>
             <button
               onClick={handleReset}
-              className="mt-6 px-6 py-2.5 text-sm font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/20 transition-colors"
+              className="mt-6 px-6 py-2.5 text-sm font-medium bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
             >
               Import More
             </button>
