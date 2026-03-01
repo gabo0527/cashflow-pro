@@ -58,7 +58,7 @@ const ProjectsSection = forwardRef<ProjectsSectionHandle, ProjectsSectionProps>(
 
     return projects.map(p => {
       const hours = hoursMap.get(p.id) || { actual: 0, billed: 0 }
-      const healthScore = calculateHealthScore(p)
+      const healthScore = calculateHealthScore(p).score
       const margin = p.budget > 0 ? ((p.budget - p.spent) / p.budget) * 100 : 0
       const burnRate = p.budget > 0 ? (p.spent / p.budget) * 100 : 0
       const effectiveRate = hours.actual > 0 ? p.spent / hours.actual : 0
@@ -192,13 +192,13 @@ const ProjectsSection = forwardRef<ProjectsSectionHandle, ProjectsSectionProps>(
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 isActive
                   ? `${config.bg} ${config.text} border ${config.border} shadow-lg`
-                  : `${THEME.textMuted} hover:text-white hover:bg-white/[0.05]`
+                  : `${THEME.textMuted} hover:text-slate-700 hover:bg-slate-100`
               }`}
             >
               {config.label}
               {count > 0 && (
                 <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
-                  isActive ? 'bg-white/20' : 'bg-white/[0.08]'
+                  isActive ? 'bg-white' : 'bg-slate-100'
                 }`}>
                   {count}
                 </span>
@@ -226,19 +226,19 @@ const ProjectsSection = forwardRef<ProjectsSectionHandle, ProjectsSectionProps>(
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search projects..."
-                className="bg-white/[0.05] border border-white/[0.1] rounded-lg pl-9 pr-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 w-48 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                className="bg-slate-100 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-sm text-slate-800 placeholder-slate-400 w-48 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
               />
             </div>
             <button
               onClick={toggleAllClients}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium ${THEME.textMuted} hover:text-white transition-colors`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium ${THEME.textMuted} hover:text-slate-700 transition-colors`}
             >
               {allExpanded ? <EyeOff size={14} /> : <Eye size={14} />}
               {allExpanded ? 'Collapse' : 'Expand'}
             </button>
             <button
               onClick={onAddProject}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/20 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
             >
               <Plus size={14} /> Add Project
             </button>
@@ -246,19 +246,19 @@ const ProjectsSection = forwardRef<ProjectsSectionHandle, ProjectsSectionProps>(
         </div>
 
         {/* Column Headers */}
-        <div className={`flex items-center gap-3 py-2.5 px-4 bg-white/[0.03] border-b ${THEME.glassBorder} text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>
+        <div className={`flex items-center gap-3 py-2.5 px-4 bg-slate-50 border-b ${THEME.glassBorder} text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>
           <div className="w-8 shrink-0"></div>
-          <button onClick={() => handleSort('name')} className="flex-1 min-w-0 flex items-center gap-1 hover:text-white transition-colors">
+          <button onClick={() => handleSort('name')} className="flex-1 min-w-0 flex items-center gap-1 hover:text-slate-700 transition-colors">
             Client / Project {sortField === 'name' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
           </button>
-          <button onClick={() => handleSort('health')} className="w-16 shrink-0 text-center flex items-center justify-center gap-1 hover:text-white transition-colors">
+          <button onClick={() => handleSort('health')} className="w-16 shrink-0 text-center flex items-center justify-center gap-1 hover:text-slate-700 transition-colors">
             Health {sortField === 'health' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
           </button>
-          <button onClick={() => handleSort('budget')} className="w-28 shrink-0 text-right flex items-center justify-end gap-1 hover:text-white transition-colors">
+          <button onClick={() => handleSort('budget')} className="w-28 shrink-0 text-right flex items-center justify-end gap-1 hover:text-slate-700 transition-colors">
             Contract {sortField === 'budget' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
           </button>
           <div className="w-24 shrink-0 text-right">Spent</div>
-          <button onClick={() => handleSort('margin')} className="w-20 shrink-0 text-right flex items-center justify-end gap-1 hover:text-white transition-colors">
+          <button onClick={() => handleSort('margin')} className="w-20 shrink-0 text-right flex items-center justify-end gap-1 hover:text-slate-700 transition-colors">
             Margin {sortField === 'margin' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
           </button>
           <div className="w-28 shrink-0 text-center">Burn %</div>
@@ -316,7 +316,7 @@ const ProjectsSection = forwardRef<ProjectsSectionHandle, ProjectsSectionProps>(
 
         {/* Footer */}
         {filteredProjects.length > 0 && (
-          <div className={`flex items-center justify-between px-6 py-3 border-t ${THEME.glassBorder} bg-white/[0.02]`}>
+          <div className={`flex items-center justify-between px-6 py-3 border-t ${THEME.glassBorder} bg-slate-50`}>
             <p className={`text-sm ${THEME.textMuted}`}>
               {projectsByClient.length} clients • {filteredProjects.length} projects
             </p>
@@ -327,7 +327,7 @@ const ProjectsSection = forwardRef<ProjectsSectionHandle, ProjectsSectionProps>(
               </div>
               <div>
                 <span className={THEME.textMuted}>Spent: </span>
-                <span className="font-semibold text-rose-400">{formatCurrency(totals.spent)}</span>
+                <span className="font-semibold text-rose-600">{formatCurrency(totals.spent)}</span>
               </div>
               <div>
                 <span className={THEME.textMuted}>Avg Margin: </span>
@@ -362,7 +362,7 @@ function ClientRow({ clientName, projects, isExpanded, onToggle }: {
   return (
     <div
       onClick={onToggle}
-      className="flex items-center gap-3 py-3 px-4 bg-white/[0.03] hover:bg-white/[0.06] cursor-pointer transition-colors border-b border-white/[0.08]"
+      className="flex items-center gap-3 py-3 px-4 bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors border-b border-slate-200"
     >
       <div className="w-8 shrink-0">
         <div className={`p-1 rounded transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
@@ -370,14 +370,14 @@ function ClientRow({ clientName, projects, isExpanded, onToggle }: {
         </div>
       </div>
       <div className="flex-1 min-w-0 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500/20 to-blue-500/20 flex items-center justify-center shrink-0">
-          <Building2 size={16} className="text-emerald-400" />
+        <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center shrink-0">
+          <Building2 size={16} className="text-emerald-600" />
         </div>
         <div>
           <p className={`font-semibold ${THEME.textPrimary}`}>{clientName}</p>
           <p className={`text-xs ${THEME.textDim}`}>
             {projects.length} project{projects.length !== 1 ? 's' : ''}
-            {atRiskCount > 0 && <span className="text-rose-400 ml-2">• {atRiskCount} at risk</span>}
+            {atRiskCount > 0 && <span className="text-rose-600 ml-2">• {atRiskCount} at risk</span>}
           </p>
         </div>
       </div>
@@ -388,7 +388,7 @@ function ClientRow({ clientName, projects, isExpanded, onToggle }: {
         <span className={`font-semibold ${THEME.textPrimary}`}>{formatCurrency(totalBudget)}</span>
       </div>
       <div className="w-24 shrink-0 text-right">
-        <span className="text-rose-400">{formatCurrency(totalSpent)}</span>
+        <span className="text-rose-600">{formatCurrency(totalSpent)}</span>
       </div>
       <div className="w-20 shrink-0 text-right">
         <MarginIndicator margin={margin} />
@@ -416,15 +416,15 @@ function ProjectRow({ project, isChangeOrder = false, onEdit, onDelete, onAddCO 
   onAddCO: () => void
 }) {
   return (
-    <div className={`flex items-center gap-3 py-3 px-4 hover:bg-white/[0.03] transition-colors border-b border-white/[0.05] ${isChangeOrder ? 'bg-white/[0.01]' : ''}`}>
+    <div className={`flex items-center gap-3 py-3 px-4 hover:bg-slate-50 transition-colors border-b border-slate-100 ${isChangeOrder ? 'bg-slate-50/50' : ''}`}>
       <div className="w-8 shrink-0"></div>
       <div className={`flex-1 min-w-0 flex items-center gap-2 ${isChangeOrder ? 'pl-8' : ''}`}>
         {isChangeOrder && <div className="w-4 h-px bg-white/10" />}
         <Briefcase size={14} className={THEME.textDim} />
         <span className={`font-medium ${THEME.textPrimary} truncate`}>{project.name}</span>
-        {project.healthScore < 60 && <AlertTriangle size={14} className="text-rose-400 shrink-0" />}
+        {project.healthScore < 60 && <AlertTriangle size={14} className="text-rose-600 shrink-0" />}
         {isChangeOrder && (
-          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-cyan-500/20 text-cyan-400 shrink-0">CO</span>
+          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-cyan-50 text-cyan-600 shrink-0">CO</span>
         )}
       </div>
       <div className="w-16 shrink-0 text-center">
@@ -434,7 +434,7 @@ function ProjectRow({ project, isChangeOrder = false, onEdit, onDelete, onAddCO 
         <span className={`font-medium ${THEME.textPrimary}`}>{formatCurrency(project.budget)}</span>
       </div>
       <div className="w-24 shrink-0 text-right">
-        <span className="text-rose-400">{formatCurrency(project.spent)}</span>
+        <span className="text-rose-600">{formatCurrency(project.spent)}</span>
       </div>
       <div className="w-20 shrink-0 text-right">
         <MarginIndicator margin={project.margin} />
@@ -457,7 +457,7 @@ function ProjectRow({ project, isChangeOrder = false, onEdit, onDelete, onAddCO 
         {!isChangeOrder && (
           <button
             onClick={(e) => { e.stopPropagation(); onAddCO(); }}
-            className="p-1.5 rounded hover:bg-white/[0.08] text-slate-500 hover:text-emerald-400 transition-colors"
+            className="p-1.5 rounded hover:bg-slate-100 text-slate-500 hover:text-emerald-600 transition-colors"
             title="Add Change Order"
           >
             <Plus size={14} />
@@ -465,14 +465,14 @@ function ProjectRow({ project, isChangeOrder = false, onEdit, onDelete, onAddCO 
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(); }}
-          className="p-1.5 rounded hover:bg-white/[0.08] text-slate-500 hover:text-slate-300 transition-colors"
+          className="p-1.5 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-600 transition-colors"
           title="Edit"
         >
           <Edit2 size={14} />
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="p-1.5 rounded hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 transition-colors"
+          className="p-1.5 rounded hover:bg-rose-100 text-slate-500 hover:text-rose-600 transition-colors"
           title="Delete"
         >
           <Trash2 size={14} />
