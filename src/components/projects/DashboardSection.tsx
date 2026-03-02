@@ -2,469 +2,399 @@
 
 import React, { useMemo, useState } from 'react'
 import {
-  Briefcase, DollarSign, TrendingUp, TrendingDown, Users,
-  AlertTriangle, Target, Activity, Clock, Building2, Zap,
-  ChevronRight, ArrowUpRight, ArrowDownRight, FileText,
-  CheckCircle2, XCircle, Calendar, BarChart3
+  Briefcase, DollarSign, TrendingUp, Clock, Receipt, AlertTriangle,
+  ArrowUpRight, BarChart3, PieChart as PieChartIcon, Users, Timer, Layers
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, ComposedChart, Line
+  PieChart, Pie, Cell, ComposedChart, CartesianGrid, Legend
 } from 'recharts'
 import {
-  THEME, COLORS, PROJECT_STATUSES, getHealthConfig, calculateHealthScore, getHealthScore,
-  formatCurrency, formatCompactCurrency, formatPercent,
-  KPICard, CustomTooltip, WaterfallItem, SlicerButton, InsightBadge
+  THEME, COLORS, getContractType, getServiceLine, SERVICE_LINE_COLORS,
+  calculateProjectEconomics, calculateLS, calculateTM, getMonthsActive,
+  formatCurrency, formatCompactCurrency, formatPercent, formatVariance,
+  getPeriodRange, filterByPeriod, ContractType,
+  KPICard, ContractBadge, MarginIndicator, VarianceIndicator, ProgressBar,
+  SlicerButton, CustomTooltip, WaterfallItem, EmptyState
 } from './shared'
 
 interface DashboardSectionProps {
-  projects: any[]
-  clients: any[]
-  expenses: any[]
-  invoices: any[]
-  timesheets: any[]
+  projects: any[]; clients: any[]; expenses: any[]
+  invoices: any[]; timesheets: any[]
   onDrillDown?: (type: string, id: string) => void
 }
 
-export default function DashboardSection({
-  projects, clients, expenses, invoices, timesheets, onDrillDown
-}: DashboardSectionProps) {
+export default function DashboardSection({ projects, clients, expenses, invoices, timesheets, onDrillDown }: DashboardSectionProps) {
   const [selectedClient, setSelectedClient] = useState('all')
   const [selectedPeriod, setSelectedPeriod] = useState('ytd')
 
-  const filteredProjects = useMemo(() => {
-    let result = projects.filter(p => p.status !== 'archived')
-    if (selectedClient !== 'all') result = result.filter(p => p.client_id === selectedClient)
-    return result
-  }, [projects, selectedClient])
+  const periodRange = useMemo(() => getPeriodRange(selectedPeriod), [selectedPeriod])
 
-  // Enrich with calculations + health reasons
-  const enrichedProjects = useMemo(() => {
-    // Hours per project from timesheets
-    const hoursMap = new Map<string, { actual: number; billed: number }>()
-    timesheets.forEach(t => {
-      const existing = hoursMap.get(t.project_id) || { actual: 0, billed: 0 }
-      existing.actual += t.hours || 0
-      if (t.billable) existing.billed += t.hours || 0
-      hoursMap.set(t.project_id, existing)
-    })
-
-    return filteredProjects.map(p => {
-      const hours = hoursMap.get(p.id) || { actual: 0, billed: 0 }
-      const health = calculateHealthScore({ ...p, actual_hours: hours.actual })
-      const margin = p.budget > 0 ? ((p.budget - p.spent) / p.budget) * 100 : 0
-      const burnRate = p.budget > 0 ? (p.spent / p.budget) * 100 : 0
-      const effectiveRate = hours.actual > 0 ? p.spent / hours.actual : 0
-
-      // Change orders for this project
-      const cos = projects.filter(co => co.parent_id === p.id && co.is_change_order)
-      const coValue = cos.reduce((sum, co) => sum + (co.budget || 0), 0)
-      const totalContractWithCOs = (p.budget || 0) + coValue
-
-      return {
-        ...p,
-        actual_hours: hours.actual,
-        billed_hours: hours.billed,
-        healthScore: health.score,
-        healthReasons: health.reasons,
-        margin,
-        burnRate,
-        effectiveRate,
-        changeOrderCount: cos.length,
-        changeOrderValue: coValue,
-        totalContractWithCOs,
-        client: clients.find(c => c.id === p.client_id)?.name || 'No Client'
-      }
-    })
-  }, [filteredProjects, projects, clients, timesheets])
-
-  // ============ PORTFOLIO METRICS ============
-  const metrics = useMemo(() => {
-    const active = enrichedProjects.filter(p => p.status === 'active' && !p.is_change_order)
-    const prospects = enrichedProjects.filter(p => p.status === 'prospect')
-
-    const totalContract = active.reduce((sum, p) => sum + (p.totalContractWithCOs || p.budget || 0), 0)
-    const totalSpent = active.reduce((sum, p) => sum + (p.spent || 0), 0)
-    const totalRemaining = totalContract - totalSpent
-
-    const weightedMargin = totalContract > 0
-      ? active.reduce((sum, p) => {
-          const pBudget = p.totalContractWithCOs || p.budget || 0
-          return sum + (pBudget > 0 ? ((pBudget - (p.spent || 0)) / pBudget) * 100 * (pBudget / totalContract) : 0)
-        }, 0)
-      : 0
-
-    // Hours
-    const totalHours = active.reduce((sum, p) => sum + (p.actual_hours || 0), 0)
-    const totalBudgetedHours = active.reduce((sum, p) => sum + (p.budgeted_hours || 0), 0)
-
-    // Health
-    const atRisk = active.filter(p => p.healthScore < 60)
-    const atRiskValue = atRisk.reduce((sum, p) => sum + (p.budget || 0), 0)
-    const healthy = active.filter(p => p.healthScore >= 80)
-
-    // Pipeline
-    const pipelineValue = prospects.reduce((sum, p) => sum + (p.budget || 0), 0)
-
-    // Direct costs from expenses table (using new category key)
-    const projectExpenses = expenses.filter(e =>
-      e.category === 'directCost' &&
-      enrichedProjects.some(p => p.id === e.project_id)
-    )
-    const totalDirectCosts = projectExpenses.reduce((sum, e) => sum + e.amount, 0)
-
-    // Invoicing
-    const projectInvoices = invoices.filter(inv => enrichedProjects.some(p => p.id === inv.project_id))
-    const totalInvoiced = projectInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
-    const totalCollected = projectInvoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + (inv.amount || 0), 0)
-    const realization = totalContract > 0 ? (totalInvoiced / totalContract) * 100 : 0
-
-    // Change orders
-    const totalCOs = active.reduce((sum, p) => sum + p.changeOrderCount, 0)
-    const totalCOValue = active.reduce((sum, p) => sum + p.changeOrderValue, 0)
-
-    return {
-      activeCount: active.length, prospectCount: prospects.length,
-      totalContract, totalSpent, totalRemaining, weightedMargin,
-      totalHours, totalBudgetedHours,
-      atRiskCount: atRisk.length, atRiskValue, healthyCount: healthy.length,
-      pipelineValue, totalDirectCosts, totalInvoiced, totalCollected, realization,
-      totalCOs, totalCOValue,
-    }
-  }, [enrichedProjects, expenses, invoices])
-
-  // ============ CLIENT OPTIONS ============
   const clientOptions = useMemo(() => {
-    const counts = new Map<string, number>()
-    projects.forEach(p => { if (p.client_id) counts.set(p.client_id, (counts.get(p.client_id) || 0) + 1) })
-    return clients.map(c => ({ id: c.id, label: c.name, count: counts.get(c.id) || 0 })).filter(c => c.count > 0)
+    const unique = Array.from(new Set(projects.map(p => p.client_id).filter(Boolean)))
+      .map(id => clients.find(c => c.id === id)).filter(Boolean)
+    return [{ id: 'all', label: 'All Clients' }, ...unique.map(c => ({ id: c.id, label: c.name }))]
   }, [projects, clients])
 
-  // ============ CLIENT REVENUE CHART ============
-  const clientRevenueData = useMemo(() => {
-    const totals = new Map<string, { name: string; contract: number; spent: number }>()
-    enrichedProjects.filter(p => p.status === 'active' && !p.is_change_order).forEach(p => {
-      const clientName = p.client || 'No Client'
-      const existing = totals.get(clientName) || { name: clientName, contract: 0, spent: 0 }
-      existing.contract += p.totalContractWithCOs || p.budget || 0
-      existing.spent += p.spent || 0
-      totals.set(clientName, existing)
+  // ============ FILTERED + ENRICHED ============
+  const data = useMemo(() => {
+    let fp = projects.filter(p => !p.is_change_order)
+    if (selectedClient !== 'all') fp = fp.filter(p => p.client_id === selectedClient)
+    const active = fp.filter(p => p.status === 'active')
+    const allIds = fp.map(p => p.id)
+
+    const ts = filterByPeriod(timesheets.filter(t => allIds.includes(t.project_id)), 'date', periodRange)
+    const exp = filterByPeriod(expenses.filter(e => allIds.includes(e.project_id)), 'date', periodRange)
+    const inv = filterByPeriod(invoices.filter(i => allIds.includes(i.project_id)), 'date', periodRange)
+    const cos = projects.filter(p => p.is_change_order && allIds.includes(p.parent_id))
+
+    // Enrich each project
+    const enriched = active.map(p => {
+      const projectCOs = cos.filter(co => co.parent_id === p.id)
+      const coValue = projectCOs.reduce((s, co) => s + (co.budget || 0), 0)
+      const coSpent = projectCOs.reduce((s, co) => s + (co.spent || 0), 0)
+      const projectTS = ts.filter(t => t.project_id === p.id)
+      const totalHours = projectTS.reduce((s, t) => s + (t.hours || 0), 0)
+      const billableHours = projectTS.filter(t => t.billable).reduce((s, t) => s + (t.hours || 0), 0)
+      const contractType = getContractType(p)
+      const serviceLine = getServiceLine(p)
+      const clientName = clients.find(c => c.id === p.client_id)?.name || 'No Client'
+      const econ = calculateProjectEconomics(p, { coValue, coSpent, totalHours, billableHours, billRate: p.bill_rate, monthsActive: getMonthsActive(p.start_date) })
+
+      return { ...p, ...econ, clientName, serviceLine, totalHours, billableHours, coValue, coSpent, coCount: projectCOs.length }
     })
-    return Array.from(totals.values())
-      .map(c => ({ ...c, margin: c.contract > 0 ? ((c.contract - c.spent) / c.contract) * 100 : 0 }))
-      .sort((a, b) => b.contract - a.contract).slice(0, 8)
-  }, [enrichedProjects])
 
-  // ============ HEALTH DISTRIBUTION ============
-  const healthDistribution = useMemo(() => {
-    const active = enrichedProjects.filter(p => p.status === 'active' && !p.is_change_order)
-    return [
-      { name: 'Healthy', value: active.filter(p => p.healthScore >= 80).length, color: COLORS.emerald },
-      { name: 'Warning', value: active.filter(p => p.healthScore >= 60 && p.healthScore < 80).length, color: COLORS.amber },
-      { name: 'At Risk', value: active.filter(p => p.healthScore < 60).length, color: COLORS.rose },
-    ].filter(d => d.value > 0)
-  }, [enrichedProjects])
+    return { fp, active, enriched, cos, ts, exp, inv }
+  }, [projects, clients, expenses, invoices, timesheets, selectedClient, periodRange])
 
-  // ============ BURN VS COMPLETION ============
-  const burnVsCompletion = useMemo(() => {
-    return enrichedProjects
-      .filter(p => p.status === 'active' && !p.is_change_order && p.budget > 0)
-      .map(p => ({
-        name: p.name.length > 18 ? p.name.slice(0, 18) + '…' : p.name,
-        burn: Math.round(p.burnRate),
-        completion: p.percent_complete || 0,
-        delta: Math.round(p.burnRate - (p.percent_complete || 0)),
-      }))
-      .sort((a, b) => b.delta - a.delta)
-      .slice(0, 8)
-  }, [enrichedProjects])
+  // ============ PORTFOLIO METRICS ============
+  const m = useMemo(() => {
+    const { enriched, ts, inv } = data
 
-  // ============ TOP / BOTTOM PERFORMERS ============
-  const { topPerformers, needsAttention } = useMemo(() => {
-    const active = enrichedProjects.filter(p => p.status === 'active' && !p.is_change_order && p.budget > 0)
-    const sorted = [...active].sort((a, b) => b.margin - a.margin)
+    const totalFees = enriched.reduce((s, p) => s + p.totalContract, 0)
+    const totalCosts = enriched.reduce((s, p) => s + p.totalCosts, 0)
+    const grossProfit = totalFees - totalCosts
+    const portfolioMargin = totalFees > 0 ? (grossProfit / totalFees) * 100 : 0
+
+    // LS: Fee Earned across portfolio
+    const lsProjects = enriched.filter(p => p.contractType === 'lump_sum')
+    const totalFeeEarned = lsProjects.reduce((s, p) => s + (p.ls?.feeEarned || 0), 0)
+    const totalLSCosts = lsProjects.reduce((s, p) => s + p.totalCosts, 0)
+    const lsOverUnder = totalFeeEarned - totalLSCosts
+
+    // T&M: Billed vs Cap
+    const tmProjects = enriched.filter(p => p.contractType === 'time_and_materials')
+    const totalBilled = tmProjects.reduce((s, p) => s + (p.tm?.billed || 0), 0)
+    const totalCap = tmProjects.reduce((s, p) => s + (p.tm?.cap || 0), 0)
+
+    // Hours
+    const totalHours = ts.reduce((s, t) => s + (t.hours || 0), 0)
+    const billableHours = ts.filter(t => t.billable).reduce((s, t) => s + (t.hours || 0), 0)
+    const utilization = totalHours > 0 ? (billableHours / totalHours) * 100 : 0
+
+    // Invoicing
+    const totalInvoiced = inv.reduce((s, i) => s + (i.amount || 0), 0)
+    const totalCollected = inv.filter(i => i.status === 'paid').reduce((s, i) => s + (i.amount || 0), 0)
+    const arOutstanding = totalInvoiced - totalCollected
+    const backlog = totalFees - totalInvoiced
+
+    // Burn
+    const totalMonthlyBurn = enriched.reduce((s, p) => s + p.monthlyBurn, 0)
+    const portfolioRunway = totalMonthlyBurn > 0 ? (totalFees - totalCosts) / totalMonthlyBurn : 0
+
+    // Pipeline
+    const prospects = data.fp.filter(p => p.status === 'prospect')
+
+    // Trouble
+    const losingMoney = enriched.filter(p => p.margin < 0)
+    const lsBehind = lsProjects.filter(p => p.ls && p.ls.overUnder < 0 && p.ls.costs > 0)
+
     return {
-      topPerformers: sorted.slice(0, 5),
-      needsAttention: [...active].sort((a, b) => a.healthScore - b.healthScore).slice(0, 5).filter(p => p.healthScore < 80)
+      activeCount: enriched.length, totalFees, totalCosts, grossProfit, portfolioMargin,
+      lsCount: lsProjects.length, tmCount: tmProjects.length,
+      totalFeeEarned, totalLSCosts, lsOverUnder,
+      totalBilled, totalCap,
+      totalHours, billableHours, utilization,
+      totalInvoiced, totalCollected, arOutstanding, backlog,
+      totalMonthlyBurn, portfolioRunway,
+      pipelineValue: prospects.reduce((s, p) => s + (p.budget || 0), 0), prospectCount: prospects.length,
+      losingMoney, lsBehind,
     }
-  }, [enrichedProjects])
+  }, [data])
 
-  // ============ PORTFOLIO INSIGHTS (decision support) ============
-  const insights = useMemo(() => {
-    const msgs: { type: 'warning' | 'danger' | 'info' | 'success'; message: string }[] = []
-    const active = enrichedProjects.filter(p => p.status === 'active' && !p.is_change_order)
+  // ============ CHART DATA ============
 
-    if (metrics.atRiskCount > 0) msgs.push({ type: 'danger', message: `${metrics.atRiskCount} project${metrics.atRiskCount > 1 ? 's' : ''} at risk — ${formatCurrency(metrics.atRiskValue)} in contract value exposed` })
-    if (metrics.realization < 50 && metrics.totalContract > 0) msgs.push({ type: 'warning', message: `Realization at ${metrics.realization.toFixed(0)}% — ${formatCurrency(metrics.totalContract - metrics.totalInvoiced)} un-invoiced` })
-    if (metrics.weightedMargin < 15 && active.length > 0) msgs.push({ type: 'warning', message: `Portfolio margin at ${metrics.weightedMargin.toFixed(1)}% — below 15% target` })
+  // Service Line Revenue
+  const serviceLineData = useMemo(() => {
+    const map = new Map<string, { name: string; revenue: number; cost: number; profit: number; count: number }>()
+    data.enriched.forEach(p => {
+      const ex = map.get(p.serviceLine) || { name: p.serviceLine, revenue: 0, cost: 0, profit: 0, count: 0 }
+      ex.revenue += p.totalContract; ex.cost += p.totalCosts; ex.profit += p.grossProfit; ex.count++
+      map.set(p.serviceLine, ex)
+    })
+    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue)
+  }, [data.enriched])
 
-    // Projects burning faster than completing
-    const overburning = active.filter(p => p.burnRate - (p.percent_complete || 0) > 15)
-    if (overburning.length > 0) msgs.push({ type: 'warning', message: `${overburning.length} project${overburning.length > 1 ? 's' : ''} burning faster than progress — review resource allocation` })
+  // Client Program P&L
+  const clientProgramData = useMemo(() => {
+    const map = new Map<string, { name: string; id: string; revenue: number; cost: number; margin: number; projects: number; lsCount: number; tmCount: number }>()
+    data.enriched.forEach(p => {
+      const ex = map.get(p.clientName) || { name: p.clientName, id: p.client_id, revenue: 0, cost: 0, margin: 0, projects: 0, lsCount: 0, tmCount: 0 }
+      ex.revenue += p.totalContract; ex.cost += p.totalCosts; ex.projects++
+      if (p.contractType === 'lump_sum') ex.lsCount++; else ex.tmCount++
+      map.set(p.clientName, ex)
+    })
+    return Array.from(map.values()).map(c => ({ ...c, margin: c.revenue > 0 ? ((c.revenue - c.cost) / c.revenue) * 100 : 0, profit: c.revenue - c.cost })).sort((a, b) => b.revenue - a.revenue)
+  }, [data.enriched])
 
-    // Past deadline
-    const pastDeadline = active.filter(p => p.end_date && new Date(p.end_date) < new Date())
-    if (pastDeadline.length > 0) msgs.push({ type: 'danger', message: `${pastDeadline.length} project${pastDeadline.length > 1 ? 's' : ''} past deadline — consider change orders` })
+  // LS Fee Earned vs Costs
+  const lsFeeData = useMemo(() => {
+    return data.enriched
+      .filter(p => p.contractType === 'lump_sum' && p.totalContract > 0)
+      .map(p => ({
+        name: p.name.length > 22 ? p.name.substring(0, 22) + '…' : p.name,
+        feeEarned: p.ls?.feeEarned || 0,
+        costs: p.totalCosts,
+        id: p.id,
+      }))
+      .sort((a, b) => (a.feeEarned - a.costs) - (b.feeEarned - b.costs))
+      .slice(0, 10)
+  }, [data.enriched])
 
-    if (metrics.healthyCount === active.length && active.length > 0) msgs.push({ type: 'success', message: 'All projects healthy — portfolio performing well' })
-    if (metrics.totalCOs > 0) msgs.push({ type: 'info', message: `${metrics.totalCOs} active change orders adding ${formatCurrency(metrics.totalCOValue)} to portfolio` })
+  // T&M Billed vs Cap
+  const tmCapData = useMemo(() => {
+    return data.enriched
+      .filter(p => p.contractType === 'time_and_materials' && p.totalContract > 0)
+      .map(p => ({
+        name: p.name.length > 22 ? p.name.substring(0, 22) + '…' : p.name,
+        billed: p.tm?.billed || 0,
+        cap: p.tm?.cap || 0,
+        id: p.id,
+      }))
+      .sort((a, b) => (b.billed / (b.cap || 1)) - (a.billed / (a.cap || 1)))
+      .slice(0, 10)
+  }, [data.enriched])
 
-    return msgs.slice(0, 4)
-  }, [enrichedProjects, metrics])
-
-  // ============ REALIZATION BY PROJECT ============
-  const realizationByProject = useMemo(() => {
-    return enrichedProjects
-      .filter(p => p.status === 'active' && !p.is_change_order && p.budget > 0)
-      .map(p => {
-        const pInvoices = invoices.filter(inv => inv.project_id === p.id)
-        const invoiced = pInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
-        const collected = pInvoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + (inv.amount || 0), 0)
-        return {
-          name: p.name.length > 20 ? p.name.slice(0, 20) + '…' : p.name,
-          contract: p.totalContractWithCOs || p.budget,
-          invoiced,
-          collected,
-          realization: p.budget > 0 ? (invoiced / p.budget) * 100 : 0,
-        }
-      })
-      .sort((a, b) => b.contract - a.contract)
-      .slice(0, 6)
-  }, [enrichedProjects, invoices])
+  const slColors = Object.values(SERVICE_LINE_COLORS)
 
   return (
     <div className="space-y-6">
       {/* Slicers */}
       <div className="flex items-center gap-3 flex-wrap">
-        <SlicerButton label="Client" value={selectedClient} options={clientOptions} onChange={setSelectedClient} allLabel="All Clients" />
+        <SlicerButton label="Client" value={selectedClient} options={clientOptions} onChange={setSelectedClient} />
         <SlicerButton label="Period" value={selectedPeriod}
-          options={[{ id: 'ytd', label: 'Year to Date' }, { id: 'q1', label: 'Q1 2026' }, { id: 'all', label: 'All Time' }]}
+          options={[
+            { id: 'ytd', label: 'Year to Date' },
+            { id: 'q1', label: 'Q1 2026' }, { id: 'q2', label: 'Q2 2026' },
+            { id: 'jan', label: 'January' }, { id: 'feb', label: 'February' }, { id: 'mar', label: 'March' },
+            { id: 'apr', label: 'April' }, { id: 'may', label: 'May' }, { id: 'jun', label: 'June' },
+            { id: 'last30', label: 'Last 30 Days' }, { id: 'last90', label: 'Last 90 Days' },
+            { id: 'all', label: 'All Time' },
+          ]}
           onChange={setSelectedPeriod}
         />
-        {selectedClient !== 'all' && (
-          <button onClick={() => setSelectedClient('all')} className="text-xs text-emerald-600 hover:text-emerald-700 transition-colors">Clear filters</button>
-        )}
       </div>
 
-      {/* Portfolio Insights */}
-      {insights.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {insights.map((ins, i) => <InsightBadge key={i} type={ins.type} message={ins.message} />)}
+      {/* Alerts */}
+      {m.losingMoney.length > 0 && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-rose-50 border border-rose-200 rounded-lg">
+          <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+          <span className="text-sm text-rose-700"><strong>{m.losingMoney.length} project{m.losingMoney.length !== 1 ? 's' : ''} losing money</strong> — costs exceed fees on {m.losingMoney.map(p => p.name).slice(0, 3).join(', ')}{m.losingMoney.length > 3 ? ` +${m.losingMoney.length - 3} more` : ''}</span>
+        </div>
+      )}
+      {m.lsBehind.length > 0 && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+          <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+          <span className="text-sm text-amber-700"><strong>{m.lsBehind.length} LS project{m.lsBehind.length !== 1 ? 's' : ''} costs ahead of fee earned</strong> — spending faster than completing scope</span>
         </div>
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-        <KPICard label="Active Projects" value={metrics.activeCount} subtitle={`${formatCompactCurrency(metrics.totalContract)} total`} icon={Briefcase} color="emerald" />
-        <KPICard label="Portfolio Margin" value={formatPercent(metrics.weightedMargin)} subtitle="Weighted average" icon={TrendingUp}
-          color={metrics.weightedMargin >= 20 ? 'emerald' : metrics.weightedMargin >= 10 ? 'amber' : 'rose'} />
-        <KPICard label="Remaining Budget" value={formatCompactCurrency(metrics.totalRemaining)}
-          subtitle={`${metrics.totalContract > 0 ? formatPercent(100 - (metrics.totalSpent / metrics.totalContract * 100)) : '0%'} of contracts`} icon={DollarSign} color="blue" />
-        <KPICard label="Realization" value={formatPercent(metrics.realization)} subtitle={`${formatCompactCurrency(metrics.totalInvoiced)} invoiced`} icon={Target}
-          color={metrics.realization >= 80 ? 'emerald' : metrics.realization >= 50 ? 'amber' : 'rose'} />
-        <KPICard label="At Risk Value" value={formatCompactCurrency(metrics.atRiskValue)} subtitle={`${metrics.atRiskCount} projects`} icon={AlertTriangle}
-          color={metrics.atRiskCount > 0 ? 'rose' : 'emerald'} />
-        <KPICard label="Pipeline" value={formatCompactCurrency(metrics.pipelineValue)} subtitle={`${metrics.prospectCount} prospects`} icon={Zap} color="cyan" />
+      {/* KPI Row 1 — Portfolio */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <KPICard label="Active Engagements" value={String(m.activeCount)} subtitle={`${m.lsCount} LS • ${m.tmCount} T&M`} icon={Briefcase} color="blue" />
+        <KPICard label="Total Fees" value={formatCompactCurrency(m.totalFees)} subtitle={`${formatCompactCurrency(m.totalCosts)} in costs`} icon={DollarSign} color="slate" />
+        <KPICard label="Gross Profit" value={formatCompactCurrency(m.grossProfit)} subtitle={`${formatPercent(m.portfolioMargin)} margin`} icon={TrendingUp} color={m.portfolioMargin >= 20 ? 'emerald' : m.portfolioMargin >= 10 ? 'amber' : 'rose'} />
+        <KPICard label="Backlog" value={formatCompactCurrency(m.backlog)} subtitle="Fees contracted, not yet invoiced" icon={Layers} color="blue" />
+        <KPICard label="AR Outstanding" value={formatCompactCurrency(m.arOutstanding)} subtitle={`${formatCompactCurrency(m.totalInvoiced)} invoiced total`} icon={Receipt} color={m.arOutstanding > 0 ? 'amber' : 'emerald'} />
       </div>
 
-      {/* Row 1: Contract by Client + Health */}
+      {/* KPI Row 2 — LS vs T&M */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard label="LS: Fee Earned" value={formatCompactCurrency(m.totalFeeEarned)} subtitle={m.lsOverUnder >= 0 ? `${formatCurrency(m.lsOverUnder)} under budget` : `${formatCurrency(Math.abs(m.lsOverUnder))} over budget`} icon={BarChart3} color={m.lsOverUnder >= 0 ? 'emerald' : 'rose'} />
+        <KPICard label="T&M: Billed vs Cap" value={m.totalCap > 0 ? formatPercent((m.totalBilled / m.totalCap) * 100) : '—'} subtitle={`${formatCompactCurrency(m.totalBilled)} of ${formatCompactCurrency(m.totalCap)} cap`} icon={Clock} color={m.totalBilled > 0 ? 'purple' : 'slate'} />
+        <KPICard label="Monthly Burn" value={formatCompactCurrency(m.totalMonthlyBurn)} subtitle={m.portfolioRunway > 0 ? `${m.portfolioRunway.toFixed(1)} months of budget remaining` : 'No data'} icon={Timer} color={m.portfolioRunway > 3 ? 'emerald' : m.portfolioRunway > 1 ? 'amber' : 'rose'} />
+        <KPICard label="Pipeline" value={formatCompactCurrency(m.pipelineValue)} subtitle={`${m.prospectCount} prospect${m.prospectCount !== 1 ? 's' : ''}`} icon={ArrowUpRight} color="cyan" />
+      </div>
+
+      {/* Charts Row 1 — Service Lines + Client Concentration */}
       <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-12 lg:col-span-8">
-          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900">Contract Value by Client</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Active projects — includes change orders</p>
-              </div>
-            </div>
-            <div className="h-64">
-              {clientRevenueData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={clientRevenueData} layout="vertical" margin={{ left: 80 }}>
-                    <XAxis type="number" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCompactCurrency(v)} />
-                    <YAxis type="category" dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
-                    <Tooltip content={<CustomTooltip formatter={(v: number) => formatCurrency(v)} />} />
-                    <Bar dataKey="contract" name="Contract" fill={COLORS.emerald} radius={[0, 4, 4, 0]} barSize={18} />
-                    <Bar dataKey="spent" name="Spent" fill={COLORS.rose} radius={[0, 4, 4, 0]} barSize={18} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-slate-400">No project data</div>
-              )}
-            </div>
+        <div className="col-span-12 lg:col-span-8 bg-white border border-slate-200 rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-slate-900 mb-1">Revenue & Profit by Service Line</h3>
+          <p className="text-xs text-slate-400 mb-4">Which services make money across all clients?</p>
+          <div style={{ height: Math.max(160, serviceLineData.length * 44 + 40) }}>
+            {serviceLineData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={serviceLineData} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+                  <XAxis type="number" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCompactCurrency(v)} />
+                  <YAxis type="category" dataKey="name" tick={{ fill: '#334155', fontSize: 12, fontWeight: 500 }} axisLine={false} tickLine={false} width={130} />
+                  <Tooltip content={<CustomTooltip formatter={(v: number) => formatCurrency(v)} />} />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="revenue" name="Fee" fill={COLORS.blue} radius={[0, 4, 4, 0]} barSize={12} />
+                  <Bar dataKey="cost" name="Cost" fill={COLORS.rose} radius={[0, 4, 4, 0]} barSize={12} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : <EmptyState icon={BarChart3} message="No active projects" />}
           </div>
         </div>
 
-        <div className="col-span-12 lg:col-span-4">
-          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm h-full">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4">Portfolio Health</h3>
-            {healthDistribution.length > 0 ? (
-              <>
-                <div className="h-40">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={healthDistribution} cx="50%" cy="50%" innerRadius={42} outerRadius={62} paddingAngle={4} dataKey="value">
-                        {healthDistribution.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                      </Pie>
-                      <Tooltip content={<CustomTooltip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="space-y-2 mt-4">
-                  {healthDistribution.map((item, i) => (
-                    <div key={i} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                        <span className="text-sm text-slate-600">{item.name}</span>
-                      </div>
-                      <span className="text-sm font-semibold text-slate-900">{item.value}</span>
+        <div className="col-span-12 lg:col-span-4 bg-white border border-slate-200 rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-slate-900 mb-1">Service Line Mix</h3>
+          <p className="text-xs text-slate-400 mb-4">Revenue concentration by discipline</p>
+          {serviceLineData.length > 0 ? (
+            <>
+              <div className="h-44">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart><Pie data={serviceLineData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={2} dataKey="revenue" nameKey="name">
+                    {serviceLineData.map((d, i) => <Cell key={i} fill={SERVICE_LINE_COLORS[d.name] || slColors[i % slColors.length]} />)}
+                  </Pie><Tooltip content={<CustomTooltip formatter={(v: number) => formatCurrency(v)} />} /></PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-1.5 mt-2">
+                {serviceLineData.slice(0, 6).map((d, i) => (
+                  <div key={d.name} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SERVICE_LINE_COLORS[d.name] || slColors[i % slColors.length] }} />
+                      <span className="text-slate-600">{d.name}</span>
                     </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="flex items-center justify-center h-40 text-slate-400">No active projects</div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Row 2: Burn vs Completion + Realization by Project */}
-      <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-12 lg:col-span-6">
-          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-            <div className="mb-5">
-              <h3 className="text-sm font-semibold text-slate-900">Burn Rate vs Completion</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Projects burning faster than progressing need attention</p>
-            </div>
-            <div className="h-56">
-              {burnVsCompletion.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={burnVsCompletion} layout="vertical" margin={{ left: 100 }}>
-                    <XAxis type="number" domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />
-                    <YAxis type="category" dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} width={100} />
-                    <Tooltip content={<CustomTooltip formatter={(v: number) => `${v}%`} />} />
-                    <Bar dataKey="burn" name="Burn %" fill={COLORS.rose} radius={[0, 4, 4, 0]} barSize={10} />
-                    <Bar dataKey="completion" name="Complete %" fill={COLORS.emerald} radius={[0, 4, 4, 0]} barSize={10} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-slate-400">No budget data</div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="col-span-12 lg:col-span-6">
-          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-            <div className="mb-5">
-              <h3 className="text-sm font-semibold text-slate-900">Revenue Recognition</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Contract → Invoiced → Collected</p>
-            </div>
-            <div className="h-56">
-              {realizationByProject.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={realizationByProject} layout="vertical" margin={{ left: 100 }}>
-                    <XAxis type="number" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCompactCurrency(v)} />
-                    <YAxis type="category" dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} width={100} />
-                    <Tooltip content={<CustomTooltip formatter={(v: number) => formatCurrency(v)} />} />
-                    <Bar dataKey="contract" name="Contract" fill={COLORS.blue} radius={[0, 4, 4, 0]} barSize={8} opacity={0.3} />
-                    <Bar dataKey="invoiced" name="Invoiced" fill={COLORS.amber} radius={[0, 4, 4, 0]} barSize={8} />
-                    <Bar dataKey="collected" name="Collected" fill={COLORS.emerald} radius={[0, 4, 4, 0]} barSize={8} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-slate-400">No invoice data</div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Row 3: Financial Waterfall + Top Performers + Needs Attention */}
-      <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-12 lg:col-span-4">
-          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4">Financial Summary</h3>
-            <div className="space-y-1">
-              <WaterfallItem label="Contract Value" value={metrics.totalContract} type="start" showBar={false} />
-              {metrics.totalCOValue > 0 && <WaterfallItem label="Change Orders" value={metrics.totalCOValue} type="add" showBar={false} />}
-              <WaterfallItem label="Direct Costs" value={metrics.totalDirectCosts} type="subtract" showBar={false} />
-              <WaterfallItem label="Labor (Spent)" value={Math.max(0, metrics.totalSpent - metrics.totalDirectCosts)} type="subtract" showBar={false} />
-              <div className="border-t border-slate-200 my-2" />
-              <WaterfallItem label="Gross Profit" value={metrics.totalRemaining} type="total" showBar={false} />
-            </div>
-            <div className="mt-4 pt-4 border-t border-slate-200">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-500">Portfolio Margin</span>
-                <span className={`text-lg font-bold ${metrics.weightedMargin >= 20 ? 'text-emerald-600' : metrics.weightedMargin >= 10 ? 'text-amber-600' : 'text-rose-600'}`}>
-                  {formatPercent(metrics.weightedMargin)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between mt-2">
-                <span className="text-sm text-slate-500">Collected</span>
-                <span className="text-sm font-semibold text-slate-700">{formatCurrency(metrics.totalCollected)}</span>
-              </div>
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-sm text-slate-500">Outstanding AR</span>
-                <span className="text-sm font-semibold text-amber-600">{formatCurrency(metrics.totalInvoiced - metrics.totalCollected)}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-span-12 lg:col-span-4">
-          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm h-full">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4">Top Performers</h3>
-            {topPerformers.length > 0 ? (
-              <div className="space-y-2.5">
-                {topPerformers.map((p, i) => (
-                  <div key={p.id} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors" onClick={() => onDrillDown?.('project', p.id)}>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center ${i === 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-500'}`}>{i + 1}</span>
-                      <div>
-                        <p className="text-sm font-medium text-slate-700 truncate max-w-[140px]">{p.name}</p>
-                        <p className="text-xs text-slate-400">{p.client}</p>
-                      </div>
-                    </div>
-                    <span className="text-sm font-semibold text-emerald-600">{formatPercent(p.margin)}</span>
+                    <span className={`font-medium tabular-nums ${d.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCompactCurrency(d.profit)}</span>
                   </div>
                 ))}
               </div>
-            ) : (
-              <p className="text-sm text-slate-400 text-center py-8">No active projects</p>
-            )}
+            </>
+          ) : <EmptyState icon={PieChartIcon} message="No data" />}
+        </div>
+      </div>
+
+      {/* Charts Row 2 — LS Fee Earned + T&M Cap */}
+      <div className="grid grid-cols-12 gap-6">
+        {lsFeeData.length > 0 && (
+          <div className="col-span-12 lg:col-span-6 bg-white border border-slate-200 rounded-xl p-5">
+            <h3 className="text-sm font-semibold text-slate-900 mb-1">Lump Sum: Fee Earned vs Costs</h3>
+            <p className="text-xs text-slate-400 mb-4">Am I spending ahead of what I've earned on fixed-fee work?</p>
+            <div style={{ height: Math.max(120, lsFeeData.length * 36 + 40) }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={lsFeeData} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+                  <XAxis type="number" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCompactCurrency(v)} />
+                  <YAxis type="category" dataKey="name" tick={{ fill: '#334155', fontSize: 11, fontWeight: 500 }} axisLine={false} tickLine={false} width={150} />
+                  <Tooltip content={<CustomTooltip formatter={(v: number) => formatCurrency(v)} />} />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="feeEarned" name="Fee Earned (% Complete × Fee)" fill={COLORS.blue} radius={[0, 4, 4, 0]} barSize={10} />
+                  <Bar dataKey="costs" name="Costs to Date" fill={COLORS.rose} radius={[0, 4, 4, 0]} barSize={10} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {tmCapData.length > 0 && (
+          <div className={`col-span-12 ${lsFeeData.length > 0 ? 'lg:col-span-6' : 'lg:col-span-12'} bg-white border border-slate-200 rounded-xl p-5`}>
+            <h3 className="text-sm font-semibold text-slate-900 mb-1">T&M: Billed Against Cap</h3>
+            <p className="text-xs text-slate-400 mb-4">How much of the contract ceiling have I consumed?</p>
+            <div style={{ height: Math.max(120, tmCapData.length * 36 + 40) }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={tmCapData} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+                  <XAxis type="number" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCompactCurrency(v)} />
+                  <YAxis type="category" dataKey="name" tick={{ fill: '#334155', fontSize: 11, fontWeight: 500 }} axisLine={false} tickLine={false} width={150} />
+                  <Tooltip content={<CustomTooltip formatter={(v: number) => formatCurrency(v)} />} />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="billed" name="Billed" fill={COLORS.purple} radius={[0, 4, 4, 0]} barSize={10} />
+                  <Bar dataKey="cap" name="Contract Cap" fill={COLORS.slate} radius={[0, 4, 4, 0]} barSize={10} opacity={0.4} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {lsFeeData.length === 0 && tmCapData.length === 0 && (
+          <div className="col-span-12 bg-white border border-slate-200 rounded-xl p-5">
+            <EmptyState icon={BarChart3} message="No LS or T&M data to display — add budget data to your projects" />
+          </div>
+        )}
+      </div>
+
+      {/* Client Program P&L + Waterfall */}
+      <div className="grid grid-cols-12 gap-6">
+        {/* Waterfall */}
+        <div className="col-span-12 lg:col-span-4 bg-white border border-slate-200 rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-slate-900 mb-4">Financial Summary</h3>
+          <div className="space-y-0">
+            <WaterfallItem label="Total Fees (Contracted)" value={formatCurrency(m.totalFees)} />
+            <WaterfallItem label="(−) Total Costs" value={`(${formatCurrency(m.totalCosts)})`} />
+            <WaterfallItem label="Gross Profit" value={formatCurrency(m.grossProfit)} isTotal />
+            <div className="my-3" />
+            <WaterfallItem label="Total Invoiced" value={formatCurrency(m.totalInvoiced)} />
+            <WaterfallItem label="(−) Collected" value={`(${formatCurrency(m.totalCollected)})`} />
+            <WaterfallItem label="AR Outstanding" value={formatCurrency(m.arOutstanding)} isTotal />
+            <div className="my-3" />
+            <WaterfallItem label="Backlog (uninvoiced)" value={formatCurrency(m.backlog)} />
+            <WaterfallItem label="Monthly Burn Rate" value={formatCurrency(m.totalMonthlyBurn)} />
+            <WaterfallItem label="Budget Runway" value={`${m.portfolioRunway.toFixed(1)} months`} isTotal />
           </div>
         </div>
 
-        <div className="col-span-12 lg:col-span-4">
-          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm h-full">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4">Needs Attention</h3>
-            {needsAttention.length > 0 ? (
-              <div className="space-y-2.5">
-                {needsAttention.map(p => (
-                  <div key={p.id} className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 cursor-pointer transition-colors" onClick={() => onDrillDown?.('project', p.id)}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle size={14} className="text-rose-500 shrink-0" />
-                        <p className="text-sm font-medium text-slate-700 truncate max-w-[140px]">{p.name}</p>
-                      </div>
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${getHealthConfig(p.healthScore).bg} ${getHealthConfig(p.healthScore).text}`}>{p.healthScore}</span>
-                    </div>
-                    {p.healthReasons?.length > 0 && (
-                      <p className="text-xs text-rose-600 mt-1.5 ml-6">{p.healthReasons[0]}</p>
-                    )}
-                  </div>
+        {/* Client Program P&L */}
+        <div className="col-span-12 lg:col-span-8 bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-200 bg-slate-50">
+            <h3 className="text-sm font-semibold text-slate-900">Client Program P&L</h3>
+            <p className="text-xs text-slate-400">Total relationship across all workstreams — click to filter</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="text-left px-4 py-2 text-[11px] font-semibold text-slate-400 uppercase">Client</th>
+                  <th className="text-center px-3 py-2 text-[11px] font-semibold text-slate-400 uppercase">Scope</th>
+                  <th className="text-right px-3 py-2 text-[11px] font-semibold text-slate-400 uppercase">Fees</th>
+                  <th className="text-right px-3 py-2 text-[11px] font-semibold text-slate-400 uppercase">Costs</th>
+                  <th className="text-right px-3 py-2 text-[11px] font-semibold text-slate-400 uppercase">Profit</th>
+                  <th className="text-right px-3 py-2 text-[11px] font-semibold text-slate-400 uppercase">Margin</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clientProgramData.map(c => (
+                  <tr key={c.name} className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors"
+                    onClick={() => setSelectedClient(c.id || 'all')}>
+                    <td className="px-4 py-2.5">
+                      <span className="font-medium text-slate-700">{c.name}</span>
+                    </td>
+                    <td className="text-center px-3 py-2.5">
+                      <span className="text-xs text-slate-500">{c.projects} project{c.projects !== 1 ? 's' : ''}</span>
+                      {c.lsCount > 0 && <span className="ml-1 text-[10px] font-bold text-blue-600">{c.lsCount}LS</span>}
+                      {c.tmCount > 0 && <span className="ml-1 text-[10px] font-bold text-purple-600">{c.tmCount}T&M</span>}
+                    </td>
+                    <td className="text-right px-3 py-2.5 tabular-nums text-slate-700">{formatCompactCurrency(c.revenue)}</td>
+                    <td className="text-right px-3 py-2.5 tabular-nums text-slate-700">{formatCompactCurrency(c.cost)}</td>
+                    <td className="text-right px-3 py-2.5"><VarianceIndicator value={c.profit} /></td>
+                    <td className="text-right px-3 py-2.5"><MarginIndicator value={c.margin} /></td>
+                  </tr>
                 ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8 gap-2">
-                <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center">
-                  <CheckCircle2 size={20} className="text-emerald-600" />
-                </div>
-                <p className="text-sm text-slate-500">All projects healthy!</p>
-              </div>
-            )}
+              </tbody>
+              {clientProgramData.length > 1 && (
+                <tfoot>
+                  <tr className="border-t-2 border-slate-300 bg-slate-50">
+                    <td className="px-4 py-2.5 font-semibold text-slate-900">Total</td>
+                    <td className="text-center px-3 py-2.5 text-xs text-slate-500">{m.activeCount} projects</td>
+                    <td className="text-right px-3 py-2.5 font-semibold text-slate-900 tabular-nums">{formatCompactCurrency(m.totalFees)}</td>
+                    <td className="text-right px-3 py-2.5 font-semibold text-slate-900 tabular-nums">{formatCompactCurrency(m.totalCosts)}</td>
+                    <td className="text-right px-3 py-2.5"><VarianceIndicator value={m.grossProfit} /></td>
+                    <td className="text-right px-3 py-2.5"><MarginIndicator value={m.portfolioMargin} /></td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
           </div>
         </div>
       </div>
