@@ -1194,7 +1194,7 @@ export default function ContractorPortal() {
                       <span className="text-[11px] text-gray-300 ml-1 tabular-nums">{historyTotals.totalHours.toFixed(1)}h total</span>
                     </div>
                     {historyTimeByWeek.length > 0 ? (
-                      <div className="space-y-2">
+                      <div className="space-y-2.5">
                         {historyTimeByWeek.map(([weekKey, week], weekIdx) => {
                           const isExpanded = expandedHistoryWeeks.has(weekKey)
                           // Build project summary for collapsed view
@@ -1216,54 +1216,57 @@ export default function ContractorPortal() {
                                   if (next.has(weekKey)) next.delete(weekKey); else next.add(weekKey)
                                   return next
                                 })}
-                                className="w-full flex items-center justify-between px-4 sm:px-5 py-3 hover:bg-gray-50/50 transition-colors"
+                                className="w-full px-4 sm:px-5 py-3.5 hover:bg-gray-50/30 transition-colors"
                               >
-                                <div className="flex items-center gap-3">
-                                  <ChevronDown size={14} className={`text-gray-300 transition-transform duration-200 ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
-                                  <span className="text-xs font-medium text-gray-500">{week.label}</span>
-                                  <span className="text-[10px] text-gray-300">·</span>
-                                  <span className="text-[11px] text-gray-400">{week.entries.length} entr{week.entries.length === 1 ? 'y' : 'ies'}</span>
+                                <div className="flex items-center justify-between mb-2.5">
+                                  <div className="flex items-center gap-2.5">
+                                    <ChevronDown size={13} className={`text-gray-300 transition-transform duration-200 ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                                    <span className="text-[13px] font-semibold text-gray-700">{week.label}</span>
+                                    <span className="text-[11px] text-gray-300 font-medium">{week.entries.length} entr{week.entries.length === 1 ? 'y' : 'ies'}</span>
+                                  </div>
+                                  <span className="text-[15px] font-bold text-emerald-600 tabular-nums">{week.totalHours.toFixed(1)}h</span>
                                 </div>
-                                <span className="text-sm font-bold text-emerald-600 tabular-nums">{week.totalHours.toFixed(1)}h</span>
-                              </button>
 
-                              {/* Collapsed: Project summary bar */}
-                              {!isExpanded && (
-                                <div className="px-4 sm:px-5 pb-3 pt-0">
-                                  {/* Stacked bar */}
-                                  <div className="flex h-2 rounded-full overflow-hidden bg-gray-100 mb-2">
-                                    {projects.map((p, pi) => (
-                                      <div key={pi} className="h-full transition-all duration-300"
-                                        style={{ width: `${(p.hours / week.totalHours) * 100}%`, background: clientColorMap[p.clientId] || CLIENT_COLORS[pi % CLIENT_COLORS.length] }} />
-                                    ))}
-                                  </div>
-                                  {/* Project chips */}
-                                  <div className="flex flex-wrap gap-x-3 gap-y-1">
-                                    {projects.map((p, pi) => (
-                                      <div key={pi} className="flex items-center gap-1.5">
-                                        <div className="w-1.5 h-1.5 rounded-full" style={{ background: clientColorMap[p.clientId] || CLIENT_COLORS[pi % CLIENT_COLORS.length] }} />
-                                        <span className="text-[11px] text-gray-500">{p.name}</span>
-                                        <span className="text-[11px] font-semibold text-gray-700 tabular-nums">{p.hours.toFixed(1)}h</span>
-                                      </div>
-                                    ))}
-                                  </div>
+                                {/* Segmented progress bar */}
+                                <div className="flex gap-1 h-2.5 ml-6">
+                                  {projects.map((p, pi) => (
+                                    <div key={pi} className="h-full rounded-full transition-all duration-300"
+                                      style={{ 
+                                        width: `${(p.hours / week.totalHours) * 100}%`, 
+                                        background: clientColorMap[p.clientId] || CLIENT_COLORS[pi % CLIENT_COLORS.length],
+                                        minWidth: '8px'
+                                      }} />
+                                  ))}
                                 </div>
-                              )}
+
+                                {/* Project chips */}
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5 ml-6">
+                                  {projects.map((p, pi) => (
+                                    <div key={pi} className="flex items-center gap-1.5">
+                                      <div className="w-2 h-2 rounded-full" style={{ background: clientColorMap[p.clientId] || CLIENT_COLORS[pi % CLIENT_COLORS.length] }} />
+                                      <span className="text-[11px] text-gray-500 font-medium">{p.name}</span>
+                                      <span className="text-[11px] font-bold text-gray-700 tabular-nums">{p.hours.toFixed(1)}h</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </button>
 
                               {/* Expanded: Full entry list */}
                               {isExpanded && (
-                                <div className="border-t border-gray-100">
-                                  <div className="divide-y divide-gray-50">
+                                <div className="border-t border-gray-100 bg-gray-50/30">
+                                  <div className="divide-y divide-gray-100/80">
                                     {week.entries.map((e: any) => {
                                       const a = assignments.find(a => a.project_id === e.project_id)
                                       return (
-                                        <div key={e.id} className="px-4 sm:px-5 py-2.5 flex items-center gap-3 hover:bg-gray-50/50 transition-colors">
-                                          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: clientColorMap[a?.client_id || ''] || '#94a3b8' }} />
+                                        <div key={e.id} className="px-4 sm:px-5 py-2.5 flex items-center gap-3 ml-6">
+                                          <div className="w-2 h-2 rounded-full shrink-0" style={{ background: clientColorMap[a?.client_id || ''] || '#94a3b8' }} />
                                           <div className="flex-1 min-w-0">
-                                            <p className="text-sm text-gray-900 font-medium truncate">{a?.project_name || 'Unknown'}</p>
-                                            <p className="text-[11px] text-gray-400 truncate">{a?.client_name || ''}{e.description ? ` — ${e.description}` : ''}</p>
+                                            <p className="text-sm text-gray-800 font-medium truncate">{a?.project_name || 'Unknown'}</p>
+                                            {(a?.client_name || e.description) && (
+                                              <p className="text-[11px] text-gray-400 truncate">{a?.client_name || ''}{e.description ? ` — ${e.description}` : ''}</p>
+                                            )}
                                           </div>
-                                          <span className="text-sm font-semibold text-gray-700 tabular-nums">{e.hours}h</span>
+                                          <span className="text-sm font-semibold text-gray-700 tabular-nums shrink-0">{e.hours}h</span>
                                         </div>
                                       )
                                     })}
@@ -1340,12 +1343,12 @@ export default function ContractorPortal() {
                       <span className="text-[11px] text-gray-300 ml-1">{historyInvoices.length} invoice{historyInvoices.length !== 1 ? 's' : ''}</span>
                     </div>
                     {historyInvoices.length > 0 ? (
-                      <div className={`${T.card} overflow-hidden divide-y divide-gray-100`}>
+                      <div className="space-y-2">
                         {historyInvoices.map(inv => {
                           const lines = inv.contractor_invoice_lines || inv.lines || []
                           const isExpanded = expandedHistoryInvoices.has(inv.id)
                           return (
-                            <div key={inv.id}>
+                            <div key={inv.id} className={`${T.card} overflow-hidden`}>
                               <button
                                 onClick={() => {
                                   if (lines.length === 0) return
@@ -1355,39 +1358,41 @@ export default function ContractorPortal() {
                                     return next
                                   })
                                 }}
-                                className={`w-full px-4 sm:px-5 py-3 flex items-center gap-3 sm:gap-4 hover:bg-gray-50/50 transition-colors ${lines.length > 0 ? 'cursor-pointer' : 'cursor-default'}`}
+                                className={`w-full px-4 sm:px-5 py-3.5 flex items-center gap-3 hover:bg-gray-50/30 transition-colors ${lines.length > 0 ? 'cursor-pointer' : 'cursor-default'}`}
                               >
-                                {lines.length > 0 && (
-                                  <ChevronDown size={12} className={`text-gray-300 transition-transform duration-200 shrink-0 ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                                {lines.length > 0 ? (
+                                  <ChevronDown size={13} className={`text-gray-300 transition-transform duration-200 shrink-0 ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                                ) : (
+                                  <div className="w-[13px] shrink-0" />
                                 )}
                                 <div className="flex-1 min-w-0 text-left">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-sm text-gray-900 font-medium">#{inv.invoice_number}</span>
-                                    {inv.receipt_url && <Paperclip size={10} className="text-sky-500" />}
+                                    <span className="text-[13px] text-gray-900 font-semibold">#{inv.invoice_number}</span>
+                                    {inv.receipt_url && <Paperclip size={10} className="text-sky-500 shrink-0" />}
                                   </div>
                                   <p className="text-[11px] text-gray-400 mt-0.5">{formatDate(inv.period_start)} – {formatDate(inv.period_end)}</p>
                                 </div>
-                                <span className="text-sm font-bold text-gray-900 tabular-nums">{formatCurrency(inv.total_amount)}</span>
-                                <StatusPill status={inv.status} />
+                                <span className="text-[15px] font-bold text-gray-900 tabular-nums shrink-0">{formatCurrency(inv.total_amount)}</span>
+                                <div className="shrink-0"><StatusPill status={inv.status} /></div>
                               </button>
                               {isExpanded && lines.length > 0 && (
-                                <div className="px-4 sm:px-5 pb-3">
-                                  <table className="w-full text-xs ml-6">
+                                <div className="border-t border-gray-100 bg-gray-50/30 px-4 sm:px-5 py-3">
+                                  <table className="w-full text-xs">
                                     <thead>
                                       <tr className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                                        <th className="text-left pb-1.5">Description</th>
+                                        <th className="text-left pb-1.5 pl-7">Description</th>
                                         <th className="text-right pb-1.5">Hours</th>
                                         <th className="text-right pb-1.5">Alloc</th>
                                         <th className="text-right pb-1.5">Amount</th>
                                       </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-50">
+                                    <tbody className="divide-y divide-gray-100/80">
                                       {lines.map((l: any, li: number) => (
                                         <tr key={li}>
-                                          <td className="py-1.5 text-gray-500">{l.description}</td>
-                                          <td className="py-1.5 text-right text-gray-400 tabular-nums">{l.hours ? `${Number(l.hours).toFixed(1)}h` : '—'}</td>
-                                          <td className="py-1.5 text-right text-gray-400 tabular-nums">{l.allocation_pct ? `${l.allocation_pct}%` : '—'}</td>
-                                          <td className="py-1.5 text-right text-gray-700 font-medium tabular-nums">{l.amount ? formatCurrency(l.amount) : '—'}</td>
+                                          <td className="py-2 text-gray-600 pl-7">{l.description}</td>
+                                          <td className="py-2 text-right text-gray-400 tabular-nums">{l.hours ? `${Number(l.hours).toFixed(1)}h` : '—'}</td>
+                                          <td className="py-2 text-right text-gray-400 tabular-nums">{l.allocation_pct ? `${l.allocation_pct}%` : '—'}</td>
+                                          <td className="py-2 text-right text-gray-800 font-semibold tabular-nums">{l.amount ? formatCurrency(l.amount) : '—'}</td>
                                         </tr>
                                       ))}
                                     </tbody>
