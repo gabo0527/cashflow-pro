@@ -146,10 +146,10 @@ export default function ProjectsPage() {
     { id: 'import' as const, label: 'Import', icon: Upload },
   ]
 
-  if (loading) return <div className={`min-h-screen ${THEME.pageBg} flex items-center justify-center`}><div className="animate-pulse text-slate-400">Loading projects...</div></div>
+  if (loading) return <div className={`min-h-screen ${THEME.bgAlt} flex items-center justify-center`}><div className="animate-pulse text-slate-400">Loading projects...</div></div>
 
   return (
-    <div className={`min-h-screen ${THEME.pageBg}`}>
+    <div className={`min-h-screen ${THEME.bgAlt}`}>
       <div className="max-w-[1440px] mx-auto px-6 py-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -220,11 +220,11 @@ export default function ProjectsPage() {
             <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">{isAddingCO ? 'Change Order Name' : 'Project Name'}</label>
-                <input value={formData.name} onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))} className={THEME.input + ' w-full px-3 py-2'} placeholder={isAddingCO ? 'CO-001: Scope Change' : 'Project Name'} />
+                <input value={formData.name} onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))} className={'bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none w-full px-3 py-2'} placeholder={isAddingCO ? 'CO-001: Scope Change' : 'Project Name'} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">Client</label>
-                <select value={formData.client_id} onChange={e => setFormData(prev => ({ ...prev, client_id: e.target.value }))} className={THEME.selectClass + ' w-full py-2'}>
+                <select value={formData.client_id} onChange={e => setFormData(prev => ({ ...prev, client_id: e.target.value }))} className={'bg-white border border-slate-200 rounded-lg text-sm text-slate-900 px-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none w-full py-2'}>
                   <option value="">Select client</option>
                   {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -232,31 +232,31 @@ export default function ProjectsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">Budget</label>
-                  <input type="number" value={formData.budget} onChange={e => setFormData(prev => ({ ...prev, budget: e.target.value }))} className={THEME.input + ' w-full px-3 py-2'} placeholder="0" />
+                  <input type="number" value={formData.budget} onChange={e => setFormData(prev => ({ ...prev, budget: e.target.value }))} className={'bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none w-full px-3 py-2'} placeholder="0" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">Spent</label>
-                  <input type="number" value={formData.spent} onChange={e => setFormData(prev => ({ ...prev, spent: e.target.value }))} className={THEME.input + ' w-full px-3 py-2'} placeholder="0" />
+                  <input type="number" value={formData.spent} onChange={e => setFormData(prev => ({ ...prev, spent: e.target.value }))} className={'bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none w-full px-3 py-2'} placeholder="0" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">Budgeted Hours</label>
-                  <input type="number" value={formData.budgeted_hours} onChange={e => setFormData(prev => ({ ...prev, budgeted_hours: e.target.value }))} className={THEME.input + ' w-full px-3 py-2'} placeholder="0" />
+                  <input type="number" value={formData.budgeted_hours} onChange={e => setFormData(prev => ({ ...prev, budgeted_hours: e.target.value }))} className={'bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none w-full px-3 py-2'} placeholder="0" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">% Complete</label>
-                  <input type="number" value={formData.percent_complete} onChange={e => setFormData(prev => ({ ...prev, percent_complete: e.target.value }))} className={THEME.input + ' w-full px-3 py-2'} placeholder="0" min="0" max="100" />
+                  <input type="number" value={formData.percent_complete} onChange={e => setFormData(prev => ({ ...prev, percent_complete: e.target.value }))} className={'bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none w-full px-3 py-2'} placeholder="0" min="0" max="100" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">Start Date</label>
-                  <input type="date" value={formData.start_date} onChange={e => setFormData(prev => ({ ...prev, start_date: e.target.value }))} className={THEME.input + ' w-full px-3 py-2'} />
+                  <input type="date" value={formData.start_date} onChange={e => setFormData(prev => ({ ...prev, start_date: e.target.value }))} className={'bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none w-full px-3 py-2'} />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">End Date</label>
-                  <input type="date" value={formData.end_date} onChange={e => setFormData(prev => ({ ...prev, end_date: e.target.value }))} className={THEME.input + ' w-full px-3 py-2'} />
+                  <input type="date" value={formData.end_date} onChange={e => setFormData(prev => ({ ...prev, end_date: e.target.value }))} className={'bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none w-full px-3 py-2'} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -273,7 +273,7 @@ export default function ProjectsPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">Budget Type</label>
-                  <select value={formData.budget_type} onChange={e => setFormData(prev => ({ ...prev, budget_type: e.target.value }))} className={THEME.selectClass + ' w-full py-2'}>
+                  <select value={formData.budget_type} onChange={e => setFormData(prev => ({ ...prev, budget_type: e.target.value }))} className={'bg-white border border-slate-200 rounded-lg text-sm text-slate-900 px-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none w-full py-2'}>
                     <option value="fixed">Fixed Price</option>
                     <option value="time_and_materials">Time & Materials</option>
                     <option value="retainer">Retainer</option>
