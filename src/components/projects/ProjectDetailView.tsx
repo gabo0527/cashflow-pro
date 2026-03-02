@@ -71,7 +71,7 @@ export default function ProjectDetailView({
     const pts = timesheets.filter(t => t.project_id === project.id)
     const byMember = new Map<string, { id: string; name: string; hours: number; billable: number; cost: number }>()
     pts.forEach(t => {
-      const mid = t.team_member_id || t.user_id || 'unknown'
+      const mid = t.contractor_id || t.user_id || 'unknown'
       const member = teamMembers.find(m => m.id === mid)
       const ex = byMember.get(mid) || { id: mid, name: member?.name || 'Unknown', hours: 0, billable: 0, cost: 0 }
       ex.hours += t.hours || 0
