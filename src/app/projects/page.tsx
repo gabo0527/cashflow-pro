@@ -44,7 +44,7 @@ export default function ProjectsPage() {
         supabase.from('projects').select('*').order('name'),
         supabase.from('clients').select('*').order('name'),
         supabase.from('team_members').select('*'),
-        supabase.from('timesheets').select('*'),
+        supabase.from('time_entries').select('*'),
         supabase.from('expenses').select('*'),
         supabase.from('invoices').select('*'),
       ])
