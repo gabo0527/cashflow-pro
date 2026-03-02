@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { supabase } from '@/lib/supabase'
 import {
   Briefcase, Plus, Download, Upload, X, Building2,
   BarChart3, List, Target, Calendar
@@ -16,7 +16,6 @@ import ImportSection from '@/components/projects/ImportSection'
 import ProjectDetailView from '@/components/projects/ProjectDetailView'
 
 export default function ProjectsPage() {
-  const supabase = createClientComponentClient()
   const projectsSectionRef = useRef<ProjectsSectionHandle>(null)
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'pipeline' | 'import'>('dashboard')
@@ -61,7 +60,7 @@ export default function ProjectsPage() {
       setExpenses(eRes.data || [])
       setInvoices(iRes.data || [])
     } catch (err) { console.error(err) } finally { setLoading(false) }
-  }, [supabase])
+  }, [])
 
   useEffect(() => { loadData() }, [loadData])
 
