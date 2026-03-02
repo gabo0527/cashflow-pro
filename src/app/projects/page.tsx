@@ -37,6 +37,9 @@ export default function ProjectsPage() {
   const emptyForm = { name: '', client_id: '', budget: '', spent: '', budgeted_hours: '', percent_complete: '', status: 'active', start_date: '', end_date: '', budget_type: 'fixed', description: '' }
   const [formData, setFormData] = useState(emptyForm)
 
+  // Derive company_id from existing projects
+  const companyId = projects.find(p => p.company_id)?.company_id || null
+
   const loadData = useCallback(async () => {
     try {
       const [pRes, cRes, tmRes, tsRes, eRes, iRes] = await Promise.all([
@@ -99,9 +102,12 @@ export default function ProjectsPage() {
       }
       if (isAddingCO && coParentId) { payload.parent_id = coParentId; payload.is_change_order = true }
       if (editingProject) {
-        await supabase.from('projects').update(payload).eq('id', editingProject.id)
+        const { error } = await supabase.from('projects').update(payload).eq('id', editingProject.id)
+        if (error) { console.error('Update error:', error); alert(`Error: ${error.message}`); return }
       } else {
-        await supabase.from('projects').insert(payload)
+        if (companyId) payload.company_id = companyId
+        const { error } = await supabase.from('projects').insert(payload).select().single()
+        if (error) { console.error('Insert error:', error); alert(`Error: ${error.message}`); return }
       }
       setShowProjectModal(false)
       resetForm()
