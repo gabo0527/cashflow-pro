@@ -1579,8 +1579,9 @@ export default function ContractorPortal() {
                             <tr key={wi} className="hover:bg-gray-50/50 transition-colors">
                               <td className="py-2 pr-4 text-gray-600 font-medium whitespace-nowrap sticky left-0 bg-white">{wk.week}</td>
                               {analyticsProjectNames.map((name, i) => {
-                                const hrs = (wk[name] as number) || 0
-                                const maxH = Math.max(...analyticsWeeklyHours.map(w => (w[name] as number) || 0))
+                                const wkAny = wk as Record<string, any>
+                                const hrs = Number(wkAny[name]) || 0
+                                const maxH = Math.max(...analyticsWeeklyHours.map(w => Number((w as Record<string, any>)[name]) || 0))
                                 const intensity = maxH > 0 ? hrs / maxH : 0
                                 return (
                                   <td key={name} className="py-2 px-2 text-center">
