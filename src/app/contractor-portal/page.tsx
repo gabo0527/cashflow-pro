@@ -577,18 +577,20 @@ export default function ContractorPortal() {
     if (analyticsTime.length === 0) return []
     const projectMap: Record<string, string> = {}
     assignments.forEach(a => { projectMap[a.project_id] = a.project_name })
-    const weeks: Record<string, Record<string, number> & { week: string; total: number }> = {}
+    const weeks: Record<string, { week: string; total: number; projects: Record<string, number> }> = {}
     analyticsTime.forEach((e: any) => {
       const d = new Date(e.date + 'T00:00:00'); const day = d.getDay()
       const weekStart = new Date(d); weekStart.setDate(d.getDate() - day)
       const key = weekStart.toISOString().split('T')[0]
       const label = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-      if (!weeks[key]) weeks[key] = { week: label, total: 0 }
+      if (!weeks[key]) weeks[key] = { week: label, total: 0, projects: {} }
       const pName = projectMap[e.project_id] || 'Other'
-      weeks[key][pName] = (weeks[key][pName] || 0) + (e.hours || 0)
+      weeks[key].projects[pName] = (weeks[key].projects[pName] || 0) + (e.hours || 0)
       weeks[key].total += e.hours || 0
     })
-    return Object.entries(weeks).sort(([a], [b]) => a.localeCompare(b)).map(([_, v]) => v)
+    return Object.entries(weeks).sort(([a], [b]) => a.localeCompare(b)).map(([_, v]) => ({
+      week: v.week, total: v.total, ...v.projects
+    }))
   }, [analyticsTime, assignments])
 
   // Unique project names for chart bars
