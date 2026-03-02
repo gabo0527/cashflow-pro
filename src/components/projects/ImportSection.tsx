@@ -207,7 +207,7 @@ export default function ImportSection({
       </div>
 
       {/* Step Content */}
-      <div className={`${THEME.glass} border ${THEME.glassBorder} rounded-xl p-6`}>
+      <div className={`${THEME.bg} border ${THEME.border} rounded-xl p-6`}>
         {/* Step 1: Select Import Type */}
         {step === 'select' && (
           <div className="space-y-6">
@@ -220,7 +220,7 @@ export default function ImportSection({
                 <button
                   key={type.id}
                   onClick={() => { setSelectedType(type.id); setStep('upload'); }}
-                  className={`p-6 rounded-xl border ${THEME.glassBorder} hover:bg-slate-100 hover:border-emerald-300 transition-all text-left group`}
+                  className={`p-6 rounded-xl border ${THEME.border} hover:bg-slate-100 hover:border-emerald-300 transition-all text-left group`}
                 >
                   <div className="w-12 h-12 rounded-lg bg-emerald-50 flex items-center justify-center mb-4 group-hover:bg-emerald-100 transition-colors">
                     <type.icon size={24} className="text-emerald-600" />
@@ -367,7 +367,7 @@ export default function ImportSection({
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className={`border-b ${THEME.glassBorder}`}>
+                  <tr className={`border-b ${THEME.border}`}>
                     <th className={`px-3 py-2 text-left ${THEME.textDim} font-medium`}>#</th>
                     {currentType.fields.map(field => (
                       <th key={field} className={`px-3 py-2 text-left ${THEME.textDim} font-medium`}>
