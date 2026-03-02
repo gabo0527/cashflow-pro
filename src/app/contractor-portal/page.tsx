@@ -9,6 +9,7 @@ import {
   LayoutDashboard, TrendingUp, Menu
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, Area, AreaChart } from 'recharts'
 
 const supabase = createClient(
   'https://jmahfgpbtjeomuepfozf.supabase.co',
@@ -243,7 +244,7 @@ export default function ContractorPortal() {
   const [rateCards, setRateCards] = useState<RateCard[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'time' | 'expenses' | 'invoices' | 'history'>('time')
+  const [activeTab, setActiveTab] = useState<'time' | 'expenses' | 'invoices' | 'history' | 'analytics'>('time')
 
   // Time
   const [weekDate, setWeekDate] = useState(new Date())
@@ -276,6 +277,15 @@ export default function ContractorPortal() {
   const [historyExpenses, setHistoryExpenses] = useState<Expense[]>([])
   const [historyInvoices, setHistoryInvoices] = useState<ContractorInvoice[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+
+  // Analytics
+  const [analyticsPreset, setAnalyticsPreset] = useState<'month' | 'qtd' | 'ytd' | 'custom'>('ytd')
+  const [analyticsCustomStart, setAnalyticsCustomStart] = useState('')
+  const [analyticsCustomEnd, setAnalyticsCustomEnd] = useState('')
+  const [analyticsTime, setAnalyticsTime] = useState<any[]>([])
+  const [analyticsExpenses, setAnalyticsExpenses] = useState<any[]>([])
+  const [analyticsInvoices, setAnalyticsInvoices] = useState<any[]>([])
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
 
   const week = useMemo(() => getWeekRange(weekDate), [weekDate])
   const billingMonth = useMemo(() => getMonthRange(invoiceMonth), [invoiceMonth])
@@ -524,6 +534,126 @@ export default function ContractorPortal() {
     load()
   }, [member, activeTab, historyRange.start, historyRange.end])
 
+  // ============ ANALYTICS DATE RANGE ============
+  const analyticsRange = useMemo(() => {
+    const now = new Date()
+    if (analyticsPreset === 'month') {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1)
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0], label: start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) }
+    }
+    if (analyticsPreset === 'qtd') {
+      const qStart = Math.floor(now.getMonth() / 3) * 3
+      const start = new Date(now.getFullYear(), qStart, 1)
+      return { start: start.toISOString().split('T')[0], end: now.toISOString().split('T')[0], label: `Q${Math.floor(qStart / 3) + 1} ${now.getFullYear()}` }
+    }
+    if (analyticsPreset === 'custom' && analyticsCustomStart && analyticsCustomEnd) {
+      return { start: analyticsCustomStart, end: analyticsCustomEnd, label: 'Custom Range' }
+    }
+    // Default: YTD
+    const start = new Date(now.getFullYear(), 0, 1)
+    return { start: start.toISOString().split('T')[0], end: now.toISOString().split('T')[0], label: `YTD ${now.getFullYear()}` }
+  }, [analyticsPreset, analyticsCustomStart, analyticsCustomEnd])
+
+  // ============ LOAD ANALYTICS ============
+  useEffect(() => {
+    if (!member || activeTab !== 'analytics') return
+    const load = async () => {
+      setAnalyticsLoading(true)
+      try {
+        const { data: timeData } = await supabase.from('time_entries').select('id, project_id, hours, billable_hours, date').eq('contractor_id', member.id).gte('date', analyticsRange.start).lte('date', analyticsRange.end).order('date', { ascending: true })
+        const { data: expData } = await supabase.from('contractor_expenses').select('id, date, category, amount, status, client_id').eq('team_member_id', member.id).gte('date', analyticsRange.start).lte('date', analyticsRange.end).order('date', { ascending: true })
+        const { data: invData } = await supabase.from('contractor_invoices').select('id, invoice_date, total_amount, status, period_start, period_end, contractor_invoice_lines(*)').eq('team_member_id', member.id).lte('period_start', analyticsRange.end).gte('period_end', analyticsRange.start).order('invoice_date', { ascending: true })
+        setAnalyticsTime(timeData || []); setAnalyticsExpenses(expData || []); setAnalyticsInvoices(invData || [])
+      } catch (err) { console.error('Analytics load error:', err) }
+      finally { setAnalyticsLoading(false) }
+    }
+    load()
+  }, [member, activeTab, analyticsRange.start, analyticsRange.end])
+
+  // ============ ANALYTICS COMPUTED DATA ============
+  // Weekly hours by project (stacked bar)
+  const analyticsWeeklyHours = useMemo(() => {
+    if (analyticsTime.length === 0) return []
+    const projectMap: Record<string, string> = {}
+    assignments.forEach(a => { projectMap[a.project_id] = a.project_name })
+    const weeks: Record<string, Record<string, number> & { week: string; total: number }> = {}
+    analyticsTime.forEach((e: any) => {
+      const d = new Date(e.date + 'T00:00:00'); const day = d.getDay()
+      const weekStart = new Date(d); weekStart.setDate(d.getDate() - day)
+      const key = weekStart.toISOString().split('T')[0]
+      const label = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+      if (!weeks[key]) weeks[key] = { week: label, total: 0 }
+      const pName = projectMap[e.project_id] || 'Other'
+      weeks[key][pName] = (weeks[key][pName] || 0) + (e.hours || 0)
+      weeks[key].total += e.hours || 0
+    })
+    return Object.entries(weeks).sort(([a], [b]) => a.localeCompare(b)).map(([_, v]) => v)
+  }, [analyticsTime, assignments])
+
+  // Unique project names for chart bars
+  const analyticsProjectNames = useMemo(() => {
+    const names = new Set<string>()
+    assignments.forEach(a => names.add(a.project_name))
+    return Array.from(names)
+  }, [assignments])
+
+  // Effort distribution by client (pie)
+  const analyticsEffortByClient = useMemo(() => {
+    if (analyticsTime.length === 0) return []
+    const clientMap: Record<string, string> = {}
+    assignments.forEach(a => { clientMap[a.project_id] = a.client_name || 'Unassigned' })
+    const totals: Record<string, number> = {}
+    analyticsTime.forEach((e: any) => {
+      const client = clientMap[e.project_id] || 'Other'
+      totals[client] = (totals[client] || 0) + (e.hours || 0)
+    })
+    return Object.entries(totals).map(([name, hours]) => ({ name, hours: Math.round(hours * 10) / 10 })).sort((a, b) => b.hours - a.hours)
+  }, [analyticsTime, assignments])
+
+  // Monthly invoice trend
+  const analyticsInvoiceTrend = useMemo(() => {
+    if (analyticsInvoices.length === 0) return []
+    const months: Record<string, { month: string; amount: number; count: number }> = {}
+    analyticsInvoices.forEach((inv: any) => {
+      const d = new Date(inv.invoice_date + 'T00:00:00')
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+      if (!months[key]) months[key] = { month: label, amount: 0, count: 0 }
+      months[key].amount += inv.total_amount || 0
+      months[key].count += 1
+    })
+    return Object.entries(months).sort(([a], [b]) => a.localeCompare(b)).map(([_, v]) => v)
+  }, [analyticsInvoices])
+
+  // Expense breakdown by category
+  const analyticsExpensesByCategory = useMemo(() => {
+    if (analyticsExpenses.length === 0) return []
+    const cats: Record<string, number> = {}
+    analyticsExpenses.forEach((e: any) => {
+      const cat = EXPENSE_CATEGORIES.find(c => c.id === e.category)?.label || e.category || 'Other'
+      cats[cat] = (cats[cat] || 0) + (e.amount || 0)
+    })
+    return Object.entries(cats).map(([name, amount]) => ({ name, amount: Math.round(amount) })).sort((a, b) => b.amount - a.amount)
+  }, [analyticsExpenses])
+
+  // Analytics KPIs with period comparisons
+  const analyticsKPIs = useMemo(() => {
+    const totalHours = analyticsTime.reduce((s: number, e: any) => s + (e.hours || 0), 0)
+    const totalExpenses = analyticsExpenses.reduce((s: number, e: any) => s + (e.amount || 0), 0)
+    const totalInvoiced = analyticsInvoices.reduce((s: number, inv: any) => s + (inv.total_amount || 0), 0)
+    const uniqueProjects = new Set(analyticsTime.map((e: any) => e.project_id)).size
+    // Average weekly hours
+    const weeks = new Set<string>()
+    analyticsTime.forEach((e: any) => {
+      const d = new Date(e.date + 'T00:00:00'); const day = d.getDay()
+      const ws = new Date(d); ws.setDate(d.getDate() - day)
+      weeks.add(ws.toISOString().split('T')[0])
+    })
+    const avgWeeklyHours = weeks.size > 0 ? totalHours / weeks.size : 0
+    return { totalHours, totalExpenses, totalInvoiced, uniqueProjects, avgWeeklyHours, weekCount: weeks.size }
+  }, [analyticsTime, analyticsExpenses, analyticsInvoices])
+
   const historyTotals = useMemo(() => {
     const totalHours = historyTime.reduce((s: number, e: any) => s + (e.hours || 0), 0)
     const totalExpenses = historyExpenses.reduce((s, e) => s + (e.amount || 0), 0)
@@ -550,7 +680,8 @@ export default function ContractorPortal() {
     { id: 'time' as const, label: 'Timesheet', icon: Timer },
     { id: 'expenses' as const, label: 'Expenses', icon: CreditCard },
     { id: 'invoices' as const, label: 'Invoices', icon: FileText },
-    { id: 'history' as const, label: 'History', icon: History }
+    { id: 'history' as const, label: 'History', icon: History },
+    { id: 'analytics' as const, label: 'Analytics', icon: TrendingUp }
   ]
   const totalTimeHours = Object.values(timeEntries).reduce((s, e) => s + parseFloat(e.hours || '0'), 0)
 
@@ -1210,6 +1341,279 @@ export default function ContractorPortal() {
                   </div>
                 )}
               </div>
+            )}
+          </div>
+        )}
+
+        {/* ====== ANALYTICS ====== */}
+        {activeTab === 'analytics' && (
+          <div className="space-y-5">
+            {/* Date Range Presets */}
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="inline-flex items-center bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
+                {([['month', 'This Month'], ['qtd', 'QTD'], ['ytd', 'YTD'], ['custom', 'Custom']] as const).map(([key, label]) => (
+                  <button key={key} onClick={() => setAnalyticsPreset(key)}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                      analyticsPreset === key ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'text-gray-400 hover:text-gray-600 border border-transparent'
+                    }`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs font-medium text-gray-400 tracking-wide">{analyticsRange.label}</span>
+            </div>
+
+            {/* Custom Date Picker */}
+            {analyticsPreset === 'custom' && (
+              <div className={`${T.card} p-4 flex items-center gap-3 flex-wrap`}>
+                <div className="flex items-center gap-2">
+                  <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">From</label>
+                  <input type="date" value={analyticsCustomStart} onChange={e => setAnalyticsCustomStart(e.target.value)} className={`${T.input} w-auto`} style={{ colorScheme: 'light' }} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">To</label>
+                  <input type="date" value={analyticsCustomEnd} onChange={e => setAnalyticsCustomEnd(e.target.value)} className={`${T.input} w-auto`} style={{ colorScheme: 'light' }} />
+                </div>
+              </div>
+            )}
+
+            {analyticsLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 size={22} className="text-emerald-500 animate-spin" />
+              </div>
+            ) : (
+              <>
+                {/* KPI Summary Row */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: 'Total Hours', value: analyticsKPIs.totalHours.toFixed(1), sub: `${analyticsKPIs.avgWeeklyHours.toFixed(1)}h avg/wk`, color: '#10b981' },
+                    { label: 'Invoiced', value: formatCurrency(analyticsKPIs.totalInvoiced), sub: `${analyticsInvoiceTrend.length} invoice${analyticsInvoiceTrend.length !== 1 ? 's' : ''}`, color: '#0ea5e9' },
+                    { label: 'Expenses', value: formatCurrency(analyticsKPIs.totalExpenses), sub: `${analyticsExpenses.length} item${analyticsExpenses.length !== 1 ? 's' : ''}`, color: '#f59e0b' },
+                    { label: 'Projects', value: String(analyticsKPIs.uniqueProjects), sub: `${analyticsKPIs.weekCount} weeks tracked`, color: '#6366f1' },
+                  ].map(card => (
+                    <div key={card.label} className={`${T.card} p-4 relative overflow-hidden`}>
+                      <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full" style={{ background: card.color }} />
+                      <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 mb-1.5 pl-3">{card.label}</p>
+                      <p className="text-xl font-bold text-gray-900 tabular-nums tracking-tight pl-3">{card.value}</p>
+                      <p className="text-[11px] text-gray-400 pl-3 mt-0.5">{card.sub}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Weekly Hours Trend — Stacked Bar */}
+                {analyticsWeeklyHours.length > 0 && (
+                  <div className={`${T.card} p-5`}>
+                    <div className="flex items-center gap-2 mb-4">
+                      <TrendingUp className="w-[13px] h-[13px] text-emerald-500" />
+                      <h2 className={T.sectionTitle}>Weekly Hours</h2>
+                    </div>
+                    <ResponsiveContainer width="100%" height={240}>
+                      <RechartsBarChart data={analyticsWeeklyHours} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="week" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                        <Tooltip
+                          contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', fontSize: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                          labelStyle={{ fontWeight: 600, color: '#1e293b', marginBottom: 4 }}
+                        />
+                        {analyticsProjectNames.map((name, i) => (
+                          <Bar key={name} dataKey={name} stackId="hours" fill={CLIENT_COLORS[i % CLIENT_COLORS.length]} radius={i === analyticsProjectNames.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+                        ))}
+                      </RechartsBarChart>
+                    </ResponsiveContainer>
+                    {/* Legend */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 pl-2">
+                      {analyticsProjectNames.map((name, i) => (
+                        <div key={name} className="flex items-center gap-1.5">
+                          <div className="w-2.5 h-2.5 rounded-sm" style={{ background: CLIENT_COLORS[i % CLIENT_COLORS.length] }} />
+                          <span className="text-[11px] text-gray-500 font-medium">{name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Two-column: Effort Distribution + Expense Breakdown */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Effort Distribution — Donut */}
+                  {analyticsEffortByClient.length > 0 && (
+                    <div className={`${T.card} p-5`}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Briefcase size={13} className="text-indigo-500" />
+                        <h2 className={T.sectionTitle}>Effort by Client</h2>
+                      </div>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <PieChart>
+                          <Pie data={analyticsEffortByClient} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="hours" nameKey="name">
+                            {analyticsEffortByClient.map((_, i) => (
+                              <Cell key={i} fill={CLIENT_COLORS[i % CLIENT_COLORS.length]} stroke="none" />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', fontSize: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                            formatter={(value: number) => [`${value}h`, 'Hours']}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="space-y-1.5 mt-2">
+                        {analyticsEffortByClient.map((item, i) => {
+                          const total = analyticsEffortByClient.reduce((s, e) => s + e.hours, 0)
+                          const pct = total > 0 ? ((item.hours / total) * 100).toFixed(0) : '0'
+                          return (
+                            <div key={item.name} className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-sm" style={{ background: CLIENT_COLORS[i % CLIENT_COLORS.length] }} />
+                                <span className="text-gray-600 font-medium">{item.name}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-900 font-semibold tabular-nums">{item.hours}h</span>
+                                <span className="text-gray-400 tabular-nums w-8 text-right">{pct}%</span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Expense Breakdown */}
+                  {analyticsExpensesByCategory.length > 0 ? (
+                    <div className={`${T.card} p-5`}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Receipt size={13} className="text-amber-500" />
+                        <h2 className={T.sectionTitle}>Expenses by Category</h2>
+                      </div>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <PieChart>
+                          <Pie data={analyticsExpensesByCategory} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="amount" nameKey="name">
+                            {analyticsExpensesByCategory.map((_, i) => (
+                              <Cell key={i} fill={['#f59e0b', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16'][i % 6]} stroke="none" />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', fontSize: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                            formatter={(value: number) => [formatCurrency(value), 'Amount']}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="space-y-1.5 mt-2">
+                        {analyticsExpensesByCategory.map((item, i) => {
+                          const total = analyticsExpensesByCategory.reduce((s, e) => s + e.amount, 0)
+                          const pct = total > 0 ? ((item.amount / total) * 100).toFixed(0) : '0'
+                          return (
+                            <div key={item.name} className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-sm" style={{ background: ['#f59e0b', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16'][i % 6] }} />
+                                <span className="text-gray-600 font-medium">{item.name}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-900 font-semibold tabular-nums">{formatCurrency(item.amount)}</span>
+                                <span className="text-gray-400 tabular-nums w-8 text-right">{pct}%</span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={`${T.card} p-5 flex flex-col items-center justify-center text-center`}>
+                      <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mb-3">
+                        <Receipt size={18} className="text-gray-300" />
+                      </div>
+                      <p className="text-gray-400 text-sm font-medium">No expenses</p>
+                      <p className="text-gray-300 text-xs mt-1">for this period</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Invoice Trend — Area Chart */}
+                {analyticsInvoiceTrend.length > 0 && (
+                  <div className={`${T.card} p-5`}>
+                    <div className="flex items-center gap-2 mb-4">
+                      <DollarSign size={13} className="text-sky-500" />
+                      <h2 className={T.sectionTitle}>Invoice Trend</h2>
+                    </div>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <AreaChart data={analyticsInvoiceTrend} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                        <defs>
+                          <linearGradient id="invoiceGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.15} />
+                            <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                        <Tooltip
+                          contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', fontSize: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                          formatter={(value: number) => [formatCurrency(value), 'Invoiced']}
+                        />
+                        <Area type="monotone" dataKey="amount" stroke="#0ea5e9" strokeWidth={2.5} fill="url(#invoiceGrad)" dot={{ r: 4, fill: '#0ea5e9', strokeWidth: 2, stroke: '#fff' }} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                {/* Hours Heatmap — by project over weeks */}
+                {analyticsWeeklyHours.length > 0 && analyticsProjectNames.length > 1 && (
+                  <div className={`${T.card} p-5`}>
+                    <div className="flex items-center gap-2 mb-4">
+                      <LayoutDashboard size={13} className="text-violet-500" />
+                      <h2 className={T.sectionTitle}>Project Allocation Over Time</h2>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr>
+                            <th className="text-left pb-2 pr-4 text-[10px] text-gray-400 font-bold uppercase tracking-wider sticky left-0 bg-white">Week</th>
+                            {analyticsProjectNames.map((name, i) => (
+                              <th key={name} className="text-center pb-2 px-2 text-[10px] font-bold uppercase tracking-wider" style={{ color: CLIENT_COLORS[i % CLIENT_COLORS.length] }}>{name}</th>
+                            ))}
+                            <th className="text-right pb-2 pl-4 text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {analyticsWeeklyHours.map((wk, wi) => (
+                            <tr key={wi} className="hover:bg-gray-50/50 transition-colors">
+                              <td className="py-2 pr-4 text-gray-600 font-medium whitespace-nowrap sticky left-0 bg-white">{wk.week}</td>
+                              {analyticsProjectNames.map((name, i) => {
+                                const hrs = (wk[name] as number) || 0
+                                const maxH = Math.max(...analyticsWeeklyHours.map(w => (w[name] as number) || 0))
+                                const intensity = maxH > 0 ? hrs / maxH : 0
+                                return (
+                                  <td key={name} className="py-2 px-2 text-center">
+                                    {hrs > 0 ? (
+                                      <span className="inline-block px-2 py-0.5 rounded-md text-[11px] font-semibold tabular-nums"
+                                        style={{
+                                          background: `${CLIENT_COLORS[i % CLIENT_COLORS.length]}${Math.round(intensity * 25 + 8).toString(16).padStart(2, '0')}`,
+                                          color: CLIENT_COLORS[i % CLIENT_COLORS.length]
+                                        }}>
+                                        {hrs.toFixed(1)}
+                                      </span>
+                                    ) : <span className="text-gray-200">—</span>}
+                                  </td>
+                                )
+                              })}
+                              <td className="py-2 pl-4 text-right text-gray-900 font-bold tabular-nums">{wk.total.toFixed(1)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {analyticsTime.length === 0 && analyticsExpenses.length === 0 && analyticsInvoices.length === 0 && (
+                  <div className={`${T.card} text-center py-16`}>
+                    <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto mb-4">
+                      <TrendingUp size={22} className="text-gray-300" />
+                    </div>
+                    <p className="text-gray-500 text-sm font-medium">No data for {analyticsRange.label}</p>
+                    <p className="text-gray-400 text-xs mt-1.5">Try selecting a different time period</p>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
