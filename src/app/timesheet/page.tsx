@@ -573,7 +573,7 @@ export default function ContractorPortal() {
 
   // ============ ANALYTICS COMPUTED DATA ============
   // Weekly hours by project (stacked bar)
-  const analyticsWeeklyHours = useMemo(() => {
+  const analyticsWeeklyHours: any[] = useMemo(() => {
     if (analyticsTime.length === 0) return []
     const projectMap: Record<string, string> = {}
     assignments.forEach(a => { projectMap[a.project_id] = a.project_name })
@@ -1579,8 +1579,8 @@ export default function ContractorPortal() {
                             <tr key={wi} className="hover:bg-gray-50/50 transition-colors">
                               <td className="py-2 pr-4 text-gray-600 font-medium whitespace-nowrap sticky left-0 bg-white">{wk.week}</td>
                               {analyticsProjectNames.map((name, i) => {
-                                const hrs = (wk[name] as number) || 0
-                                const maxH = Math.max(...analyticsWeeklyHours.map(w => (w[name] as number) || 0))
+                                const hrs = Number(wk[name]) || 0
+                                const maxH = Math.max(...analyticsWeeklyHours.map((w: any) => Number(w[name]) || 0))
                                 const intensity = maxH > 0 ? hrs / maxH : 0
                                 return (
                                   <td key={name} className="py-2 px-2 text-center">
