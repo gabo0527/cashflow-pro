@@ -1,330 +1,290 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import {
-  Briefcase, Download, ChevronDown, Plus, LayoutGrid,
-  LayoutList, Upload, RefreshCw, X, Target
+  Briefcase, Plus, Download, Upload, X, Building2,
+  BarChart3, List, Target, Calendar
 } from 'lucide-react'
-import { createClient } from '@supabase/supabase-js'
-import { getCurrentUser } from '@/lib/supabase'
-import { PROJECT_STATUSES, getStatusConfig } from '@/components/projects/shared'
+import {
+  THEME, PROJECT_STATUSES,
+  formatCurrency, formatDateShort, StatusBadge
+} from '@/components/projects/shared'
 import DashboardSection from '@/components/projects/DashboardSection'
 import ProjectsSection, { ProjectsSectionHandle } from '@/components/projects/ProjectsSection'
 import ImportSection from '@/components/projects/ImportSection'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-)
-
-const inputClass = "w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-colors"
-
-type TabType = 'dashboard' | 'projects' | 'pipeline' | 'import'
+import ProjectDetailView from '@/components/projects/ProjectDetailView'
 
 export default function ProjectsPage() {
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard')
-  const [companyId, setCompanyId] = useState<string | null>(null)
+  const supabase = createClientComponentClient()
+  const projectsSectionRef = useRef<ProjectsSectionHandle>(null)
+
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'pipeline' | 'import'>('dashboard')
   const [projects, setProjects] = useState<any[]>([])
   const [clients, setClients] = useState<any[]>([])
   const [teamMembers, setTeamMembers] = useState<any[]>([])
   const [timesheets, setTimesheets] = useState<any[]>([])
   const [expenses, setExpenses] = useState<any[]>([])
   const [invoices, setInvoices] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
   const [showProjectModal, setShowProjectModal] = useState(false)
   const [editingProject, setEditingProject] = useState<any>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [isAddingCO, setIsAddingCO] = useState(false)
-  const [parentProjectId, setParentProjectId] = useState<string | null>(null)
-  const [formData, setFormData] = useState({
-    name: '', client_id: '', status: 'active', budget_type: 'lump_sum',
-    budget: '', spent: '', start_date: '', end_date: '',
-    budgeted_hours: '', percent_complete: '', description: '',
-  })
+  const [coParentId, setCoParentId] = useState<string | null>(null)
+  const [coParentName, setCoParentName] = useState('')
 
-  const projectsSectionRef = useRef<ProjectsSectionHandle>(null)
+  const emptyForm = { name: '', client_id: '', budget: '', spent: '', budgeted_hours: '', percent_complete: '', status: 'active', start_date: '', end_date: '', budget_type: 'fixed', description: '' }
+  const [formData, setFormData] = useState(emptyForm)
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const result = await getCurrentUser()
-        const user = result?.user
-        if (!user) { setLoading(false); return }
-        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
-        if (!profile?.company_id) { setLoading(false); return }
-        setCompanyId(profile.company_id)
+  const loadData = useCallback(async () => {
+    try {
+      const [pRes, cRes, tmRes, tsRes, eRes, iRes] = await Promise.all([
+        supabase.from('projects').select('*').order('name'),
+        supabase.from('clients').select('*').order('name'),
+        supabase.from('team_members').select('*'),
+        supabase.from('timesheets').select('*'),
+        supabase.from('expenses').select('*'),
+        supabase.from('invoices').select('*'),
+      ])
+      setProjects((pRes.data || []).map(p => ({
+        ...p,
+        budget: parseFloat(p.budget) || 0,
+        spent: parseFloat(p.spent) || 0,
+        budgeted_hours: parseFloat(p.budgeted_hours) || 0,
+        percent_complete: parseFloat(p.percent_complete) || 0,
+      })))
+      setClients(cRes.data || [])
+      setTeamMembers(tmRes.data || [])
+      setTimesheets(tsRes.data || [])
+      setExpenses(eRes.data || [])
+      setInvoices(iRes.data || [])
+    } catch (err) { console.error(err) } finally { setLoading(false) }
+  }, [supabase])
 
-        const [projRes, clientRes, teamRes, timeRes, expRes, invRes] = await Promise.all([
-          supabase.from('projects').select('*').eq('company_id', profile.company_id).order('name'),
-          supabase.from('clients').select('*').eq('company_id', profile.company_id).order('name'),
-          supabase.from('team_members').select('id, name').eq('company_id', profile.company_id).order('name'),
-          supabase.from('timesheet_entries').select('id, project_id, hours, billable, date').eq('company_id', profile.company_id),
-          supabase.from('expenses').select('*').eq('company_id', profile.company_id),
-          supabase.from('invoices').select('*').eq('company_id', profile.company_id),
-        ])
+  useEffect(() => { loadData() }, [loadData])
 
-        setProjects((projRes.data || []).map(p => ({ ...p, budget: parseFloat(p.budget || 0), spent: parseFloat(p.spent || 0), budgeted_hours: parseFloat(p.budgeted_hours || 0), percent_complete: parseFloat(p.percent_complete || 0) })))
-        setClients(clientRes.data || [])
-        setTeamMembers(teamRes.data || [])
-        setTimesheets(timeRes.data || [])
-        setExpenses((expRes.data || []).map(e => ({ ...e, amount: parseFloat(e.amount || 0) })))
-        setInvoices((invRes.data || []).map(i => ({ ...i, amount: parseFloat(i.total_amount || i.amount || 0) })))
-      } catch (error) { console.error('Error loading data:', error) } finally { setLoading(false) }
-    }
-    loadData()
-  }, [])
-
-  const counts = useMemo(() => ({
-    active: projects.filter(p => p.status === 'active' && !p.is_change_order).length,
-    prospect: projects.filter(p => p.status === 'prospect' && !p.is_change_order).length,
-  }), [projects])
-
-  const resetForm = () => {
-    setFormData({ name: '', client_id: '', status: 'active', budget_type: 'lump_sum', budget: '', spent: '', start_date: '', end_date: '', budgeted_hours: '', percent_complete: '', description: '' })
-    setEditingProject(null); setIsAddingCO(false); setParentProjectId(null)
-  }
-
+  const resetForm = () => { setFormData(emptyForm); setEditingProject(null); setIsAddingCO(false); setCoParentId(null); setCoParentName('') }
   const openAddProject = () => { resetForm(); setShowProjectModal(true) }
-
   const openEditProject = (project: any) => {
-    setEditingProject(project); setIsAddingCO(false); setParentProjectId(null)
     setFormData({
-      name: project.name || '', client_id: project.client_id || '', status: project.status || 'active',
-      budget_type: project.budget_type || 'lump_sum', budget: project.budget?.toString() || '',
-      spent: project.spent?.toString() || '', start_date: project.start_date || '',
-      end_date: project.end_date || '', budgeted_hours: project.budgeted_hours?.toString() || '',
-      percent_complete: project.percent_complete?.toString() || '', description: project.description || '',
+      name: project.name || '', client_id: project.client_id || '',
+      budget: project.budget?.toString() || '', spent: project.spent?.toString() || '',
+      budgeted_hours: project.budgeted_hours?.toString() || '', percent_complete: project.percent_complete?.toString() || '',
+      status: project.status || 'active', start_date: project.start_date || '', end_date: project.end_date || '',
+      budget_type: project.budget_type || 'fixed', description: project.description || '',
     })
+    setEditingProject(project)
     setShowProjectModal(true)
   }
-
   const openAddChangeOrder = (parentId: string, parentName: string) => {
-    resetForm(); setIsAddingCO(true); setParentProjectId(parentId)
+    resetForm()
+    setIsAddingCO(true)
+    setCoParentId(parentId)
+    setCoParentName(parentName)
     const parent = projects.find(p => p.id === parentId)
-    const existingCOs = projects.filter(p => p.parent_id === parentId).length
-    setFormData(prev => ({ ...prev, name: `${parentName} - CO${existingCOs + 1}`, client_id: parent?.client_id || '', budget_type: parent?.budget_type || 'lump_sum' }))
+    if (parent) setFormData(prev => ({ ...prev, client_id: parent.client_id }))
     setShowProjectModal(true)
   }
 
-  const handleSaveProject = async () => {
-    if (!companyId || !formData.name) return
-    const projectData = {
-      company_id: companyId, name: formData.name, client_id: formData.client_id || null,
-      status: formData.status, budget_type: formData.budget_type,
-      budget: parseFloat(formData.budget) || 0, spent: parseFloat(formData.spent) || 0,
-      start_date: formData.start_date || null, end_date: formData.end_date || null,
-      budgeted_hours: parseFloat(formData.budgeted_hours) || 0,
-      percent_complete: parseFloat(formData.percent_complete) || 0,
-      description: formData.description || null,
-      is_change_order: isAddingCO, parent_id: parentProjectId,
-    }
-    if (editingProject) {
-      const { error } = await supabase.from('projects').update({ ...projectData, updated_at: new Date().toISOString() }).eq('id', editingProject.id)
-      if (error) { console.error('Error updating project:', error); return }
-      setProjects(prev => prev.map(p => p.id === editingProject.id ? { ...p, ...projectData } : p))
-    } else {
-      const { data, error } = await supabase.from('projects').insert(projectData).select().single()
-      if (error) { console.error('Error creating project:', error); return }
-      setProjects(prev => [...prev, { ...data, budget: parseFloat(data.budget || 0), spent: parseFloat(data.spent || 0) }])
-    }
-    setShowProjectModal(false); resetForm()
+  const handleSave = async () => {
+    try {
+      const payload: any = {
+        name: formData.name, client_id: formData.client_id || null,
+        budget: parseFloat(formData.budget) || 0, spent: parseFloat(formData.spent) || 0,
+        budgeted_hours: parseFloat(formData.budgeted_hours) || 0,
+        percent_complete: parseFloat(formData.percent_complete) || 0,
+        status: formData.status, start_date: formData.start_date || null, end_date: formData.end_date || null,
+        budget_type: formData.budget_type, description: formData.description,
+      }
+      if (isAddingCO && coParentId) { payload.parent_id = coParentId; payload.is_change_order = true }
+      if (editingProject) {
+        await supabase.from('projects').update(payload).eq('id', editingProject.id)
+      } else {
+        await supabase.from('projects').insert(payload)
+      }
+      setShowProjectModal(false)
+      resetForm()
+      loadData()
+    } catch (err) { console.error(err) }
   }
 
   const handleDeleteProject = async (id: string, name: string) => {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return
-    const { error } = await supabase.from('projects').delete().eq('id', id)
-    if (error) { console.error('Error deleting project:', error); return }
-    setProjects(prev => prev.filter(p => p.id !== id))
+    await supabase.from('projects').delete().eq('id', id)
+    loadData()
   }
 
-  const handleImportProjects = async (data: any[]) => {
-    if (!companyId) return
-    for (const row of data) {
-      let clientId = null
-      if (row.client) {
-        const existing = clients.find(c => c.name.toLowerCase() === row.client.toLowerCase())
-        if (existing) { clientId = existing.id } else {
-          const { data: newClient } = await supabase.from('clients').insert({ company_id: companyId, name: row.client }).select().single()
-          if (newClient) { clientId = newClient.id; setClients(prev => [...prev, newClient]) }
-        }
-      }
-      const { data: newProject } = await supabase.from('projects').insert({
-        company_id: companyId, name: row.name, client_id: clientId,
-        budget: parseFloat(row.budget) || 0, start_date: row.start_date || null,
-        end_date: row.end_date || null, status: row.status || 'active',
-      }).select().single()
-      if (newProject) setProjects(prev => [...prev, { ...newProject, budget: parseFloat(newProject.budget || 0), spent: 0 }])
-    }
-  }
+  const handleDrillDown = (type: string, id: string) => { if (type === 'project') setSelectedProjectId(id) }
+  const handleViewProject = (projectId: string) => setSelectedProjectId(projectId)
 
-  const handleImportBudgets = async (data: any[]) => {
-    for (const row of data) {
-      const project = projects.find(p => p.name.toLowerCase() === row.project_name?.toLowerCase())
-      if (!project) continue
-      await supabase.from('projects').update({ budget: parseFloat(row.budget) || project.budget, spent: parseFloat(row.spent) || project.spent, budgeted_hours: parseFloat(row.budgeted_hours) || project.budgeted_hours }).eq('id', project.id)
-      setProjects(prev => prev.map(p => p.id === project.id ? { ...p, budget: parseFloat(row.budget) || p.budget, spent: parseFloat(row.spent) || p.spent } : p))
-    }
-  }
-
-  const handleImportResources = async (data: any[]) => { console.log('Importing resources:', data) }
-  const handleDrillDown = (type: string, id: string) => { if (type === 'project') { const project = projects.find(p => p.id === id); if (project) openEditProject(project) } }
+  const handleImportProjects = async (data: any[]) => { await supabase.from('projects').insert(data); loadData() }
+  const handleImportBudgets = async (data: any[]) => { for (const d of data) { const p = projects.find(pp => pp.name === d.project_name); if (p) await supabase.from('projects').update({ budget: d.budget, spent: d.spent, budgeted_hours: d.budgeted_hours }).eq('id', p.id) }; loadData() }
+  const handleImportResources = async (_data: any[]) => { loadData() }
 
   const handleExport = () => {
-    const csv = ['Name,Client,Status,Budget,Spent,Margin %,Start Date,End Date']
-    projects.filter(p => !p.is_change_order).forEach(p => {
-      const client = clients.find(c => c.id === p.client_id)
-      const margin = p.budget > 0 ? ((p.budget - p.spent) / p.budget * 100).toFixed(1) : '0'
-      csv.push(`"${p.name}","${client?.name || ''}",${p.status},${p.budget},${p.spent},${margin},${p.start_date || ''},${p.end_date || ''}`)
-    })
-    const blob = new Blob([csv.join('\n')], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'projects-export.csv'; a.click()
+    const csv = ['Name,Client,Budget,Spent,Margin,Status',
+      ...projects.filter(p => !p.is_change_order).map(p => {
+        const client = clients.find(c => c.id === p.client_id)?.name || ''
+        const margin = p.budget > 0 ? ((p.budget - p.spent) / p.budget * 100).toFixed(1) : '0'
+        return `"${p.name}","${client}",${p.budget},${p.spent},${margin}%,${p.status}`
+      })
+    ].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = 'projects.csv'; a.click()
   }
 
-  if (loading) {
-    return (<div className="flex items-center justify-center h-[60vh]"><div className="text-center"><RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" /><p className="text-sm text-slate-500">Loading projects...</p></div></div>)
-  }
+  const activeCount = projects.filter(p => p.status === 'active' && !p.is_change_order).length
+  const prospectCount = projects.filter(p => p.status === 'prospect' && !p.is_change_order).length
 
   const tabs = [
-    { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutGrid },
-    { id: 'projects' as TabType, label: 'Projects', icon: LayoutList, count: counts.active },
-    { id: 'pipeline' as TabType, label: 'Pipeline', icon: Target, count: counts.prospect > 0 ? counts.prospect : undefined },
-    { id: 'import' as TabType, label: 'Import', icon: Upload },
+    { id: 'dashboard' as const, label: 'Dashboard', icon: BarChart3 },
+    { id: 'projects' as const, label: 'Projects', icon: List, badge: activeCount },
+    { id: 'pipeline' as const, label: 'Pipeline', icon: Target, badge: prospectCount },
+    { id: 'import' as const, label: 'Import', icon: Upload },
   ]
 
+  if (loading) return <div className={`min-h-screen ${THEME.pageBg} flex items-center justify-center`}><div className="animate-pulse text-slate-400">Loading projects...</div></div>
+
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 tracking-tight">Projects</h1>
-          <p className="text-[13px] text-slate-400 mt-1">Portfolio analytics and project management</p>
+    <div className={`min-h-screen ${THEME.pageBg}`}>
+      <div className="max-w-[1440px] mx-auto px-6 py-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Projects</h1>
+            <p className="text-sm text-slate-400">Portfolio analytics and project management</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors shadow-sm">
+              <Download size={16} /> Export
+            </button>
+            <button onClick={openAddProject} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm font-medium text-white transition-colors shadow-sm">
+              <Plus size={16} /> Add Project
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-            <Download size={14} /> Export
-          </button>
-          <button onClick={openAddProject}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-semibold hover:bg-emerald-600 transition-colors shadow-sm">
-            <Plus size={14} /> Add Project
-          </button>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-0 border-b border-slate-200 mb-6">
+          {tabs.map(tab => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              className={`relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all ${
+                activeTab === tab.id ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}>
+              <tab.icon size={16} />
+              {tab.label}
+              {tab.badge !== undefined && tab.badge > 0 && (
+                <span className={`ml-1 px-1.5 py-0.5 text-[10px] rounded-full font-bold ${
+                  activeTab === tab.id ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                }`}>{tab.badge}</span>
+              )}
+            </button>
+          ))}
         </div>
-      </div>
 
-      {/* Tab Navigation */}
-      <div className="flex items-center gap-0 border-b border-slate-200">
-        {tabs.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={`relative flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all ${
-              activeTab === tab.id ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600 hover:border-slate-300'
-            }`}>
-            <tab.icon size={15} />
-            {tab.label}
-            {tab.count !== undefined && (
-              <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
-                activeTab === tab.id ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
-              }`}>{tab.count}</span>
-            )}
-          </button>
-        ))}
-      </div>
+        {/* Tab Content */}
+        {activeTab === 'dashboard' && <DashboardSection projects={projects} clients={clients} expenses={expenses} invoices={invoices} timesheets={timesheets} onDrillDown={handleDrillDown} />}
+        {activeTab === 'projects' && <ProjectsSection ref={projectsSectionRef} projects={projects} clients={clients} timesheets={timesheets} onAddProject={openAddProject} onEditProject={openEditProject} onDeleteProject={handleDeleteProject} onAddChangeOrder={openAddChangeOrder} onViewProject={handleViewProject} />}
+        {activeTab === 'pipeline' && <ProjectsSection ref={projectsSectionRef} projects={projects.filter(p => p.status === 'prospect')} clients={clients} timesheets={timesheets} onAddProject={() => { resetForm(); setFormData(prev => ({ ...prev, status: 'prospect' })); setShowProjectModal(true) }} onEditProject={openEditProject} onDeleteProject={handleDeleteProject} onAddChangeOrder={openAddChangeOrder} onViewProject={handleViewProject} />}
+        {activeTab === 'import' && <ImportSection projects={projects} clients={clients} teamMembers={teamMembers} onImportProjects={handleImportProjects} onImportBudgets={handleImportBudgets} onImportResources={handleImportResources} />}
 
-      {/* Tab Content */}
-      {activeTab === 'dashboard' && <DashboardSection projects={projects} clients={clients} expenses={expenses} invoices={invoices} timesheets={timesheets} onDrillDown={handleDrillDown} />}
-      {activeTab === 'projects' && <ProjectsSection ref={projectsSectionRef} projects={projects} clients={clients} timesheets={timesheets} onAddProject={openAddProject} onEditProject={openEditProject} onDeleteProject={handleDeleteProject} onAddChangeOrder={openAddChangeOrder} />}
-      {activeTab === 'pipeline' && <ProjectsSection ref={projectsSectionRef} projects={projects.map(p => p.status === 'prospect' ? p : { ...p, status: 'prospect' }).filter(p => p.status === 'prospect')} clients={clients} timesheets={timesheets} onAddProject={() => { resetForm(); setFormData(prev => ({ ...prev, status: 'prospect' })); setShowProjectModal(true) }} onEditProject={openEditProject} onDeleteProject={handleDeleteProject} onAddChangeOrder={openAddChangeOrder} />}
-      {activeTab === 'import' && <ImportSection projects={projects} clients={clients} teamMembers={teamMembers} onImportProjects={handleImportProjects} onImportBudgets={handleImportBudgets} onImportResources={handleImportResources} />}
+        {/* Project Detail View */}
+        {selectedProjectId && (() => {
+          const project = projects.find(p => p.id === selectedProjectId)
+          if (!project) return null
+          const client = clients.find(c => c.id === project.client_id)
+          const cos = projects.filter(p => p.parent_id === selectedProjectId && p.is_change_order)
+          return (
+            <ProjectDetailView project={project} client={client} timesheets={timesheets} expenses={expenses} invoices={invoices}
+              teamMembers={teamMembers} changeOrders={cos}
+              onClose={() => setSelectedProjectId(null)}
+              onEdit={() => { setSelectedProjectId(null); openEditProject(project) }}
+            />
+          )
+        })()}
+      </div>
 
       {/* Project Modal */}
       {showProjectModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white border border-slate-200 rounded-xl w-full max-w-lg mx-4 overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white border border-slate-200 rounded-xl w-full max-w-lg mx-4 shadow-2xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">
-                  {editingProject ? 'Edit Project' : isAddingCO ? 'Add Change Order' : 'Add Project'}
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">{editingProject ? 'Update project details' : 'Create a new project'}</p>
-              </div>
-              <button onClick={() => setShowProjectModal(false)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"><X size={18} className="text-slate-400" /></button>
+              <h2 className="text-base font-semibold text-slate-900">
+                {editingProject ? 'Edit Project' : isAddingCO ? `Add Change Order — ${coParentName}` : 'Add Project'}
+              </h2>
+              <button onClick={() => { setShowProjectModal(false); resetForm() }} className="p-1 hover:bg-slate-100 rounded"><X size={18} className="text-slate-400" /></button>
             </div>
-
             <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
               <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Project Name <span className="text-red-500">*</span></label>
-                <input type="text" value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} className={inputClass} placeholder="Enter project name" />
+                <label className="block text-xs font-medium text-slate-500 mb-1">{isAddingCO ? 'Change Order Name' : 'Project Name'}</label>
+                <input value={formData.name} onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))} className={THEME.input + ' w-full px-3 py-2'} placeholder={isAddingCO ? 'CO-001: Scope Change' : 'Project Name'} />
               </div>
-
-              {!isAddingCO && (
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Client</label>
-                  <select value={formData.client_id} onChange={(e) => setFormData(prev => ({ ...prev, client_id: e.target.value }))} className={`${inputClass} cursor-pointer`}>
-                    <option value="">Select client...</option>
-                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Budget</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
-                    <input type="number" value={formData.budget} onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))} className={`${inputClass} pl-7`} placeholder="0" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Spent</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
-                    <input type="number" value={formData.spent} onChange={(e) => setFormData(prev => ({ ...prev, spent: e.target.value }))} className={`${inputClass} pl-7`} placeholder="0" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Start Date</label>
-                  <input type="date" value={formData.start_date} onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))} className={inputClass} />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">End Date</label>
-                  <input type="date" value={formData.end_date} onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))} className={inputClass} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Budgeted Hours</label>
-                  <input type="number" value={formData.budgeted_hours} onChange={(e) => setFormData(prev => ({ ...prev, budgeted_hours: e.target.value }))} className={inputClass} placeholder="0" />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">% Complete</label>
-                  <input type="number" value={formData.percent_complete} onChange={(e) => setFormData(prev => ({ ...prev, percent_complete: e.target.value }))} className={inputClass} placeholder="0" min="0" max="100" />
-                </div>
-              </div>
-
               <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Status</label>
-                <div className="flex gap-2 flex-wrap">
-                  {Object.values(PROJECT_STATUSES).filter(s => s.id !== 'archived').map(s => (
-                    <button key={s.id} onClick={() => setFormData(prev => ({ ...prev, status: s.id }))}
-                      className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                        formData.status === s.id
-                          ? `${s.bg} ${s.text} border ${s.border}`
-                          : 'bg-slate-100 text-slate-500 border border-transparent hover:bg-slate-200'
-                      }`}>
-                      {s.label}
-                    </button>
-                  ))}
+                <label className="block text-xs font-medium text-slate-500 mb-1">Client</label>
+                <select value={formData.client_id} onChange={e => setFormData(prev => ({ ...prev, client_id: e.target.value }))} className={THEME.selectClass + ' w-full py-2'}>
+                  <option value="">Select client</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Budget</label>
+                  <input type="number" value={formData.budget} onChange={e => setFormData(prev => ({ ...prev, budget: e.target.value }))} className={THEME.input + ' w-full px-3 py-2'} placeholder="0" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Spent</label>
+                  <input type="number" value={formData.spent} onChange={e => setFormData(prev => ({ ...prev, spent: e.target.value }))} className={THEME.input + ' w-full px-3 py-2'} placeholder="0" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Budgeted Hours</label>
+                  <input type="number" value={formData.budgeted_hours} onChange={e => setFormData(prev => ({ ...prev, budgeted_hours: e.target.value }))} className={THEME.input + ' w-full px-3 py-2'} placeholder="0" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">% Complete</label>
+                  <input type="number" value={formData.percent_complete} onChange={e => setFormData(prev => ({ ...prev, percent_complete: e.target.value }))} className={THEME.input + ' w-full px-3 py-2'} placeholder="0" min="0" max="100" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Start Date</label>
+                  <input type="date" value={formData.start_date} onChange={e => setFormData(prev => ({ ...prev, start_date: e.target.value }))} className={THEME.input + ' w-full px-3 py-2'} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">End Date</label>
+                  <input type="date" value={formData.end_date} onChange={e => setFormData(prev => ({ ...prev, end_date: e.target.value }))} className={THEME.input + ' w-full px-3 py-2'} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {Object.values(PROJECT_STATUSES).map(s => (
+                      <button key={s.id} onClick={() => setFormData(prev => ({ ...prev, status: s.id }))}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                          formData.status === s.id ? `${s.bg} ${s.text} border ${s.border}` : 'bg-slate-50 text-slate-400 border border-slate-200 hover:bg-slate-100'
+                        }`}>{s.label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Budget Type</label>
+                  <select value={formData.budget_type} onChange={e => setFormData(prev => ({ ...prev, budget_type: e.target.value }))} className={THEME.selectClass + ' w-full py-2'}>
+                    <option value="fixed">Fixed Price</option>
+                    <option value="time_and_materials">Time & Materials</option>
+                    <option value="retainer">Retainer</option>
+                  </select>
                 </div>
               </div>
             </div>
-
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50">
-              <button onClick={() => setShowProjectModal(false)} className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition-colors">Cancel</button>
-              <button onClick={handleSaveProject} disabled={!formData.name}
-                className="px-5 py-2.5 text-sm font-semibold bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm">
-                {editingProject ? 'Save Changes' : 'Create Project'}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200">
+              <button onClick={() => { setShowProjectModal(false); resetForm() }} className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700">Cancel</button>
+              <button onClick={handleSave} className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm">
+                {editingProject ? 'Save Changes' : isAddingCO ? 'Add Change Order' : 'Create Project'}
               </button>
             </div>
           </div>
