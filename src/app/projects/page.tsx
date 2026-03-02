@@ -263,10 +263,10 @@ export default function ProjectsPage() {
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
                   <div className="flex gap-2 flex-wrap">
-                    {Object.values(PROJECT_STATUSES).map(s => (
-                      <button key={s.id} onClick={() => setFormData(prev => ({ ...prev, status: s.id }))}
+                    {Object.entries(PROJECT_STATUSES).map(([statusId, s]) => (
+                      <button key={statusId} onClick={() => setFormData(prev => ({ ...prev, status: statusId }))}
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                          formData.status === s.id ? `${s.bg} ${s.text} border ${s.border}` : 'bg-slate-50 text-slate-400 border border-slate-200 hover:bg-slate-100'
+                          formData.status === statusId ? `${s.bg} ${s.text} border ${s.border}` : 'bg-slate-50 text-slate-400 border border-slate-200 hover:bg-slate-100'
                         }`}>{s.label}</button>
                     ))}
                   </div>
