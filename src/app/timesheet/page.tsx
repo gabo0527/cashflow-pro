@@ -277,6 +277,8 @@ export default function ContractorPortal() {
   const [historyExpenses, setHistoryExpenses] = useState<Expense[]>([])
   const [historyInvoices, setHistoryInvoices] = useState<ContractorInvoice[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [expandedHistoryWeeks, setExpandedHistoryWeeks] = useState<Set<string>>(new Set())
+  const [expandedHistoryInvoices, setExpandedHistoryInvoices] = useState<Set<string>>(new Set())
 
   // Analytics
   const [analyticsPreset, setAnalyticsPreset] = useState<'month' | 'qtd' | 'ytd' | 'custom'>('ytd')
@@ -573,8 +575,8 @@ export default function ContractorPortal() {
 
   // ============ ANALYTICS COMPUTED DATA ============
   // Weekly hours by project (stacked bar)
-  const analyticsWeeklyHours: any[] = useMemo(() => {
-    if (analyticsTime.length === 0) return []
+  const analyticsWeeklyHours = useMemo(() => {
+    if (analyticsTime.length === 0) return [] as { week: string; total: number; projects: Record<string, number> }[]
     const projectMap: Record<string, string> = {}
     assignments.forEach(a => { projectMap[a.project_id] = a.project_name })
     const weeks: Record<string, { week: string; total: number; projects: Record<string, number> }> = {}
@@ -588,9 +590,7 @@ export default function ContractorPortal() {
       weeks[key].projects[pName] = (weeks[key].projects[pName] || 0) + (e.hours || 0)
       weeks[key].total += e.hours || 0
     })
-    return Object.entries(weeks).sort(([a], [b]) => a.localeCompare(b)).map(([_, v]) => ({
-      week: v.week, total: v.total, ...v.projects
-    }))
+    return Object.entries(weeks).sort(([a], [b]) => a.localeCompare(b)).map(([_, v]) => v)
   }, [analyticsTime, assignments])
 
   // Unique project names for chart bars
@@ -1184,8 +1184,8 @@ export default function ContractorPortal() {
                 <Loader2 size={22} className="text-emerald-500 animate-spin" />
               </div>
             ) : (
-              <div className="space-y-8">
-                {/* TIME ENTRIES */}
+              <div className="space-y-6">
+                {/* TIME ENTRIES — Collapsible Weeks */}
                 {(historyFilter === 'all' || historyFilter === 'time') && (
                   <div>
                     <div className="flex items-center gap-2 mb-3">
@@ -1195,128 +1195,78 @@ export default function ContractorPortal() {
                     </div>
                     {historyTimeByWeek.length > 0 ? (
                       <div className="space-y-2">
-                        {historyTimeByWeek.map(([weekKey, week]) => (
-                          <div key={weekKey} className={`${T.card} overflow-hidden`}>
-                            <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-gray-100 bg-gray-50/50">
-                              <span className="text-xs font-medium text-gray-500">{week.label}</span>
-                              <span className="text-xs font-bold text-emerald-600 tabular-nums">{week.totalHours.toFixed(1)}h</span>
-                            </div>
-                            <div className="divide-y divide-gray-50">
-                              {week.entries.map((e: any) => {
-                                const a = assignments.find(a => a.project_id === e.project_id)
-                                return (
-                                  <div key={e.id} className="px-4 sm:px-5 py-3 flex items-center gap-4 hover:bg-gray-50/50 transition-colors">
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm text-gray-900 font-medium truncate">{a?.project_name || 'Unknown Project'}</p>
-                                      <p className="text-xs text-gray-400 mt-0.5">{a?.client_name || ''}{e.description ? ` — ${e.description}` : ''}</p>
-                                    </div>
-                                    <span className="text-sm font-semibold text-gray-700 tabular-nums">{e.hours}h</span>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className={`${T.card} text-center py-12`}>
-                        <p className="text-gray-400 text-sm">No timesheet entries for {historyRange.label}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
+                        {historyTimeByWeek.map(([weekKey, week], weekIdx) => {
+                          const isExpanded = expandedHistoryWeeks.has(weekKey)
+                          // Build project summary for collapsed view
+                          const projectSummary: Record<string, { name: string; clientName: string; hours: number; clientId: string }> = {}
+                          week.entries.forEach((e: any) => {
+                            const a = assignments.find(a => a.project_id === e.project_id)
+                            const pid = e.project_id
+                            if (!projectSummary[pid]) projectSummary[pid] = { name: a?.project_name || 'Unknown', clientName: a?.client_name || '', hours: 0, clientId: a?.client_id || '' }
+                            projectSummary[pid].hours += e.hours || 0
+                          })
+                          const projects = Object.values(projectSummary).sort((a, b) => b.hours - a.hours)
 
-                {/* EXPENSES */}
-                {(historyFilter === 'all' || historyFilter === 'expenses') && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <CreditCard size={13} className="text-amber-500" />
-                      <h2 className={T.sectionTitle}>Expenses</h2>
-                      <span className="text-[11px] text-gray-300 ml-1">{historyExpenses.length} item{historyExpenses.length !== 1 ? 's' : ''}</span>
-                    </div>
-                    {historyExpenses.length > 0 ? (
-                      <div className="space-y-2">
-                        {historyExpenses.map(exp => {
-                          const cat = EXPENSE_CATEGORIES.find(c => c.id === exp.category)
                           return (
-                            <div key={exp.id} className={`${T.cardHover} px-4 sm:px-5 py-4 flex items-center gap-3 sm:gap-4`}>
-                              <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
-                                <Receipt size={15} className="text-amber-500" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-gray-900 text-sm font-medium truncate">{exp.description}</p>
-                                <div className="flex items-center gap-2 text-gray-400 text-xs mt-1">
-                                  <span>{formatDate(exp.date)}</span>
-                                  <span className="w-0.5 h-0.5 rounded-full bg-gray-300" />
-                                  <span>{cat?.label || exp.category}</span>
-                                  {exp.receipt_url && <><span className="w-0.5 h-0.5 rounded-full bg-gray-300" /><Paperclip size={10} className="text-sky-500" /></>}
+                            <div key={weekKey} className={`${T.card} overflow-hidden transition-all duration-200`}>
+                              {/* Week Header — always visible, clickable */}
+                              <button
+                                onClick={() => setExpandedHistoryWeeks(prev => {
+                                  const next = new Set(prev)
+                                  if (next.has(weekKey)) next.delete(weekKey); else next.add(weekKey)
+                                  return next
+                                })}
+                                className="w-full flex items-center justify-between px-4 sm:px-5 py-3 hover:bg-gray-50/50 transition-colors"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <ChevronDown size={14} className={`text-gray-300 transition-transform duration-200 ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                                  <span className="text-xs font-medium text-gray-500">{week.label}</span>
+                                  <span className="text-[10px] text-gray-300">·</span>
+                                  <span className="text-[11px] text-gray-400">{week.entries.length} entr{week.entries.length === 1 ? 'y' : 'ies'}</span>
                                 </div>
-                              </div>
-                              <span className="text-gray-900 font-semibold text-sm tabular-nums">{formatCurrency(exp.amount)}</span>
-                              <StatusPill status={exp.status} />
-                            </div>
-                          )
-                        })}
-                      </div>
-                    ) : (
-                      <div className={`${T.card} text-center py-12`}>
-                        <p className="text-gray-400 text-sm">No expenses for {historyRange.label}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
+                                <span className="text-sm font-bold text-emerald-600 tabular-nums">{week.totalHours.toFixed(1)}h</span>
+                              </button>
 
-                {/* INVOICES */}
-                {(historyFilter === 'all' || historyFilter === 'invoices') && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <FileText size={13} className="text-sky-500" />
-                      <h2 className={T.sectionTitle}>Invoices</h2>
-                      <span className="text-[11px] text-gray-300 ml-1">{historyInvoices.length} invoice{historyInvoices.length !== 1 ? 's' : ''}</span>
-                    </div>
-                    {historyInvoices.length > 0 ? (
-                      <div className="space-y-2">
-                        {historyInvoices.map(inv => {
-                          const lines = inv.contractor_invoice_lines || inv.lines || []
-                          return (
-                            <div key={inv.id} className={`${T.cardHover} overflow-hidden`}>
-                              <div className="px-4 sm:px-5 py-4 flex items-center gap-3 sm:gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center shrink-0">
-                                  <FileText size={15} className="text-sky-500" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <p className="text-gray-900 text-sm font-medium">{inv.invoice_number}</p>
-                                    {inv.receipt_url && <Paperclip size={11} className="text-sky-500" />}
+                              {/* Collapsed: Project summary bar */}
+                              {!isExpanded && (
+                                <div className="px-4 sm:px-5 pb-3 pt-0">
+                                  {/* Stacked bar */}
+                                  <div className="flex h-2 rounded-full overflow-hidden bg-gray-100 mb-2">
+                                    {projects.map((p, pi) => (
+                                      <div key={pi} className="h-full transition-all duration-300"
+                                        style={{ width: `${(p.hours / week.totalHours) * 100}%`, background: clientColorMap[p.clientId] || CLIENT_COLORS[pi % CLIENT_COLORS.length] }} />
+                                    ))}
                                   </div>
-                                  <p className="text-gray-400 text-xs mt-0.5">{formatDate(inv.period_start)} – {formatDate(inv.period_end)}</p>
+                                  {/* Project chips */}
+                                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                    {projects.map((p, pi) => (
+                                      <div key={pi} className="flex items-center gap-1.5">
+                                        <div className="w-1.5 h-1.5 rounded-full" style={{ background: clientColorMap[p.clientId] || CLIENT_COLORS[pi % CLIENT_COLORS.length] }} />
+                                        <span className="text-[11px] text-gray-500">{p.name}</span>
+                                        <span className="text-[11px] font-semibold text-gray-700 tabular-nums">{p.hours.toFixed(1)}h</span>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                                <span className="text-gray-900 font-semibold text-sm tabular-nums">{formatCurrency(inv.total_amount)}</span>
-                                <StatusPill status={inv.status} />
-                              </div>
-                              {lines.length > 0 && (
-                                <div className="px-4 sm:px-5 pb-4 pt-0">
-                                  <div className="border-t border-gray-100 pt-3">
-                                    <table className="w-full text-xs">
-                                      <thead>
-                                        <tr className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                                          <th className="text-left pb-2">Description</th>
-                                          <th className="text-right pb-2">Hours</th>
-                                          <th className="text-right pb-2">Allocation</th>
-                                          <th className="text-right pb-2">Amount</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-gray-50">
-                                        {lines.map((l: any, i: number) => (
-                                          <tr key={i}>
-                                            <td className="py-2 text-gray-500">{l.description}</td>
-                                            <td className="py-2 text-right text-gray-400 tabular-nums">{l.hours ? `${Number(l.hours).toFixed(1)}h` : '—'}</td>
-                                            <td className="py-2 text-right text-gray-400 tabular-nums">{l.allocation_pct ? `${l.allocation_pct}%` : '—'}</td>
-                                            <td className="py-2 text-right text-gray-700 font-medium tabular-nums">{l.amount ? formatCurrency(l.amount) : '—'}</td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
+                              )}
+
+                              {/* Expanded: Full entry list */}
+                              {isExpanded && (
+                                <div className="border-t border-gray-100">
+                                  <div className="divide-y divide-gray-50">
+                                    {week.entries.map((e: any) => {
+                                      const a = assignments.find(a => a.project_id === e.project_id)
+                                      return (
+                                        <div key={e.id} className="px-4 sm:px-5 py-2.5 flex items-center gap-3 hover:bg-gray-50/50 transition-colors">
+                                          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: clientColorMap[a?.client_id || ''] || '#94a3b8' }} />
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-sm text-gray-900 font-medium truncate">{a?.project_name || 'Unknown'}</p>
+                                            <p className="text-[11px] text-gray-400 truncate">{a?.client_name || ''}{e.description ? ` — ${e.description}` : ''}</p>
+                                          </div>
+                                          <span className="text-sm font-semibold text-gray-700 tabular-nums">{e.hours}h</span>
+                                        </div>
+                                      )
+                                    })}
                                   </div>
                                 </div>
                               )}
@@ -1326,6 +1276,130 @@ export default function ContractorPortal() {
                       </div>
                     ) : (
                       <div className={`${T.card} text-center py-12`}>
+                        <p className="text-gray-400 text-sm">No timesheet entries for {historyRange.label}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* EXPENSES — Compact table */}
+                {(historyFilter === 'all' || historyFilter === 'expenses') && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <CreditCard size={13} className="text-amber-500" />
+                      <h2 className={T.sectionTitle}>Expenses</h2>
+                      <span className="text-[11px] text-gray-300 ml-1">{historyExpenses.length} item{historyExpenses.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    {historyExpenses.length > 0 ? (
+                      <div className={`${T.card} overflow-hidden`}>
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-[10px] text-gray-400 font-bold uppercase tracking-wider border-b border-gray-100">
+                              <th className="text-left py-2.5 px-4">Date</th>
+                              <th className="text-left py-2.5">Description</th>
+                              <th className="text-left py-2.5">Category</th>
+                              <th className="text-right py-2.5">Amount</th>
+                              <th className="text-right py-2.5 px-4">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {historyExpenses.map(exp => {
+                              const cat = EXPENSE_CATEGORIES.find(c => c.id === exp.category)
+                              return (
+                                <tr key={exp.id} className="hover:bg-gray-50/50 transition-colors">
+                                  <td className="py-2.5 px-4 text-gray-400 whitespace-nowrap">{formatDate(exp.date)}</td>
+                                  <td className="py-2.5 text-gray-700 font-medium">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="truncate max-w-[180px]">{exp.description}</span>
+                                      {exp.receipt_url && <Paperclip size={10} className="text-sky-500 shrink-0" />}
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 text-gray-400">{cat?.label || exp.category}</td>
+                                  <td className="py-2.5 text-right text-gray-900 font-semibold tabular-nums">{formatCurrency(exp.amount)}</td>
+                                  <td className="py-2.5 px-4 text-right"><StatusPill status={exp.status} /></td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className={`${T.card} text-center py-10`}>
+                        <p className="text-gray-400 text-sm">No expenses for {historyRange.label}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* INVOICES — Compact with expandable line items */}
+                {(historyFilter === 'all' || historyFilter === 'invoices') && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <FileText size={13} className="text-sky-500" />
+                      <h2 className={T.sectionTitle}>Invoices</h2>
+                      <span className="text-[11px] text-gray-300 ml-1">{historyInvoices.length} invoice{historyInvoices.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    {historyInvoices.length > 0 ? (
+                      <div className={`${T.card} overflow-hidden divide-y divide-gray-100`}>
+                        {historyInvoices.map(inv => {
+                          const lines = inv.contractor_invoice_lines || inv.lines || []
+                          const isExpanded = expandedHistoryInvoices.has(inv.id)
+                          return (
+                            <div key={inv.id}>
+                              <button
+                                onClick={() => {
+                                  if (lines.length === 0) return
+                                  setExpandedHistoryInvoices(prev => {
+                                    const next = new Set(prev)
+                                    if (next.has(inv.id)) next.delete(inv.id); else next.add(inv.id)
+                                    return next
+                                  })
+                                }}
+                                className={`w-full px-4 sm:px-5 py-3 flex items-center gap-3 sm:gap-4 hover:bg-gray-50/50 transition-colors ${lines.length > 0 ? 'cursor-pointer' : 'cursor-default'}`}
+                              >
+                                {lines.length > 0 && (
+                                  <ChevronDown size={12} className={`text-gray-300 transition-transform duration-200 shrink-0 ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                                )}
+                                <div className="flex-1 min-w-0 text-left">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm text-gray-900 font-medium">#{inv.invoice_number}</span>
+                                    {inv.receipt_url && <Paperclip size={10} className="text-sky-500" />}
+                                  </div>
+                                  <p className="text-[11px] text-gray-400 mt-0.5">{formatDate(inv.period_start)} – {formatDate(inv.period_end)}</p>
+                                </div>
+                                <span className="text-sm font-bold text-gray-900 tabular-nums">{formatCurrency(inv.total_amount)}</span>
+                                <StatusPill status={inv.status} />
+                              </button>
+                              {isExpanded && lines.length > 0 && (
+                                <div className="px-4 sm:px-5 pb-3">
+                                  <table className="w-full text-xs ml-6">
+                                    <thead>
+                                      <tr className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                                        <th className="text-left pb-1.5">Description</th>
+                                        <th className="text-right pb-1.5">Hours</th>
+                                        <th className="text-right pb-1.5">Alloc</th>
+                                        <th className="text-right pb-1.5">Amount</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                      {lines.map((l: any, li: number) => (
+                                        <tr key={li}>
+                                          <td className="py-1.5 text-gray-500">{l.description}</td>
+                                          <td className="py-1.5 text-right text-gray-400 tabular-nums">{l.hours ? `${Number(l.hours).toFixed(1)}h` : '—'}</td>
+                                          <td className="py-1.5 text-right text-gray-400 tabular-nums">{l.allocation_pct ? `${l.allocation_pct}%` : '—'}</td>
+                                          <td className="py-1.5 text-right text-gray-700 font-medium tabular-nums">{l.amount ? formatCurrency(l.amount) : '—'}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className={`${T.card} text-center py-10`}>
                         <p className="text-gray-400 text-sm">No invoices for {historyRange.label}</p>
                       </div>
                     )}
@@ -1419,7 +1493,7 @@ export default function ContractorPortal() {
                           labelStyle={{ fontWeight: 600, color: '#1e293b', marginBottom: 4 }}
                         />
                         {analyticsProjectNames.map((name, i) => (
-                          <Bar key={name} dataKey={name} stackId="hours" fill={CLIENT_COLORS[i % CLIENT_COLORS.length]} radius={i === analyticsProjectNames.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+                          <Bar key={name} dataKey={(d: any) => d.projects?.[name] || 0} name={name} stackId="hours" fill={CLIENT_COLORS[i % CLIENT_COLORS.length]} radius={i === analyticsProjectNames.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
                         ))}
                       </RechartsBarChart>
                     </ResponsiveContainer>
@@ -1579,8 +1653,8 @@ export default function ContractorPortal() {
                             <tr key={wi} className="hover:bg-gray-50/50 transition-colors">
                               <td className="py-2 pr-4 text-gray-600 font-medium whitespace-nowrap sticky left-0 bg-white">{wk.week}</td>
                               {analyticsProjectNames.map((name, i) => {
-                                const hrs = Number(wk[name]) || 0
-                                const maxH = Math.max(...analyticsWeeklyHours.map((w: any) => Number(w[name]) || 0))
+                                const hrs = wk.projects[name] || 0
+                                const maxH = Math.max(...analyticsWeeklyHours.map(w => w.projects[name] || 0))
                                 const intensity = maxH > 0 ? hrs / maxH : 0
                                 return (
                                   <td key={name} className="py-2 px-2 text-center">
