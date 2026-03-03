@@ -371,10 +371,16 @@ export default function ContractorPortal() {
         }).filter((a: Assignment) => a.project_name !== 'Unknown')
       }
 
-      // Source 2: Bill-rate implied — add projects for clients with rate cards not already assigned
+      // Source 2: Bill-rate implied — only for clients with NO explicit project assignments
+      // If a client has specific projects selected in the rate card, respect that selection
       const assignedProjectIds = new Set(assigns.map(a => a.project_id))
+      const clientsWithExplicitAssignments = new Set(assigns.map(a => a.client_id).filter(Boolean))
       const rateImplied = (projects || [])
-        .filter((p: any) => ratesByClient[p.client_id] && !assignedProjectIds.has(p.id))
+        .filter((p: any) => 
+          ratesByClient[p.client_id] && 
+          !assignedProjectIds.has(p.id) && 
+          !clientsWithExplicitAssignments.has(p.client_id) // Skip clients that already have specific project picks
+        )
         .map((p: any) => ({
           project_id: p.id, project_name: p.name, client_id: p.client_id,
           client_name: cMap[p.client_id] || '',
