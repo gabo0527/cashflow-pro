@@ -355,7 +355,9 @@ export default function ContractorPortal() {
       const { data: projects } = await supabase.from('projects').select('id, name, client_id, company_id').eq('status', 'active')
       const pMap: Record<string, any> = {}; (projects || []).forEach((p: any) => { pMap[p.id] = p })
 
-      let assigns: Assignment[]
+      let assigns: Assignment[] = []
+
+      // Source 1: Explicit project assignments
       if (pa && pa.length > 0) {
         assigns = pa.map((a: any) => {
           const p = pMap[a.project_id]
@@ -367,16 +369,19 @@ export default function ContractorPortal() {
             rate: clientRate?.rate || a.bill_rate || a.rate || 0
           }
         }).filter((a: Assignment) => a.project_name !== 'Unknown')
-      } else {
-        assigns = (projects || [])
-          .filter((p: any) => ratesByClient[p.client_id])
-          .map((p: any) => ({
-            project_id: p.id, project_name: p.name, client_id: p.client_id,
-            client_name: cMap[p.client_id] || '',
-            payment_type: ratesByClient[p.client_id].cost_type === 'hourly' ? 'tm' : 'lump_sum',
-            rate: ratesByClient[p.client_id].rate
-          }))
       }
+
+      // Source 2: Bill-rate implied — add projects for clients with rate cards not already assigned
+      const assignedProjectIds = new Set(assigns.map(a => a.project_id))
+      const rateImplied = (projects || [])
+        .filter((p: any) => ratesByClient[p.client_id] && !assignedProjectIds.has(p.id))
+        .map((p: any) => ({
+          project_id: p.id, project_name: p.name, client_id: p.client_id,
+          client_name: cMap[p.client_id] || '',
+          payment_type: ratesByClient[p.client_id].cost_type === 'hourly' ? 'tm' : 'lump_sum',
+          rate: ratesByClient[p.client_id].rate
+        }))
+      assigns = [...assigns, ...rateImplied]
 
       if (!md.company_id && projects && projects.length > 0) {
         const projectWithCompany = projects.find((p: any) => p.company_id)
