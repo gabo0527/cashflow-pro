@@ -189,7 +189,7 @@ async function analyzeHealth(companyId: string): Promise<HealthReport> {
 
     // Determine health status + signals
     const signals: string[] = []
-    let status: HealthStatus = 'green'
+    let status: string = 'green'
 
     // Budget burn checks
     if (burnPct !== null) {
@@ -240,7 +240,7 @@ async function analyzeHealth(companyId: string): Promise<HealthReport> {
       project_name: p.name,
       client_name: clientMap[p.client_id] || 'Unknown',
       contract_type: p.contract_type || 'unknown',
-      status,
+      status: status as HealthStatus,
       signals,
       total_revenue: Math.round(totalRevenue * 100) / 100,
       total_cost: Math.round(totalCost * 100) / 100,
