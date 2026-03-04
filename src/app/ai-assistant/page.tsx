@@ -6,7 +6,7 @@ import {
   Plus, MessageSquare, Pencil, Check, X, PanelLeftClose, PanelLeft,
   Paperclip, Image as ImageIcon, FileText, XCircle, BarChart3, PieChart,
   Zap, Brain, TrendingDown, ArrowUpRight, ArrowDownRight, Lightbulb, Activity,
-  Gauge, Receipt, Search, CreditCard, CheckCircle2, XOctagon, Loader2, Shield
+  Gauge, Receipt, Search, CreditCard, CheckCircle2, XOctagon, Loader2, Shield, Mail
 } from "lucide-react"
 import { createClient } from "@supabase/supabase-js"
 import Link from "next/link"
@@ -161,7 +161,7 @@ function SageLogo({ size = 32, className = "" }: { size?: number, className?: st
 }
 
 // ============ TYPES ============
-interface Message { id: string; role: "user" | "assistant"; content: string; timestamp: Date; attachments?: Attachment[]; chart?: ChartData; agentResult?: AgentResult; pendingApproval?: PendingApproval }
+interface Message { id: string; role: "user" | "assistant"; content: string; timestamp: Date; attachments?: Attachment[]; chart?: ChartData; agentResult?: AgentResult; pendingApproval?: PendingApproval; emailDraft?: EmailDraftData }
 interface Attachment { id: string; name: string; type: string; size: number; content?: string }
 interface ChartData { type: "bar" | "line" | "pie" | "area" | "waterfall" | "stacked_bar" | "multi_line" | "composed"; title: string; data: any[]; keys?: string[]; colors?: string[] }
 interface TableData { title: string; headers: string[]; rows: string[][] }
@@ -170,6 +170,7 @@ interface CompanyData { transactions: any[]; invoices: any[]; projects: any[]; c
 interface KPISummary { totalRevenue: number; totalExpenses: number; netIncome: number; grossMargin: number; cashOnHand: number; arOutstanding: number; burnRate: number; runway: number; utilizationRate: number; dso: number; teamCost: number; teamRevenue: number; teamMarginPct: number }
 interface AgentResult { agent: string; status: "success" | "error"; data: any; summary: string }
 interface PendingApproval { id: string; type: "bulk_update" | "invoice_approve" | "expense_categorize"; description: string; items: any[]; onApprove: () => Promise<void>; onReject: () => void }
+interface EmailDraftData { subject: string; body: string; recipientName: string; recipientEmail: string; tone: string; isTeamWide: boolean }
 
 // ============ AGENT INTENT DETECTION ============
 interface AgentIntent {
@@ -878,6 +879,93 @@ function ApprovalCard({ approval, onApprove, onReject }: { approval: PendingAppr
   )
 }
 
+// ============ EMAIL DRAFT CARD ============
+function EmailDraftCard({ draft, onSend }: { draft: EmailDraftData; onSend: (draft: EmailDraftData) => Promise<void> }) {
+  const [status, setStatus] = useState<"pending" | "sending" | "sent" | "error">("pending")
+  const [editMode, setEditMode] = useState(false)
+  const [editSubject, setEditSubject] = useState(draft.subject)
+  const [editBody, setEditBody] = useState(draft.body)
+
+  const toneColors: Record<string, string> = {
+    info: "border-emerald-200 bg-emerald-50/50",
+    reminder: "border-amber-200 bg-amber-50/50",
+    urgent: "border-rose-200 bg-rose-50/50",
+    appreciation: "border-violet-200 bg-violet-50/50",
+    correction: "border-blue-200 bg-blue-50/50",
+  }
+
+  const handleSend = async () => {
+    setStatus("sending")
+    try {
+      const finalDraft = editMode ? { ...draft, subject: editSubject, body: editBody } : draft
+      await onSend(finalDraft)
+      setStatus("sent")
+      setEditMode(false)
+    } catch {
+      setStatus("error")
+    }
+  }
+
+  if (status === "sent") {
+    return (
+      <div className="my-3 p-4 rounded-xl border border-emerald-200 bg-emerald-50">
+        <div className="flex items-center gap-2 text-emerald-700 text-sm font-medium">
+          <CheckCircle2 size={16} />
+          <span>Email sent to {draft.isTeamWide ? "all contractors" : draft.recipientName}.</span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`my-3 rounded-xl border overflow-hidden ${toneColors[draft.tone] || toneColors.info}`}>
+      <div className="px-4 py-3 border-b border-gray-200 bg-white/60">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-gray-800 text-sm font-medium">
+            <Mail size={14} className="text-emerald-600" />
+            <span>Email Draft</span>
+            <span className="px-1.5 py-0.5 rounded text-[9px] bg-gray-100 text-gray-500 uppercase tracking-wider">{draft.tone}</span>
+          </div>
+          <span className="text-xs text-gray-500">
+            To: {draft.isTeamWide ? "All Contractors" : `${draft.recipientName} (${draft.recipientEmail})`}
+          </span>
+        </div>
+      </div>
+      <div className="bg-white px-4 py-3">
+        {editMode ? (
+          <div className="space-y-3">
+            <div>
+              <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">Subject</label>
+              <input value={editSubject} onChange={e => setEditSubject(e.target.value)} className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400" />
+            </div>
+            <div>
+              <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">Body</label>
+              <textarea value={editBody} onChange={e => setEditBody(e.target.value)} rows={6} className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 resize-none" />
+            </div>
+          </div>
+        ) : (
+          <>
+            <p className="text-xs font-medium text-gray-800 mb-2">Subject: {draft.subject}</p>
+            <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
+              {draft.body}
+            </div>
+          </>
+        )}
+      </div>
+      <div className="px-4 py-3 flex items-center gap-2 bg-white border-t border-gray-100">
+        <button onClick={handleSend} disabled={status === "sending"} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium transition-colors disabled:opacity-50">
+          {status === "sending" ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+          {status === "sending" ? "Sending..." : status === "error" ? "Retry" : "Approve & Send"}
+        </button>
+        <button onClick={() => setEditMode(!editMode)} disabled={status === "sending"} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors">
+          <Pencil size={14} /> {editMode ? "Preview" : "Edit"}
+        </button>
+        {status === "error" && <span className="text-xs text-rose-500 ml-2">Failed to send. Try again.</span>}
+      </div>
+    </div>
+  )
+}
+
 // ============ MESSAGE COMPONENT ============
 function ChatMessage({ message }: { message: Message }) {
   const isUser = message.role === "user"
@@ -946,6 +1034,22 @@ function ChatMessage({ message }: { message: Message }) {
               approval={message.pendingApproval} 
               onApprove={message.pendingApproval.onApprove}
               onReject={message.pendingApproval.onReject}
+            />
+          )}
+          {/* Email draft card */}
+          {message.emailDraft && (
+            <EmailDraftCard 
+              draft={message.emailDraft}
+              onSend={async (finalDraft) => {
+                const res = await fetch("/api/agents/email-send", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(finalDraft),
+                })
+                if (!res.ok) throw new Error("Send failed")
+                const data = await res.json()
+                if (!data.success) throw new Error("Send failed")
+              }}
             />
           )}
         </div>
@@ -1076,7 +1180,7 @@ export default function SageAssistantPage() {
   // ---- CONVERSATION MANAGEMENT ----
   const saveConversation = async (msgs: Message[], conversationId: string | null, title?: string) => {
     if (!userId || !companyId) return null
-    const messagesForStorage = msgs.map(m => ({ ...m, timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp, pendingApproval: undefined }))
+    const messagesForStorage = msgs.map(m => ({ ...m, timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp, pendingApproval: undefined, emailDraft: undefined }))
     if (conversationId) {
       await supabase.from("sage_conversations").update({ messages: messagesForStorage, updated_at: new Date().toISOString(), ...(title ? { title } : {}) }).eq("id", conversationId)
       return conversationId
@@ -1259,12 +1363,18 @@ AI Summary: ${d.summary || result.summary}`
       // === STEP 4: Detect action blocks for approval workflow ===
       let actionData = null
       let cleanMessage = assistantContent
-      const actionMatch = assistantContent.match(/```vantage-action\s*([\s\S]*?)```/)
-      if (actionMatch && actionMatch[1]) {
+      const actionMatch2 = assistantContent.match(/```vantage-action\s*([\s\S]*?)```/)
+      if (actionMatch2 && actionMatch2[1]) {
         try {
-          actionData = JSON.parse(actionMatch[1].trim())
+          actionData = JSON.parse(actionMatch2[1].trim())
           cleanMessage = assistantContent.replace(/```vantage-action[\s\S]*?```/g, "").trim()
         } catch (e) { console.error("Failed to parse action:", e) }
+      }
+
+      // === STEP 5: Detect email draft from agent response ===
+      let emailDraftData: EmailDraftData | undefined = undefined
+      if (data.action?.type === "email_draft" && data.action.data) {
+        emailDraftData = data.action.data as EmailDraftData
       }
 
       // Build assistant message
@@ -1273,6 +1383,7 @@ AI Summary: ${d.summary || result.summary}`
         role: "assistant",
         content: cleanMessage,
         timestamp: new Date(),
+        emailDraft: emailDraftData,
         agentResult: agentResults.length > 0 ? { agent: agentResults.map(r => r.agent).join("+"), status: agentResults.every(r => r.status === "success") ? "success" : "error", data: agentResults.length === 1 ? agentResults[0].data : agentResults.map(r => r.data), summary: agentResults.map(r => r.summary).join(" | ") } : undefined,
         pendingApproval: actionData ? {
           id: `approval_${Date.now()}`,
