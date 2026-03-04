@@ -4,8 +4,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   FileText, Receipt, Search, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
   CheckCircle, XCircle, Clock, DollarSign, Download, Eye, Building2,
-  Loader2, X, Calendar, TrendingUp,
-  ExternalLink, Tag, Ban, Layers, MessageSquare, Send
+  Loader2, X, Calendar, TrendingUp, Check,
+  ExternalLink, Tag, Ban, Layers, MessageSquare, Send, Edit2, Trash2
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 
@@ -361,6 +361,15 @@ export default function ContractorManagement() {
   const [rejectModal, setRejectModal] = useState<{ id: string; type: 'invoice' | 'expense'; label: string } | null>(null)
   const [rejectNotes, setRejectNotes] = useState('')
 
+  // Edit modal
+  const [editInvoice, setEditInvoice] = useState<ContractorInvoice | null>(null)
+  const [editExpense, setEditExpense] = useState<ContractorExpense | null>(null)
+  const [editForm, setEditForm] = useState<Record<string, any>>({})
+  const [saving, setSaving] = useState(false)
+
+  // Delete confirmation
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; type: 'invoice' | 'expense'; label: string } | null>(null)
+
   // Fire-and-forget notification
   const sendNotification = (type: 'invoice' | 'expense', id: string, status: string, notes?: string, paidDate?: string, paymentMethod?: string) => {
     fetch('/api/notify', {
@@ -431,7 +440,8 @@ export default function ContractorManagement() {
     let r = [...invoices]
     if (dateRange !== 'all') r = r.filter(inv => inv.period_start >= dateFilter.start && inv.period_end <= dateFilter.end)
     if (searchQuery) { const q = searchQuery.toLowerCase(); r = r.filter(inv => inv.invoice_number.toLowerCase().includes(q) || (memberMap[inv.team_member_id] || '').toLowerCase().includes(q)) }
-    if (filterStatus !== 'all') r = r.filter(inv => filterStatus === 'pending' ? ['submitted', 'pending'].includes(inv.status) : inv.status === filterStatus)
+    if (filterStatus === 'all') r = r.filter(inv => inv.status !== 'rejected')
+    else if (filterStatus !== 'all') r = r.filter(inv => filterStatus === 'pending' ? ['submitted', 'pending'].includes(inv.status) : inv.status === filterStatus)
     if (filterMember !== 'all') r = r.filter(inv => inv.team_member_id === filterMember)
     if (filterClient !== 'all') r = r.filter(inv => inv.contractor_invoice_lines?.some((l: any) => l.client_id === filterClient))
     return r
@@ -441,7 +451,8 @@ export default function ContractorManagement() {
     let r = [...expenses]
     if (dateRange !== 'all') r = r.filter(e => e.date >= dateFilter.start && e.date <= dateFilter.end)
     if (searchQuery) { const q = searchQuery.toLowerCase(); r = r.filter(e => e.description.toLowerCase().includes(q) || (memberMap[e.team_member_id] || '').toLowerCase().includes(q)) }
-    if (filterStatus !== 'all') r = r.filter(e => e.status === filterStatus)
+    if (filterStatus === 'all') r = r.filter(e => e.status !== 'rejected')
+    else r = r.filter(e => e.status === filterStatus)
     if (filterMember !== 'all') r = r.filter(e => e.team_member_id === filterMember)
     if (filterClient !== 'all') r = r.filter(e => e.client_id === filterClient)
     return r
@@ -572,8 +583,86 @@ export default function ContractorManagement() {
   }
   const closePreview = () => { setPreviewFiles([]); setPreviewIndex(0) }
 
+  // ============ EDIT HANDLERS ============
+  const openEditInvoice = (inv: ContractorInvoice) => {
+    setEditInvoice(inv)
+    setEditForm({
+      invoice_number: inv.invoice_number,
+      total_amount: inv.total_amount,
+      period_start: inv.period_start,
+      period_end: inv.period_end,
+      notes: inv.notes || '',
+    })
+  }
+
+  const openEditExpense = (exp: ContractorExpense) => {
+    setEditExpense(exp)
+    setEditForm({
+      description: exp.description,
+      amount: exp.amount,
+      date: exp.date,
+      category: exp.category,
+      client_id: exp.client_id || '',
+      project_id: exp.project_id || '',
+      notes: exp.notes || '',
+      is_billable: exp.is_billable ?? false,
+    })
+  }
+
+  const saveEditInvoice = async () => {
+    if (!editInvoice) return
+    setSaving(true)
+    const updates = {
+      invoice_number: editForm.invoice_number,
+      total_amount: Number(editForm.total_amount),
+      period_start: editForm.period_start,
+      period_end: editForm.period_end,
+      notes: editForm.notes || null,
+    }
+    const { error } = await supabase.from('contractor_invoices').update(updates).eq('id', editInvoice.id)
+    if (!error) {
+      setInvoices(prev => prev.map(inv => inv.id === editInvoice.id ? { ...inv, ...updates } : inv))
+      setEditInvoice(null)
+    }
+    setSaving(false)
+  }
+
+  const saveEditExpense = async () => {
+    if (!editExpense) return
+    setSaving(true)
+    const updates = {
+      description: editForm.description,
+      amount: Number(editForm.amount),
+      date: editForm.date,
+      category: editForm.category,
+      client_id: editForm.client_id || null,
+      project_id: editForm.project_id || null,
+      notes: editForm.notes || null,
+      is_billable: editForm.is_billable,
+    }
+    const { error } = await supabase.from('contractor_expenses').update(updates).eq('id', editExpense.id)
+    if (!error) {
+      setExpenses(prev => prev.map(e => e.id === editExpense.id ? { ...e, ...updates } : e))
+      setEditExpense(null)
+    }
+    setSaving(false)
+  }
+
+  const deleteItem = async () => {
+    if (!deleteConfirm) return
+    setProcessing(deleteConfirm.id)
+    const table = deleteConfirm.type === 'invoice' ? 'contractor_invoices' : 'contractor_expenses'
+    const { error } = await supabase.from(table).delete().eq('id', deleteConfirm.id)
+    if (!error) {
+      if (deleteConfirm.type === 'invoice') setInvoices(prev => prev.filter(i => i.id !== deleteConfirm.id))
+      else setExpenses(prev => prev.filter(e => e.id !== deleteConfirm.id))
+    }
+    setDeleteConfirm(null)
+    setProcessing(null)
+  }
+
   // ============ INVOICE ROW GRID ============
-  const invGrid = 'grid-cols-[1fr_120px_90px_100px_120px_110px]'
+  const invGrid = 'grid-cols-[1fr_120px_90px_100px_120px_130px]'
 
   const renderInvoiceRows = (items: ContractorInvoice[]) => (
     <>
@@ -586,6 +675,7 @@ export default function ContractorManagement() {
         const lines = inv.contractor_invoice_lines || []
         const isExp = expandedInvoice === inv.id
         const canReject = !['paid', 'rejected'].includes(inv.status)
+        const isRejected = inv.status === 'rejected'
         return (
           <div key={inv.id} className="border-b border-gray-100 last:border-0">
             <div className={`grid ${invGrid} gap-2 px-5 py-3 items-center ${THEME.cardHover} transition-colors ${getRowBorder(inv.status)}`}>
@@ -606,6 +696,9 @@ export default function ContractorManagement() {
                 else changeInvStatus(inv.id, s)
               }} disabled={processing === inv.id} />
               <div className="flex items-center gap-1.5">
+                <button onClick={() => openEditInvoice(inv)} className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 vBtn" title="Edit">
+                  <Edit2 size={13} />
+                </button>
                 {inv.receipt_url && (
                   <button onClick={() => openPreview(inv.receipt_url!)} className="p-1 rounded text-emerald-600 hover:text-emerald-500 hover:bg-emerald-50 vBtn" title="View receipt">
                     <Eye size={14} />
@@ -615,6 +708,12 @@ export default function ContractorManagement() {
                   <button onClick={() => { setRejectModal({ id: inv.id, type: 'invoice', label: inv.invoice_number }); setRejectNotes('') }} disabled={processing === inv.id}
                     className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 vBtn disabled:opacity-50" title="Reject">
                     <XCircle size={14} />
+                  </button>
+                )}
+                {isRejected && (
+                  <button onClick={() => setDeleteConfirm({ id: inv.id, type: 'invoice', label: inv.invoice_number })} disabled={processing === inv.id}
+                    className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 vBtn disabled:opacity-50" title="Delete">
+                    <Trash2 size={13} />
                   </button>
                 )}
               </div>
@@ -655,7 +754,7 @@ export default function ContractorManagement() {
   )
 
   // ============ EXPENSE ROW GRID ============
-  const expGrid = 'grid-cols-[1fr_110px_110px_70px_70px_80px_85px_120px_80px]'
+  const expGrid = 'grid-cols-[1fr_110px_110px_70px_70px_80px_85px_120px_100px]'
 
   const renderExpenseRows = (items: ContractorExpense[]) => (
     <>
@@ -668,6 +767,7 @@ export default function ContractorManagement() {
         const cn = exp.client_id ? (clientMap[exp.client_id] || '—') : '—'
         const oh = isOverhead(cn); const bill = exp.is_billable ?? false
         const canReject = !['paid', 'rejected'].includes(exp.status)
+        const isRejected = exp.status === 'rejected'
         return (
           <div key={exp.id} className={`grid ${expGrid} gap-2 px-5 py-3 items-center border-b border-gray-100 last:border-0 ${THEME.cardHover} transition-colors ${getRowBorder(exp.status)}`}>
             <p className="text-gray-900 text-sm truncate">{exp.description}</p>
@@ -689,6 +789,9 @@ export default function ContractorManagement() {
                 else changeExpStatus(exp.id, s)
               }} disabled={processing === exp.id} />
             <div className="flex items-center gap-1.5">
+              <button onClick={() => openEditExpense(exp)} className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 vBtn" title="Edit">
+                <Edit2 size={13} />
+              </button>
               {exp.receipt_url && (
                 <button onClick={() => openPreview(exp.receipt_url!)} className="p-1 rounded text-emerald-600 hover:text-emerald-500 hover:bg-emerald-50 vBtn" title="View receipt">
                   <Eye size={14} />
@@ -698,6 +801,12 @@ export default function ContractorManagement() {
                 <button onClick={() => { setRejectModal({ id: exp.id, type: 'expense', label: exp.description }); setRejectNotes('') }} disabled={processing === exp.id}
                   className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 vBtn disabled:opacity-50" title="Reject">
                   <XCircle size={14} />
+                </button>
+              )}
+              {isRejected && (
+                <button onClick={() => setDeleteConfirm({ id: exp.id, type: 'expense', label: exp.description })} disabled={processing === exp.id}
+                  className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 vBtn disabled:opacity-50" title="Delete">
+                  <Trash2 size={13} />
                 </button>
               )}
             </div>
@@ -920,6 +1029,160 @@ export default function ContractorManagement() {
               <p className="text-sm text-gray-500 font-medium">No expenses for {dateFilter.label}</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ===================== EDIT INVOICE MODAL ===================== */}
+      {editInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm vFade" onClick={() => setEditInvoice(null)}>
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-200 bg-blue-50">
+              <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center"><Edit2 size={15} className="text-blue-600" /></div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Edit Invoice</p>
+                <p className="text-xs text-gray-500">{editInvoice.invoice_number} — {memberMap[editInvoice.team_member_id]}</p>
+              </div>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Invoice Number</label>
+                <input type="text" value={editForm.invoice_number || ''} onChange={e => setEditForm(f => ({ ...f, invoice_number: e.target.value }))}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Amount</label>
+                <input type="number" step="0.01" value={editForm.total_amount ?? ''} onChange={e => setEditForm(f => ({ ...f, total_amount: e.target.value }))}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Period Start</label>
+                  <input type="date" value={editForm.period_start || ''} onChange={e => setEditForm(f => ({ ...f, period_start: e.target.value }))}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Period End</label>
+                  <input type="date" value={editForm.period_end || ''} onChange={e => setEditForm(f => ({ ...f, period_end: e.target.value }))}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Notes</label>
+                <textarea value={editForm.notes || ''} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} rows={2}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 resize-none" placeholder="Internal notes..." />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200 bg-gray-50">
+              <button onClick={() => setEditInvoice(null)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg">Cancel</button>
+              <button onClick={saveEditInvoice} disabled={saving}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5">
+                {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== EDIT EXPENSE MODAL ===================== */}
+      {editExpense && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm vFade" onClick={() => setEditExpense(null)}>
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-200 bg-blue-50">
+              <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center"><Edit2 size={15} className="text-blue-600" /></div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Edit Expense</p>
+                <p className="text-xs text-gray-500">{editExpense.description} — {memberMap[editExpense.team_member_id]}</p>
+              </div>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Description</label>
+                <input type="text" value={editForm.description || ''} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Amount</label>
+                  <input type="number" step="0.01" value={editForm.amount ?? ''} onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Date</label>
+                  <input type="date" value={editForm.date || ''} onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Category</label>
+                  <select value={editForm.category || 'other'} onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300">
+                    {Object.entries(EXPENSE_CATEGORIES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Client</label>
+                  <select value={editForm.client_id || ''} onChange={e => setEditForm(f => ({ ...f, client_id: e.target.value }))}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300">
+                    <option value="">No Client</option>
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Project</label>
+                <select value={editForm.project_id || ''} onChange={e => setEditForm(f => ({ ...f, project_id: e.target.value }))}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300">
+                  <option value="">No Project</option>
+                  {projects.filter(p => !editForm.client_id || p.client_id === editForm.client_id).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">Billable</label>
+                <button onClick={() => setEditForm(f => ({ ...f, is_billable: !f.is_billable }))}
+                  className={`relative w-9 h-5 rounded-full transition-colors ${editForm.is_billable ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${editForm.is_billable ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Notes</label>
+                <textarea value={editForm.notes || ''} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} rows={2}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 resize-none" placeholder="Internal notes..." />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200 bg-gray-50">
+              <button onClick={() => setEditExpense(null)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg">Cancel</button>
+              <button onClick={saveEditExpense} disabled={saving}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5">
+                {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== DELETE CONFIRMATION ===================== */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm vFade" onClick={() => setDeleteConfirm(null)}>
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-200 bg-red-50">
+              <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center"><Trash2 size={15} className="text-red-600" /></div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Delete {deleteConfirm.type === 'invoice' ? 'Invoice' : 'Expense'}</p>
+                <p className="text-xs text-gray-500">{deleteConfirm.label}</p>
+              </div>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-sm text-gray-700">This will permanently remove this {deleteConfirm.type}. This action cannot be undone.</p>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200 bg-gray-50">
+              <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg">Cancel</button>
+              <button onClick={deleteItem} disabled={processing !== null}
+                className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-1.5">
+                {processing ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />} Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
