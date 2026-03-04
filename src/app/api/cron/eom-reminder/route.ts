@@ -57,8 +57,8 @@ export async function GET(request: Request) {
     const { data: contractors, error: teamError } = await supabase
       .from("team_members")
       .select("id, name, email, company_id, cost_type, cost_amount")
-      .or("employment_type.eq.1099,employment_type.eq.contractor")
-      .eq("is_active", true)
+      .eq("employment_type", "contractor")
+      .eq("status", "active")
       .not("email", "is", null)
 
     if (teamError || !contractors || contractors.length === 0) {
@@ -123,8 +123,9 @@ export async function GET(request: Request) {
       }
 
       // Calculate estimated invoice amount for hourly contractors
-      const isHourly = contractor.cost_type === "hourly"
-      const isFixed = contractor.cost_type === "lump_sum"
+      const costTypeLower = (contractor.cost_type || "").toLowerCase().replace(/\s+/g, "_")
+      const isHourly = costTypeLower === "hourly"
+      const isFixed = costTypeLower === "lump_sum"
       let estimatedInvoiceAmount: number | undefined
 
       if (isHourly && totalHours > 0) {
