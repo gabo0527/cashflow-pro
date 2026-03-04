@@ -5,7 +5,7 @@ import {
   FileText, Receipt, Search, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
   CheckCircle, XCircle, Clock, DollarSign, Download, Eye, Building2,
   Loader2, X, Calendar, TrendingUp,
-  ExternalLink, Tag, Ban, Layers
+  ExternalLink, Tag, Ban, Layers, MessageSquare, Send
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 
@@ -357,6 +357,19 @@ export default function ContractorManagement() {
   // Processing
   const [processing, setProcessing] = useState<string | null>(null)
 
+  // Rejection modal
+  const [rejectModal, setRejectModal] = useState<{ id: string; type: 'invoice' | 'expense'; label: string } | null>(null)
+  const [rejectNotes, setRejectNotes] = useState('')
+
+  // Fire-and-forget notification
+  const sendNotification = (type: 'invoice' | 'expense', id: string, status: string, notes?: string, paidDate?: string, paymentMethod?: string) => {
+    fetch('/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, id, status, notes, paidDate, paymentMethod }),
+    }).catch(err => console.warn('Notification failed (non-blocking):', err))
+  }
+
   const memberMap = useMemo(() => { const m: Record<string, string> = {}; teamMembers.forEach(t => { m[t.id] = t.name }); return m }, [teamMembers])
   const clientMap = useMemo(() => { const m: Record<string, string> = {}; clients.forEach(c => { m[c.id] = c.name }); return m }, [clients])
 
@@ -488,20 +501,28 @@ export default function ContractorManagement() {
   }, [filteredExpenses])
 
   // ============ ACTIONS ============
-  const changeInvStatus = async (id: string, status: string) => {
+  const changeInvStatus = async (id: string, status: string, notes?: string) => {
     setProcessing(id)
     const updates: any = { status, reviewed_at: new Date().toISOString() }
     if (status === 'paid') updates.paid_at = new Date().toISOString()
+    if (notes) updates.notes = notes
     const { error } = await supabase.from('contractor_invoices').update(updates).eq('id', id)
-    if (!error) setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, ...updates } : inv))
+    if (!error) {
+      setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, ...updates } : inv))
+      sendNotification('invoice', id, status, notes, status === 'paid' ? new Date().toISOString() : undefined, status === 'paid' ? 'ACH' : undefined)
+    }
     setProcessing(null)
   }
 
-  const changeExpStatus = async (id: string, status: string) => {
+  const changeExpStatus = async (id: string, status: string, notes?: string) => {
     setProcessing(id)
     const updates: any = { status, reviewed_at: new Date().toISOString() }
+    if (notes) updates.notes = notes
     const { error } = await supabase.from('contractor_expenses').update(updates).eq('id', id)
-    if (!error) setExpenses(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e))
+    if (!error) {
+      setExpenses(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e))
+      sendNotification('expense', id, status, notes)
+    }
     setProcessing(null)
   }
 
@@ -515,7 +536,10 @@ export default function ContractorManagement() {
     for (const inv of pend) {
       const u = { status: 'approved', reviewed_at: new Date().toISOString() }
       const { error } = await supabase.from('contractor_invoices').update(u).eq('id', inv.id)
-      if (!error) setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, ...u } : i))
+      if (!error) {
+        setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, ...u } : i))
+        sendNotification('invoice', inv.id, 'approved')
+      }
     }
     setProcessing(null)
   }
@@ -525,7 +549,10 @@ export default function ContractorManagement() {
     for (const exp of pend) {
       const u = { status: 'approved', reviewed_at: new Date().toISOString() }
       const { error } = await supabase.from('contractor_expenses').update(u).eq('id', exp.id)
-      if (!error) setExpenses(prev => prev.map(e => e.id === exp.id ? { ...e, ...u } : e))
+      if (!error) {
+        setExpenses(prev => prev.map(e => e.id === exp.id ? { ...e, ...u } : e))
+        sendNotification('expense', exp.id, 'approved')
+      }
     }
     setProcessing(null)
   }
@@ -574,7 +601,10 @@ export default function ContractorManagement() {
               <span className="text-gray-600 text-sm truncate">{memberMap[inv.team_member_id] || '—'}</span>
               <span className="text-gray-400 text-xs vN">{fmtDateS(inv.period_start)} – {fmtDateS(inv.period_end)}</span>
               <span className="text-gray-900 text-sm font-medium text-right vN">{fmt$(inv.total_amount)}</span>
-              <StatusDropdown status={inv.status} onChange={s => changeInvStatus(inv.id, s)} disabled={processing === inv.id} />
+              <StatusDropdown status={inv.status} onChange={s => {
+                if (s === 'rejected') { setRejectModal({ id: inv.id, type: 'invoice', label: inv.invoice_number }); setRejectNotes('') }
+                else changeInvStatus(inv.id, s)
+              }} disabled={processing === inv.id} />
               <div className="flex items-center gap-1.5">
                 {inv.receipt_url && (
                   <button onClick={() => openPreview(inv.receipt_url!)} className="p-1 rounded text-emerald-600 hover:text-emerald-500 hover:bg-emerald-50 vBtn" title="View receipt">
@@ -582,7 +612,7 @@ export default function ContractorManagement() {
                   </button>
                 )}
                 {canReject && (
-                  <button onClick={() => changeInvStatus(inv.id, 'rejected')} disabled={processing === inv.id}
+                  <button onClick={() => { setRejectModal({ id: inv.id, type: 'invoice', label: inv.invoice_number }); setRejectNotes('') }} disabled={processing === inv.id}
                     className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 vBtn disabled:opacity-50" title="Reject">
                     <XCircle size={14} />
                   </button>
@@ -654,7 +684,10 @@ export default function ContractorManagement() {
             <button onClick={() => toggleBillable(exp.id, bill)} title={bill ? 'Click to mark non-billable' : 'Click to mark billable'}>
               <BillableBadge isBillable={bill} isOH={oh && !bill} />
             </button>
-            <StatusDropdown status={exp.status} onChange={s => changeExpStatus(exp.id, s)} disabled={processing === exp.id} />
+            <StatusDropdown status={exp.status} onChange={s => {
+                if (s === 'rejected') { setRejectModal({ id: exp.id, type: 'expense', label: exp.description }); setRejectNotes('') }
+                else changeExpStatus(exp.id, s)
+              }} disabled={processing === exp.id} />
             <div className="flex items-center gap-1.5">
               {exp.receipt_url && (
                 <button onClick={() => openPreview(exp.receipt_url!)} className="p-1 rounded text-emerald-600 hover:text-emerald-500 hover:bg-emerald-50 vBtn" title="View receipt">
@@ -662,7 +695,7 @@ export default function ContractorManagement() {
                 </button>
               )}
               {canReject && (
-                <button onClick={() => changeExpStatus(exp.id, 'rejected')} disabled={processing === exp.id}
+                <button onClick={() => { setRejectModal({ id: exp.id, type: 'expense', label: exp.description }); setRejectNotes('') }} disabled={processing === exp.id}
                   className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 vBtn disabled:opacity-50" title="Reject">
                   <XCircle size={14} />
                 </button>
@@ -887,6 +920,56 @@ export default function ContractorManagement() {
               <p className="text-sm text-gray-500 font-medium">No expenses for {dateFilter.label}</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ===================== REJECTION NOTES MODAL ===================== */}
+      {rejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm vFade" onClick={() => setRejectModal(null)}>
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-200 bg-red-50">
+              <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+                <XCircle size={16} className="text-red-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Reject {rejectModal.type === 'invoice' ? 'Invoice' : 'Expense'}</p>
+                <p className="text-xs text-gray-500">{rejectModal.label}</p>
+              </div>
+            </div>
+            <div className="px-5 py-4">
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                <MessageSquare size={11} className="inline mr-1" />
+                Reason for rejection (sent to contractor)
+              </label>
+              <textarea
+                value={rejectNotes}
+                onChange={e => setRejectNotes(e.target.value)}
+                placeholder="e.g. Hours don't match approved timesheets, missing receipt, incorrect amount..."
+                rows={3}
+                autoFocus
+                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-300 resize-none"
+              />
+              <p className="text-[11px] text-gray-400 mt-1.5">This note will appear in the notification email to the contractor.</p>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200 bg-gray-50">
+              <button onClick={() => setRejectModal(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (rejectModal.type === 'invoice') changeInvStatus(rejectModal.id, 'rejected', rejectNotes || undefined)
+                  else changeExpStatus(rejectModal.id, 'rejected', rejectNotes || undefined)
+                  setRejectModal(null)
+                  setRejectNotes('')
+                }}
+                disabled={processing !== null}
+                className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-1.5 transition-colors">
+                {processing ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                Reject & Notify
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
