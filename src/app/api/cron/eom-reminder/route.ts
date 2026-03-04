@@ -75,7 +75,7 @@ export async function GET(request: Request) {
       const { data: existingInvoice } = await supabase
         .from("contractor_invoices")
         .select("id, status")
-        .eq("contractor_id", contractor.id)
+        .eq("team_member_id", contractor.id)
         .gte("period_start", periodStart)
         .lte("period_start", periodEnd)
         .limit(1)
@@ -102,7 +102,7 @@ export async function GET(request: Request) {
           project_id,
           projects!project_id (name)
         `)
-        .eq("contractor_id", contractor.id)
+        .eq("team_member_id", contractor.id)
         .gte("date", periodStart)
         .lte("date", periodEnd)
 
