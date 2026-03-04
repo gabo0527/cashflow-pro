@@ -233,7 +233,7 @@ export async function sendInvoiceStatusEmail(data: InvoiceStatusEmailData) {
   try {
     const { data: result, error } = await resend.emails.send({
       from: FROM_EMAIL,
-      reply_to: REPLY_TO,
+      replyTo: REPLY_TO,
       to: data.contractorEmail,
       subject: msg.subject,
       html: emailWrapper(content),
@@ -325,7 +325,7 @@ export async function sendExpenseStatusEmail(data: ExpenseStatusEmailData) {
   try {
     const { data: result, error } = await resend.emails.send({
       from: FROM_EMAIL,
-      reply_to: REPLY_TO,
+      replyTo: REPLY_TO,
       to: data.contractorEmail,
       subject: msg.subject,
       html: emailWrapper(content),
@@ -421,7 +421,7 @@ export async function sendEOMReminderEmail(data: EOMReminderEmailData) {
   try {
     const { data: result, error } = await resend.emails.send({
       from: FROM_EMAIL,
-      reply_to: REPLY_TO,
+      replyTo: REPLY_TO,
       to: data.contractorEmail,
       subject,
       html: emailWrapper(content),
