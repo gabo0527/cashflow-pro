@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { aiRequest } from '@/lib/ai-router'
 import { composeEmail } from '@/lib/email-compose'
+import { tryAgentExecution, detectAgentIntent, AGENTS } from '@/lib/agent-dispatcher'
 
 // ============================================================
 // Email intent detection — catches send/email/notify/remind patterns
@@ -29,10 +30,23 @@ function extractContractorName(message: string): string | null {
   return null
 }
 
+// ============================================================
+// Agent awareness prompt — tells Sage what agents can do
+// ============================================================
+const AGENT_AWARENESS = `
+
+EXECUTABLE AGENTS — You have access to these automation agents. When a user asks about these capabilities, you CAN execute them. The system detects the intent automatically and runs the agent.
+
+${AGENTS.map(a => `• ${a.name}: ${a.description}\n  Example phrases: "${a.triggers.slice(0, 3).join('", "')}"`).join('\n')}
+
+When a user's request matches an agent, it will execute automatically. If you think they want an agent but the phrasing is ambiguous, suggest they try a direct phrase like "validate all pending invoices" or "run timesheet reconciliation for last week".
+
+Do NOT say you cannot execute agents. You CAN. They run automatically when the user's intent is detected.`
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { messages, systemPrompt, dataContext } = body
+    const { messages, systemPrompt, dataContext, companyId } = body
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: 'Messages array is required' }, { status: 400 })
@@ -41,7 +55,31 @@ export async function POST(request: NextRequest) {
     const lastMessage = messages[messages.length - 1]?.content || ''
 
     // ============================================================
-    // EMAIL INTENT → Route to Email Composer
+    // 1. AGENT EXECUTION CHECK — runs before email and chat
+    // ============================================================
+    if (companyId) {
+      const protocol = request.headers.get('x-forwarded-proto') || 'https'
+      const host = request.headers.get('host') || 'localhost:3000'
+      const baseUrl = `${protocol}://${host}`
+
+      const agentResponse = await tryAgentExecution(lastMessage, baseUrl, companyId)
+
+      if (agentResponse) {
+        const intent = detectAgentIntent(lastMessage)
+        return NextResponse.json({
+          content: agentResponse,
+          message: agentResponse,
+          provider: 'agent',
+          model: intent?.agent.id || 'unknown',
+          agentUsed: intent?.agent.id,
+          agentAction: intent?.action,
+          metadata: { agentExecuted: true },
+        })
+      }
+    }
+
+    // ============================================================
+    // 2. EMAIL INTENT → Route to Email Composer
     // ============================================================
     if (detectEmailIntent(lastMessage)) {
       const contractorName = extractContractorName(lastMessage)
@@ -89,7 +127,7 @@ Would you like me to send this, or should I adjust anything?`
     }
 
     // ============================================================
-    // REGULAR CHAT → Standard Sage response
+    // 3. REGULAR CHAT → Standard Sage response
     // ============================================================
     const fullSystemPrompt = `${systemPrompt || 'You are Sage, the VantageFP financial AI assistant.'}
 
@@ -106,7 +144,8 @@ Remember to:
 6. When relevant, mention [View Report →] or [Open Forecast →] as clickable links
 
 IMPORTANT — Email capability:
-You can send emails to contractors on Gabriel's behalf. If someone asks you to email, message, or notify a contractor, let them know you're drafting it. If the automatic detection didn't trigger, ask them to clarify who they want to contact and what the message should say.`
+You can send emails to contractors on Gabriel's behalf. If someone asks you to email, message, or notify a contractor, let them know you're drafting it. If the automatic detection didn't trigger, ask them to clarify who they want to contact and what the message should say.
+${AGENT_AWARENESS}`
 
     const formattedMessages = messages.map((msg: { role: string; content: string }) => ({
       role: msg.role as 'user' | 'assistant',
