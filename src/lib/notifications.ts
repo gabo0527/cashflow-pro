@@ -46,12 +46,12 @@ export async function notifyInvoiceStatusChange(
       .select(`
         id,
         invoice_number,
-        amount,
+        total_amount,
         status,
         period_start,
         period_end,
-        contractor_id,
-        team_members!contractor_id (
+        team_member_id,
+        team_members!team_member_id (
           id,
           name,
           email
@@ -80,7 +80,7 @@ export async function notifyInvoiceStatusChange(
       contractorName: contractor.name?.split(" ")[0] || contractor.name || "there",
       contractorEmail: contractor.email,
       invoiceNumber: invoice.invoice_number || `INV-${invoiceId.slice(0, 6).toUpperCase()}`,
-      invoiceAmount: invoice.amount || 0,
+      invoiceAmount: invoice.total_amount || 0,
       previousStatus: invoice.status || "submitted",
       newStatus,
       periodStart: invoice.period_start ? formatDate(invoice.period_start) : undefined,
@@ -137,15 +137,15 @@ export async function notifyExpenseStatusChange(
 
   try {
     const { data: expense, error: expError } = await supabase
-      .from("project_expenses")
+      .from("contractor_expenses")
       .select(`
         id,
         description,
         amount,
         date,
         status,
-        submitted_by,
-        team_members!submitted_by (
+        team_member_id,
+        team_members!team_member_id (
           id,
           name,
           email
