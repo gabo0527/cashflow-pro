@@ -462,6 +462,9 @@ export default function ContractorManagement() {
   // ============ GROUPED DATA ============
   const invResolvers = useMemo(() => ({
     client: (inv: ContractorInvoice) => {
+      // Check invoice-level client_id first (set on creation or via edit)
+      if (inv.client_id && clientMap[inv.client_id]) return { id: inv.client_id, name: clientMap[inv.client_id] }
+      // Fall back to lines
       const lines = inv.contractor_invoice_lines || []
       if (lines.length === 0) return { id: '', name: 'Unassigned' }
       const ct: Record<string, number> = {}; lines.forEach(l => { ct[l.client_id] = (ct[l.client_id] || 0) + l.amount })
