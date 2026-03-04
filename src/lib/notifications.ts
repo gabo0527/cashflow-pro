@@ -71,10 +71,8 @@ export async function notifyInvoiceStatusChange(
       return { success: false, error: "No contractor email" }
     }
 
-    // Don't notify if status hasn't actually changed
-    if (invoice.status === newStatus) {
-      return { success: false, error: "Status unchanged" }
-    }
+    // Note: The DB status is already updated by the caller before this runs,
+    // so we skip the status comparison check and always send the notification.
 
     const emailData: InvoiceStatusEmailData = {
       contractorName: contractor.name?.split(" ")[0] || contractor.name || "there",
@@ -165,9 +163,8 @@ export async function notifyExpenseStatusChange(
       return { success: false, error: "No contractor email" }
     }
 
-    if (expense.status === newStatus) {
-      return { success: false, error: "Status unchanged" }
-    }
+    // Note: The DB status is already updated by the caller before this runs,
+    // so we skip the status comparison check and always send the notification.
 
     const emailData: ExpenseStatusEmailData = {
       contractorName: contractor.name?.split(" ")[0] || contractor.name || "there",
