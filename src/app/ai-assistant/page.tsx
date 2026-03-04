@@ -1,5 +1,4 @@
 "use client"
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { 
   Send, User, TrendingUp, DollarSign, 
@@ -7,7 +6,7 @@ import {
   Plus, MessageSquare, Pencil, Check, X, PanelLeftClose, PanelLeft,
   Paperclip, Image as ImageIcon, FileText, XCircle, BarChart3, PieChart,
   Zap, Brain, TrendingDown, ArrowUpRight, ArrowDownRight, Lightbulb, Activity,
-  Gauge, Receipt, Search, CreditCard
+  Gauge, Receipt, Search, CreditCard, CheckCircle2, XOctagon, Loader2, Shield
 } from "lucide-react"
 import { createClient } from "@supabase/supabase-js"
 import Link from "next/link"
@@ -24,84 +23,53 @@ const supabase = createClient(
 
 const CHART_COLORS = ["#10B981", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444", "#EC4899", "#34D399", "#6366F1", "#F97316", "#06B6D4"]
 
-// ============ NEW SAGE LOGO — Emerald Sphere with Neural Network + Chart ============
+// ============ SAGE LOGO ============
 function SageLogo({ size = 32, className = "" }: { size?: number, className?: string }) {
   const id = React.useId().replace(/:/g, "")
   const full = size >= 48
   const mid = size >= 28
   const sm = size < 28
-
   return (
     <svg width={size} height={size} viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
       <defs>
-        {/* Sphere gradient — deep emerald core to bright edge */}
         <radialGradient id={`sphere${id}`} cx="45%" cy="40%" r="50%" fx="35%" fy="35%">
           <stop offset="0%" stopColor="#34d399" stopOpacity="0.35" />
           <stop offset="40%" stopColor="#10b981" stopOpacity="0.20" />
           <stop offset="70%" stopColor="#059669" stopOpacity="0.12" />
           <stop offset="100%" stopColor="#047857" stopOpacity="0.04" />
         </radialGradient>
-
-        {/* Sphere rim light */}
         <radialGradient id={`rim${id}`} cx="50%" cy="50%" r="50%">
           <stop offset="85%" stopColor="#10b981" stopOpacity="0" />
           <stop offset="95%" stopColor="#10b981" stopOpacity="0.25" />
           <stop offset="100%" stopColor="#34d399" stopOpacity="0.08" />
         </radialGradient>
-
-        {/* Specular highlight */}
         <radialGradient id={`spec${id}`} cx="38%" cy="30%" r="30%" fx="35%" fy="25%">
           <stop offset="0%" stopColor="#ffffff" stopOpacity="0.22" />
           <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
         </radialGradient>
-
-        {/* Outer glow */}
-        <radialGradient id={`glow${id}`} cx="50%" cy="50%" r="50%">
-          <stop offset="60%" stopColor="#10b981" stopOpacity="0" />
-          <stop offset="100%" stopColor="#10b981" stopOpacity="0.12" />
-        </radialGradient>
-
-        {/* Bar chart gradient */}
         <linearGradient id={`bar${id}`} x1="0" y1="1" x2="0" y2="0">
           <stop offset="0%" stopColor="#059669" stopOpacity="0.7" />
           <stop offset="100%" stopColor="#34d399" stopOpacity="0.9" />
         </linearGradient>
-
-        {/* Arrow gradient */}
         <linearGradient id={`arrow${id}`} x1="0" y1="1" x2="1" y2="0">
           <stop offset="0%" stopColor="#10b981" />
           <stop offset="100%" stopColor="#6ee7b7" />
         </linearGradient>
-
-        {/* Node glow filter */}
         <filter id={`ng${id}`}><feGaussianBlur stdDeviation="1.5" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
-
-        {/* Outer glow filter */}
         <filter id={`og${id}`}><feGaussianBlur stdDeviation="6" /></filter>
       </defs>
-
-      {/* ====== OUTER GLOW ====== */}
       {mid && <circle cx="60" cy="60" r="52" fill="#10b981" opacity="0.08" filter={`url(#og${id})`} />}
-
-      {/* ====== SPHERE BASE ====== */}
       <circle cx="60" cy="60" r={sm ? "48" : "46"} fill={`url(#sphere${id})`} />
       <circle cx="60" cy="60" r={sm ? "48" : "46"} fill={`url(#rim${id})`} />
       <circle cx="60" cy="60" r={sm ? "48" : "46"} fill={`url(#spec${id})`} />
-
-      {/* Sphere edge ring */}
       <circle cx="60" cy="60" r={sm ? "47" : "45"} fill="none" stroke="#10b981" strokeWidth={sm ? "1.5" : "1"} opacity="0.3" />
       {mid && <circle cx="60" cy="60" r="45" fill="none" stroke="#34d399" strokeWidth="0.5" opacity="0.15" />}
-
-      {/* ====== NETWORK CONNECTIONS (surface lines) ====== */}
       {mid && <>
-        {/* Latitude-ish curves */}
         <ellipse cx="60" cy="42" rx="34" ry="8" fill="none" stroke="#34d399" strokeWidth="0.4" opacity="0.15" />
         <ellipse cx="60" cy="60" rx="40" ry="10" fill="none" stroke="#10b981" strokeWidth="0.3" opacity="0.10" />
         <ellipse cx="60" cy="78" rx="32" ry="7" fill="none" stroke="#34d399" strokeWidth="0.4" opacity="0.12" />
       </>}
-
       {full && <>
-        {/* Diagonal network lines */}
         <line x1="30" y1="28" x2="52" y2="44" stroke="#34d399" strokeWidth="0.4" opacity="0.18" />
         <line x1="90" y1="30" x2="70" y2="46" stroke="#34d399" strokeWidth="0.4" opacity="0.15" />
         <line x1="25" y1="55" x2="42" y2="52" stroke="#10b981" strokeWidth="0.35" opacity="0.14" />
@@ -111,7 +79,6 @@ function SageLogo({ size = 32, className = "" }: { size?: number, className?: st
         <line x1="52" y1="44" x2="70" y2="46" stroke="#10b981" strokeWidth="0.4" opacity="0.16" />
         <line x1="42" y1="52" x2="78" y2="54" stroke="#10b981" strokeWidth="0.3" opacity="0.10" />
         <line x1="48" y1="72" x2="72" y2="74" stroke="#10b981" strokeWidth="0.3" opacity="0.10" />
-        {/* Cross connections */}
         <line x1="30" y1="28" x2="25" y2="55" stroke="#34d399" strokeWidth="0.3" opacity="0.10" />
         <line x1="90" y1="30" x2="95" y2="58" stroke="#34d399" strokeWidth="0.3" opacity="0.08" />
         <line x1="25" y1="55" x2="32" y2="80" stroke="#34d399" strokeWidth="0.3" opacity="0.10" />
@@ -119,10 +86,7 @@ function SageLogo({ size = 32, className = "" }: { size?: number, className?: st
         <line x1="52" y1="44" x2="48" y2="72" stroke="#10b981" strokeWidth="0.25" opacity="0.08" strokeDasharray="2 3" />
         <line x1="70" y1="46" x2="72" y2="74" stroke="#10b981" strokeWidth="0.25" opacity="0.08" strokeDasharray="2 3" />
       </>}
-
-      {/* ====== NETWORK NODES (glowing dots) ====== */}
       {full && <>
-        {/* Outer ring nodes */}
         <circle cx="30" cy="28" r="2.2" fill="#34d399" opacity="0.5" filter={`url(#ng${id})`} />
         <circle cx="30" cy="28" r="1.2" fill="#6ee7b7" opacity="0.8" />
         <circle cx="90" cy="30" r="2" fill="#34d399" opacity="0.4" filter={`url(#ng${id})`} />
@@ -135,8 +99,6 @@ function SageLogo({ size = 32, className = "" }: { size?: number, className?: st
         <circle cx="32" cy="80" r="0.9" fill="#6ee7b7" opacity="0.6" />
         <circle cx="88" cy="82" r="1.8" fill="#34d399" opacity="0.3" filter={`url(#ng${id})`} />
         <circle cx="88" cy="82" r="0.9" fill="#6ee7b7" opacity="0.55" />
-
-        {/* Inner ring nodes */}
         <circle cx="52" cy="44" r="1.8" fill="#34d399" opacity="0.4" filter={`url(#ng${id})`} />
         <circle cx="52" cy="44" r="0.9" fill="#6ee7b7" opacity="0.7" />
         <circle cx="70" cy="46" r="1.8" fill="#34d399" opacity="0.35" filter={`url(#ng${id})`} />
@@ -149,8 +111,6 @@ function SageLogo({ size = 32, className = "" }: { size?: number, className?: st
         <circle cx="48" cy="72" r="0.7" fill="#6ee7b7" opacity="0.55" />
         <circle cx="72" cy="74" r="1.5" fill="#34d399" opacity="0.28" />
         <circle cx="72" cy="74" r="0.7" fill="#6ee7b7" opacity="0.5" />
-
-        {/* Scattered small dust */}
         <circle cx="40" cy="30" r="0.8" fill="#6ee7b7" opacity="0.3" />
         <circle cx="80" cy="40" r="0.8" fill="#6ee7b7" opacity="0.25" />
         <circle cx="22" cy="68" r="0.7" fill="#6ee7b7" opacity="0.2" />
@@ -158,8 +118,6 @@ function SageLogo({ size = 32, className = "" }: { size?: number, className?: st
         <circle cx="60" cy="22" r="0.8" fill="#6ee7b7" opacity="0.25" />
         <circle cx="60" cy="98" r="0.7" fill="#6ee7b7" opacity="0.2" />
       </>}
-
-      {/* Mid-size simplified nodes */}
       {mid && !full && <>
         <circle cx="32" cy="34" r="1.8" fill="#34d399" opacity="0.4" filter={`url(#ng${id})`} />
         <circle cx="32" cy="34" r="0.9" fill="#6ee7b7" opacity="0.7" />
@@ -172,72 +130,122 @@ function SageLogo({ size = 32, className = "" }: { size?: number, className?: st
         <circle cx="40" cy="85" r="1.3" fill="#34d399" opacity="0.25" />
         <circle cx="80" cy="86" r="1.3" fill="#34d399" opacity="0.22" />
       </>}
-
-      {/* ====== BAR CHART (center) ====== */}
       {mid && <>
-        {/* Bars — 5 ascending */}
         <rect x="42" y="72" width={full ? "5" : "6"} height="10" rx="1" fill={`url(#bar${id})`} opacity="0.75" />
         <rect x="49" y="67" width={full ? "5" : "6"} height="15" rx="1" fill={`url(#bar${id})`} opacity="0.80" />
         <rect x="56" y="62" width={full ? "5" : "6"} height="20" rx="1" fill={`url(#bar${id})`} opacity="0.85" />
         <rect x="63" y="56" width={full ? "5" : "6"} height="26" rx="1" fill={`url(#bar${id})`} opacity="0.90" />
         <rect x="70" y="50" width={full ? "5" : "6"} height="32" rx="1" fill={`url(#bar${id})`} opacity="0.95" />
       </>}
-
-      {/* Small size — 3 bars only */}
       {sm && <>
         <rect x="40" y="68" width="10" height="16" rx="2" fill={`url(#bar${id})`} opacity="0.75" />
         <rect x="54" y="58" width="10" height="26" rx="2" fill={`url(#bar${id})`} opacity="0.85" />
         <rect x="68" y="46" width="10" height="38" rx="2" fill={`url(#bar${id})`} opacity="0.95" />
       </>}
-
-      {/* ====== UPWARD ARROW ====== */}
       {mid && (
-        <path
-          d="M45 68 C50 55, 58 48, 68 40 L74 38"
-          stroke={`url(#arrow${id})`}
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          fill="none"
-          opacity="0.85"
-        />
+        <path d="M45 68 C50 55, 58 48, 68 40 L74 38" stroke={`url(#arrow${id})`} strokeWidth="2.5" strokeLinecap="round" fill="none" opacity="0.85" />
       )}
       {mid && <>
-        {/* Arrowhead */}
         <polygon points="74,38 68,36 71,42" fill="#6ee7b7" opacity="0.9" />
-        {/* Arrow glow */}
         <path d="M45 68 C50 55, 58 48, 68 40 L74 38" stroke="#6ee7b7" strokeWidth="4" strokeLinecap="round" fill="none" opacity="0.08" filter={`url(#ng${id})`} />
       </>}
-
       {sm && (
         <>
           <path d="M42 72 C50 58, 58 50, 72 40" stroke={`url(#arrow${id})`} strokeWidth="3.5" strokeLinecap="round" fill="none" opacity="0.85" />
           <polygon points="72,40 65,38 68,45" fill="#6ee7b7" opacity="0.9" />
         </>
       )}
-
-      {/* ====== TOP SPECULAR FLARE ====== */}
       {mid && <ellipse cx="48" cy="30" rx="14" ry="6" fill="white" opacity="0.06" />}
     </svg>
   )
 }
 
 // ============ TYPES ============
-interface Message { id: string; role: "user" | "assistant"; content: string; timestamp: Date; attachments?: Attachment[]; chart?: ChartData }
+interface Message { id: string; role: "user" | "assistant"; content: string; timestamp: Date; attachments?: Attachment[]; chart?: ChartData; agentResult?: AgentResult; pendingApproval?: PendingApproval }
 interface Attachment { id: string; name: string; type: string; size: number; content?: string }
 interface ChartData { type: "bar" | "line" | "pie" | "area" | "waterfall" | "stacked_bar" | "multi_line" | "composed"; title: string; data: any[]; keys?: string[]; colors?: string[] }
 interface TableData { title: string; headers: string[]; rows: string[][] }
 interface Conversation { id: string; title: string; messages: Message[]; created_at: string; updated_at: string }
 interface CompanyData { transactions: any[]; invoices: any[]; projects: any[]; clients: any[]; teamMembers: any[]; timeEntries: any[]; projectAssignments: any[]; billRates: any[]; costOverrides: any[]; expenses: any[]; learnedPatterns: any[] }
 interface KPISummary { totalRevenue: number; totalExpenses: number; netIncome: number; grossMargin: number; cashOnHand: number; arOutstanding: number; burnRate: number; runway: number; utilizationRate: number; dso: number; teamCost: number; teamRevenue: number; teamMarginPct: number }
+interface AgentResult { agent: string; status: "success" | "error"; data: any; summary: string }
+interface PendingApproval { id: string; type: "bulk_update" | "invoice_approve" | "expense_categorize"; description: string; items: any[]; onApprove: () => Promise<void>; onReject: () => void }
 
-// ============ QUICK ACTIONS ============
+// ============ AGENT INTENT DETECTION ============
+interface AgentIntent {
+  agent: "invoice-validator" | "expense-categorizer" | "timesheet-reconciler" | "cashflow-forecaster" | "project-health" | "morning-briefing" | null
+  action: string
+  confidence: number
+}
+
+function detectAgentIntent(message: string): AgentIntent {
+  const m = message.toLowerCase().trim()
+  
+  // Invoice validator
+  if (/\b(validate|check|review|verify)\b.*\b(invoice|invoices)\b/.test(m) ||
+      /\b(invoice|invoices)\b.*\b(validate|check|review|match|reconcile)\b/.test(m) ||
+      /\bpending invoices?\b/.test(m) ||
+      /\binvoice.*(discrepanc|mismatch|wrong|off)\b/.test(m)) {
+    return { agent: "invoice-validator", action: "validate-pending", confidence: 0.9 }
+  }
+
+  // Expense categorizer
+  if (/\b(categorize|classify|sort|organize|tag)\b.*\b(expense|transaction|bank|uncategorized)\b/.test(m) ||
+      /\b(uncategorized|untagged|unsorted)\b.*\b(expense|transaction)\b/.test(m) ||
+      /\bcategorize\b.*\b(recent|all|pending|new)\b/.test(m)) {
+    return { agent: "expense-categorizer", action: "categorize-pending", confidence: 0.85 }
+  }
+
+  // Timesheet reconciler
+  if (/\b(timesheet|time.?sheet)\b.*\b(missing|submit|reconcil|check|status|review)\b/.test(m) ||
+      /\b(who|which|any).*(missing|submit|log|enter).*(time|hours|timesheet)\b/.test(m) ||
+      /\bmissing\b.*\b(time|hours|timesheet|submission)\b/.test(m) ||
+      /\b(team|contractor).*(hours|time).*(this week|last week|submit)\b/.test(m) ||
+      /\b(budget|hour).*(overrun|over.?budget|burn)\b/.test(m)) {
+    const action = /budget|overrun|burn/.test(m) ? "budget-check" : /missing/.test(m) ? "missing-report" : "reconcile"
+    return { agent: "timesheet-reconciler", action, confidence: 0.85 }
+  }
+
+  // Cash flow forecaster
+  if (/\b(cash.?flow|cashflow)\b.*\b(forecast|project|predict|model|outlook)\b/.test(m) ||
+      /\b(forecast|project)\b.*\b(cash|money|revenue|income)\b/.test(m) ||
+      /\b13.?week\b/.test(m) ||
+      /\b(cash|money)\b.*(runway|last|enough|tight|low)\b/.test(m) ||
+      /\b(build|create|show|run)\b.*\bforecast\b/.test(m) ||
+      /\bcash.?flow\b.*\b(risk|alert|warning)\b/.test(m)) {
+    const action = /alert|risk|warning/.test(m) ? "alerts-only" : "forecast"
+    return { agent: "cashflow-forecaster", action, confidence: 0.85 }
+  }
+
+  // Project health monitor
+  if (/\b(project|portfolio)\b.*\b(health|status|report|digest|overview|scorecard)\b/.test(m) ||
+      /\b(red|yellow|green)\b.*\b(project|flag)\b/.test(m) ||
+      /\b(scope.?creep|margin.?erosion|burn.?rate)\b/.test(m) ||
+      /\bproject.*(at risk|behind|over.?budget|trouble)\b/.test(m)) {
+    const action = /digest|summary|brief/.test(m) ? "digest" : "full-report"
+    return { agent: "project-health", action, confidence: 0.85 }
+  }
+
+  // Morning briefing (multi-agent)
+  if (/\b(morning|monday|weekly|daily)\b.*\b(brief|report|update|digest|summary|rundown)\b/.test(m) ||
+      /\bwhat.*(should|need).*(focus|attention|priority|look at)\b/.test(m) ||
+      /\bwhat.*going on\b/.test(m) ||
+      /\bgive me.*(brief|rundown|overview|update)\b/.test(m) ||
+      /\b(brief|update) me\b/.test(m)) {
+    return { agent: "morning-briefing", action: "full", confidence: 0.8 }
+  }
+
+  return { agent: null, action: "", confidence: 0 }
+}
+
+// ============ QUICK ACTIONS — agent-powered ============
 const QUICK_ACTIONS = [
-  { label: "What should I be focused on this week?", icon: Target, accent: true },
-  { label: "Show me client profitability chart", icon: TrendingUp, accent: false },
-  { label: "Any cash flow risks I should know about?", icon: AlertTriangle, accent: true },
-  { label: "Show team utilization and margins", icon: BarChart3, accent: false },
-  { label: "Categorize my recent bank transactions", icon: CreditCard, accent: false },
-  { label: "Revenue trend over last 6 months", icon: Activity, accent: false },
+  { label: "Give me my Monday briefing", icon: Target, accent: true, agent: true },
+  { label: "Show me project health scorecard", icon: BarChart3, accent: true, agent: true },
+  { label: "Any cash flow risks in the next 13 weeks?", icon: AlertTriangle, accent: true, agent: true },
+  { label: "Who is missing timesheets this week?", icon: Clock, accent: false, agent: true },
+  { label: "Validate all pending contractor invoices", icon: Receipt, accent: false, agent: true },
+  { label: "Categorize my uncategorized transactions", icon: CreditCard, accent: false, agent: true },
 ]
 
 // ============ UTILITIES ============
@@ -246,151 +254,103 @@ const formatPercent = (v: number): string => v.toFixed(1) + "%"
 const formatFileSize = (bytes: number): string => { if (bytes < 1024) return bytes + " B"; if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"; return (bytes / (1024 * 1024)).toFixed(1) + " MB" }
 const getCurrentMonth = (): string => { const n = new Date(); return n.getFullYear() + "-" + String(n.getMonth() + 1).padStart(2, "0") }
 
-// ============ SYSTEM PROMPT (UNCHANGED) ============
-const SYSTEM_PROMPT = `You are Sage, the AI Agent for Vantage (CashFlow-Pro). You are a virtual CFO, FP&A analyst, and operations partner for Mano CG LLC, a project-based consulting business.
+// ============ SYSTEM PROMPT — REWRITTEN ============
+const SYSTEM_PROMPT = `You are Sage, the financial intelligence engine inside VantageFP. You work alongside Gabriel, who runs Mano CG LLC, an Owner's Representative consulting firm.
 
-YOUR IDENTITY:
-- Name: Sage
-- Role: CFO-level financial advisor, operations agent, and strategic partner
-- Personality: Direct, insightful, proactive. You tell it like it is with specific numbers.
-- Style: Lead with the answer, then explain. Be concise. Always suggest a next action.
+WHO YOU ARE:
+You are not a chatbot. You are a senior financial operator — think fractional CFO who also handles FP&A and operations. Gabriel is the CEO. He does not have a finance team. You are his finance team. Between you and the AI agents running in the background, the goal is to automate 60-80% of financial operations so Gabriel can focus on strategy and client relationships.
 
-YOUR AGENT CAPABILITIES:
-1. ANALYZE - Deep dive into KPIs, trends, variances, profitability by client/project/team member. Cross-reference time entries with rate cards, invoices with bank deposits, expenses with budgets.
-2. ADVISE - Strategic recommendations based on data. Challenge assumptions constructively. Identify opportunities.
-3. ALERT - Proactively flag risks: cash flow gaps, overdue AR, utilization drops, margin compression, cost overruns, uncategorized transactions.
-4. FORECAST - Projections, scenario planning, what-if analysis. "If Client X churns, what happens to margin?"
-5. CATEGORIZE - Analyze bank transactions and suggest categories based on vendor patterns, amounts, and historical data. Learn from user corrections.
-6. VISUALIZE - Create charts, tables, and data views. You have access to multiple chart types.
-7. NAVIGATE - Direct users to relevant Vantage pages with [View in Reports ->] style links.
-8. LEARN - Remember patterns from this conversation. If a user corrects a categorization or shares context, incorporate it.
+HOW YOU COMMUNICATE:
+- Direct and clear. No corporate jargon. No buzzwords.
+- Lead with the number or the answer, then explain why it matters.
+- When you present data, explain what it means in plain language — as if Gabriel needs to relay it to a client or a board.
+- Challenge what the data shows. If margins are shrinking, say so and explain what is driving it. If cash is tighter than it should be, flag it.
+- Always end with what to do next — a specific action, not a vague suggestion.
+- No emojis. Clean, professional tone.
+- Do NOT use markdown bold (**text**). Use ALL CAPS sparingly for emphasis.
+- Be conversational. This is a working session, not a report.
+
+YOUR AGENT TEAM:
+You have 5 AI agents that run specific tasks. When the user triggers one, you orchestrate the agent call and present results clearly.
+
+1. INVOICE VALIDATOR — Cross-references contractor invoices against time entries. Flags discrepancies, auto-approves clean ones.
+2. EXPENSE CATEGORIZER — Auto-categorizes uncategorized bank transactions using patterns and historical data.
+3. TIMESHEET RECONCILER — Checks who submitted timesheets, who is missing, which projects are burning through budget.
+4. CASH FLOW FORECASTER — Builds a rolling 13-week cash flow projection from actuals, AR, AP, and contractor costs.
+5. PROJECT HEALTH MONITOR — Scores every active project green/yellow/red based on margin, burn rate, scope creep, and AR.
+
+When agent results come in, format them clearly with tables and charts. For the morning briefing, run project health + cash flow + timesheet reconciler together.
+
+CASH FLOW PROJECTIONS (IMPORTANT):
+Gabriel is CFO/COO/FP&A all in one. Cash flow is king. When building projections:
+- OPTION 1: Based on historical averages from the data
+- OPTION 2: Interactive build — start with averages, then ask what to add or change (new hires, lost clients, delayed collections, one-time expenses)
+- OPTION 3: Scenario comparison — show best case / base case / worst case side by side
+Always ask clarifying questions when building something that needs inputs not in the database. Do not guess — ask.
+
+APPROVAL WORKFLOW:
+When you recommend bulk changes (categorizing transactions, approving invoices), ALWAYS present a preview first:
+- Show what will change in a clear table
+- Ask for explicit approval before executing
+- Use the action block format for changes (see below)
+Never make changes without showing them first. This is non-negotiable.
 
 KNOWN ALIASES:
 - "CADC" or "Clean Arc" = Clean Arc Data Center
 - "P1" or "Point One" = Point One, LLC
-- Automatically detect abbreviations from client/project names
+- Detect abbreviations from client/project names automatically
 
-RATE CARD MODEL (IMPORTANT - this is how cost works):
-Vantage uses a TWO-TIER cost model:
+RATE CARD MODEL:
+Two-tier cost model:
 - TIER 1 (Custom): Rate card has cost_amount > 0 for a specific member+client = use that exact cost
   - cost_type "hourly": cost = hours x cost_amount
-  - cost_type "lump_sum": cost = cost_amount/month (distributed across months)
-- TIER 2 (Distributed): Rate card has cost_amount = 0 = fall back to team member's total cost
-  - Member's total cost (from team_members table) is distributed across all their clients by % of hours worked
-  - Example: Emily costs $35k/mo total, works 40% on Client A, 35% on Client B, 25% on Client C
-  - Client A gets $14k cost, Client B gets $12.25k, Client C gets $8.75k
-- cost_overrides table = monthly exceptions to override automatic distribution
+  - cost_type "lump_sum": cost = cost_amount/month
+- TIER 2 (Distributed): Rate card has cost_amount = 0 = fall back to team member total cost distributed by % of hours worked
+- cost_overrides = monthly exceptions
 
-TIME TRACKING MODEL (IMPORTANT - logged vs billable):
-Each time entry has TWO hour fields:
-- "hours" = ACTUAL time logged by the contractor (what they worked)
-- "billable_hours" = ADJUSTED hours approved for billing (may be LESS than logged)
-When leadership reduces billable_hours below logged hours, that delta is "written down" or "non-billable" time.
-- Written-down hours = hours - billable_hours (when billable_hours < hours)
-- This represents revenue LOSS: the work was done but will not be billed to the client
-- When asked about "logged vs billed" or "lost hours", ALWAYS show both columns and the delta
-- Calculate potential lost revenue as: (hours - billable_hours) x bill_rate for that member+client
-- If billable_hours is null or not set, assume billable_hours = hours (no write-down)
-Example: Brian logs 40 hours, leadership sets billable_hours to 32. Delta = 8 hours written down. At $190/hr = $1,520 in lost revenue.
+TIME TRACKING:
+Each time entry has "hours" (logged) and "billable_hours" (approved for billing).
+- Written-down hours = hours - billable_hours
+- Lost revenue = delta x bill_rate
+- Always show both when asked about hours
 
 BANK TRANSACTION CATEGORIZATION:
-When asked to categorize transactions, analyze:
-- FIRST check the SAGE LEARNED PATTERNS section in your data context. If a vendor matches an approved pattern, use that category with high confidence.
-- Vendor name patterns (e.g., "GUSTO" = payroll, "AWS" = software, "AMEX" = credit card payment)
-- Amount patterns (recurring amounts = subscriptions, large one-time = equipment/deposits)
-- Historical categorizations for the same vendor
-- Suggest categories from: Direct Costs, Overhead, Other Business, Personal
-- Be specific with sub-categories: Payroll, Software & Tools, Insurance, Rent, Travel, Meals, Equipment, Subcontractors, Professional Services, Marketing, Utilities, Vehicle, Office Supplies
-- When uncertain, present your best guess with confidence level
-- For learned/approved patterns, show them as "Known" rather than "Suggested"
+When categorizing, check SAGE LEARNED PATTERNS first. For known vendors, use high confidence.
+Categories: Direct Costs (Payroll, Subcontractors, Project Materials), Overhead (Rent, Insurance, Software, Accounting), Other Business (Travel, Meals, Marketing), Personal (Owner Draws)
 
 LEARNING FLOW:
-When you categorize transactions and the user confirms or approves:
-1. Emit a PATTERN_LEARNED line for EACH confirmed vendor-category pair
-2. Format: PATTERN_LEARNED: vendor="EXACT_VENDOR_NAME" category="Category" sub_category="SubCategory"
-3. Put these AFTER your main response text (they will be auto-stripped from display)
-4. Only emit when the user explicitly confirms (says "yes", "approved", "correct", "save that", etc.)
-5. Do NOT emit patterns on your initial suggestion — wait for confirmation
-Example flow:
-- User: "Categorize my recent transactions"
-- Sage: [shows table with suggestions and confidence levels] "Want me to save these categorizations?"
-- User: "Yes, save them" or "Approve all" or "Looks good"
-- Sage: "Saved. I will remember these for next time."
-  PATTERN_LEARNED: vendor="GUSTO" category="Direct Costs" sub_category="Payroll"
-  PATTERN_LEARNED: vendor="AWS" category="Overhead" sub_category="Software & Tools"
-
-EXPENSE CATEGORIES:
-- Direct Costs: Payroll, Subcontractors, Project Materials, Equipment Rental
-- Overhead: Rent, Insurance, Software & Tools, Accounting, Legal, Utilities
-- Other Business: Travel, Meals, Marketing, Professional Development, Vehicle
-- Personal: Owner Draws, Personal Expenses
+When user confirms categorizations, emit:
+PATTERN_LEARNED: vendor="VENDOR" category="Category" sub_category="SubCategory"
+Only after explicit confirmation.
 
 TABLE FORMAT:
 \`\`\`sage-table
-{
-  "title": "Table Title",
-  "headers": ["Col1", "Col2"],
-  "rows": [["val1", "val2"]]
-}
+{"title": "Title", "headers": ["Col1", "Col2"], "rows": [["val1", "val2"]]}
 \`\`\`
 
 CHART FORMAT:
 \`\`\`sage-chart
-{
-  "type": "bar|line|pie|area|waterfall|stacked_bar|multi_line|composed",
-  "title": "Chart Title",
-  "data": [{"name": "Label", "value": 1000}],
-  "keys": ["revenue", "cost"],
-  "colors": ["#10b981", "#ef4444"]
-}
+{"type": "bar|line|pie|area|waterfall|stacked_bar|multi_line|composed", "title": "Title", "data": [{"name": "Label", "value": 1000}], "keys": ["key1"], "colors": ["#10b981"]}
 \`\`\`
 
-Chart types:
-- "bar" - single metric comparisons (revenue by client)
-- "stacked_bar" - multiple metrics stacked (revenue vs cost by client). Requires "keys" array.
-- "line" - single trend over time
-- "multi_line" - multiple trends overlaid. Requires "keys" array.
-- "area" - trend with filled area (cash flow over time)
-- "pie" - proportions (expense breakdown)
-- "waterfall" - sequential additions/subtractions (revenue -> costs -> margin bridge)
-- "composed" - mixed bar+line (revenue bars with margin % line). Requires "keys" array.
+Chart types: bar (comparisons), stacked_bar (multi-metric), line (single trend), multi_line (overlaid trends), area (filled trend), pie (proportions), waterfall (bridge), composed (bar+line mixed)
 
-For stacked_bar, multi_line, and composed: data items should have properties matching the "keys" array.
-Example stacked_bar: { "type": "stacked_bar", "keys": ["cost", "revenue"], "data": [{"name": "Jan", "cost": 5000, "revenue": 8000}] }
-Example waterfall: data items need "value" (positive=green, negative=red) and optionally "isTotal": true for summary bars.
+ACTION FORMAT (for bulk changes):
+\`\`\`vantage-action
+{"action": "bulk_update", "type": "cash", "updates": [{"id": "transaction-id", "changes": {"category": "opex"}, "preview": {"description": "desc", "amount": 100, "currentCategory": "unassigned", "newCategory": "opex"}}], "summary": "Brief description"}
+\`\`\`
 
 RESPONSE RULES:
-1. Use SPECIFIC NUMBERS from the data - never guess or use placeholders
-2. If data is missing, say so clearly and suggest what to add
-3. Be concise - lead with insights, not summaries
-4. Always suggest a follow-up action or question
-5. Do NOT use markdown bold (**text**) - the interface does not render it
-6. Use bullet points (bullet) for lists, ALL CAPS sparingly for emphasis
-7. When showing profitability, always reference the rate card model (custom vs distributed cost)
-8. For bank categorization, show confidence level and learn from corrections
-9. Cross-reference data across modules - e.g., "Invoice #102 was paid but I don't see a matching bank deposit"
+1. Use SPECIFIC NUMBERS from the data. Never estimate when data exists.
+2. If data is missing, say so and suggest what to add.
+3. Be concise — lead with insights, not summaries.
+4. Always suggest a follow-up action.
+5. Cross-reference data across modules.
+6. When showing financial data, make it presentable — think "what would I hand to a client."
+7. For the morning briefing, prioritize by financial impact: what costs money first, what makes money second.
+8. When something looks off in the data, say it. "Your margin on GOOGL dropped 8 points this month — here is why." Do not wait to be asked.`
 
-PROACTIVE INSIGHTS:
-When asked general questions like "what should I focus on" or "any issues?", scan ALL data for:
-- Overdue invoices and aging AR
-- Team members with no time entries this week
-- Projects with budget overruns
-- Uncategorized bank transactions
-- Margin compression trends
-- Cash runway warnings
-- Upcoming invoice milestones
-- Rate card gaps (members working on clients without rate cards)
-- Hours written down (logged > billable) and the revenue impact of those reductions
-
-Remember: You are not just answering questions. You are an agent running alongside the business, spotting patterns humans miss.
-
-IMPORTANT DISAMBIGUATION:
-When a user asks about "logged vs billed hours" or "lost hours" or "hours reduction":
-- This means comparing the "hours" field (what was worked) vs "billable_hours" field (what was approved for billing)
-- The WRITE-DOWN data section has this computed per member per month
-- Do NOT confuse this with "hours logged but no invoices generated" - that is a separate billing/rate card issue
-- Show a table with columns: Team Member, Logged Hours, Billable Hours, Written Down, Lost Revenue`
-
+// ============ KPI CALCULATION (unchanged) ============
 function calculateKPIs(data: CompanyData): KPISummary {
   const totalRevenue = data.invoices?.filter(inv => inv.status === "paid").reduce((sum, inv) => sum + (inv.amount || 0), 0) || 0
   const totalExpenses = data.transactions?.filter(t => t.type === "expense" || t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount || 0), 0) || 0
@@ -409,20 +369,17 @@ function calculateKPIs(data: CompanyData): KPISummary {
     const paid = new Date(inv.paid_date)
     return sum + Math.ceil((paid.getTime() - issued.getTime()) / (1000 * 60 * 60 * 24))
   }, 0) / paidInvoices.length : 45
-
   const curMonth = getCurrentMonth()
   const monthEntries = data.timeEntries?.filter(t => t.date?.substring(0, 7) === curMonth) || []
   const projectClientMap = new Map(data.projects?.map(p => [p.id, p.client_id]) || [])
   let teamRevenue = 0, teamCost = 0
   const memberHours: Record<string, Record<string, number>> = {}
-
   monthEntries.forEach(t => {
     const clientId = projectClientMap.get(t.project_id) || ""
     const memberId = t.contractor_id
     if (!memberHours[memberId]) memberHours[memberId] = {}
     memberHours[memberId][clientId] = (memberHours[memberId][clientId] || 0) + (t.hours || 0)
   })
-
   const memberBillableHours: Record<string, Record<string, number>> = {}
   monthEntries.forEach(t => {
     const clientId = projectClientMap.get(t.project_id) || ""
@@ -431,16 +388,13 @@ function calculateKPIs(data: CompanyData): KPISummary {
     const bh = t.billable_hours != null ? t.billable_hours : (t.hours || 0)
     memberBillableHours[memberId][clientId] = (memberBillableHours[memberId][clientId] || 0) + bh
   })
-
   Object.entries(memberHours).forEach(([memberId, clientHours]) => {
     const member = data.teamMembers?.find(m => m.id === memberId)
     const totalMemberHours = Object.values(clientHours).reduce((s, h) => s + h, 0)
-
     Object.entries(clientHours).forEach(([clientId, hours]) => {
       const rc = data.billRates?.find(r => r.team_member_id === memberId && r.client_id === clientId && r.is_active)
       const billableHrs = memberBillableHours[memberId]?.[clientId] || hours
       teamRevenue += billableHrs * (rc?.rate || 0)
-
       if (rc && rc.cost_amount > 0) {
         if (rc.cost_type === "hourly") teamCost += hours * rc.cost_amount
         else teamCost += rc.cost_amount
@@ -453,12 +407,11 @@ function calculateKPIs(data: CompanyData): KPISummary {
       }
     })
   })
-
   const teamMarginPct = teamRevenue > 0 ? ((teamRevenue - teamCost) / teamRevenue) * 100 : 0
-
   return { totalRevenue, totalExpenses, netIncome, grossMargin, cashOnHand, arOutstanding, burnRate, runway, utilizationRate, dso: avgDSO, teamCost, teamRevenue, teamMarginPct }
 }
 
+// ============ HELPER FUNCTIONS (unchanged) ============
 function getARAgingSummary(invoices: any[]): any {
   const now = new Date()
   const aging = { current: 0, days30: 0, days60: 0, days90: 0, over90: 0 }
@@ -486,7 +439,6 @@ function getOverdueInvoices(data: CompanyData): any[] {
 
 function getBankTransactionPatterns(transactions: any[]): string {
   if (!transactions || transactions.length === 0) return "No bank transactions available."
-
   const vendorPatterns: Record<string, { count: number, totalAmount: number, avgAmount: number, categories: Record<string, number>, lastDate: string }> = {}
   transactions.forEach(t => {
     const vendor = (t.description || t.vendor || t.name || "Unknown").trim()
@@ -497,30 +449,23 @@ function getBankTransactionPatterns(transactions: any[]): string {
     if (t.category) vendorPatterns[normalized].categories[t.category] = (vendorPatterns[normalized].categories[t.category] || 0) + 1
     if (t.date > (vendorPatterns[normalized].lastDate || "")) vendorPatterns[normalized].lastDate = t.date
   })
-
   Object.values(vendorPatterns).forEach(p => { p.avgAmount = p.totalAmount / p.count })
-
   const sorted = Object.entries(vendorPatterns).sort((a, b) => b[1].count - a[1].count)
-
   const uncategorized = transactions.filter(t => !t.category || t.category === "uncategorized" || t.category === "")
   const recentUncategorized = uncategorized.slice(0, 20).map(t => {
     return `  ${t.date || "?"} | ${(t.description || t.vendor || t.name || "?").substring(0, 40)} | $${Math.abs(t.amount || 0).toFixed(2)} | ${t.type || "?"}`
   }).join("\n")
-
   return `
 === BANK FEED PATTERNS ===
 Total Transactions: ${transactions.length}
 Uncategorized: ${uncategorized.length} (${transactions.length > 0 ? ((uncategorized.length / transactions.length) * 100).toFixed(0) : 0}%)
-
 TOP VENDORS BY FREQUENCY:
 ${sorted.slice(0, 15).map(([vendor, p]) => {
     const topCat = Object.entries(p.categories).sort((a, b) => b[1] - a[1])[0]
     return `  ${vendor}: ${p.count}x, avg ${formatCurrency(p.avgAmount)}${topCat ? ` [usually: ${topCat[0]}]` : " [UNCATEGORIZED]"}`
   }).join("\n")}
-
-RECENT UNCATEGORIZED (needs attention):
+RECENT UNCATEGORIZED:
 ${recentUncategorized || "  None - all categorized!"}
-
 CATEGORIZATION RULES LEARNED:
 ${sorted.filter(([_, p]) => Object.keys(p.categories).length > 0 && p.count >= 2).slice(0, 10).map(([vendor, p]) => {
     const topCat = Object.entries(p.categories).sort((a, b) => b[1] - a[1])[0]
@@ -528,23 +473,21 @@ ${sorted.filter(([_, p]) => Object.keys(p.categories).length > 0 && p.count >= 2
   }).join("\n") || "  No patterns established yet"}`
 }
 
+// ============ DATA CONTEXT BUILDER (unchanged) ============
 function buildDataContext(data: CompanyData, kpis: KPISummary): string {
   const aging = getARAgingSummary(data.invoices)
   const overdueInv = getOverdueInvoices(data)
-
   const curMonth = getCurrentMonth()
   const monthEntries = data.timeEntries?.filter(t => t.date?.substring(0, 7) === curMonth) || []
   const projectClientMap = new Map(data.projects?.map(p => [p.id, p.client_id]) || [])
   const clientNameMap = new Map(data.clients?.map(c => [c.id, c.name]) || [])
   const memberNameMap = new Map(data.teamMembers?.map(m => [m.id, m.name]) || [])
-
   const oneWeekAgo = new Date(); oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
   const thisWeekByMember: Record<string, number> = {}
   data.timeEntries?.filter(t => new Date(t.date) >= oneWeekAgo).forEach(entry => {
     const name = memberNameMap.get(entry.contractor_id) || "Unknown"
     thisWeekByMember[name] = (thisWeekByMember[name] || 0) + (entry.hours || 0)
   })
-
   const allTimeByMember: Record<string, { hours: number, billable: number }> = {}
   data.timeEntries?.forEach(entry => {
     const name = memberNameMap.get(entry.contractor_id) || "Unknown"
@@ -552,7 +495,6 @@ function buildDataContext(data: CompanyData, kpis: KPISummary): string {
     allTimeByMember[name].hours += entry.hours || 0
     allTimeByMember[name].billable += entry.billable_hours != null ? entry.billable_hours : (entry.hours || 0)
   })
-
   const timeByMonth: Record<string, Record<string, number>> = {}
   data.timeEntries?.forEach(entry => {
     const mo = entry.date?.substring(0, 7) || "?"
@@ -560,10 +502,8 @@ function buildDataContext(data: CompanyData, kpis: KPISummary): string {
     if (!timeByMonth[mo]) timeByMonth[mo] = {}
     timeByMonth[mo][name] = (timeByMonth[mo][name] || 0) + (entry.hours || 0)
   })
-
   const clientProfit: Record<string, { name: string, revenue: number, cost: number, hours: number }> = {}
   const memberProfit: Record<string, { name: string, revenue: number, cost: number, hours: number, clients: Record<string, { hours: number, revenue: number, cost: number }> }> = {}
-
   monthEntries.forEach(t => {
     const memberId = t.contractor_id
     const clientId = projectClientMap.get(t.project_id) || "unknown"
@@ -573,11 +513,9 @@ function buildDataContext(data: CompanyData, kpis: KPISummary): string {
     const billableHrs = t.billable_hours != null ? t.billable_hours : hours
     const rc = data.billRates?.find(r => r.team_member_id === memberId && r.client_id === clientId && r.is_active)
     const revenue = billableHrs * (rc?.rate || 0)
-
     if (!clientProfit[clientId]) clientProfit[clientId] = { name: clientName, revenue: 0, cost: 0, hours: 0 }
     clientProfit[clientId].revenue += revenue
     clientProfit[clientId].hours += hours
-
     if (!memberProfit[memberId]) memberProfit[memberId] = { name: memberName, revenue: 0, cost: 0, hours: 0, clients: {} }
     memberProfit[memberId].revenue += revenue
     memberProfit[memberId].hours += hours
@@ -585,11 +523,9 @@ function buildDataContext(data: CompanyData, kpis: KPISummary): string {
     memberProfit[memberId].clients[clientId].hours += hours
     memberProfit[memberId].clients[clientId].revenue += revenue
   })
-
   Object.entries(memberProfit).forEach(([memberId, mp]) => {
     const member = data.teamMembers?.find(m => m.id === memberId)
     const totalMemberHours = mp.hours
-
     Object.entries(mp.clients).forEach(([clientId, ch]) => {
       const rc = data.billRates?.find(r => r.team_member_id === memberId && r.client_id === clientId && r.is_active)
       let cost = 0
@@ -607,7 +543,6 @@ function buildDataContext(data: CompanyData, kpis: KPISummary): string {
       if (clientProfit[clientId]) clientProfit[clientId].cost += cost
     })
   })
-
   const rateCardSummary = data.billRates?.filter(r => r.is_active).map(r => {
     const member = data.teamMembers?.find(m => m.id === r.team_member_id)
     const client = data.clients?.find(c => c.id === r.client_id)
@@ -617,13 +552,11 @@ function buildDataContext(data: CompanyData, kpis: KPISummary): string {
       : `Distributed from ${member?.cost_type === "lump_sum" ? "$" + (member?.cost_amount || 0) + "/mo" : "$" + (member?.cost_amount || 0) + "/hr"} total`
     return `  ${member?.name || "?"} -> ${client?.name || "?"}: Bill $${r.rate}/hr | Cost: ${costDesc}`
   }).join("\n") || "No rate cards configured"
-
   const expenseByCategory: Record<string, number> = {}
   data.expenses?.forEach(e => {
     const cat = e.category || e.expense_category || "Uncategorized"
     expenseByCategory[cat] = (expenseByCategory[cat] || 0) + Math.abs(e.amount || 0)
   })
-
   const writeDownsByMember: Record<string, { name: string, months: Record<string, { logged: number, billable: number, delta: number, lostRevenue: number }> }> = {}
   data.timeEntries?.forEach(entry => {
     const memberId = entry.contractor_id
@@ -643,12 +576,9 @@ function buildDataContext(data: CompanyData, kpis: KPISummary): string {
       writeDownsByMember[memberId].months[mo].lostRevenue += delta * (rc?.rate || 0)
     }
   })
-
   const bankPatterns = getBankTransactionPatterns(data.transactions)
-
   return `
 === FINANCIAL SNAPSHOT (${new Date().toLocaleDateString()}) ===
-
 KEY METRICS:
   Total Revenue (invoiced & paid): ${formatCurrency(kpis.totalRevenue)}
   Total Expenses: ${formatCurrency(kpis.totalExpenses)}
@@ -661,7 +591,6 @@ KEY METRICS:
   Team Revenue (${curMonth}): ${formatCurrency(kpis.teamRevenue)}
   Team Cost (${curMonth}): ${formatCurrency(kpis.teamCost)}
   Team GM% (${curMonth}): ${formatPercent(kpis.teamMarginPct)}
-
 === AR AGING ===
   Current: ${formatCurrency(aging.current)}
   1-30 Days: ${formatCurrency(aging.days30)}
@@ -670,7 +599,6 @@ KEY METRICS:
   90+ Days: ${formatCurrency(aging.over90)}
   Overdue Invoices: ${overdueInv.length}
 ${overdueInv.slice(0, 5).map(i => `    ${i.invoiceNumber}: ${i.client} - ${formatCurrency(i.amount)} (${i.daysOverdue} days)`).join("\n")}
-
 === CLIENTS (${data.clients?.length || 0}) ===
 ${data.clients?.map(c => {
     const aliases: string[] = []
@@ -680,31 +608,25 @@ ${data.clients?.map(c => {
     if (name.toLowerCase().includes("point one")) aliases.push("P1")
     return `  ${name}${aliases.length > 0 ? " (aka " + aliases.join(", ") + ")" : ""} | ${c.status || "active"}`
   }).join("\n") || "No clients"}
-
 === PROJECTS (${data.projects?.length || 0}) ===
 ${data.projects?.map(p => `  ${p.name} | ${clientNameMap.get(p.client_id) || "No Client"} | ${p.status || "active"} | Budget: $${p.budget || 0}`).join("\n") || "No projects"}
-
 === TEAM (${data.teamMembers?.length || 0}) ===
 ${data.teamMembers?.map(t => {
     const costDesc = t.cost_type === "lump_sum" ? `$${t.cost_amount || 0}/mo (fixed)` : `$${t.cost_amount || 0}/hr`
     const rateCards = data.billRates?.filter(r => r.team_member_id === t.id && r.is_active).length || 0
     return `  ${t.name} | ${t.role || "Team Member"} | ${t.employment_type || "contractor"} | Cost: ${costDesc} | ${rateCards} rate cards`
   }).join("\n") || "No team"}
-
-=== RATE CARDS (Cost + Revenue per member per client) ===
+=== RATE CARDS ===
 ${rateCardSummary}
-
-=== COST OVERRIDES (Monthly Exceptions) ===
+=== COST OVERRIDES ===
 ${data.costOverrides?.length > 0 ? data.costOverrides.map(o => {
     return `  ${memberNameMap.get(o.team_member_id) || "?"} -> ${clientNameMap.get(o.client_id) || "?"} (${o.month}): ${formatCurrency(o.fixed_amount)}${o.notes ? " - " + o.notes : ""}`
   }).join("\n") : "No overrides set"}
-
 === CLIENT PROFITABILITY (${curMonth}) ===
 ${Object.values(clientProfit).sort((a: any, b: any) => b.revenue - a.revenue).map((c: any) => {
     const margin = c.revenue > 0 ? ((c.revenue - c.cost) / c.revenue * 100).toFixed(1) : "0.0"
     return `  ${c.name}: ${formatCurrency(c.revenue)} rev, ${formatCurrency(c.cost)} cost, ${formatCurrency(c.revenue - c.cost)} margin (${margin}% GM), ${c.hours.toFixed(1)} hrs`
   }).join("\n") || "No profitability data"}
-
 === MEMBER PROFITABILITY (${curMonth}) ===
 ${Object.values(memberProfit).sort((a: any, b: any) => b.revenue - a.revenue).map((m: any) => {
     const margin = m.revenue > 0 ? ((m.revenue - m.cost) / m.revenue * 100).toFixed(1) : "0.0"
@@ -714,61 +636,42 @@ ${Object.values(memberProfit).sort((a: any, b: any) => b.revenue - a.revenue).ma
     }).join(", ")
     return `  ${m.name}: ${formatCurrency(m.revenue)} rev, ${formatCurrency(m.cost)} cost (${margin}% GM) | ${clientBreakdown}`
   }).join("\n") || "No data"}
-
 === TIME THIS WEEK ===
 ${Object.entries(thisWeekByMember).map(([name, hours]) => `  ${name}: ${hours.toFixed(1)} hours`).join("\n") || "No entries"}
-
 === TIME BY MONTH (last 6) ===
 ${Object.entries(timeByMonth).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 6).map(([month, members]) =>
     `${month}: ${Object.entries(members).map(([name, h]) => `${name}: ${h.toFixed(1)}h`).join(", ")}`
   ).join("\n") || "No entries"}
-
-=== LOGGED VS BILLABLE HOURS (Write-Downs) ===
+=== LOGGED VS BILLABLE (Write-Downs) ===
 ${Object.entries(writeDownsByMember).map(([id, wd]) => {
     const recentMonths = Object.entries(wd.months).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 3)
     return recentMonths.map(([mo, d]) => 
       `  ${wd.name} (${mo}): Logged ${d.logged.toFixed(1)}h, Billable ${d.billable.toFixed(1)}h, Written-Down ${d.delta.toFixed(1)}h${d.lostRevenue > 0 ? `, Lost Revenue ${formatCurrency(d.lostRevenue)}` : ""}`
     ).join("\n")
   }).join("\n") || "No write-downs detected"}
-Note: "Written-Down" = hours logged but reduced by leadership before billing. Delta = logged - billable. Lost Revenue = delta x bill rate.
-
 === INVOICES ===
   Paid: ${data.invoices?.filter(i => i.status === "paid").length || 0} (${formatCurrency(data.invoices?.filter(i => i.status === "paid").reduce((s, i) => s + (i.amount || 0), 0) || 0)})
   Pending: ${data.invoices?.filter(i => i.status === "pending").length || 0} (${formatCurrency(data.invoices?.filter(i => i.status === "pending").reduce((s, i) => s + (i.amount || 0), 0) || 0)})
   Overdue: ${overdueInv.length} (${formatCurrency(overdueInv.reduce((s, i) => s + i.amount, 0))})
-
 === EXPENSES BY CATEGORY ===
 ${Object.entries(expenseByCategory).sort((a, b) => b[1] - a[1]).map(([cat, amt]) => `  ${cat}: ${formatCurrency(amt)}`).join("\n") || "No expense data"}
-
-=== PROJECT BILLING RATES ===
-${data.projectAssignments?.map(a => {
-    const member = data.teamMembers?.find(m => m.id === a.team_member_id)
-    const project = data.projects?.find(p => p.id === a.project_id)
-    const client = data.clients?.find(c => c.id === project?.client_id)
-    return `  ${member?.name || "?"} -> ${project?.name || "?"} (${client?.name || "?"}): $${a.rate || 0}/hr | ${a.service || "General"}`
-  }).join("\n") || "No project assignments"}
-
 ${bankPatterns}
-
-=== SAGE LEARNED PATTERNS (${data.learnedPatterns?.length || 0} total) ===
+=== SAGE LEARNED PATTERNS (${data.learnedPatterns?.length || 0}) ===
 ${data.learnedPatterns?.length > 0 ? 
-  `Approved (use with high confidence):
+  `Approved:
 ${data.learnedPatterns.filter(p => p.status === "approved").map(p => 
     `  "${p.vendor_normalized || p.vendor_name}" -> ${p.category}${p.sub_category ? "/" + p.sub_category : ""} (confirmed ${p.times_confirmed}x)`
-  ).join("\n") || "  None yet"}
-Suggested (use but flag as suggestion):
+  ).join("\n") || "  None"}
+Suggested:
 ${data.learnedPatterns.filter(p => p.status === "suggested").map(p => 
-    `  "${p.vendor_normalized || p.vendor_name}" -> ${p.category}${p.sub_category ? "/" + p.sub_category : ""} (seen ${p.times_seen}x, confidence ${(p.confidence * 100).toFixed(0)}%)`
-  ).join("\n") || "  None yet"}`
-  : "No learned patterns yet. When categorizing transactions, suggest patterns and ask user to confirm. Use SAVE_PATTERN action to persist."}
-Note: When the user approves a categorization, respond with a line like:
-PATTERN_LEARNED: vendor="VENDOR_NAME" category="CATEGORY" sub_category="SUB_CATEGORY"
-The frontend will detect this and save the pattern to the database.
+    `  "${p.vendor_normalized || p.vendor_name}" -> ${p.category}${p.sub_category ? "/" + p.sub_category : ""} (${(p.confidence * 100).toFixed(0)}%)`
+  ).join("\n") || "  None"}`
+  : "No learned patterns yet."}
+PATTERN_LEARNED format: vendor="VENDOR" category="CATEGORY" sub_category="SUB_CATEGORY"
 `
 }
 
-
-// ============ TABLE RENDERER (Light theme) ============
+// ============ TABLE RENDERER ============
 function TableRenderer({ table }: { table: TableData }) {
   if (!table || !table.headers || !table.rows) return null
   return (
@@ -792,16 +695,14 @@ function TableRenderer({ table }: { table: TableData }) {
   )
 }
 
-// ============ CHART RENDERER (Light theme) ============
+// ============ CHART RENDERER ============
 function ChartRenderer({ chart }: { chart: ChartData }) {
   if (!chart || !chart.data || chart.data.length === 0) return null
   const colors = chart.colors || CHART_COLORS
   const keys = chart.keys || ["value"]
-  // [FIX #4] Light tooltip + axis styles
   const tooltipStyle = { backgroundColor: "#ffffff", border: "1px solid #e5e7eb", borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,0.08)" }
   const axisProps = { tick: { fill: "#6b7280", fontSize: 11 }, axisLine: { stroke: "#e5e7eb" } }
   const gridStroke = "#f3f4f6"
-
   const renderChart = () => {
     switch (chart.type) {
       case "bar":
@@ -829,7 +730,6 @@ function ChartRenderer({ chart }: { chart: ChartData }) {
         return (<RechartsPie><Pie data={chart.data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>{chart.data.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}</Pie><Tooltip contentStyle={tooltipStyle} /><Legend /></RechartsPie>)
     }
   }
-
   return (
     <div className="my-4 rounded-xl border border-gray-200 overflow-hidden shadow-sm">
       <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
@@ -842,7 +742,143 @@ function ChartRenderer({ chart }: { chart: ChartData }) {
   )
 }
 
-// ============ MESSAGE COMPONENT (Light theme) ============
+// ============ AGENT RESULT RENDERER ============
+function AgentResultRenderer({ result }: { result: AgentResult }) {
+  if (!result || result.status === "error") {
+    return (
+      <div className="my-3 p-4 rounded-xl border border-rose-200 bg-rose-50">
+        <div className="flex items-center gap-2 text-rose-700 text-sm font-medium mb-1">
+          <XOctagon size={14} />
+          <span>Agent Error: {result?.agent || "Unknown"}</span>
+        </div>
+        <p className="text-rose-600 text-sm">{result?.summary || "Failed to run agent."}</p>
+      </div>
+    )
+  }
+
+  const agentLabels: Record<string, string> = {
+    "invoice-validator": "Invoice Validator",
+    "expense-categorizer": "Expense Categorizer",
+    "timesheet-reconciler": "Timesheet Reconciler",
+    "cashflow-forecaster": "Cash Flow Forecaster",
+    "project-health": "Project Health Monitor",
+  }
+
+  return (
+    <div className="my-3 p-4 rounded-xl border border-emerald-200 bg-emerald-50/50">
+      <div className="flex items-center gap-2 text-emerald-700 text-sm font-medium mb-2">
+        <Shield size={14} />
+        <span>{agentLabels[result.agent] || result.agent}</span>
+        <span className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-100 text-emerald-600 uppercase tracking-wider">Complete</span>
+      </div>
+      <p className="text-gray-700 text-sm">{result.summary}</p>
+    </div>
+  )
+}
+
+// ============ APPROVAL WORKFLOW COMPONENT ============
+function ApprovalCard({ approval, onApprove, onReject }: { approval: PendingApproval; onApprove: () => void; onReject: () => void }) {
+  const [processing, setProcessing] = useState(false)
+  const [decided, setDecided] = useState<"approved" | "rejected" | null>(null)
+
+  const handleApprove = async () => {
+    setProcessing(true)
+    try {
+      await approval.onApprove()
+      setDecided("approved")
+    } catch (e) {
+      console.error("Approval failed:", e)
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const handleReject = () => {
+    approval.onReject()
+    setDecided("rejected")
+  }
+
+  if (decided === "approved") {
+    return (
+      <div className="my-3 p-4 rounded-xl border border-emerald-200 bg-emerald-50">
+        <div className="flex items-center gap-2 text-emerald-700 text-sm font-medium">
+          <CheckCircle2 size={16} />
+          <span>Approved and applied. {approval.items.length} items updated.</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (decided === "rejected") {
+    return (
+      <div className="my-3 p-4 rounded-xl border border-gray-200 bg-gray-50">
+        <div className="flex items-center gap-2 text-gray-500 text-sm">
+          <X size={14} />
+          <span>Changes discarded.</span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="my-3 rounded-xl border border-amber-200 bg-amber-50/50 overflow-hidden">
+      <div className="px-4 py-3 border-b border-amber-200 bg-amber-50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-amber-800 text-sm font-medium">
+            <AlertTriangle size={14} />
+            <span>Approval Required</span>
+          </div>
+          <span className="text-xs text-amber-600">{approval.items.length} items</span>
+        </div>
+        <p className="text-xs text-amber-700 mt-1">{approval.description}</p>
+      </div>
+      {approval.items.length <= 10 && (
+        <div className="bg-white overflow-x-auto max-h-48 overflow-y-auto">
+          <table className="w-full text-xs">
+            <thead><tr className="border-b border-gray-100">
+              {approval.type === "bulk_update" && <>
+                <th className="text-left py-2 px-3 text-gray-500 font-medium">Description</th>
+                <th className="text-left py-2 px-3 text-gray-500 font-medium">Amount</th>
+                <th className="text-left py-2 px-3 text-gray-500 font-medium">Change</th>
+              </>}
+              {approval.type === "invoice_approve" && <>
+                <th className="text-left py-2 px-3 text-gray-500 font-medium">Invoice</th>
+                <th className="text-left py-2 px-3 text-gray-500 font-medium">Amount</th>
+                <th className="text-left py-2 px-3 text-gray-500 font-medium">Status</th>
+              </>}
+            </tr></thead>
+            <tbody>{approval.items.slice(0, 10).map((item, i) => (
+              <tr key={i} className="border-b border-gray-50">
+                {approval.type === "bulk_update" && <>
+                  <td className="py-1.5 px-3 text-gray-700 truncate max-w-[200px]">{item.preview?.description || item.description || "-"}</td>
+                  <td className="py-1.5 px-3 text-gray-700 tabular-nums">{item.preview?.amount ? formatCurrency(item.preview.amount) : "-"}</td>
+                  <td className="py-1.5 px-3 text-gray-600">{item.preview?.newCategory || item.changes?.category || "-"}</td>
+                </>}
+                {approval.type === "invoice_approve" && <>
+                  <td className="py-1.5 px-3 text-gray-700">{item.name || item.id}</td>
+                  <td className="py-1.5 px-3 text-gray-700 tabular-nums">{formatCurrency(item.amount || 0)}</td>
+                  <td className="py-1.5 px-3"><span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-700">Clean</span></td>
+                </>}
+              </tr>
+            ))}</tbody>
+          </table>
+          {approval.items.length > 10 && <p className="text-xs text-gray-400 px-3 py-2">...and {approval.items.length - 10} more</p>}
+        </div>
+      )}
+      <div className="px-4 py-3 flex items-center gap-3 bg-white border-t border-gray-100">
+        <button onClick={handleApprove} disabled={processing} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium transition-colors disabled:opacity-50">
+          {processing ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+          {processing ? "Applying..." : "Approve"}
+        </button>
+        <button onClick={handleReject} disabled={processing} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors">
+          <X size={14} /> Reject
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ============ MESSAGE COMPONENT ============
 function ChatMessage({ message }: { message: Message }) {
   const isUser = message.role === "user"
   
@@ -859,10 +895,8 @@ function ChatMessage({ message }: { message: Message }) {
     text = text.replace(/```sage-table[\s\S]*?```/g, "").trim()
     return { text, charts, tables }
   }
-
   const { text, charts, tables } = isUser ? { text: message.content, charts: [], tables: [] } : parseVisuals(message.content)
   
-  // [FIX #5] Light-theme message formatting
   const formatContent = (content: string) => {
     return content.split("\n").map((line, i) => {
       if (line.includes("[View") || line.includes("->]") || line.includes("\u2192]")) {
@@ -884,13 +918,11 @@ function ChatMessage({ message }: { message: Message }) {
   
   return (
     <div className={`flex gap-3.5 ${isUser ? "flex-row-reverse" : ""} max-w-4xl mx-auto`}>
-      {/* [FIX #5] Light avatar badges */}
       <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${isUser ? "bg-blue-50 ring-1 ring-blue-200" : "bg-emerald-50 ring-1 ring-emerald-200"}`}>
         {isUser ? <User size={16} className="text-blue-600" /> : <SageLogo size={22} />}
       </div>
       <div className={`flex-1 min-w-0 ${isUser ? "text-right" : ""}`}>
         <p className={`text-[11px] font-medium mb-1 px-1 ${isUser ? "text-blue-500" : "text-emerald-600"}`}>{isUser ? "You" : "Sage"}</p>
-        {/* [FIX #5] Light bubbles */}
         <div className={`inline-block rounded-xl px-4 py-3 max-w-[90%] text-left ${isUser ? "bg-blue-50 border border-blue-200 text-gray-800" : "bg-white border border-gray-200 text-gray-700 shadow-sm"}`}>
           {message.attachments && message.attachments.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b border-gray-200">
@@ -903,9 +935,19 @@ function ChatMessage({ message }: { message: Message }) {
               ))}
             </div>
           )}
+          {/* Agent result badge */}
+          {message.agentResult && <AgentResultRenderer result={message.agentResult} />}
           <div className="text-sm leading-relaxed whitespace-pre-wrap">{formatContent(text)}</div>
           {tables.map((t, i) => <TableRenderer key={`t-${i}`} table={t} />)}
           {charts.map((c, i) => <ChartRenderer key={`c-${i}`} chart={c} />)}
+          {/* Approval card */}
+          {message.pendingApproval && (
+            <ApprovalCard 
+              approval={message.pendingApproval} 
+              onApprove={message.pendingApproval.onApprove}
+              onReject={message.pendingApproval.onReject}
+            />
+          )}
         </div>
         <p className="text-[10px] text-gray-400 mt-1 px-1">{new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
       </div>
@@ -913,7 +955,7 @@ function ChatMessage({ message }: { message: Message }) {
   )
 }
 
-// ============ CONVERSATION ITEM (Light sidebar) ============
+// ============ CONVERSATION ITEM ============
 function ConversationItem({ conversation, isActive, onClick, onDelete, onRename }: { conversation: Conversation, isActive: boolean, onClick: () => void, onDelete: () => void, onRename: (title: string) => void }) {
   const [isEditing, setIsEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(conversation.title)
@@ -925,9 +967,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, onRename 
     if (hrs < 24) return `${hrs}h`
     return `${Math.floor(hrs / 24)}d`
   }, [conversation.updated_at])
-
   return (
-    // [FIX #7] Clear active state on light bg
     <div className={`group relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-all ${isActive ? "bg-emerald-50 border-l-2 border-l-emerald-500" : "hover:bg-gray-50 border-l-2 border-transparent"}`} onClick={() => !isEditing && onClick()}>
       <MessageSquare size={14} className={isActive ? "text-emerald-600 flex-shrink-0" : "text-gray-400 flex-shrink-0"} />
       {isEditing ? (
@@ -952,11 +992,11 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, onRename 
   )
 }
 
-// ============ ALERT BADGE (Light theme) ============
+// ============ ALERT BADGE ============
 function AlertCard({ icon: Icon, label, count, color, onClick }: { icon: any, label: string, count: number, color: string, onClick: () => void }) {
   const cm: Record<string, string> = {
-    amber:  "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100",
-    rose:   "bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100",
+    amber: "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100",
+    rose: "bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100",
     orange: "bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100",
   }
   return (
@@ -974,6 +1014,7 @@ export default function SageAssistantPage() {
   const [input, setInput] = useState("")
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadingLabel, setLoadingLabel] = useState("Analyzing your data...")
   const [companyData, setCompanyData] = useState<CompanyData | null>(null)
   const [kpis, setKpis] = useState<KPISummary | null>(null)
   const [dataLoading, setDataLoading] = useState(true)
@@ -985,12 +1026,11 @@ export default function SageAssistantPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   useEffect(() => { scrollToBottom() }, [messages])
   useEffect(() => { if (textareaRef.current) { textareaRef.current.style.height = "auto"; textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + "px" } }, [input])
 
-  // ---- DATA LOADING (unchanged) ----
+  // ---- DATA LOADING ----
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -1033,10 +1073,10 @@ export default function SageAssistantPage() {
     loadData()
   }, [])
 
-  // ---- CONVERSATION MANAGEMENT (unchanged) ----
+  // ---- CONVERSATION MANAGEMENT ----
   const saveConversation = async (msgs: Message[], conversationId: string | null, title?: string) => {
     if (!userId || !companyId) return null
-    const messagesForStorage = msgs.map(m => ({ ...m, timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp }))
+    const messagesForStorage = msgs.map(m => ({ ...m, timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp, pendingApproval: undefined }))
     if (conversationId) {
       await supabase.from("sage_conversations").update({ messages: messagesForStorage, updated_at: new Date().toISOString(), ...(title ? { title } : {}) }).eq("id", conversationId)
       return conversationId
@@ -1048,7 +1088,7 @@ export default function SageAssistantPage() {
   }
   const generateTitle = (content: string): string => content.split(" ").slice(0, 6).join(" ").slice(0, 40)
 
-  // ---- FILE HANDLING (unchanged) ----
+  // ---- FILE HANDLING ----
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return
     Array.from(files).forEach(file => {
@@ -1061,14 +1101,121 @@ export default function SageAssistantPage() {
   const handleDrop = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); handleFileSelect(e.dataTransfer.files) }, [])
   const removeAttachment = (id: string) => setAttachments(prev => prev.filter(a => a.id !== id))
 
-  // ---- SEND MESSAGE (unchanged) ----
+  // ---- AGENT CALLER ----
+  const callAgent = async (agent: string, action: string): Promise<AgentResult> => {
+    try {
+      const endpoint = `/api/agents/${agent}`
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, companyId })
+      })
+      if (!res.ok) throw new Error(`Agent ${agent} returned ${res.status}`)
+      const data = await res.json()
+      return { agent, status: "success", data, summary: data.ai_analysis || data.ai_digest || data.summary || "Agent completed successfully." }
+    } catch (err) {
+      console.error(`Agent ${agent} failed:`, err)
+      return { agent, status: "error", data: null, summary: `Failed to run ${agent}: ${(err as Error).message}` }
+    }
+  }
+
+  // ---- FORMAT AGENT RESULTS FOR AI CONTEXT ----
+  const formatAgentResultForAI = (result: AgentResult): string => {
+    if (result.status === "error") return `AGENT ERROR (${result.agent}): ${result.summary}`
+    const d = result.data
+    switch (result.agent) {
+      case "timesheet-reconciler":
+        return `TIMESHEET RECONCILER RESULTS:
+Week: ${d.week?.start} to ${d.week?.end}
+Team: ${d.team_summary?.total_members || 0} contractors, ${d.team_summary?.submitted || 0} submitted, ${d.team_summary?.missing || 0} missing, ${d.team_summary?.partial || 0} partial
+Total hours: ${d.team_summary?.total_hours || 0}
+${(d.members || []).map((m: any) => `  ${m.name}: ${m.status} (${m.hours_logged}h/${m.expected_hours}h) — ${m.projects?.map((p: any) => `${p.name}: ${p.hours}h`).join(", ") || "no entries"}`).join("\n")}
+Budget alerts: ${(d.budget_alerts || []).map((b: any) => `${b.project_name} (${b.client_name}): ${b.hours_used}/${b.budget_hours}h = ${b.burn_pct}% [${b.status}]`).join("; ") || "None"}
+AI Analysis: ${d.ai_analysis || ""}
+Reminders drafted: ${(d.reminders || []).length}`
+
+      case "cashflow-forecaster":
+        return `CASH FLOW FORECAST RESULTS:
+Current cash: $${Math.round(d.current_cash || 0).toLocaleString()}
+13-week projection:
+${(d.forecast_weeks || []).map((w: any) => `  Wk${w.week_number} (${w.week_start}): In $${Math.round(w.inflows?.total || 0).toLocaleString()} / Out $${Math.round(w.outflows?.total || 0).toLocaleString()} / Net $${Math.round(w.net_cash_flow || 0).toLocaleString()} / Balance $${Math.round(w.running_balance || 0).toLocaleString()} [${w.confidence}]`).join("\n")}
+Summary: Inflows $${Math.round(d.summary?.total_inflows || 0).toLocaleString()}, Outflows $${Math.round(d.summary?.total_outflows || 0).toLocaleString()}, Ending balance $${Math.round(d.summary?.ending_balance || 0).toLocaleString()}
+Lowest: $${Math.round(d.summary?.lowest_balance || 0).toLocaleString()} in week ${d.summary?.lowest_balance_week || "?"}
+${d.summary?.runway_weeks ? `Runway: ~${d.summary.runway_weeks} weeks` : "Cash position stable"}
+Alerts: ${(d.alerts || []).map((a: any) => `[${a.severity}] ${a.message}`).join("; ") || "None"}
+AI Analysis: ${d.ai_analysis || ""}`
+
+      case "project-health":
+        return `PROJECT HEALTH RESULTS:
+Portfolio: ${d.portfolio_summary?.total_projects || 0} projects — ${d.portfolio_summary?.green || 0} green, ${d.portfolio_summary?.yellow || 0} yellow, ${d.portfolio_summary?.red || 0} red
+Total revenue: $${Math.round(d.portfolio_summary?.total_revenue || 0).toLocaleString()} | Cost: $${Math.round(d.portfolio_summary?.total_cost || 0).toLocaleString()} | Blended margin: ${d.portfolio_summary?.blended_margin || 0}%
+AR outstanding: $${Math.round(d.portfolio_summary?.total_ar || 0).toLocaleString()}
+${(d.projects || []).map((p: any) => `  [${p.status.toUpperCase()}] ${p.project_name} (${p.client_name}): ${p.gross_margin_pct}% margin, ${p.hours_used}h${p.budget_hours ? "/" + p.budget_hours + "h" : ""}, AR $${Math.round(p.ar_outstanding || 0).toLocaleString()} — ${p.signals?.join("; ")}`).join("\n")}
+AI Digest: ${d.ai_digest || ""}`
+
+      case "invoice-validator":
+        return `INVOICE VALIDATOR RESULTS:
+${(d.results || [d]).map((r: any) => `Invoice ${r.invoice_id || "?"}: ${r.status} — ${r.recommendation || ""} ${(r.issues || []).map((i: any) => i.description || i).join("; ")}`).join("\n")}
+Summary: ${d.summary || result.summary}`
+
+      case "expense-categorizer":
+        return `EXPENSE CATEGORIZER RESULTS:
+${d.processed || 0} transactions processed, ${d.auto_applied || 0} auto-categorized, ${d.needs_review || 0} need review
+${(d.categorizations || []).slice(0, 20).map((c: any) => `  "${c.description}": $${c.amount} -> ${c.suggested_category} (${Math.round((c.confidence || 0) * 100)}% confidence)`).join("\n") || "No categorizations"}
+AI Summary: ${d.summary || result.summary}`
+
+      default:
+        return `AGENT (${result.agent}): ${JSON.stringify(d).slice(0, 2000)}`
+    }
+  }
+
+  // ---- SEND MESSAGE (with agent routing) ----
   const sendMessage = async (content: string) => {
     if ((!content.trim() && attachments.length === 0) || loading) return
     const userMessage: Message = { id: `user_${Date.now()}`, role: "user", content: content.trim(), timestamp: new Date(), attachments: attachments.length > 0 ? [...attachments] : undefined }
     const newMessages = [...messages, userMessage]
     setMessages(newMessages); setInput(""); setAttachments([]); setLoading(true)
+
     try {
+      // === STEP 1: Detect agent intent ===
+      const intent = detectAgentIntent(content)
+      let agentContext = ""
+      let agentResults: AgentResult[] = []
+
+      if (intent.agent && intent.confidence >= 0.7) {
+        if (intent.agent === "morning-briefing") {
+          // Multi-agent: run project health + cash flow + timesheet reconciler
+          setLoadingLabel("Running morning briefing — checking projects, cash flow, and timesheets...")
+          const [health, cashflow, timesheet] = await Promise.all([
+            callAgent("project-health", "digest"),
+            callAgent("cashflow-forecaster", "alerts-only"),
+            callAgent("timesheet-reconciler", "reconcile"),
+          ])
+          agentResults = [health, cashflow, timesheet]
+          agentContext = agentResults.map(formatAgentResultForAI).join("\n\n---\n\n")
+        } else {
+          const agentLabels: Record<string, string> = {
+            "invoice-validator": "Validating invoices against time entries...",
+            "expense-categorizer": "Analyzing uncategorized transactions...",
+            "timesheet-reconciler": "Checking timesheet submissions...",
+            "cashflow-forecaster": "Building 13-week cash flow forecast...",
+            "project-health": "Scanning project health across portfolio...",
+          }
+          setLoadingLabel(agentLabels[intent.agent] || "Running agent...")
+          const result = await callAgent(intent.agent, intent.action)
+          agentResults = [result]
+          agentContext = formatAgentResultForAI(result)
+        }
+      }
+
+      // === STEP 2: Build context and call AI ===
+      setLoadingLabel("Analyzing your data...")
       let dataContext = companyData && kpis ? buildDataContext(companyData, kpis) : "No company data available yet."
+
+      if (agentContext) {
+        dataContext += `\n\n=== AGENT RESULTS (present these clearly with tables and charts) ===\n${agentContext}`
+      }
+
       if (userMessage.attachments) {
         dataContext += "\n\n=== ATTACHED FILES ===\n"
         userMessage.attachments.forEach(att => {
@@ -1076,6 +1223,7 @@ export default function SageAssistantPage() {
           else dataContext += `  File: ${att.name}\nContent:\n${att.content?.slice(0, 8000) || "[Unable to read]"}\n\n`
         })
       }
+
       const response = await fetch("/api/ai/chat", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: newMessages.map(m => ({ role: m.role, content: m.content })), systemPrompt: SYSTEM_PROMPT, dataContext })
@@ -1083,8 +1231,8 @@ export default function SageAssistantPage() {
       if (!response.ok) throw new Error("Failed to get AI response")
       const data = await response.json()
       let assistantContent = data.content
-      
-      // Detect and save learned patterns
+
+      // === STEP 3: Detect learned patterns ===
       const patternRegex = /PATTERN_LEARNED:\s*vendor="([^"]+)"\s*category="([^"]+)"(?:\s*sub_category="([^"]*)")?/g
       let patternMatch
       let patternsFound = false
@@ -1094,33 +1242,55 @@ export default function SageAssistantPage() {
         const normalized = vendor.toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim()
         try {
           await supabase.from("sage_learned_patterns").upsert({
-            company_id: companyId,
-            pattern_type: "vendor_category",
-            vendor_name: vendor,
-            vendor_normalized: normalized,
-            category: category,
-            sub_category: subCategory || null,
-            match_field: "vendor",
-            match_value: normalized,
-            confidence: 1.00,
-            times_confirmed: 1,
-            status: "approved",
-            approved_by: userId,
-            approved_at: new Date().toISOString(),
-            source: "sage_ai",
+            company_id: companyId, pattern_type: "vendor_category", vendor_name: vendor,
+            vendor_normalized: normalized, category, sub_category: subCategory || null,
+            match_field: "vendor", match_value: normalized, confidence: 1.00,
+            times_confirmed: 1, status: "approved", approved_by: userId,
+            approved_at: new Date().toISOString(), source: "sage_ai",
           }, { onConflict: "company_id,vendor_normalized", ignoreDuplicates: false })
-          console.log(`Pattern saved: ${vendor} -> ${category}/${subCategory || ""}`)
         } catch (e) { console.error("Failed to save pattern:", e) }
       }
-      // Refresh learned patterns in local state if any were saved
       if (patternsFound && companyId) {
         const { data: refreshedPatterns } = await supabase.from("sage_learned_patterns").select("*").eq("company_id", companyId).neq("status", "rejected")
         if (refreshedPatterns && companyData) setCompanyData(prev => prev ? { ...prev, learnedPatterns: refreshedPatterns } : prev)
       }
-      // Strip PATTERN_LEARNED lines from display
       assistantContent = assistantContent.replace(/PATTERN_LEARNED:.*$/gm, "").replace(/\n{3,}/g, "\n\n").trim()
-      
-      const assistantMessage: Message = { id: `assistant_${Date.now()}`, role: "assistant", content: assistantContent, timestamp: new Date() }
+
+      // === STEP 4: Detect action blocks for approval workflow ===
+      let actionData = null
+      let cleanMessage = assistantContent
+      const actionMatch = assistantContent.match(/```vantage-action\s*([\s\S]*?)```/)
+      if (actionMatch && actionMatch[1]) {
+        try {
+          actionData = JSON.parse(actionMatch[1].trim())
+          cleanMessage = assistantContent.replace(/```vantage-action[\s\S]*?```/g, "").trim()
+        } catch (e) { console.error("Failed to parse action:", e) }
+      }
+
+      // Build assistant message
+      const assistantMessage: Message = {
+        id: `assistant_${Date.now()}`,
+        role: "assistant",
+        content: cleanMessage,
+        timestamp: new Date(),
+        agentResult: agentResults.length > 0 ? { agent: agentResults.map(r => r.agent).join("+"), status: agentResults.every(r => r.status === "success") ? "success" : "error", data: agentResults.length === 1 ? agentResults[0].data : agentResults.map(r => r.data), summary: agentResults.map(r => r.summary).join(" | ") } : undefined,
+        pendingApproval: actionData ? {
+          id: `approval_${Date.now()}`,
+          type: actionData.action === "bulk_update" ? "bulk_update" : "invoice_approve",
+          description: actionData.summary || "Review changes before applying",
+          items: actionData.updates || [],
+          onApprove: async () => {
+            // Execute the bulk update
+            try {
+              for (const update of (actionData.updates || [])) {
+                await supabase.from("transactions").update(update.changes).eq("id", update.id).eq("company_id", companyId)
+              }
+            } catch (err) { console.error("Bulk update failed:", err) }
+          },
+          onReject: () => { /* no-op, just discard */ }
+        } : undefined,
+      }
+
       const finalMessages = [...newMessages, assistantMessage]
       setMessages(finalMessages)
       const title = messages.length === 0 ? generateTitle(content) : undefined
@@ -1129,8 +1299,8 @@ export default function SageAssistantPage() {
       if (currentConversationId) setConversations(prev => prev.map(c => c.id === currentConversationId ? { ...c, messages: finalMessages, updated_at: new Date().toISOString() } : c))
     } catch (error) {
       console.error("Error:", error)
-      setMessages(prev => [...prev, { id: `error_${Date.now()}`, role: "assistant", content: "I encountered an error connecting to the AI service. Please check your API configuration and try again.", timestamp: new Date() }])
-    } finally { setLoading(false) }
+      setMessages(prev => [...prev, { id: `error_${Date.now()}`, role: "assistant", content: "I hit an error connecting to the AI service. Check your API configuration and try again.", timestamp: new Date() }])
+    } finally { setLoading(false); setLoadingLabel("Analyzing your data...") }
   }
 
   const handleQuickAction = (action: typeof QUICK_ACTIONS[0]) => sendMessage(action.label)
@@ -1139,24 +1309,19 @@ export default function SageAssistantPage() {
   const loadConversation = (conversation: Conversation) => { setCurrentConversationId(conversation.id); setMessages(conversation.messages.map(m => ({ ...m, timestamp: new Date(m.timestamp) }))) }
   const deleteConversation = async (id: string) => { await supabase.from("sage_conversations").delete().eq("id", id); setConversations(prev => prev.filter(c => c.id !== id)); if (currentConversationId === id) startNewConversation() }
   const renameConversation = async (id: string, title: string) => { await supabase.from("sage_conversations").update({ title }).eq("id", id); setConversations(prev => prev.map(c => c.id === id ? { ...c, title } : c)) }
-
   const hasMessages = messages.length > 0
   const filteredConversations = useMemo(() => {
     if (!searchQuery.trim()) return conversations
     return conversations.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase()))
   }, [conversations, searchQuery])
-
   const dataStats = useMemo(() => {
     if (!companyData) return null
     const uncatTxns = companyData.transactions?.filter(t => !t.category || t.category === "uncategorized" || t.category === "").length || 0
     const overdueInvs = companyData.invoices?.filter(i => i.status !== "paid" && new Date(i.due_date || i.created_at) < new Date()).length || 0
-    const activeRates = companyData.billRates?.filter(r => r.is_active).length || 0
     const totalDataPoints = (companyData.transactions?.length || 0) + (companyData.invoices?.length || 0) + (companyData.timeEntries?.length || 0)
     const learnedCount = companyData.learnedPatterns?.filter(p => p.status === "approved").length || 0
-    return { uncatTxns, overdueInvs, activeRates, totalTxns: companyData.transactions?.length || 0, totalDataPoints, learnedCount }
+    return { uncatTxns, overdueInvs, totalDataPoints, learnedCount }
   }, [companyData])
-
-  // [FIX #10] Contextual placeholder based on data
   const smartPlaceholder = useMemo(() => {
     if (!dataStats) return "Ask Sage anything about your business..."
     if (dataStats.uncatTxns > 5) return `You have ${dataStats.uncatTxns} uncategorized transactions — ask me to sort them`
@@ -1169,9 +1334,7 @@ export default function SageAssistantPage() {
   if (dataLoading) return (
     <div className="flex items-center justify-center h-[calc(100vh-80px)] bg-[#f4f5f7]">
       <div className="text-center">
-        <div className="mx-auto mb-4">
-          <SageLogo size={64} className="animate-pulse" />
-        </div>
+        <div className="mx-auto mb-4"><SageLogo size={64} className="animate-pulse" /></div>
         <p className="text-sm text-gray-400">Loading financial data...</p>
       </div>
     </div>
@@ -1179,7 +1342,7 @@ export default function SageAssistantPage() {
 
   return (
     <div className="flex h-[calc(100vh-80px)] bg-[#f4f5f7]">
-      {/* ========== SIDEBAR (Light) ========== */}
+      {/* ========== SIDEBAR ========== */}
       <div className={`${sidebarOpen ? "w-72" : "w-0"} border-r border-gray-200 bg-white flex flex-col transition-all duration-300 overflow-hidden flex-shrink-0`}>
         <div className="p-3 border-b border-gray-200">
           <div className="flex items-center gap-2 mb-3">
@@ -1199,7 +1362,6 @@ export default function SageAssistantPage() {
           {filteredConversations.map(c => <ConversationItem key={c.id} conversation={c} isActive={c.id === currentConversationId} onClick={() => loadConversation(c)} onDelete={() => deleteConversation(c.id)} onRename={title => renameConversation(c.id, title)} />)}
           {filteredConversations.length === 0 && <p className="text-xs text-gray-400 text-center py-8">{searchQuery ? "No matches found" : "No conversations yet"}</p>}
         </div>
-        {/* [FIX #8] Data Connected stats — more visible with colored dots */}
         {dataStats && (
           <div className="p-3 border-t border-gray-200 bg-gray-50">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Data Connected</p>
@@ -1229,11 +1391,10 @@ export default function SageAssistantPage() {
             </div>
           </div>
           <div className="flex items-center gap-5">
-            {/* [FIX #9] Persistent alert badges in header */}
             {dataStats && (
               <div className="hidden md:flex items-center gap-2">
                 {dataStats.uncatTxns > 0 && (
-                  <button onClick={() => sendMessage("Categorize my recent bank transactions")} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-[11px] font-medium hover:bg-amber-100 transition-colors">
+                  <button onClick={() => sendMessage("Categorize my uncategorized transactions")} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-[11px] font-medium hover:bg-amber-100 transition-colors">
                     <CreditCard size={11} />{dataStats.uncatTxns} uncat
                   </button>
                 )}
@@ -1258,7 +1419,6 @@ export default function SageAssistantPage() {
             <button onClick={startNewConversation} className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors" title="New conversation"><Plus size={16} /></button>
           </div>
         </div>
-
         {/* Drop Zone */}
         {isDragging && (
           <div className="absolute inset-0 bg-white/95 z-50 flex items-center justify-center border-2 border-dashed border-emerald-400 m-4 rounded-xl">
@@ -1269,14 +1429,11 @@ export default function SageAssistantPage() {
             </div>
           </div>
         )}
-
         {/* ========== CONTENT ========== */}
         <div className="flex-1 overflow-y-auto">
           {!hasMessages ? (
-            /* ===== WELCOME DASHBOARD ===== */
             <div className="h-full flex flex-col px-6 py-8 overflow-y-auto">
               <div className="max-w-4xl mx-auto w-full flex flex-col">
-                {/* [FIX #2] Compact hero — inline logo + heading */}
                 <div className="flex items-center gap-4 mb-6">
                   <SageLogo size={56} className="flex-shrink-0" />
                   <div>
@@ -1284,17 +1441,13 @@ export default function SageAssistantPage() {
                     <p className="text-sm text-gray-400">Here is your financial snapshot. Ask me anything about your business.</p>
                   </div>
                 </div>
-
-                {/* Alert Badges — actionable, not decorative */}
                 {dataStats && (dataStats.uncatTxns > 0 || dataStats.overdueInvs > 0 || (kpis && kpis.teamMarginPct > 0 && kpis.teamMarginPct < 15)) && (
                   <div className="flex flex-wrap gap-2 mb-6">
-                    {dataStats.uncatTxns > 0 && <AlertCard icon={CreditCard} label="uncategorized transactions" count={dataStats.uncatTxns} color="amber" onClick={() => sendMessage("Categorize my recent bank transactions")} />}
+                    {dataStats.uncatTxns > 0 && <AlertCard icon={CreditCard} label="uncategorized transactions" count={dataStats.uncatTxns} color="amber" onClick={() => sendMessage("Categorize my uncategorized transactions")} />}
                     {dataStats.overdueInvs > 0 && <AlertCard icon={AlertTriangle} label="overdue invoices" count={dataStats.overdueInvs} color="rose" onClick={() => sendMessage("Show me overdue invoices and recommend follow-up actions")} />}
                     {kpis && kpis.teamMarginPct > 0 && kpis.teamMarginPct < 15 && <AlertCard icon={TrendingDown} label={`margin at ${kpis.teamMarginPct.toFixed(1)}%`} count={1} color="orange" onClick={() => sendMessage("My team margin is below 15%. What is driving this and how can I improve it?")} />}
                   </div>
                 )}
-
-                {/* [FIX #6] Quick Actions — accent on priority items */}
                 <div className="mb-8">
                   <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Quick Actions</p>
                   <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
@@ -1311,8 +1464,6 @@ export default function SageAssistantPage() {
                     })}
                   </div>
                 </div>
-
-                {/* Input (welcome) */}
                 <div className="w-full max-w-3xl mx-auto mt-4">
                   <div className="relative">
                     <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyPress} placeholder={smartPlaceholder} rows={2} className="w-full bg-white border border-gray-200 rounded-2xl pl-5 pr-28 py-5 text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 text-[15px] transition-all shadow-sm" style={{ minHeight: "72px", maxHeight: "200px" }} />
@@ -1323,12 +1474,11 @@ export default function SageAssistantPage() {
                       </button>
                     </div>
                   </div>
-                  <p className="text-[11px] text-gray-400 mt-2.5 text-center">Enter to send · Drop files to attach · Charts, tables, categorization</p>
+                  <p className="text-[11px] text-gray-400 mt-2.5 text-center">Enter to send · Drop files to attach · Charts, tables, agents</p>
                 </div>
               </div>
             </div>
           ) : (
-            /* ===== MESSAGES ===== */
             <div className="py-6 px-4 space-y-5">
               {messages.map(message => <ChatMessage key={message.id} message={message} />)}
               {loading && (
@@ -1343,7 +1493,7 @@ export default function SageAssistantPage() {
                           <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
                           <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                         </div>
-                        <span className="text-xs text-gray-400">Analyzing your data...</span>
+                        <span className="text-xs text-gray-400">{loadingLabel}</span>
                       </div>
                     </div>
                   </div>
@@ -1353,8 +1503,7 @@ export default function SageAssistantPage() {
             </div>
           )}
         </div>
-
-        {/* ===== BOTTOM INPUT (in chat) ===== */}
+        {/* ===== BOTTOM INPUT ===== */}
         {hasMessages && (
           <div className="border-t border-gray-200 px-4 py-3.5 bg-white">
             {attachments.length > 0 && (
@@ -1379,7 +1528,6 @@ export default function SageAssistantPage() {
             </div>
           </div>
         )}
-
         <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.csv,.xlsx,.xls,.txt,.json" onChange={e => handleFileSelect(e.target.files)} className="hidden" />
       </div>
     </div>
