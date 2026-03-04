@@ -48,10 +48,19 @@ export default function AppShell({ children }: AppShellProps) {
     localStorage.setItem('vantage-sidebar-collapsed', String(newCollapsed))
   }, [sidebarCollapsed])
 
+  // Public routes that skip auth entirely
+  const PUBLIC_PATHS = ['/login', '/portal', '/timesheet', '/contractor-portal', '/expense-report', '/terms', '/privacy']
+
   // Auth check
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // Skip auth for public/portal routes
+        if (PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))) {
+          setLoading(false)
+          return
+        }
+
         const { user } = await getCurrentUser()
         
         if (!user) {
@@ -110,7 +119,7 @@ export default function AppShell({ children }: AppShellProps) {
   }
 
   // Skip shell for public/portal pages
-  if (['/login', '/portal', '/timesheet', '/contractor-portal', '/expense-report', '/terms', '/privacy'].includes(pathname)) {
+  if (PUBLIC_PATHS.includes(pathname)) {
     return <>{children}</>
   }
 
