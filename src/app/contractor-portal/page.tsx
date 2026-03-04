@@ -497,7 +497,8 @@ export default function ContractorPortal() {
         team_member_id: member.id, invoice_number: invoiceForm.invoice_number,
         invoice_date: new Date().toISOString().split('T')[0], due_date: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
         period_start: billingMonth.start, period_end: billingMonth.end,
-        total_amount: enteredAmount, payment_terms: invoiceForm.payment_terms, receipt_url: receiptUrl, notes: invoiceForm.notes || null, status: 'submitted'
+        total_amount: enteredAmount, payment_terms: invoiceForm.payment_terms, receipt_url: receiptUrl, notes: invoiceForm.notes || null, status: 'submitted',
+        client_id: invoiceForm.client_id && invoiceForm.client_id !== 'all' ? invoiceForm.client_id : null
       }).select().single()
       if (ie || !inv) throw ie || new Error('Failed to create invoice')
 
@@ -538,7 +539,7 @@ export default function ContractorPortal() {
       setHistoryLoading(true)
       try {
         const { data: timeData } = await supabase.from('time_entries').select('id, project_id, hours, billable_hours, description, date, created_at').eq('contractor_id', member.id).gte('date', historyRange.start).lte('date', historyRange.end).order('date', { ascending: false })
-        const { data: expData } = await supabase.from('contractor_expenses').select('*').eq('team_member_id', member.id).gte('date', historyRange.start).lte('date', historyRange.end).order('date', { ascending: false })
+        const { data: expData } = await supabase.from('contractor_expenses').select('*').eq('team_member_id', member.id).neq('status', 'rejected').gte('date', historyRange.start).lte('date', historyRange.end).order('date', { ascending: false })
         const { data: invData } = await supabase.from('contractor_invoices').select('*, contractor_invoice_lines(*)').eq('team_member_id', member.id).lte('period_start', historyRange.end).gte('period_end', historyRange.start).order('invoice_date', { ascending: false })
         setHistoryTime(timeData || []); setHistoryExpenses(expData || []); setHistoryInvoices(invData || [])
       } catch (err) { console.error('History load error:', err) }
@@ -1104,6 +1105,7 @@ export default function ContractorPortal() {
               <div className="space-y-2">
                 {invoices.map(inv => {
                   const lines = inv.contractor_invoice_lines || inv.lines || []
+                  const clientName = inv.client_id ? (assignmentsByClient[inv.client_id]?.clientName || lines[0]?.description?.split(' - ')[0] || 'Unknown') : (lines[0]?.description?.split(' - ')[0] || 'General')
                   return (
                     <div key={inv.id} className={`${T.cardHover} overflow-hidden`}>
                       <div className="px-4 sm:px-5 py-4 flex items-center gap-3 sm:gap-4">
@@ -1115,7 +1117,10 @@ export default function ContractorPortal() {
                             <p className="text-gray-900 text-sm font-medium">{inv.invoice_number}</p>
                             {inv.receipt_url && <Paperclip size={11} className="text-sky-500" />}
                           </div>
-                          <p className="text-gray-400 text-xs mt-0.5">{formatDate(inv.period_start)} – {formatDate(inv.period_end)}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{clientName}</span>
+                            <span className="text-gray-400 text-xs">{formatDate(inv.period_start)} – {formatDate(inv.period_end)}</span>
+                          </div>
                         </div>
                         <span className="text-gray-900 font-semibold text-sm tabular-nums">{formatCurrency(inv.total_amount)}</span>
                         <StatusPill status={inv.status} />
