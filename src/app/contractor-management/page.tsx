@@ -829,7 +829,7 @@ export default function ContractorManagement() {
           <h1 className="text-xl font-semibold text-gray-900 tracking-tight">Contractor Management</h1>
           <p className={`text-[13px] mt-1 ${THEME.textDim}`}>AP invoices and expenses from your team</p>
         </div>
-        <a href="/timesheet" target="_blank" rel="noopener noreferrer"
+        <a href="/contractor-portal" target="_blank" rel="noopener noreferrer"
           className={`flex items-center gap-2 px-4 py-2 ${THEME.card} border hover:bg-gray-50 rounded-lg text-gray-600 text-sm transition-colors`}>
           <ExternalLink size={14} /> Contractor Portal
         </a>
