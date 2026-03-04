@@ -30,6 +30,7 @@ interface ContractorInvoice {
   due_date: string; period_start: string; period_end: string; total_amount: number
   status: string; payment_terms: string; receipt_url: string | null; notes: string | null
   submitted_at: string; reviewed_at: string | null; paid_at: string | null
+  client_id?: string | null
   contractor_invoice_lines: InvoiceLine[]
 }
 interface InvoiceLine {
