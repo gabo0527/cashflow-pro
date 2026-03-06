@@ -728,9 +728,9 @@ export default function ContractorPortal() {
         <div className="w-full max-w-[380px]">
           {/* Logo */}
           <div className="text-center mb-10">
-            <div className="inline-flex items-center justify-center w-14 h-14 bg-emerald-50 rounded-2xl border border-emerald-100 mb-5">
-              <svg width={30} height={30} viewBox="0 0 40 40" fill="none">
-                <path d="M8 8L20 32L32 8" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <div className="inline-flex items-center justify-center mb-5">
+              <svg width={52} height={52} viewBox="0 0 40 40" fill="none">
+                <path d="M8 8L20 32L32 8" stroke="#10b981" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
               </svg>
             </div>
             <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Vantage</h1>
@@ -941,18 +941,7 @@ export default function ContractorPortal() {
                     </select>
                   </div>
 
-                  {expenseForm.client_id && (() => {
-                    const cName = assignmentsByClient[expenseForm.client_id]?.clientName || ''
-                    const isInternal = cName.toLowerCase().includes('mano') || cName.toLowerCase().includes('internal') || cName.toLowerCase().includes('overhead')
-                    return (
-                      <div className={`col-span-2 flex items-center gap-2.5 px-4 py-3 rounded-xl border ${isInternal ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
-                        <div className={`w-2 h-2 rounded-full ${isInternal ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-                        <span className={`text-xs font-semibold ${isInternal ? 'text-amber-700' : 'text-emerald-700'}`}>
-                          {isInternal ? 'Overhead — company operating expense' : 'Billable — billed to client at cost'}
-                        </span>
-                      </div>
-                    )
-                  })()}
+
 
                   <div className="col-span-2">
                     <label className={T.label}>Description</label>
@@ -974,6 +963,10 @@ export default function ContractorPortal() {
               <div className="space-y-2">
                 {expenses.map(exp => {
                   const cat = EXPENSE_CATEGORIES.find(c => c.id === exp.category)
+                  const clientName = exp.client_id ? (assignmentsByClient[exp.client_id]?.clientName || '—') : null
+                  const receiptUrl = exp.receipt_url
+                    ? supabase.storage.from('contractor-uploads').getPublicUrl(exp.receipt_url).data.publicUrl
+                    : null
                   return (
                     <div key={exp.id} className={`${T.cardHover} px-4 sm:px-5 py-4 flex items-center gap-3 sm:gap-4`}>
                       <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
@@ -985,7 +978,21 @@ export default function ContractorPortal() {
                           <span>{formatDate(exp.date)}</span>
                           <span className="w-0.5 h-0.5 rounded-full bg-gray-300" />
                           <span>{cat?.label || exp.category}</span>
-                          {exp.receipt_url && <><span className="w-0.5 h-0.5 rounded-full bg-gray-300" /><Paperclip size={10} className="text-sky-500" /></>}
+                          {clientName && (
+                            <>
+                              <span className="w-0.5 h-0.5 rounded-full bg-gray-300" />
+                              <span className="text-emerald-600 font-medium">{clientName}</span>
+                            </>
+                          )}
+                          {receiptUrl ? (
+                            <>
+                              <span className="w-0.5 h-0.5 rounded-full bg-gray-300" />
+                              <a href={receiptUrl} target="_blank" rel="noopener noreferrer"
+                                className="text-sky-500 hover:text-sky-700 transition-colors" title="View receipt">
+                                <Paperclip size={10} />
+                              </a>
+                            </>
+                          ) : null}
                         </div>
                       </div>
                       <span className="text-gray-900 font-semibold text-sm tabular-nums">{formatCurrency(exp.amount)}</span>
