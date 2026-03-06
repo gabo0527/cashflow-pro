@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
         records_synced: 0,
         status: 'error',
         error_message: err.message,
-      }).catch(() => {})
+      })
     }
   }
 
