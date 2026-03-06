@@ -56,10 +56,6 @@ const PAYMENT_TERMS = [
 ]
 
 // Client color assignment
-// Emerald→Gray rank palette: darkest = most hours that week
-const RANK_COLORS = ['#059669', '#10b981', '#94a3b8', '#cbd5e1', '#e2e8f0']
-const RANK_TEXT   = ['#047857', '#059669', '#64748b', '#94a3b8', '#94a3b8']
-
 const CLIENT_COLORS = ['#f59e0b', '#10b981', '#6366f1', '#0ea5e9', '#f43f5e', '#8b5cf6']
 const getClientColor = (index: number) => CLIENT_COLORS[index % CLIENT_COLORS.length]
 
@@ -1522,14 +1518,13 @@ export default function ContractorPortal() {
                                   <span className="text-[15px] font-bold text-emerald-600 tabular-nums">{week.totalHours.toFixed(1)}h</span>
                                 </div>
 
-                                {/* Chip tags — emerald→gray by rank (sorted by hours desc) */}
+                                {/* Chip tags — per-project colors */}
                                 <div className="flex flex-wrap gap-1.5 ml-6">
                                   {projects.map((p, pi) => {
-                                    const dotColor = RANK_COLORS[Math.min(pi, RANK_COLORS.length - 1)]
-                                    const textColor = RANK_TEXT[Math.min(pi, RANK_TEXT.length - 1)]
+                                    const dotColor = clientColorMap[p.clientId] || CLIENT_COLORS[pi % CLIENT_COLORS.length]
                                     return (
                                       <span key={pi} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold"
-                                        style={{ background: dotColor + '18', color: textColor }}>
+                                        style={{ background: dotColor + '18', color: dotColor }}>
                                         <span className="w-[5px] h-[5px] rounded-full shrink-0" style={{ background: dotColor }} />
                                         {p.name} · {p.hours.toFixed(1)}h
                                       </span>
@@ -1543,18 +1538,15 @@ export default function ContractorPortal() {
                                 <div className="border-t border-gray-100 bg-gray-50/20 px-4 sm:px-5 pb-4 pt-3 ml-6">
                                   <div className="space-y-2.5">
                                     {projects.map((p, pi) => {
-                                      const dotColor = RANK_COLORS[Math.min(pi, RANK_COLORS.length - 1)]
-                                      const textColor = RANK_TEXT[Math.min(pi, RANK_TEXT.length - 1)]
+                                      const dotColor = clientColorMap[p.clientId] || CLIENT_COLORS[pi % CLIENT_COLORS.length]
                                       const pct = (p.hours / week.totalHours) * 100
-                                      // Find notes for this project
-                                      const entry = week.entries.find((e: any) => e.project_id === p.clientId || assignments.find(a => a.project_id === e.project_id)?.project_name === p.name)
                                       const a = assignments.find(a => a.project_name === p.name)
                                       return (
                                         <div key={pi}>
                                           <div className="flex items-center justify-between mb-1.5">
                                             <div className="flex items-center gap-2">
                                               <span className="w-[6px] h-[6px] rounded-sm shrink-0" style={{ background: dotColor }} />
-                                              <span className="text-xs font-medium" style={{ color: textColor }}>{p.name}</span>
+                                              <span className="text-xs font-medium text-gray-700">{p.name}</span>
                                               {a?.client_name && <span className="text-[10px] text-gray-300">{a.client_name}</span>}
                                             </div>
                                             <span className="text-xs font-bold text-gray-800 tabular-nums">{p.hours.toFixed(1)}h</span>
