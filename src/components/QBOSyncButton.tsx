@@ -1,5 +1,6 @@
 // Save as: src/components/QBOSyncButton.tsx
-// Reusable sync button — drop into Cash Flow + Invoices pages
+// Fixed: chains entities sequentially (one API call per entity, each <10s)
+// Each call syncs one entity type, client chains them to avoid Vercel timeout
 
 'use client'
 
@@ -9,8 +10,14 @@ import { RefreshCw, CheckCircle2, AlertTriangle, Cloud, CloudOff } from 'lucide-
 interface QBOSyncButtonProps {
   companyId: string
   syncType: 'bank' | 'invoices' | 'all'
-  onSyncComplete?: () => void   // Callback to refresh page data after sync
-  compact?: boolean              // Smaller variant for inline use
+  onSyncComplete?: () => void
+  compact?: boolean
+}
+
+const ENTITY_LABELS: Record<string, string> = {
+  Purchase: 'Expenses', Deposit: 'Deposits', Transfer: 'Transfers',
+  Payment: 'Payments', SalesReceipt: 'Sales Receipts', JournalEntry: 'Journal Entries',
+  Invoice: 'Invoices',
 }
 
 export default function QBOSyncButton({ companyId, syncType, onSyncComplete, compact = false }: QBOSyncButtonProps) {
@@ -19,11 +26,10 @@ export default function QBOSyncButton({ companyId, syncType, onSyncComplete, com
   const [lastSync, setLastSync] = useState<string | null>(null)
   const [connected, setConnected] = useState(false)
   const [resultMsg, setResultMsg] = useState('')
+  const [progress, setProgress] = useState('')
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (companyId) loadStatus()
-  }, [companyId])
+  useEffect(() => { if (companyId) loadStatus() }, [companyId])
 
   const loadStatus = async () => {
     setLoading(true)
@@ -45,36 +51,82 @@ export default function QBOSyncButton({ companyId, syncType, onSyncComplete, com
     setSyncing(true)
     setStatus('idle')
     setResultMsg('')
+    setProgress('')
 
     try {
-      const res = await fetch('/api/qbo/sync', {
+      // Step 1: Get the entity chain from the server
+      const planRes = await fetch('/api/qbo/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ companyId, syncType }),
       })
+      const plan = await planRes.json()
 
-      const data = await res.json()
-
-      if (!res.ok) {
+      if (!planRes.ok) {
         setStatus('error')
-        setResultMsg(data.error || 'Sync failed')
-        if (data.reconnect) setConnected(false)
+        setResultMsg(plan.error || 'Sync failed')
+        if (plan.reconnect) setConnected(false)
         return
       }
 
-      setStatus('success')
-      setLastSync(new Date().toISOString())
+      const entities: string[] = plan.entities || []
+      if (!entities.length) {
+        setStatus('error')
+        setResultMsg('No entities to sync')
+        return
+      }
 
-      const parts: string[] = []
-      if (data.results?.bank) parts.push(`${data.results.bank.synced} txns`)
-      if (data.results?.invoices) parts.push(`${data.results.invoices.synced} invoices`)
-      setResultMsg(parts.join(', ') + ' synced')
+      // Step 2: Chain entities one at a time — each call is a fresh request, well under 10s
+      let totalSynced = 0
+      let totalErrors = 0
+      const summaryParts: string[] = []
+
+      for (let i = 0; i < entities.length; i++) {
+        const entity = entities[i]
+        setProgress(`Syncing ${ENTITY_LABELS[entity] || entity} (${i + 1}/${entities.length})...`)
+
+        const res = await fetch('/api/qbo/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ companyId, syncType, entity }),
+        })
+
+        const data = await res.json()
+
+        if (!res.ok) {
+          if (data.reconnect) { setConnected(false) }
+          setStatus('error')
+          setResultMsg(data.error || `Failed on ${entity}`)
+          return
+        }
+
+        const r = data.result
+        if (r) {
+          totalSynced += r.synced || 0
+          totalErrors += r.errors || 0
+          if (r.synced > 0) summaryParts.push(`${r.synced} ${ENTITY_LABELS[entity] || entity}`)
+        }
+      }
+
+      // Done
+      const now = new Date().toISOString()
+      setLastSync(now)
+      setStatus(totalErrors > 0 && totalSynced === 0 ? 'error' : 'success')
+      setResultMsg(
+        summaryParts.length > 0
+          ? summaryParts.join(', ') + ' synced'
+          : totalErrors > 0
+          ? `Completed with ${totalErrors} errors`
+          : 'Up to date'
+      )
+      setProgress('')
 
       if (onSyncComplete) onSyncComplete()
-      setTimeout(() => { setStatus('idle'); setResultMsg('') }, 5000)
+      setTimeout(() => { setStatus('idle'); setResultMsg('') }, 6000)
     } catch (err: any) {
       setStatus('error')
       setResultMsg(err.message || 'Network error')
+      setProgress('')
     } finally {
       setSyncing(false)
     }
@@ -103,7 +155,6 @@ export default function QBOSyncButton({ companyId, syncType, onSyncComplete, com
     )
   }
 
-  // Compact: just a refresh icon + last sync
   if (compact) {
     return (
       <div className="flex items-center gap-2">
@@ -114,44 +165,38 @@ export default function QBOSyncButton({ companyId, syncType, onSyncComplete, com
             'text-slate-400 hover:text-teal-400 hover:bg-teal-500/10'
           } disabled:opacity-50`}
           title={lastSync ? `Last sync: ${formatLastSync(lastSync)}` : 'Sync from QuickBooks'}>
-          {syncing ? <RefreshCw size={14} className="animate-spin" /> :
-           status === 'success' ? <CheckCircle2 size={14} /> :
-           status === 'error' ? <AlertTriangle size={14} /> :
-           <RefreshCw size={14} />}
+          <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
         </button>
-        {lastSync && status === 'idle' && (
-          <span className="text-[10px] text-slate-600">{formatLastSync(lastSync)}</span>
-        )}
-        {resultMsg && (
-          <span className={`text-[10px] ${status === 'error' ? 'text-red-400' : 'text-emerald-400'}`}>{resultMsg}</span>
-        )}
+        <span className="text-[10px] text-slate-500">
+          {syncing ? (progress || 'Syncing...') :
+           status === 'error' ? resultMsg :
+           lastSync ? formatLastSync(lastSync) : 'Never synced'}
+        </span>
       </div>
     )
   }
 
-  // Full: card-style with last sync time + button
   return (
     <div className="flex items-center gap-3">
-      <div className="flex items-center gap-2">
-        <Cloud size={14} className="text-emerald-400" />
+      <div className="flex items-center gap-1.5">
+        <Cloud size={13} className="text-emerald-400 shrink-0" />
         <span className="text-xs text-slate-400">
-          {lastSync ? `Synced ${formatLastSync(lastSync)}` : 'Not synced yet'}
+          {syncing ? (progress || 'Syncing...') :
+           status === 'success' ? resultMsg :
+           status === 'error' ? resultMsg :
+           lastSync ? `Synced ${formatLastSync(lastSync)}` : 'Never synced'}
         </span>
       </div>
-
       <button onClick={triggerSync} disabled={syncing}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-          syncing ? 'bg-teal-500/10 text-teal-400 border-teal-500/20' :
+          syncing ? 'bg-teal-500/10 text-teal-400 border-teal-500/20 cursor-wait' :
           status === 'success' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
           status === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20' :
           'bg-teal-500/10 text-teal-400 border-teal-500/20 hover:bg-teal-500/20'
         } disabled:opacity-60`}>
-        {syncing ? <RefreshCw size={12} className="animate-spin" /> :
-         status === 'success' ? <CheckCircle2 size={12} /> :
-         status === 'error' ? <AlertTriangle size={12} /> :
-         <RefreshCw size={12} />}
+        <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} />
         {syncing ? 'Syncing...' :
-         status === 'success' ? resultMsg || 'Synced' :
+         status === 'success' ? 'Synced ✓' :
          status === 'error' ? 'Retry' :
          'Sync QBO'}
       </button>
