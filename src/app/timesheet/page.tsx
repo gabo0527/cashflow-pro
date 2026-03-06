@@ -420,27 +420,91 @@ export default function ContractorPortal() {
     const load = async () => {
       const { data } = await supabase.from('time_entries').select('project_id, hours, description, date, id').eq('contractor_id', member.id).gte('date', week.start).lte('date', week.end)
       if (data && data.length > 0) {
-        const grouped: Record<string, TimeEntryForm> = {}; assignments.forEach(a => { grouped[a.project_id] = { project_id: a.project_id, hours: '', notes: '' } })
-        data.forEach((e: any) => { if (grouped[e.project_id]) { grouped[e.project_id].hours = String(parseFloat(grouped[e.project_id].hours || '0') + (e.hours || 0)); if (e.description && !grouped[e.project_id].notes) grouped[e.project_id].notes = e.description } })
+        // Deduplicate on load: if same project appears multiple times (double-submit bug),
+        // keep only the latest entry per project and sum hours for display
+        const byProject: Record<string, any[]> = {}
+        data.forEach((e: any) => { if (!byProject[e.project_id]) byProject[e.project_id] = []; byProject[e.project_id].push(e) })
+        const hasDupes = Object.values(byProject).some(arr => arr.length > 1)
+        const grouped: Record<string, TimeEntryForm> = {}
+        assignments.forEach(a => { grouped[a.project_id] = { project_id: a.project_id, hours: '', notes: '' } })
+        // Use the canonical (latest) entry per project for display
+        const canonical: any[] = Object.values(byProject).map(arr => arr.sort((a: any, b: any) => b.id.localeCompare(a.id))[0])
+        canonical.forEach((e: any) => {
+          if (grouped[e.project_id]) {
+            grouped[e.project_id].hours = String(e.hours || 0)
+            if (e.description) grouped[e.project_id].notes = e.description
+          }
+        })
         setTimeEntries(grouped); setExistingEntries(data)
-      } else { const init: Record<string, TimeEntryForm> = {}; assignments.forEach(a => { init[a.project_id] = { project_id: a.project_id, hours: '', notes: '' } }); setTimeEntries(init); setExistingEntries([]) }
+        // Auto-fix duplicates silently in background — deduplicate without bothering the user
+        if (hasDupes) {
+          const dupeIds = data.filter((e: any) => !canonical.find((c: any) => c.id === e.id)).map((e: any) => e.id)
+          if (dupeIds.length > 0) supabase.from('time_entries').delete().in('id', dupeIds).then(() => {
+            setExistingEntries(canonical)
+          })
+        }
+      } else {
+        const init: Record<string, TimeEntryForm> = {}
+        assignments.forEach(a => { init[a.project_id] = { project_id: a.project_id, hours: '', notes: '' } })
+        setTimeEntries(init); setExistingEntries([])
+      }
     }
     load()
   }, [member, assignments, week.start, week.end])
 
   // ============ SUBMIT TIME ============
   const submitTime = async () => {
-    if (!member) return; setSubmittingTime(true); setError(null)
+    // Guard: prevent double-submit race condition
+    if (!member || submittingTime) return
+    setSubmittingTime(true); setError(null)
     try {
-      if (existingEntries.length > 0) {
-        const ids = existingEntries.map((e: any) => e.id)
-        await supabase.from('time_entries').delete().in('id', ids)
+      // Step 1: Fetch ALL current entries for this week fresh from DB (catches any race dupes)
+      const { data: freshEntries } = await supabase
+        .from('time_entries')
+        .select('id, project_id')
+        .eq('contractor_id', member.id)
+        .gte('date', week.start)
+        .lte('date', week.end)
+
+      // Step 2: Delete all existing entries for this week (clean slate, idempotent)
+      if (freshEntries && freshEntries.length > 0) {
+        const ids = freshEntries.map((e: any) => e.id)
+        const { error: de } = await supabase.from('time_entries').delete().in('id', ids)
+        if (de) throw de
       }
-      const entries = Object.values(timeEntries).filter(e => parseFloat(e.hours || '0') > 0).map(e => {
-        const a = assignments.find(a => a.project_id === e.project_id)
-        return { contractor_id: member.id, project_id: e.project_id, date: week.start, hours: parseFloat(e.hours), billable_hours: parseFloat(e.hours), is_billable: true, bill_rate: a?.rate || 0, description: e.notes || null, company_id: member.company_id }
-      })
-      if (entries.length > 0) { const { error: ie } = await supabase.from('time_entries').insert(entries); if (ie) throw ie }
+
+      // Step 3: Insert only projects with hours entered (exactly one row per project)
+      const entries = Object.values(timeEntries)
+        .filter(e => parseFloat(e.hours || '0') > 0)
+        .map(e => {
+          const a = assignments.find(a => a.project_id === e.project_id)
+          return {
+            contractor_id: member.id,
+            project_id: e.project_id,
+            date: week.start,
+            hours: parseFloat(e.hours),
+            billable_hours: parseFloat(e.hours),
+            is_billable: true,
+            bill_rate: a?.rate || 0,
+            description: e.notes || null,
+            company_id: member.company_id
+          }
+        })
+
+      if (entries.length > 0) {
+        const { error: ie } = await supabase.from('time_entries').insert(entries)
+        if (ie) throw ie
+      }
+
+      // Step 4: Refresh local state so existingEntries is accurate
+      const { data: newEntries } = await supabase
+        .from('time_entries')
+        .select('project_id, hours, description, date, id')
+        .eq('contractor_id', member.id)
+        .gte('date', week.start)
+        .lte('date', week.end)
+      setExistingEntries(newEntries || [])
+
       setTimeSuccess(true); setTimeout(() => setTimeSuccess(false), 3000)
     } catch (err: any) { setError(err.message || 'Failed to submit') } finally { setSubmittingTime(false) }
   }
