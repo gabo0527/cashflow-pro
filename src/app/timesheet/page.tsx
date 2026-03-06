@@ -286,7 +286,7 @@ export default function ContractorPortal() {
   const [expandedHistoryInvoices, setExpandedHistoryInvoices] = useState<Set<string>>(new Set())
 
   // Analytics
-  const [analyticsPreset, setAnalyticsPreset] = useState<'month' | 'qtd' | 'ytd' | 'custom'>('ytd')
+  const [analyticsPreset, setAnalyticsPreset] = useState<'this_week'|'this_month'|'last_month'|'q1'|'q2'|'q3'|'q4'|'last_quarter'|'ytd'|'last_year'|'custom'>('this_month')
   const [analyticsCustomStart, setAnalyticsCustomStart] = useState('')
   const [analyticsCustomEnd, setAnalyticsCustomEnd] = useState('')
   const [analyticsTime, setAnalyticsTime] = useState<any[]>([])
