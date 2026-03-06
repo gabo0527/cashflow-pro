@@ -42,9 +42,13 @@ const getMonthRange = (date: Date) => {
 }
 
 const EXPENSE_CATEGORIES = [
-  { id: 'travel', label: 'Travel' }, { id: 'hotel', label: 'Hotel' },
-  { id: 'meal', label: 'Meal' }, { id: 'transportation', label: 'Transportation' },
-  { id: 'software_equipment', label: 'Software / Equipment' }, { id: 'other', label: 'Other' },
+  { id: 'mixed', label: 'Mixed / Multiple' },
+  { id: 'travel', label: 'Travel' },
+  { id: 'meal', label: 'Meals' },
+  { id: 'transportation', label: 'Transportation' },
+  { id: 'hotel', label: 'Hotel' },
+  { id: 'software', label: 'Software' },
+  { id: 'other', label: 'Other' },
 ]
 const PAYMENT_TERMS = [
   { id: 'DUE_ON_RECEIPT', label: 'Due on Receipt' }, { id: 'NET30', label: 'Net 30' },
@@ -269,6 +273,7 @@ export default function ContractorPortal() {
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null)
   const [invoiceDistribution, setInvoiceDistribution] = useState<InvoiceLine[]>([])
   const [submittingInvoice, setSubmittingInvoice] = useState(false)
+  const [collapsedInvoiceClients, setCollapsedInvoiceClients] = useState<Set<string>>(new Set())
 
   // History
   const [historyMonth, setHistoryMonth] = useState(new Date())
@@ -452,9 +457,19 @@ export default function ContractorPortal() {
       const clientName = expenseForm.client_id ? (assignmentsByClient[expenseForm.client_id]?.clientName || '') : ''
       const isInternal = clientName.toLowerCase().includes('mano') || clientName.toLowerCase().includes('internal') || clientName.toLowerCase().includes('overhead')
       const isBillable = !!expenseForm.client_id && !isInternal
-      const { error: ie } = await supabase.from('contractor_expenses').insert({ team_member_id: member.id, date: expenseForm.date, category: expenseForm.category, description: expenseForm.description, amount: parseFloat(expenseForm.amount), project_id: expenseForm.project_id || null, client_id: expenseForm.client_id || null, receipt_url: receiptUrl, is_billable: isBillable, status: 'pending' })
+      const { data: newExp, error: ie } = await supabase.from('contractor_expenses').insert({ team_member_id: member.id, date: expenseForm.date, category: expenseForm.category, description: expenseForm.description, amount: parseFloat(expenseForm.amount), project_id: expenseForm.project_id || null, client_id: expenseForm.client_id || null, receipt_url: receiptUrl, is_billable: isBillable, status: 'pending' }).select().single()
       if (ie) throw ie
-      setShowExpenseForm(false); setExpenseForm({ date: new Date().toISOString().split('T')[0], category: 'travel', description: '', amount: '', project_id: '', client_id: '' }); setExpenseFiles([])
+
+      // Notify — fire and forget, don't block UI
+      if (newExp?.id) {
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'expense', id: newExp.id, status: 'pending' })
+        }).catch(err => console.warn('Expense notification failed:', err))
+      }
+
+      setShowExpenseForm(false); setExpenseForm({ date: new Date().toISOString().split('T')[0], category: 'mixed', description: '', amount: '', project_id: '', client_id: '' }); setExpenseFiles([])
       const { data } = await supabase.from('contractor_expenses').select('*').eq('team_member_id', member.id).order('date', { ascending: false }).limit(50); setExpenses(data || [])
     } catch (err: any) { setError(err.message || 'Failed to submit expense') } finally { setSubmittingExpense(false) }
   }
@@ -513,6 +528,13 @@ export default function ContractorPortal() {
         }))
         await supabase.from('contractor_invoice_lines').insert(lines)
       }
+
+      // Notify — fire and forget, don't block UI
+      fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'invoice', id: inv.id, status: 'submitted' })
+      }).catch(err => console.warn('Invoice notification failed:', err))
       setShowInvoiceForm(false); setInvoiceForm({ invoice_number: '', payment_terms: 'NET30', notes: '', client_id: 'all', amount: '' }); setInvoiceFile(null); setInvoiceDistribution([])
       const { data: invData } = await supabase.from('contractor_invoices').select('*, contractor_invoice_lines(*)').eq('team_member_id', member.id).order('invoice_date', { ascending: false }).limit(20)
       setInvoices(invData || [])
@@ -994,8 +1016,8 @@ export default function ContractorPortal() {
                 const defaultAmount = contractorType === 'pure_ls' && member?.cost_amount ? String(member.cost_amount) : ''
                 setInvoiceForm(p => ({ ...p, client_id: defaultClient, amount: defaultAmount }))
                 setShowInvoiceForm(true) 
-              }} className="w-full py-3 border-2 border-dashed border-sky-200 rounded-xl text-sky-600 text-sm font-semibold hover:bg-sky-50/50 hover:border-sky-300 transition-all duration-200">
-                <Plus size={14} className="inline mr-1.5" /> New Invoice
+              }} className={`w-full ${T.btnPrimary} py-3 rounded-xl text-[15px]`}>
+                <Plus size={15} /> New Invoice
               </button>
             )}
 
@@ -1100,53 +1122,99 @@ export default function ContractorPortal() {
               </div>
             )}
 
-            {/* Invoice History */}
-            {invoices.length > 0 ? (
-              <div className="space-y-2">
-                {invoices.map(inv => {
-                  const lines = inv.contractor_invoice_lines || inv.lines || []
-                  const clientName = inv.client_id ? (assignmentsByClient[inv.client_id]?.clientName || lines[0]?.description?.split(' - ')[0] || 'Unknown') : (lines[0]?.description?.split(' - ')[0] || 'General')
-                  return (
-                    <div key={inv.id} className={`${T.cardHover} overflow-hidden`}>
-                      <div className="px-4 sm:px-5 py-4 flex items-center gap-3 sm:gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center shrink-0">
-                          <FileText size={15} className="text-sky-500" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-gray-900 text-sm font-medium">{inv.invoice_number}</p>
-                            {inv.receipt_url && <Paperclip size={11} className="text-sky-500" />}
+            {/* Invoice History — grouped by client */}
+            {invoices.length > 0 ? (() => {
+              // Group invoices by client
+              const grouped: Record<string, { clientName: string; invoices: ContractorInvoice[] }> = {}
+              invoices.forEach(inv => {
+                const lines = inv.contractor_invoice_lines || inv.lines || []
+                const clientName = inv.client_id
+                  ? (assignmentsByClient[inv.client_id]?.clientName || lines[0]?.description?.split(' - ')[0] || 'Unknown')
+                  : (lines[0]?.description?.split(' - ')[0] || 'General')
+                const key = inv.client_id || 'general'
+                if (!grouped[key]) grouped[key] = { clientName, invoices: [] }
+                grouped[key].invoices.push(inv)
+              })
+              return (
+                <div className="space-y-4">
+                  {Object.entries(grouped).map(([clientKey, { clientName, invoices: clientInvs }], groupIdx) => {
+                    const collapsed = collapsedInvoiceClients.has(clientKey)
+                    const color = clientKey !== 'general' ? (clientColorMap[clientKey] || '#6b7280') : '#6b7280'
+                    return (
+                      <div key={clientKey}>
+                        {/* Client header */}
+                        <button
+                          onClick={() => {
+                            const n = new Set(collapsedInvoiceClients)
+                            collapsed ? n.delete(clientKey) : n.add(clientKey)
+                            setCollapsedInvoiceClients(n)
+                          }}
+                          className="w-full flex items-center gap-2.5 px-1 py-2 hover:bg-gray-100/50 rounded-lg transition-colors cursor-pointer">
+                          <div className="w-[6px] h-[6px] rounded-sm shrink-0" style={{ background: color }} />
+                          <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400">{clientName}</span>
+                          <span className="text-[10px] text-gray-300">({clientInvs.length})</span>
+                          <div className="flex-1 h-px bg-gray-100" />
+                          <ChevronDown size={12} className={`text-gray-300 transition-transform duration-200 ${collapsed ? '-rotate-90' : ''}`} />
+                        </button>
+
+                        {!collapsed && (
+                          <div className="space-y-2">
+                            {clientInvs.map(inv => {
+                              const lines = inv.contractor_invoice_lines || inv.lines || []
+                              const billingMonth = new Date(inv.period_start + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                              const receiptUrl = inv.receipt_url
+                                ? supabase.storage.from('contractor-uploads').getPublicUrl(inv.receipt_url).data.publicUrl
+                                : null
+                              return (
+                                <div key={inv.id} className={`${T.cardHover} overflow-hidden`} style={{ borderLeft: `3px solid ${color}` }}>
+                                  <div className="px-4 sm:px-5 py-4 flex items-center gap-3 sm:gap-4">
+                                    <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center shrink-0">
+                                      <FileText size={15} className="text-sky-500" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-gray-900 text-sm font-medium">{inv.invoice_number}</p>
+                                        {receiptUrl ? (
+                                          <a href={receiptUrl} target="_blank" rel="noopener noreferrer"
+                                            onClick={e => e.stopPropagation()}
+                                            className="text-sky-500 hover:text-sky-700 transition-colors" title="View attachment">
+                                            <Paperclip size={11} />
+                                          </a>
+                                        ) : null}
+                                      </div>
+                                      <p className="text-gray-400 text-xs mt-0.5">{billingMonth}</p>
+                                    </div>
+                                    <span className="text-gray-900 font-semibold text-sm tabular-nums">{formatCurrency(inv.total_amount)}</span>
+                                    <StatusPill status={inv.status} />
+                                    {inv.status === 'submitted' && (
+                                      <button onClick={() => deleteInvoice(inv.id)} className="p-2 rounded-lg text-gray-300 hover:text-rose-500 hover:bg-rose-50 transition-all duration-200" title="Delete">
+                                        <Trash2 size={14} />
+                                      </button>
+                                    )}
+                                  </div>
+                                  {lines.length > 0 && (
+                                    <div className="px-4 sm:px-5 pb-4 pt-0">
+                                      <div className="border-t border-gray-100 pt-3 space-y-1.5">
+                                        {lines.map((l: any, i: number) => (
+                                          <div key={i} className="flex items-center justify-between text-xs py-0.5">
+                                            <span className="text-gray-500">{l.description}</span>
+                                            <span className="text-gray-400 tabular-nums">{l.hours ? `${l.hours}h` : ''}{l.allocation_pct ? ` · ${l.allocation_pct}%` : ''}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
                           </div>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{clientName}</span>
-                            <span className="text-gray-400 text-xs">{formatDate(inv.period_start)} – {formatDate(inv.period_end)}</span>
-                          </div>
-                        </div>
-                        <span className="text-gray-900 font-semibold text-sm tabular-nums">{formatCurrency(inv.total_amount)}</span>
-                        <StatusPill status={inv.status} />
-                        {inv.status === 'submitted' && (
-                          <button onClick={() => deleteInvoice(inv.id)} className="p-2 rounded-lg text-gray-300 hover:text-rose-500 hover:bg-rose-50 transition-all duration-200" title="Delete">
-                            <Trash2 size={14} />
-                          </button>
                         )}
                       </div>
-                      {lines.length > 0 && (
-                        <div className="px-4 sm:px-5 pb-4 pt-0">
-                          <div className="border-t border-gray-100 pt-3 space-y-1.5">
-                            {lines.map((l: any, i: number) => (
-                              <div key={i} className="flex items-center justify-between text-xs py-0.5">
-                                <span className="text-gray-500">{l.description}</span>
-                                <span className="text-gray-400 tabular-nums">{l.hours ? `${l.hours}h` : ''}{l.allocation_pct ? ` · ${l.allocation_pct}%` : ''}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
+                    )
+                  })}
+                </div>
+              )
+            })() : (
               <div className={`${T.card} text-center py-16`}>
                 <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto mb-4">
                   <FileText size={22} className="text-gray-300" />
@@ -1316,6 +1384,7 @@ export default function ContractorPortal() {
                             <tr className="text-[10px] text-gray-400 font-bold uppercase tracking-wider border-b border-gray-100">
                               <th className="text-left py-2.5 px-4">Date</th>
                               <th className="text-left py-2.5">Description</th>
+                              <th className="text-left py-2.5">Client</th>
                               <th className="text-left py-2.5">Category</th>
                               <th className="text-right py-2.5">Amount</th>
                               <th className="text-right py-2.5 px-4">Status</th>
@@ -1324,15 +1393,25 @@ export default function ContractorPortal() {
                           <tbody className="divide-y divide-gray-50">
                             {historyExpenses.map(exp => {
                               const cat = EXPENSE_CATEGORIES.find(c => c.id === exp.category)
+                              const clientName = exp.client_id ? (assignmentsByClient[exp.client_id]?.clientName || '—') : '—'
+                              const receiptUrl = exp.receipt_url
+                                ? supabase.storage.from('contractor-uploads').getPublicUrl(exp.receipt_url).data.publicUrl
+                                : null
                               return (
                                 <tr key={exp.id} className="hover:bg-gray-50/50 transition-colors">
                                   <td className="py-2.5 px-4 text-gray-400 whitespace-nowrap">{formatDate(exp.date)}</td>
                                   <td className="py-2.5 text-gray-700 font-medium">
                                     <div className="flex items-center gap-1.5">
-                                      <span className="truncate max-w-[180px]">{exp.description}</span>
-                                      {exp.receipt_url && <Paperclip size={10} className="text-sky-500 shrink-0" />}
+                                      <span className="truncate max-w-[140px]">{exp.description}</span>
+                                      {receiptUrl ? (
+                                        <a href={receiptUrl} target="_blank" rel="noopener noreferrer"
+                                          className="text-sky-500 hover:text-sky-700 transition-colors shrink-0" title="View receipt">
+                                          <Paperclip size={10} />
+                                        </a>
+                                      ) : null}
                                     </div>
                                   </td>
+                                  <td className="py-2.5 text-gray-400 whitespace-nowrap">{clientName}</td>
                                   <td className="py-2.5 text-gray-400">{cat?.label || exp.category}</td>
                                   <td className="py-2.5 text-right text-gray-900 font-semibold tabular-nums">{formatCurrency(exp.amount)}</td>
                                   <td className="py-2.5 px-4 text-right"><StatusPill status={exp.status} /></td>
@@ -1363,8 +1442,16 @@ export default function ContractorPortal() {
                         {historyInvoices.map(inv => {
                           const lines = inv.contractor_invoice_lines || inv.lines || []
                           const isExpanded = expandedHistoryInvoices.has(inv.id)
+                          const clientName = inv.client_id
+                            ? (assignmentsByClient[inv.client_id]?.clientName || lines[0]?.description?.split(' - ')[0] || 'Unknown')
+                            : (lines[0]?.description?.split(' - ')[0] || 'General')
+                          const billingMonthLabel = new Date(inv.period_start + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                          const clientColor = inv.client_id ? (clientColorMap[inv.client_id] || '#6b7280') : '#6b7280'
+                          const receiptUrl = inv.receipt_url
+                            ? supabase.storage.from('contractor-uploads').getPublicUrl(inv.receipt_url).data.publicUrl
+                            : null
                           return (
-                            <div key={inv.id} className={`${T.card} overflow-hidden`}>
+                            <div key={inv.id} className={`${T.card} overflow-hidden`} style={{ borderLeft: `3px solid ${clientColor}` }}>
                               <button
                                 onClick={() => {
                                   if (lines.length === 0) return
@@ -1384,9 +1471,16 @@ export default function ContractorPortal() {
                                 <div className="flex-1 min-w-0 text-left">
                                   <div className="flex items-center gap-2">
                                     <span className="text-[13px] text-gray-900 font-semibold">#{inv.invoice_number}</span>
-                                    {inv.receipt_url && <Paperclip size={10} className="text-sky-500 shrink-0" />}
+                                    <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{clientName}</span>
+                                    {receiptUrl ? (
+                                      <a href={receiptUrl} target="_blank" rel="noopener noreferrer"
+                                        onClick={e => e.stopPropagation()}
+                                        className="text-sky-500 hover:text-sky-700 transition-colors shrink-0" title="View attachment">
+                                        <Paperclip size={10} />
+                                      </a>
+                                    ) : null}
                                   </div>
-                                  <p className="text-[11px] text-gray-400 mt-0.5">{formatDate(inv.period_start)} – {formatDate(inv.period_end)}</p>
+                                  <p className="text-[11px] text-gray-400 mt-0.5">{billingMonthLabel}</p>
                                 </div>
                                 <span className="text-[15px] font-bold text-gray-900 tabular-nums shrink-0">{formatCurrency(inv.total_amount)}</span>
                                 <div className="shrink-0"><StatusPill status={inv.status} /></div>
