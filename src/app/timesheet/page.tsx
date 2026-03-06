@@ -56,6 +56,10 @@ const PAYMENT_TERMS = [
 ]
 
 // Client color assignment
+// Emerald→Gray rank palette: darkest = most hours that week
+const RANK_COLORS = ['#059669', '#10b981', '#94a3b8', '#cbd5e1', '#e2e8f0']
+const RANK_TEXT   = ['#047857', '#059669', '#64748b', '#94a3b8', '#94a3b8']
+
 const CLIENT_COLORS = ['#f59e0b', '#10b981', '#6366f1', '#0ea5e9', '#f43f5e', '#8b5cf6']
 const getClientColor = (index: number) => CLIENT_COLORS[index % CLIENT_COLORS.length]
 
@@ -274,6 +278,7 @@ export default function ContractorPortal() {
   const [invoiceDistribution, setInvoiceDistribution] = useState<InvoiceLine[]>([])
   const [submittingInvoice, setSubmittingInvoice] = useState(false)
   const [collapsedInvoiceClients, setCollapsedInvoiceClients] = useState<Set<string>>(new Set())
+  const [invoiceGrouping, setInvoiceGrouping] = useState<'client' | 'month'>('client')
 
   // History
   const [historyMonth, setHistoryMonth] = useState(new Date())
@@ -1275,91 +1280,144 @@ export default function ContractorPortal() {
               </div>
             )}
 
-            {/* Invoice History — grouped by client */}
+            {/* Invoice History — grouping toggle + two views */}
             {invoices.length > 0 ? (() => {
-              // Group invoices by client
-              const grouped: Record<string, { clientName: string; invoices: ContractorInvoice[] }> = {}
+              // Build client→month grouping
+              const byClient: Record<string, { clientName: string; color: string; total: number; invoices: ContractorInvoice[] }> = {}
               invoices.forEach(inv => {
                 const lines = inv.contractor_invoice_lines || inv.lines || []
                 const clientName = inv.client_id
-                  ? (assignmentsByClient[inv.client_id]?.clientName || lines[0]?.description?.split(' - ')[0] || 'Unknown')
+                  ? (assignmentsByClient[inv.client_id]?.clientName || 'Unknown')
                   : (lines[0]?.description?.split(' - ')[0] || 'General')
                 const key = inv.client_id || 'general'
-                if (!grouped[key]) grouped[key] = { clientName, invoices: [] }
-                grouped[key].invoices.push(inv)
+                const color = key !== 'general' ? (clientColorMap[key] || '#6b7280') : '#6b7280'
+                if (!byClient[key]) byClient[key] = { clientName, color, total: 0, invoices: [] }
+                byClient[key].invoices.push(inv)
+                byClient[key].total += inv.total_amount || 0
               })
+
+              // Build month→client grouping
+              const byMonth: Record<string, { monthLabel: string; total: number; clients: { key: string; clientName: string; color: string; invoices: ContractorInvoice[] }[] }> = {}
+              invoices.forEach(inv => {
+                const d = new Date((inv.period_start || inv.invoice_date) + 'T00:00:00')
+                const monthKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+                const monthLabel = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                const clientName = inv.client_id ? (assignmentsByClient[inv.client_id]?.clientName || 'Unknown') : 'General'
+                const clientKey = inv.client_id || 'general'
+                const color = clientKey !== 'general' ? (clientColorMap[clientKey] || '#6b7280') : '#6b7280'
+                if (!byMonth[monthKey]) byMonth[monthKey] = { monthLabel, total: 0, clients: [] }
+                byMonth[monthKey].total += inv.total_amount || 0
+                const existing = byMonth[monthKey].clients.find(c => c.key === clientKey)
+                if (existing) existing.invoices.push(inv)
+                else byMonth[monthKey].clients.push({ key: clientKey, clientName, color, invoices: [inv] })
+              })
+
+              // Shared invoice card render
+              const InvCard = ({ inv, color }: { inv: ContractorInvoice; color: string }) => {
+                const lines = inv.contractor_invoice_lines || (inv as any).lines || []
+                const bMonth = new Date(inv.period_start + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                const receiptUrl = inv.receipt_url ? supabase.storage.from('contractor-uploads').getPublicUrl(inv.receipt_url).data.publicUrl : null
+                return (
+                  <div className={`${T.cardHover} overflow-hidden`} style={{ borderLeft: `3px solid ${color}` }}>
+                    <div className="px-4 sm:px-5 py-4 flex items-center gap-3 sm:gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center shrink-0">
+                        <FileText size={15} className="text-sky-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-gray-900 text-sm font-medium">{inv.invoice_number}</p>
+                          {receiptUrl && <a href={receiptUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-sky-500 hover:text-sky-700 transition-colors"><Paperclip size={11} /></a>}
+                        </div>
+                        <p className="text-gray-400 text-xs mt-0.5">{bMonth}</p>
+                      </div>
+                      <span className="text-gray-900 font-semibold text-sm tabular-nums">{formatCurrency(inv.total_amount)}</span>
+                      <StatusPill status={inv.status} />
+                      {inv.status === 'submitted' && (
+                        <button onClick={() => deleteInvoice(inv.id)} className="p-2 rounded-lg text-gray-300 hover:text-rose-500 hover:bg-rose-50 transition-all duration-200"><Trash2 size={14} /></button>
+                      )}
+                    </div>
+                    {lines.length > 0 && (
+                      <div className="px-4 sm:px-5 pb-4 pt-0">
+                        <div className="border-t border-gray-100 pt-3 space-y-1.5">
+                          {lines.map((l: any, i: number) => (
+                            <div key={i} className="flex items-center justify-between text-xs py-0.5">
+                              <span className="text-gray-500">{l.description}</span>
+                              <span className="text-gray-400 tabular-nums">{l.hours ? `${l.hours}h` : ''}{l.allocation_pct ? ` · ${l.allocation_pct}%` : ''}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+
               return (
                 <div className="space-y-4">
-                  {Object.entries(grouped).map(([clientKey, { clientName, invoices: clientInvs }], groupIdx) => {
+                  {/* Grouping toggle */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-gray-400 font-medium">{invoices.length} invoice{invoices.length !== 1 ? 's' : ''}</span>
+                    <div className="inline-flex bg-gray-100 rounded-lg p-0.5">
+                      {([['client', 'Client → Month'], ['month', 'Month → Client']] as const).map(([v, l]) => (
+                        <button key={v} onClick={() => setInvoiceGrouping(v)}
+                          className={`px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all whitespace-nowrap ${
+                            invoiceGrouping === v ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                          }`}>
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Client → Month view */}
+                  {invoiceGrouping === 'client' && Object.entries(byClient).map(([clientKey, g]) => {
                     const collapsed = collapsedInvoiceClients.has(clientKey)
-                    const color = clientKey !== 'general' ? (clientColorMap[clientKey] || '#6b7280') : '#6b7280'
                     return (
                       <div key={clientKey}>
-                        {/* Client header */}
-                        <button
-                          onClick={() => {
-                            const n = new Set(collapsedInvoiceClients)
-                            collapsed ? n.delete(clientKey) : n.add(clientKey)
-                            setCollapsedInvoiceClients(n)
-                          }}
-                          className="w-full flex items-center gap-2.5 px-1 py-2 hover:bg-gray-100/50 rounded-lg transition-colors cursor-pointer">
-                          <div className="w-[6px] h-[6px] rounded-sm shrink-0" style={{ background: color }} />
-                          <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400">{clientName}</span>
-                          <span className="text-[10px] text-gray-300">({clientInvs.length})</span>
+                        <button onClick={() => { const n = new Set(collapsedInvoiceClients); collapsed ? n.delete(clientKey) : n.add(clientKey); setCollapsedInvoiceClients(n) }}
+                          className="w-full flex items-center gap-2.5 px-1 py-2 hover:bg-gray-100/50 rounded-lg transition-colors">
+                          <div className="w-[6px] h-[6px] rounded-sm shrink-0" style={{ background: g.color }} />
+                          <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-500">{g.clientName}</span>
+                          <span className="text-[10px] text-gray-300">({g.invoices.length})</span>
                           <div className="flex-1 h-px bg-gray-100" />
+                          <span className="text-[11px] font-semibold text-gray-600 tabular-nums">{formatCurrency(g.total)}</span>
                           <ChevronDown size={12} className={`text-gray-300 transition-transform duration-200 ${collapsed ? '-rotate-90' : ''}`} />
                         </button>
-
                         {!collapsed && (
                           <div className="space-y-2">
-                            {clientInvs.map(inv => {
-                              const lines = inv.contractor_invoice_lines || inv.lines || []
-                              const billingMonth = new Date(inv.period_start + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-                              const receiptUrl = inv.receipt_url
-                                ? supabase.storage.from('contractor-uploads').getPublicUrl(inv.receipt_url).data.publicUrl
-                                : null
-                              return (
-                                <div key={inv.id} className={`${T.cardHover} overflow-hidden`} style={{ borderLeft: `3px solid ${color}` }}>
-                                  <div className="px-4 sm:px-5 py-4 flex items-center gap-3 sm:gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center shrink-0">
-                                      <FileText size={15} className="text-sky-500" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2">
-                                        <p className="text-gray-900 text-sm font-medium">{inv.invoice_number}</p>
-                                        {receiptUrl ? (
-                                          <a href={receiptUrl} target="_blank" rel="noopener noreferrer"
-                                            onClick={e => e.stopPropagation()}
-                                            className="text-sky-500 hover:text-sky-700 transition-colors" title="View attachment">
-                                            <Paperclip size={11} />
-                                          </a>
-                                        ) : null}
-                                      </div>
-                                      <p className="text-gray-400 text-xs mt-0.5">{billingMonth}</p>
-                                    </div>
-                                    <span className="text-gray-900 font-semibold text-sm tabular-nums">{formatCurrency(inv.total_amount)}</span>
-                                    <StatusPill status={inv.status} />
-                                    {inv.status === 'submitted' && (
-                                      <button onClick={() => deleteInvoice(inv.id)} className="p-2 rounded-lg text-gray-300 hover:text-rose-500 hover:bg-rose-50 transition-all duration-200" title="Delete">
-                                        <Trash2 size={14} />
-                                      </button>
-                                    )}
-                                  </div>
-                                  {lines.length > 0 && (
-                                    <div className="px-4 sm:px-5 pb-4 pt-0">
-                                      <div className="border-t border-gray-100 pt-3 space-y-1.5">
-                                        {lines.map((l: any, i: number) => (
-                                          <div key={i} className="flex items-center justify-between text-xs py-0.5">
-                                            <span className="text-gray-500">{l.description}</span>
-                                            <span className="text-gray-400 tabular-nums">{l.hours ? `${l.hours}h` : ''}{l.allocation_pct ? ` · ${l.allocation_pct}%` : ''}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
+                            {g.invoices.map(inv => <InvCard key={inv.id} inv={inv} color={g.color} />)}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+
+                  {/* Month → Client view */}
+                  {invoiceGrouping === 'month' && Object.entries(byMonth).sort(([a],[b]) => b.localeCompare(a)).map(([monthKey, m]) => {
+                    const collapsed = collapsedInvoiceClients.has(monthKey)
+                    return (
+                      <div key={monthKey}>
+                        <button onClick={() => { const n = new Set(collapsedInvoiceClients); collapsed ? n.delete(monthKey) : n.add(monthKey); setCollapsedInvoiceClients(n) }}
+                          className="w-full flex items-center gap-2.5 px-1 py-2 hover:bg-gray-100/50 rounded-lg transition-colors">
+                          <ChevronDown size={12} className={`text-gray-300 transition-transform duration-200 ${collapsed ? '-rotate-90' : ''}`} />
+                          <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-500">{m.monthLabel}</span>
+                          <span className="text-[10px] text-gray-300">({m.clients.reduce((s,c) => s + c.invoices.length, 0)})</span>
+                          <div className="flex-1 h-px bg-gray-100" />
+                          <span className="text-[11px] font-semibold text-gray-600 tabular-nums">{formatCurrency(m.total)}</span>
+                        </button>
+                        {!collapsed && (
+                          <div className="space-y-3">
+                            {m.clients.map(c => (
+                              <div key={c.key}>
+                                <div className="flex items-center gap-2 px-1 mb-1.5">
+                                  <span className="w-[5px] h-[5px] rounded-full" style={{ background: c.color }} />
+                                  <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{c.clientName}</span>
                                 </div>
-                              )
-                            })}
+                                <div className="space-y-2">
+                                  {c.invoices.map(inv => <InvCard key={inv.id} inv={inv} color={c.color} />)}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -1464,46 +1522,47 @@ export default function ContractorPortal() {
                                   <span className="text-[15px] font-bold text-emerald-600 tabular-nums">{week.totalHours.toFixed(1)}h</span>
                                 </div>
 
-                                {/* Segmented progress bar */}
-                                <div className="flex gap-1 h-2.5 ml-6">
-                                  {projects.map((p, pi) => (
-                                    <div key={pi} className="h-full rounded-full transition-all duration-300"
-                                      style={{ 
-                                        width: `${(p.hours / week.totalHours) * 100}%`, 
-                                        background: clientColorMap[p.clientId] || CLIENT_COLORS[pi % CLIENT_COLORS.length],
-                                        minWidth: '8px'
-                                      }} />
-                                  ))}
-                                </div>
-
-                                {/* Project chips */}
-                                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5 ml-6">
-                                  {projects.map((p, pi) => (
-                                    <div key={pi} className="flex items-center gap-1.5">
-                                      <div className="w-2 h-2 rounded-full" style={{ background: clientColorMap[p.clientId] || CLIENT_COLORS[pi % CLIENT_COLORS.length] }} />
-                                      <span className="text-[11px] text-gray-500 font-medium">{p.name}</span>
-                                      <span className="text-[11px] font-bold text-gray-700 tabular-nums">{p.hours.toFixed(1)}h</span>
-                                    </div>
-                                  ))}
+                                {/* Chip tags — emerald→gray by rank (sorted by hours desc) */}
+                                <div className="flex flex-wrap gap-1.5 ml-6">
+                                  {projects.map((p, pi) => {
+                                    const dotColor = RANK_COLORS[Math.min(pi, RANK_COLORS.length - 1)]
+                                    const textColor = RANK_TEXT[Math.min(pi, RANK_TEXT.length - 1)]
+                                    return (
+                                      <span key={pi} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold"
+                                        style={{ background: dotColor + '18', color: textColor }}>
+                                        <span className="w-[5px] h-[5px] rounded-full shrink-0" style={{ background: dotColor }} />
+                                        {p.name} · {p.hours.toFixed(1)}h
+                                      </span>
+                                    )
+                                  })}
                                 </div>
                               </button>
 
-                              {/* Expanded: Full entry list */}
+                              {/* Expanded: Full entry list with rank-colored bars */}
                               {isExpanded && (
-                                <div className="border-t border-gray-100 bg-gray-50/30">
-                                  <div className="divide-y divide-gray-100/80">
-                                    {week.entries.map((e: any) => {
-                                      const a = assignments.find(a => a.project_id === e.project_id)
+                                <div className="border-t border-gray-100 bg-gray-50/20 px-4 sm:px-5 pb-4 pt-3 ml-6">
+                                  <div className="space-y-2.5">
+                                    {projects.map((p, pi) => {
+                                      const dotColor = RANK_COLORS[Math.min(pi, RANK_COLORS.length - 1)]
+                                      const textColor = RANK_TEXT[Math.min(pi, RANK_TEXT.length - 1)]
+                                      const pct = (p.hours / week.totalHours) * 100
+                                      // Find notes for this project
+                                      const entry = week.entries.find((e: any) => e.project_id === p.clientId || assignments.find(a => a.project_id === e.project_id)?.project_name === p.name)
+                                      const a = assignments.find(a => a.project_name === p.name)
                                       return (
-                                        <div key={e.id} className="px-4 sm:px-5 py-2.5 flex items-center gap-3 ml-6">
-                                          <div className="w-2 h-2 rounded-full shrink-0" style={{ background: clientColorMap[a?.client_id || ''] || '#94a3b8' }} />
-                                          <div className="flex-1 min-w-0">
-                                            <p className="text-sm text-gray-800 font-medium truncate">{a?.project_name || 'Unknown'}</p>
-                                            {(a?.client_name || e.description) && (
-                                              <p className="text-[11px] text-gray-400 truncate">{a?.client_name || ''}{e.description ? ` — ${e.description}` : ''}</p>
-                                            )}
+                                        <div key={pi}>
+                                          <div className="flex items-center justify-between mb-1.5">
+                                            <div className="flex items-center gap-2">
+                                              <span className="w-[6px] h-[6px] rounded-sm shrink-0" style={{ background: dotColor }} />
+                                              <span className="text-xs font-medium" style={{ color: textColor }}>{p.name}</span>
+                                              {a?.client_name && <span className="text-[10px] text-gray-300">{a.client_name}</span>}
+                                            </div>
+                                            <span className="text-xs font-bold text-gray-800 tabular-nums">{p.hours.toFixed(1)}h</span>
                                           </div>
-                                          <span className="text-sm font-semibold text-gray-700 tabular-nums shrink-0">{e.hours}h</span>
+                                          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                            <div className="h-full rounded-full transition-all duration-500"
+                                              style={{ width: `${pct}%`, background: dotColor, opacity: 0.8 }} />
+                                          </div>
                                         </div>
                                       )
                                     })}
