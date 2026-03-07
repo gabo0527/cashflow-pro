@@ -5,10 +5,16 @@
 // Uses Plaid's hosted Link UI via their script tag
 
 import React, { useState, useEffect, useCallback } from 'react'
+import { createClient } from '@supabase/supabase-js'
 import { THEME } from '@/components/expenses/shared'
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
 interface PlaidLinkButtonProps {
-  companyId: string
+  companyId?: string   // optional — fetched from Supabase if not provided
   institution: 'firstbank' | 'bofa'
   onSuccess: () => void
   onError?: (err: string) => void
@@ -56,11 +62,25 @@ export default function PlaidLinkButton({
     setLoading(true)
 
     try {
+      // Resolve companyId — use prop or fetch from Supabase
+      let resolvedCompanyId = companyId
+      if (!resolvedCompanyId) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('Not authenticated')
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('company_id')
+          .eq('id', user.id)
+          .single()
+        resolvedCompanyId = profile?.company_id
+      }
+      if (!resolvedCompanyId) throw new Error('Company not found')
+
       // Get link token from our API
       const res = await fetch('/api/plaid/link-token', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ companyId, institution }),
+        body:    JSON.stringify({ companyId: resolvedCompanyId, institution }),
       })
       const { link_token, error } = await res.json()
       if (error) throw new Error(error)
@@ -76,7 +96,7 @@ export default function PlaidLinkButton({
             const exchangeRes = await fetch('/api/plaid/exchange-token', {
               method:  'POST',
               headers: { 'Content-Type': 'application/json' },
-              body:    JSON.stringify({ companyId, publicToken, institution }),
+              body:    JSON.stringify({ companyId: resolvedCompanyId, publicToken, institution }),
             })
             const exchangeData = await exchangeRes.json()
 
@@ -86,7 +106,7 @@ export default function PlaidLinkButton({
             await fetch('/api/plaid/sync', {
               method:  'POST',
               headers: { 'Content-Type': 'application/json' },
-              body:    JSON.stringify({ companyId, institution }),
+              body:    JSON.stringify({ companyId: resolvedCompanyId, institution }),
             })
 
             onSuccess()
