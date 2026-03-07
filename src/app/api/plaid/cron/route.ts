@@ -140,7 +140,8 @@ export async function POST(request: NextRequest) {
         records_total:   companyResults.reduce((s, r) => s + r.total, 0),
         status:          totalErrors > 0 ? 'partial' : 'success',
         error_message:   totalErrors > 0 ? `${totalErrors} errors` : null,
-      }).catch(_e => { /* sync_log is optional — don't fail cron if it errors */ })
+      // sync_log is optional — ignore errors
+      ).then(() => {}).catch(() => {})
 
       allResults.push({ company_id, success: true, results: companyResults })
 
