@@ -82,7 +82,7 @@ async function cronSyncInvoices(
 
       if (error) errors++
       else synced++
-    } catch { errors++ }
+    } catch (_e) { errors++ }
   }
 
   return { synced, errors, total: invoices.length }
