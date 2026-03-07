@@ -130,18 +130,19 @@ export async function POST(request: NextRequest) {
         .update({ plaid_last_sync: new Date().toISOString() })
         .eq('company_id', company_id)
 
-      // Write to sync_log
-      await supabase.from('sync_log').insert({
-        company_id,
-        source:          'plaid_cron',
-        started_at:      startedAt,
-        completed_at:    new Date().toISOString(),
-        records_synced:  totalSynced,
-        records_total:   companyResults.reduce((s, r) => s + r.total, 0),
-        status:          totalErrors > 0 ? 'partial' : 'success',
-        error_message:   totalErrors > 0 ? `${totalErrors} errors` : null,
-      // sync_log is optional — ignore errors
-      ).then(() => {}).catch(() => {})
+      // Write to sync_log — optional, ignore errors
+      try {
+        await supabase.from('sync_log').insert({
+          company_id,
+          source:         'plaid_cron',
+          started_at:     startedAt,
+          completed_at:   new Date().toISOString(),
+          records_synced: totalSynced,
+          records_total:  companyResults.reduce((s, r) => s + r.total, 0),
+          status:         totalErrors > 0 ? 'partial' : 'success',
+          error_message:  totalErrors > 0 ? `${totalErrors} errors` : null,
+        })
+      } catch (_e) {}
 
       allResults.push({ company_id, success: true, results: companyResults })
 
