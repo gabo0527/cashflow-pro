@@ -302,16 +302,22 @@ export function hydrateCategories(saved: any): typeof EXPENSE_CATEGORIES {
 
 // ============ ACCOUNTS ============
 export const ACCOUNTS = [
-  { id: 'firstbank_checking', name: 'FirstBank Checking', type: 'bank', shortName: 'Checking' },
-  { id: 'bofa_cc', name: 'BofA Credit Card', type: 'credit_card', shortName: 'BofA CC' },
+  { id: 'checking_7801',    name: 'Checking ··7801',        type: 'bank',        shortName: 'Checking',       cardholder: null },
+  { id: 'bofa_cc_gabriel',  name: 'Gabriel Vazquez ··3739', type: 'credit_card', shortName: 'Gabriel ··3739', cardholder: 'gabriel' },
+  { id: 'bofa_cc_rodrigo',  name: 'Rodrigo Urrutia ··0518', type: 'credit_card', shortName: 'Rodrigo ··0518', cardholder: 'rodrigo' },
+  { id: 'bofa_cc_marcus',   name: 'Marcus Mattox ··5943',   type: 'credit_card', shortName: 'Marcus ··5943',  cardholder: 'marcus' },
 ]
 
 // ============ CARDHOLDERS ============
 export const CARDHOLDERS = [
-  { id: 'gabriel', name: 'Gabriel Vazquez' },
-  { id: 'marcus', name: 'Marcus Mattox' },
-  { id: 'ceo', name: 'CEO (Primary)' },
+  { id: 'gabriel', name: 'Gabriel Vazquez', last4: '3739' },
+  { id: 'rodrigo', name: 'Rodrigo Urrutia', last4: '0518' },
+  { id: 'marcus',  name: 'Marcus Mattox',   last4: '5943' },
 ]
+
+// ============ OPENING BALANCE ============
+export const OPENING_BALANCE      = 182457.71
+export const OPENING_BALANCE_DATE = '2026-01-01'
 
 // ============ UTILITY FUNCTIONS ============
 export const formatCurrency = (value: number): string => {
@@ -331,8 +337,8 @@ export const formatDateFull = (dateStr: string): string => {
 export const shortAccountName = (name: string): string => {
   if (!name) return '—'
   const n = name.toLowerCase()
-  if (n.includes('credit card') || n.includes('credit') || n.includes('bofa') || n.includes('bank of america')) return 'BofA CC'
-  if (n.includes('firstbank') || n.includes('first bank') || n.includes('checking') || n.includes('1404')) return 'Checking'
+  if (n.includes('credit card') || n.includes('credit') || n.includes('bofa') || n.includes('bank of america')) return 'CC'
+  if (n.includes('checking') || n.includes('first bank') || n.includes('firstbank') || n.includes('7801')) return 'Checking'
   return name.length > 25 ? name.substring(0, 22) + '...' : name
 }
 
