@@ -5,6 +5,7 @@ import {
   THEME, CARDHOLDERS, ACCOUNTS, OPENING_BALANCE, OPENING_BALANCE_DATE,
   formatCurrency, formatDateShort, getCategoriesForDirection, ALL_CATEGORIES,
 } from './shared'
+import PlaidLinkButton from '@/components/PlaidLinkButton'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -29,7 +30,7 @@ interface BankFeedSectionProps {
   onRefresh?: () => Promise<void>
   lastSynced?: string | null
   plaidConnected?: boolean
-  onConnectPlaid?: () => void
+  onConnectPlaid?: () => void   // called after successful Plaid Link
   companyId?: string
 }
 
@@ -518,7 +519,7 @@ export default function BankFeedSection({
   return (
     <>
       {/* ── Sticky Header ── */}
-      <div className="sticky top-0 z-40 bg-white border-b border-slate-200 px-8">
+      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-8">
         <div className="max-w-screen-xl mx-auto">
 
           {/* Row 1: Title + controls */}
@@ -822,21 +823,21 @@ export default function BankFeedSection({
             </div>
 
             {/* Plaid connect banner */}
-            {!plaidConnected && (
-              <div className="mt-3 bg-white border border-dashed border-slate-300 rounded-xl px-5 py-3.5 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.72"/></svg>
-                  </div>
-                  <div>
-                    <p className={`text-[13px] font-semibold ${THEME.textSecondary}`}>Connect live bank feed via Plaid</p>
-                    <p className={`text-[11px] ${THEME.textDim} mt-0.5`}>Auto-import Checking ··7801 and 3 credit cards · updates hourly</p>
-                  </div>
-                </div>
-                <button onClick={onConnectPlaid}
-                  className="px-4 py-1.5 bg-slate-900 text-white rounded-lg text-[12px] font-semibold hover:bg-slate-800 transition-colors">
-                  Connect
-                </button>
+            {!plaidConnected && companyId && (
+              <div className="mt-3 space-y-2">
+                <p className={`text-[11px] font-semibold uppercase tracking-wider ${THEME.textDim} mb-2`}>Connect Bank Accounts</p>
+                <PlaidLinkButton
+                  companyId={companyId}
+                  institution="firstbank"
+                  onSuccess={onConnectPlaid || (() => {})}
+                  connected={false}
+                />
+                <PlaidLinkButton
+                  companyId={companyId}
+                  institution="bofa"
+                  onSuccess={onConnectPlaid || (() => {})}
+                  connected={false}
+                />
               </div>
             )}
           </div>
