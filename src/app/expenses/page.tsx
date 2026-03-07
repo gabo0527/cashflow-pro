@@ -1,10 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { 
-  Receipt, Download, ChevronDown, Plus, PieChart, 
-  LayoutList, Landmark, RefreshCw, Settings
-} from 'lucide-react'
+import { RefreshCw, Plus, PieChart, LayoutList, Landmark, Settings, Download } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import { getCurrentUser } from '@/lib/supabase'
 import { THEME, EXPENSE_CATEGORIES, CategoryManager, hydrateCategories } from '@/components/expenses/shared'
@@ -21,67 +18,77 @@ const supabase = createClient(
 type TabType = 'overview' | 'expenses' | 'bankfeed'
 
 export default function BankingPage() {
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<TabType>('overview')
-  const [companyId, setCompanyId] = useState<string | null>(null)
-  
-  // Period filters
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [loading, setLoading]         = useState(true)
+  const [activeTab, setActiveTab]     = useState<TabType>('bankfeed')
+  const [companyId, setCompanyId]     = useState<string | null>(null)
+
+  const [selectedYear,  setSelectedYear]  = useState(new Date().getFullYear())
   const [selectedMonth, setSelectedMonth] = useState<string>('all')
 
-  // Data
-  const [expenses, setExpenses] = useState<any[]>([])
+  const [expenses,     setExpenses]     = useState<any[]>([])
   const [transactions, setTransactions] = useState<any[]>([])
-  const [projects, setProjects] = useState<any[]>([])
-  const [clients, setClients] = useState<any[]>([])
-  const [teamMembers, setTeamMembers] = useState<any[]>([])
+  const [projects,     setProjects]     = useState<any[]>([])
+  const [clients,      setClients]      = useState<any[]>([])
+  const [teamMembers,  setTeamMembers]  = useState<any[]>([])
 
-  // Category management
+  const [plaidConnected, setPlaidConnected] = useState(false)
+  const [lastSynced,     setLastSynced]     = useState<string | null>(null)
+
   const [showCategoryManager, setShowCategoryManager] = useState(false)
-  const [customCategories, setCustomCategories] = useState(EXPENSE_CATEGORIES)
-  const [isSyncing, setIsSyncing] = useState(false)
+  const [customCategories,    setCustomCategories]    = useState(EXPENSE_CATEGORIES)
 
-  // Ref for Expenses section
   const expensesSectionRef = useRef<ExpensesSectionHandle>(null)
 
-  // ============ DATA LOADING ============
+  const normalizeTxn = (t: any) => ({
+    ...t,
+    amount:         parseFloat(t.amount || 0),
+    is_categorized: !!(t.category),
+    sync_source:    t.sync_source || 'manual',
+  })
+
   const loadData = useCallback(async () => {
     try {
       const result = await getCurrentUser()
       const user = result?.user
       if (!user) { setLoading(false); return }
 
-      const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single()
+      const { data: profile } = await supabase
+        .from('profiles').select('company_id').eq('id', user.id).single()
       if (!profile?.company_id) { setLoading(false); return }
 
       setCompanyId(profile.company_id)
 
       const yearStart = `${selectedYear}-01-01`
-      const yearEnd = `${selectedYear}-12-31`
+      const yearEnd   = `${selectedYear}-12-31`
 
-      const [expRes, txnRes, projRes, clientRes, teamRes] = await Promise.all([
-        supabase.from('expenses').select('*').eq('company_id', profile.company_id).gte('date', yearStart).lte('date', yearEnd).order('date', { ascending: false }).limit(10000),
-        supabase.from('transactions').select('*').eq('company_id', profile.company_id).gte('date', yearStart).lte('date', yearEnd).order('date', { ascending: false }).limit(10000),
+      const [expRes, txnRes, projRes, clientRes, teamRes, settingsRes] = await Promise.all([
+        supabase.from('expenses').select('*').eq('company_id', profile.company_id)
+          .gte('date', yearStart).lte('date', yearEnd).order('date', { ascending: false }).limit(10000),
+        supabase.from('transactions').select('*').eq('company_id', profile.company_id)
+          .order('date', { ascending: false }).limit(10000),
         supabase.from('projects').select('*').eq('company_id', profile.company_id).order('name'),
         supabase.from('clients').select('*').eq('company_id', profile.company_id).order('name'),
-        supabase.from('team_members').select('id, name').eq('company_id', profile.company_id).order('name')
+        supabase.from('team_members').select('id, name').eq('company_id', profile.company_id).order('name'),
+        supabase.from('company_settings')
+          .select('expense_categories, plaid_connected, plaid_last_sync')
+          .eq('company_id', profile.company_id).single(),
       ])
 
       setExpenses((expRes.data || []).map(e => ({ ...e, amount: parseFloat(e.amount || 0) })))
-      setTransactions((txnRes.data || []).map(t => ({ ...t, amount: parseFloat(t.amount || 0) })))
+      setTransactions((txnRes.data || []).map(normalizeTxn))
       setProjects(projRes.data || [])
       setClients(clientRes.data || [])
       setTeamMembers(teamRes.data || [])
 
-      // Load custom categories from company_settings
-      const { data: settings } = await supabase
-        .from('company_settings')
-        .select('expense_categories')
-        .eq('company_id', profile.company_id)
-        .single()
-      
-      if (settings?.expense_categories) {
-        setCustomCategories(hydrateCategories(settings.expense_categories))
+      const settings = settingsRes.data
+      if (settings?.expense_categories) setCustomCategories(hydrateCategories(settings.expense_categories))
+      if (settings?.plaid_connected)    setPlaidConnected(true)
+      if (settings?.plaid_last_sync) {
+        const d = new Date(settings.plaid_last_sync)
+        const diff = Math.round((Date.now() - d.getTime()) / 60000)
+        setLastSynced(diff < 60
+          ? `${diff}m ago`
+          : d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))
       }
     } catch (error) {
       console.error('Error loading data:', error)
@@ -92,20 +99,90 @@ export default function BankingPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Reload after QBO sync
   const handleSyncComplete = useCallback(() => { loadData() }, [loadData])
 
-  // ============ EXPENSE HANDLERS ============
+  const handlePlaidRefresh = async () => {
+    if (!companyId) return
+    await fetch('/api/plaid/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId }),
+    })
+    await loadData()
+  }
+
+  const handleConnectPlaid = async () => {
+    if (!companyId) return
+    try {
+      const res = await fetch('/api/plaid/link-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId }),
+      })
+      const { link_token } = await res.json()
+      // Plaid Link SDK wired up in Phase 2
+      console.log('Plaid link token ready:', link_token)
+    } catch (err) {
+      console.error('Plaid connect error:', err)
+    }
+  }
+
+  const handleCategorizeTransaction = async (
+    transactionId: string, category: string, subcategory: string, cardholder?: string
+  ) => {
+    if (!companyId) return
+    const txn = transactions.find(t => t.id === transactionId)
+    if (!txn) return
+
+    const txnUpdate: any = {
+      category, subcategory,
+      type: txn.amount >= 0 ? 'income' : 'expense',
+      updated_at: new Date().toISOString(),
+    }
+    if (cardholder) txnUpdate.cardholder = cardholder
+
+    const { error: txnError } = await supabase
+      .from('transactions').update(txnUpdate).eq('id', transactionId)
+
+    if (txnError) {
+      console.error('Error updating transaction:', txnError)
+      alert('Failed to categorize transaction')
+      return
+    }
+
+    // Mirror outflows to expenses table for OverviewSection / ExpensesSection
+    if (txn.amount < 0 && category !== 'transfer') {
+      const expenseData = {
+        company_id: companyId, category, subcategory,
+        description: txn.description, amount: Math.abs(txn.amount),
+        date: txn.date, vendor: txn.payee || '', status: 'paid',
+        transaction_id: transactionId,
+      }
+      const { data: newExp, error: expError } = await supabase
+        .from('expenses').insert(expenseData).select().single()
+      if (expError) {
+        console.error('Error creating expense record:', expError)
+      } else {
+        setExpenses(prev => [{ ...newExp, amount: parseFloat(newExp.amount || 0) }, ...prev])
+      }
+    }
+
+    setTransactions(prev => prev.map(t =>
+      t.id === transactionId ? { ...t, ...txnUpdate, is_categorized: true } : t
+    ))
+  }
+
   const handleAddExpense = async (expense: any) => {
     if (!companyId) return
-    const newExpense = { company_id: companyId, ...expense }
-    const { data, error } = await supabase.from('expenses').insert(newExpense).select().single()
+    const { data, error } = await supabase
+      .from('expenses').insert({ company_id: companyId, ...expense }).select().single()
     if (error) { console.error('Error adding expense:', error); alert('Failed to add expense'); return }
     setExpenses(prev => [{ ...data, amount: parseFloat(data.amount || 0) }, ...prev])
   }
 
   const handleUpdateExpense = async (id: string, updates: any) => {
-    const { error } = await supabase.from('expenses').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+    const { error } = await supabase
+      .from('expenses').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
     if (error) { console.error('Error updating expense:', error); return }
     setExpenses(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e))
   }
@@ -116,315 +193,168 @@ export default function BankingPage() {
     setExpenses(prev => prev.filter(e => e.id !== id))
   }
 
-  // ============ BANK FEED HANDLERS ============
-  const handleCategorizeTransaction = async (transactionId: string, data: any) => {
-    if (!companyId) return
-
-    // Step 1: Update the transaction record directly with category info
-    const txnUpdate: any = {
-      category: data.category,
-      subcategory: data.subcategory,
-      type: data.type || (data.amount >= 0 ? 'income' : 'expense'),
-      updated_at: new Date().toISOString(),
-    }
-    if (data.project_id) txnUpdate.project_id = data.project_id
-    if (data.client_id) txnUpdate.client_id = data.client_id
-    if (data.cardholder) txnUpdate.cardholder = data.cardholder
-
-    const { error: txnError } = await supabase
-      .from('transactions')
-      .update(txnUpdate)
-      .eq('id', transactionId)
-
-    if (txnError) {
-      console.error('Error updating transaction:', txnError)
-      alert('Failed to categorize transaction')
-      return
-    }
-
-    // Step 2: For outflows, also create an expense record (for backwards compatibility)
-    if (data.type === 'expense' && data.category !== 'transfer') {
-      const expenseData = {
-        company_id: companyId,
-        category: data.category,
-        subcategory: data.subcategory,
-        project_id: data.project_id || null,
-        client_id: data.client_id || null,
-        description: data.description,
-        amount: Math.abs(data.amount),
-        date: data.date,
-        vendor: data.vendor,
-        status: 'paid',
-        transaction_id: transactionId,
-      }
-      const { data: newExp, error: expError } = await supabase.from('expenses').insert(expenseData).select().single()
-      if (expError) {
-        console.error('Error creating expense record:', expError)
-      } else {
-        setExpenses(prev => [{ ...newExp, amount: parseFloat(newExp.amount || 0) }, ...prev])
-      }
-    }
-
-    // Step 3: Update local transaction state
-    setTransactions(prev => prev.map(t => 
-      t.id === transactionId ? { ...t, ...txnUpdate } : t
-    ))
-  }
-
-  const handleSkipTransaction = async (transactionId: string) => {
-    const { error } = await supabase
-      .from('transactions')
-      .update({ skipped: true, updated_at: new Date().toISOString() })
-      .eq('id', transactionId)
-    if (error) { console.error('Error skipping transaction:', error); return }
-    setTransactions(prev => prev.map(t => t.id === transactionId ? { ...t, skipped: true } : t))
-  }
-
-  const [syncStatus, setSyncStatus] = useState('')
-
-  const handleSyncQBO = async () => {
-    if (!companyId || isSyncing) return
-    setIsSyncing(true)
-    setSyncStatus('Getting sync plan...')
-    try {
-      // Step 1: Get the list of entities to sync
-      const planRes = await fetch('/api/qbo/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, syncType: 'bank' }),
-      })
-      const plan = await planRes.json()
-
-      if (!planRes.ok || !plan.entities) {
-        alert(`Sync failed: ${plan.error || 'Could not get sync plan'}`)
-        setIsSyncing(false)
-        setSyncStatus('')
-        return
-      }
-
-      // Step 2: Chain each entity one at a time
-      let totalSynced = 0
-      let totalErrors = 0
-      for (let i = 0; i < plan.entities.length; i++) {
-        const entity = plan.entities[i]
-        setSyncStatus(`Syncing ${entity}... (${i + 1}/${plan.entities.length})`)
-
-        const res = await fetch('/api/qbo/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ companyId, entity }),
-        })
-        const data = await res.json()
-
-        if (!res.ok) {
-          console.error(`Failed syncing ${entity}:`, data)
-          if (data.reconnect) {
-            alert('QuickBooks session expired — please reconnect.')
-            break
-          }
-          totalErrors++
-          continue
-        }
-
-        totalSynced += data.result?.synced || 0
-        totalErrors += data.result?.errors || 0
-        console.log(`✓ ${entity}: ${data.result?.synced || 0} synced`)
-      }
-
-      setSyncStatus(`Done! ${totalSynced} transactions synced.`)
-      loadData()
-      setTimeout(() => setSyncStatus(''), 4000)
-    } catch (err) {
-      console.error('Sync error:', err)
-      alert('Sync failed — check console for details')
-      setSyncStatus('')
-    } finally {
-      setIsSyncing(false)
-    }
-  }
-
-  // ============ CATEGORY MANAGEMENT ============
   const handleUpdateCategories = async (newCategories: typeof EXPENSE_CATEGORIES) => {
     setCustomCategories(newCategories)
     if (companyId) {
-      const { error } = await supabase
-        .from('company_settings')
-        .upsert(
-          { company_id: companyId, expense_categories: newCategories, updated_at: new Date().toISOString() },
-          { onConflict: 'company_id' }
-        )
+      const { error } = await supabase.from('company_settings').upsert(
+        { company_id: companyId, expense_categories: newCategories, updated_at: new Date().toISOString() },
+        { onConflict: 'company_id' }
+      )
       if (error) console.error('Error saving categories:', error)
     }
   }
 
-  // ============ EXPORT ============
   const handleExport = () => {
     const csv = ['Date,Description,Category,Subcategory,Project,Amount,Type']
     expenses.forEach(e => {
-      const proj = projects.find(p => p.id === e.project_id)
+      const proj = projects.find((p: any) => p.id === e.project_id)
       csv.push(`${e.date},"${e.description}",${e.category},${e.subcategory},"${proj?.name || ''}",${e.amount},${e.type || 'expense'}`)
     })
     const blob = new Blob([csv.join('\n')], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = 'banking-export.csv'; a.click()
+    const a = document.createElement('a'); a.href = url; a.download = 'cash-export.csv'; a.click()
   }
 
-  // Pending bank feed count
-  const pendingTransactions = transactions.filter(t => {
-    if (t.skipped || t.category) return false
-    const linkedIds = new Set(expenses.filter(e => e.transaction_id).map(e => e.transaction_id))
-    return !linkedIds.has(t.id)
-  }).length
+  const pendingCount = transactions.filter(t => !t.is_categorized && !t.skipped).length
 
-  // ============ LOADING ============
+  const TAB_ITEMS = [
+    { id: 'overview' as TabType,  icon: PieChart,   label: 'Overview',      badge: null },
+    { id: 'expenses' as TabType,  icon: LayoutList, label: 'Transactions',  badge: expenses.length },
+    { id: 'bankfeed' as TabType,  icon: Landmark,   label: 'Bank Feed',     badge: pendingCount },
+  ]
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="text-center">
           <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" />
-          <p className="text-sm text-slate-500">Loading banking data...</p>
+          <p className="text-sm text-slate-500">Loading…</p>
         </div>
       </div>
     )
   }
 
-  // ============ RENDER ============
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className={`text-xl font-bold tracking-tight ${THEME.textPrimary}`}>Cash Management</h1>
-          <p className={`text-sm ${THEME.textMuted} mt-1`}>Categorize transactions, track cash flow, manage accounts</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Year */}
-          <div className="relative">
-            <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))} className={THEME.selectClass}>
-              {[2026, 2025, 2024, 2023].map(year => <option key={year} value={year}>{year}</option>)}
-            </select>
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          </div>
+    <div className="min-h-screen bg-slate-50">
 
-          {/* Month */}
-          <div className="relative">
-            <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className={THEME.selectClass}>
-              <option value="all">All Months</option>
-              {['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].map((m, i) => (
-                <option key={m} value={m}>{new Date(2000, i).toLocaleString('default', { month: 'long' })}</option>
+      {/* Top nav bar — non-bankfeed tabs only (bankfeed has its own sticky header) */}
+      {activeTab !== 'bankfeed' && (
+        <div className="bg-white border-b border-slate-200 px-8">
+          <div className="max-w-screen-xl mx-auto">
+            <div className="flex items-center justify-between py-3 gap-3">
+              <div>
+                <h1 className={`text-[15px] font-bold ${THEME.textPrimary} tracking-tight`}>Cash Management</h1>
+                <p className={`text-[11px] ${THEME.textDim} mt-0.5`}>Mano CG LLC · 2026</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}
+                  className={`${THEME.selectClass} text-[12px]`}>
+                  {[2026, 2025, 2024, 2023].map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+                <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
+                  className={`${THEME.selectClass} text-[12px]`}>
+                  <option value="all">All Months</option>
+                  {['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].map((m, i) => (
+                    <option key={m} value={m}>{new Date(2000, i).toLocaleString('default', { month: 'long' })}</option>
+                  ))}
+                </select>
+                {companyId && (
+                  <QBOSyncButton companyId={companyId} syncType="invoices" onSyncComplete={handleSyncComplete} compact />
+                )}
+                <button onClick={handleExport}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[12px] font-medium ${THEME.textSecondary} hover:border-slate-300 transition-colors`}>
+                  <Download size={13} /> Export
+                </button>
+                <button onClick={() => setShowCategoryManager(true)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[12px] font-medium ${THEME.textSecondary} hover:border-slate-300 transition-colors`}>
+                  <Settings size={13} />
+                </button>
+                <button onClick={() => { setActiveTab('expenses'); setTimeout(() => expensesSectionRef.current?.openAddModal(), 100) }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-[12px] font-semibold hover:bg-emerald-700 transition-colors">
+                  <Plus size={13} /> Add Expense
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-0">
+              {TAB_ITEMS.map(({ id, icon: Icon, label, badge }) => (
+                <button key={id} onClick={() => setActiveTab(id)}
+                  className={`relative flex items-center gap-2 px-5 py-3 text-[13px] font-medium transition-colors ${activeTab === id ? 'text-emerald-600' : `${THEME.textDim} hover:text-slate-600`}`}>
+                  <Icon size={14} />
+                  {label}
+                  {badge !== null && badge !== undefined && (
+                    <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md border ${
+                      id === 'bankfeed' && pendingCount > 0 ? 'bg-amber-50 text-amber-600 border-amber-200'
+                      : activeTab === id ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                      : 'bg-slate-100 text-slate-400 border-slate-200'
+                    }`}>{badge}</span>
+                  )}
+                  {activeTab === id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t" />}
+                </button>
               ))}
-            </select>
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
           </div>
-
-          {/* QBO Sync (real) */}
-          {companyId && (
-            <QBOSyncButton companyId={companyId} syncType="bank" onSyncComplete={handleSyncComplete} compact />
-          )}
-
-          {/* Export */}
-          <button onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-sm">
-            <Download size={14} /> Export
-          </button>
-
-          {/* Category Manager */}
-          <button onClick={() => setShowCategoryManager(true)} title="Manage Categories"
-            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-sm">
-            <Settings size={14} />
-          </button>
-
-          {/* Add Expense */}
-          <button onClick={() => { setActiveTab('expenses'); setTimeout(() => expensesSectionRef.current?.openAddModal(), 100) }}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm">
-            <Plus size={14} /> Add Expense
-          </button>
         </div>
-      </div>
+      )}
 
-      {/* Tab Navigation — underline style */}
-      <div className="border-b border-slate-200">
-        <div className="flex gap-0">
-          <button onClick={() => setActiveTab('overview')}
-            className={`relative flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'overview' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'
-            }`}>
-            <PieChart size={15} />
-            Overview
-            {activeTab === 'overview' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t" />}
-          </button>
-          <button onClick={() => setActiveTab('expenses')}
-            className={`relative flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'expenses' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'
-            }`}>
-            <LayoutList size={15} />
-            Transactions
-            <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md ${
-              activeTab === 'expenses' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-100 text-slate-400 border border-slate-200'
-            }`}>{expenses.length}</span>
-            {activeTab === 'expenses' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t" />}
-          </button>
-          <button onClick={() => setActiveTab('bankfeed')}
-            className={`relative flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'bankfeed' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'
-            }`}>
-            <Landmark size={15} />
-            Bank Feed
-            {pendingTransactions > 0 && (
-              <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md ${
-                activeTab === 'bankfeed' ? 'bg-amber-50 text-amber-600 border border-amber-200' : 'bg-amber-50 text-amber-500 border border-amber-200'
-              }`}>{pendingTransactions}</span>
-            )}
-            {activeTab === 'bankfeed' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t" />}
-          </button>
+      {/* Slim tab strip when bankfeed active (has its own sticky header below) */}
+      {activeTab === 'bankfeed' && (
+        <div className="bg-white border-b border-slate-100 px-8">
+          <div className="max-w-screen-xl mx-auto flex">
+            {TAB_ITEMS.map(({ id, icon: Icon, label }) => (
+              <button key={id} onClick={() => setActiveTab(id)}
+                className={`relative flex items-center gap-1.5 px-4 py-2 text-[12px] font-medium transition-colors ${activeTab === id ? 'text-emerald-600' : `${THEME.textDim} hover:text-slate-600`}`}>
+                <Icon size={13} />
+                {label}
+                {id === 'bankfeed' && pendingCount > 0 && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-amber-50 text-amber-600 border border-amber-200">{pendingCount}</span>
+                )}
+                {activeTab === id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t" />}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Tab Content */}
+      {/* Tab content */}
       {activeTab === 'overview' && (
-        <OverviewSection
-          expenses={expenses}
-          transactions={transactions}
-          projects={projects}
-          clients={clients}
-          selectedYear={selectedYear}
-          selectedMonth={selectedMonth}
-          categories={customCategories}
-        />
+        <div className="max-w-screen-xl mx-auto px-8 py-6">
+          <OverviewSection
+            expenses={expenses} transactions={transactions}
+            projects={projects} clients={clients}
+            selectedYear={selectedYear} selectedMonth={selectedMonth}
+            categories={customCategories}
+          />
+        </div>
       )}
 
       {activeTab === 'expenses' && (
-        <ExpensesSection
-          ref={expensesSectionRef}
-          expenses={expenses}
-          projects={projects}
-          clients={clients}
-          teamMembers={teamMembers}
-          selectedYear={selectedYear}
-          selectedMonth={selectedMonth}
-          companyId={companyId}
-          onAddExpense={handleAddExpense}
-          onUpdateExpense={handleUpdateExpense}
-          onDeleteExpense={handleDeleteExpense}
-        />
+        <div className="max-w-screen-xl mx-auto px-8 py-6">
+          <ExpensesSection
+            ref={expensesSectionRef}
+            expenses={expenses} projects={projects}
+            clients={clients} teamMembers={teamMembers}
+            selectedYear={selectedYear} selectedMonth={selectedMonth}
+            companyId={companyId}
+            onAddExpense={handleAddExpense}
+            onUpdateExpense={handleUpdateExpense}
+            onDeleteExpense={handleDeleteExpense}
+          />
+        </div>
       )}
 
       {activeTab === 'bankfeed' && (
         <BankFeedSection
           transactions={transactions}
-          expenses={expenses}
-          projects={projects}
-          clients={clients}
-          categories={customCategories}
           onCategorizeTransaction={handleCategorizeTransaction}
-          onSkipTransaction={handleSkipTransaction}
-          onSyncQBO={handleSyncQBO}
-          isSyncing={isSyncing}
-          syncStatus={syncStatus}
+          onRefresh={handlePlaidRefresh}
+          lastSynced={lastSynced}
+          plaidConnected={plaidConnected}
+          onConnectPlaid={handleConnectPlaid}
+          companyId={companyId || undefined}
         />
       )}
 
-      {/* Category Manager Modal */}
       <CategoryManager
         isOpen={showCategoryManager}
         onClose={() => setShowCategoryManager(false)}
