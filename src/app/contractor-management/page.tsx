@@ -439,7 +439,7 @@ export default function ContractorManagement() {
   // ============ FILTERED DATA ============
   const filteredInvoices = useMemo(() => {
     let r = [...invoices]
-    if (dateRange !== 'all') r = r.filter(inv => inv.period_start >= dateFilter.start && inv.period_end <= dateFilter.end)
+    if (dateRange !== 'all') r = r.filter(inv => inv.period_start >= dateFilter.start && inv.period_start <= dateFilter.end)
     if (searchQuery) { const q = searchQuery.toLowerCase(); r = r.filter(inv => inv.invoice_number.toLowerCase().includes(q) || (memberMap[inv.team_member_id] || '').toLowerCase().includes(q)) }
     if (filterStatus === 'all') r = r.filter(inv => inv.status !== 'rejected')
     else if (filterStatus !== 'all') r = r.filter(inv => filterStatus === 'pending' ? ['submitted', 'pending'].includes(inv.status) : inv.status === filterStatus)
@@ -450,7 +450,10 @@ export default function ContractorManagement() {
 
   const filteredExpenses = useMemo(() => {
     let r = [...expenses]
-    if (dateRange !== 'all') r = r.filter(e => e.date >= dateFilter.start && e.date <= dateFilter.end)
+    if (dateRange !== 'all') r = r.filter(e => {
+      const d = (e.date || '').split('T')[0]
+      return d >= dateFilter.start && d <= dateFilter.end
+    })
     if (searchQuery) { const q = searchQuery.toLowerCase(); r = r.filter(e => e.description.toLowerCase().includes(q) || (memberMap[e.team_member_id] || '').toLowerCase().includes(q)) }
     if (filterStatus === 'all') r = r.filter(e => e.status !== 'rejected')
     else r = r.filter(e => e.status === filterStatus)
