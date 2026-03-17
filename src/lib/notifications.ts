@@ -8,6 +8,8 @@ import { createClient } from "@supabase/supabase-js"
 import {
   sendInvoiceStatusEmail,
   sendExpenseStatusEmail,
+  sendAdminInvoiceSubmittedEmail,
+  sendAdminExpenseSubmittedEmail,
   type InvoiceStatusEmailData,
   type ExpenseStatusEmailData,
 } from "./email"
@@ -260,6 +262,96 @@ export async function batchUpdateInvoiceStatus(
   console.log(`Batch update: ${invoiceIds.length} invoices → ${newStatus}, ${sent}/${invoiceIds.length} emails sent`)
 
   return { success: true, results, emailsSent: sent, total: invoiceIds.length }
+}
+
+// ============================================================
+// ADMIN NOTIFICATION — INVOICE SUBMITTED
+// ============================================================
+export async function notifyAdminInvoiceSubmitted(invoiceId: string) {
+  const supabase = getSupabase()
+  try {
+    const { data: invoice, error } = await supabase
+      .from("contractor_invoices")
+      .select(`
+        id, invoice_number, total_amount, period_start, period_end, notes,
+        team_members!team_member_id ( name, email )
+      `)
+      .eq("id", invoiceId)
+      .single()
+
+    if (error || !invoice) { console.error("Admin invoice notify: fetch failed", error); return { success: false } }
+    const contractor = invoice.team_members as any
+
+    const result = await sendAdminInvoiceSubmittedEmail({
+      contractorName: contractor.name || "Unknown",
+      contractorEmail: contractor.email || "",
+      invoiceNumber: invoice.invoice_number || `INV-${invoiceId.slice(0, 6).toUpperCase()}`,
+      invoiceAmount: invoice.total_amount || 0,
+      periodStart: invoice.period_start ? formatDate(invoice.period_start) : undefined,
+      periodEnd: invoice.period_end ? formatDate(invoice.period_end) : undefined,
+      notes: invoice.notes || undefined,
+    })
+
+    if (result.success) {
+      await supabase.from("notification_log").insert({
+        type: "admin_invoice_submitted",
+        recipient_email: process.env.EMAIL_REPLY_TO || "gabriel@manocg.com",
+        reference_id: invoiceId,
+        reference_type: "contractor_invoice",
+        status: "sent",
+        metadata: { invoice_number: invoice.invoice_number, contractor: contractor.name, email_id: result.id },
+      }).then(({ error: e }) => { if (e) console.warn("Log insert failed:", e.message) })
+    }
+    return result
+  } catch (err) {
+    console.error("notifyAdminInvoiceSubmitted error:", err)
+    return { success: false, error: err }
+  }
+}
+
+// ============================================================
+// ADMIN NOTIFICATION — EXPENSE SUBMITTED
+// ============================================================
+export async function notifyAdminExpenseSubmitted(expenseId: string) {
+  const supabase = getSupabase()
+  try {
+    const { data: expense, error } = await supabase
+      .from("contractor_expenses")
+      .select(`
+        id, description, amount, date, category, notes,
+        team_members!team_member_id ( name, email )
+      `)
+      .eq("id", expenseId)
+      .single()
+
+    if (error || !expense) { console.error("Admin expense notify: fetch failed", error); return { success: false } }
+    const contractor = expense.team_members as any
+
+    const result = await sendAdminExpenseSubmittedEmail({
+      contractorName: contractor.name || "Unknown",
+      contractorEmail: contractor.email || "",
+      expenseDescription: expense.description || "Expense",
+      expenseAmount: Math.abs(expense.amount || 0),
+      expenseDate: expense.date ? formatDate(expense.date) : "N/A",
+      category: expense.category || "other",
+      notes: expense.notes || undefined,
+    })
+
+    if (result.success) {
+      await supabase.from("notification_log").insert({
+        type: "admin_expense_submitted",
+        recipient_email: process.env.EMAIL_REPLY_TO || "gabriel@manocg.com",
+        reference_id: expenseId,
+        reference_type: "contractor_expense",
+        status: "sent",
+        metadata: { description: expense.description, contractor: contractor.name, email_id: result.id },
+      }).then(({ error: e }) => { if (e) console.warn("Log insert failed:", e.message) })
+    }
+    return result
+  } catch (err) {
+    console.error("notifyAdminExpenseSubmitted error:", err)
+    return { success: false, error: err }
+  }
 }
 
 // ============================================================
