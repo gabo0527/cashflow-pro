@@ -68,16 +68,16 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   paid:      { label: 'Paid',      color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', dot: 'bg-emerald-600' },
 }
 
-// ============ DESIGN TOKENS (light theme) ============
+// ============ DESIGN TOKENS — financial/institutional ============
 const T = {
-  card: "bg-white border border-gray-200 rounded-xl shadow-sm",
-  cardHover: "bg-white border border-gray-200 rounded-xl shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md",
-  input: "w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all duration-200",
-  select: "w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all duration-200 cursor-pointer appearance-none",
-  label: "block text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2",
-  btnPrimary: "px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm shadow-emerald-500/20",
-  btnGhost: "px-4 py-2 rounded-lg text-sm text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200",
-  sectionTitle: "text-[11px] font-bold uppercase tracking-[0.08em] text-gray-400",
+  card: "bg-white border border-gray-200 rounded",
+  cardHover: "bg-white border border-gray-200 rounded transition-colors hover:border-gray-300",
+  input: "w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-gray-900 text-sm placeholder-gray-300 focus:outline-none focus:border-gray-900 focus:bg-white transition-colors",
+  select: "w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-gray-900 text-sm focus:outline-none focus:border-gray-900 focus:bg-white transition-colors cursor-pointer appearance-none",
+  label: "block text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400 mb-1.5",
+  btnPrimary: "px-4 py-2 bg-gray-900 hover:bg-gray-800 active:bg-black text-white text-[13px] font-medium rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2",
+  btnGhost: "px-3 py-1.5 rounded text-[13px] text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors border border-gray-200 hover:border-gray-300",
+  sectionTitle: "text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400",
 }
 
 // ============ FILE UPLOAD ============
@@ -95,11 +95,18 @@ async function uploadFile(file: File, folder: string, memberId: string): Promise
   } catch (err) { console.error('Upload error:', err); return null }
 }
 
-// ============ STATUS PILL ============
+// ============ STATUS PILL — sharp financial style ============
 function StatusPill({ status }: { status: string }) {
   const config = STATUS_CONFIG[status] || STATUS_CONFIG.pending
+  const sharpStyles: Record<string, string> = {
+    pending:   'bg-amber-50 text-amber-700 border border-amber-200',
+    submitted: 'bg-blue-50 text-blue-700 border border-blue-200',
+    approved:  'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    rejected:  'bg-red-50 text-red-700 border border-red-200',
+    paid:      'bg-gray-100 text-gray-600 border border-gray-200',
+  }
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${config.bg} ${config.border} ${config.color}`}>
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium tracking-wide ${sharpStyles[status] || sharpStyles.pending}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
       {config.label}
     </span>
@@ -224,16 +231,16 @@ function MultiDropZone({ files, onAddFiles, onRemoveFile, uploading, label, acce
 // ============ WEEK NAVIGATOR ============
 function WeekNav({ week, onPrev, onNext }: { week: { label: string }; onPrev: () => void; onNext: () => void }) {
   return (
-    <div className="inline-flex items-center gap-0 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-      <button onClick={onPrev} className="p-2.5 text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-all duration-200 border-r border-gray-200">
-        <ChevronLeft size={15} />
+    <div className="inline-flex items-center gap-0 border border-gray-200 rounded overflow-hidden bg-white">
+      <button onClick={onPrev} className="px-2.5 py-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-colors border-r border-gray-200">
+        <ChevronLeft size={14} />
       </button>
-      <div className="flex items-center gap-2.5 px-5 py-2">
-        <Calendar size={13} className="text-emerald-500" />
-        <span className="text-sm font-semibold text-gray-900 tracking-tight">{week.label}</span>
+      <div className="flex items-center gap-2 px-4 py-1.5">
+        <Calendar size={12} className="text-gray-400" />
+        <span className="text-[13px] font-medium text-gray-900 tracking-tight">{week.label}</span>
       </div>
-      <button onClick={onNext} className="p-2.5 text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-all duration-200 border-l border-gray-200">
-        <ChevronRight size={15} />
+      <button onClick={onNext} className="px-2.5 py-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-colors border-l border-gray-200">
+        <ChevronRight size={14} />
       </button>
     </div>
   )
@@ -921,33 +928,33 @@ export default function ContractorPortal() {
 
   // ============ PORTAL ============
   return (
-    <div className="min-h-screen bg-[#f4f5f7] text-gray-900" style={{ colorScheme: 'light' }}>
+    <div className="min-h-screen bg-[#f5f5f3] text-gray-900" style={{ colorScheme: 'light' }}>
       {/* Top Bar */}
-      <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/95 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-gray-200 bg-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-[56px]">
+          <div className="flex items-center justify-between h-[48px]">
             {/* Logo + Name */}
             <div className="flex items-center gap-3">
-              <svg width={20} height={20} viewBox="0 0 40 40" fill="none">
+              <svg width={18} height={18} viewBox="0 0 40 40" fill="none">
                 <path d="M8 8L20 32L32 8" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
               </svg>
-              <div className="h-4 w-px bg-gray-200" />
-              <span className="text-[13px] font-medium text-gray-500">{member?.name}</span>
+              <div className="h-3.5 w-px bg-gray-200" />
+              <span className="text-[13px] font-medium text-gray-600">{member?.name}</span>
             </div>
 
-            {/* Nav Tabs — scrollable on mobile */}
+            {/* Nav Tabs */}
             <nav className="flex items-center overflow-x-auto">
               {navItems.map(item => (
                 <button key={item.id} onClick={() => { setActiveTab(item.id); setError(null) }}
-                  className={`relative flex items-center gap-1.5 px-3 sm:px-4 h-[56px] text-[13px] font-medium transition-all duration-200 whitespace-nowrap ${
-                    activeTab === item.id 
-                      ? 'text-gray-900' 
-                      : 'text-gray-400 hover:text-gray-600'
+                  className={`relative flex items-center gap-1.5 px-3 sm:px-4 h-[48px] text-[12px] font-medium transition-colors whitespace-nowrap ${
+                    activeTab === item.id
+                      ? 'text-gray-900'
+                      : 'text-gray-400 hover:text-gray-700'
                   }`}>
-                  <item.icon size={14} className={activeTab === item.id ? 'text-emerald-500' : ''} />
+                  <item.icon size={13} className={activeTab === item.id ? 'text-gray-700' : ''} />
                   <span className="hidden sm:inline">{item.label}</span>
                   {activeTab === item.id && (
-                    <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-emerald-500 rounded-full" />
+                    <span className="absolute bottom-0 left-2 right-2 h-[1.5px] bg-gray-900" />
                   )}
                 </button>
               ))}
@@ -955,104 +962,176 @@ export default function ContractorPortal() {
 
             {/* Sign out */}
             <button onClick={() => { setStep('email'); setMember(null); setAssignments([]); setRateCards([]); setEmail('') }}
-              className="flex items-center gap-2 p-2 rounded-lg text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-all duration-200">
-              <LogOut size={14} />
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded text-[12px] text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+              <LogOut size={13} />
             </button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-5">
         {/* Error Banner */}
         {error && (
-          <div className="mb-6 p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-3 text-rose-600 text-sm">
-            <AlertCircle size={16} className="shrink-0" />
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded flex items-center gap-2.5 text-red-700 text-[13px]">
+            <AlertCircle size={14} className="shrink-0" />
             <span className="flex-1">{error}</span>
-            <button onClick={() => setError(null)} className="p-1 hover:bg-rose-100 rounded-lg transition-colors"><X size={14} /></button>
+            <button onClick={() => setError(null)} className="p-1 hover:bg-red-100 rounded transition-colors"><X size={13} /></button>
           </div>
         )}
 
         {/* ====== TIMESHEET ====== */}
         {activeTab === 'time' && (
-          <div className="space-y-4">
-            {/* Week Nav + Total */}
-            <div className={`${T.card} p-4 sm:p-5`}>
-              <div className="flex items-center justify-between">
+          <div className="space-y-3">
+            {/* Week Nav + KPI strip */}
+            <div className={`${T.card} overflow-hidden`}>
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                 <WeekNav week={week}
                   onPrev={() => { const d = new Date(weekDate); d.setDate(d.getDate() - 7); setWeekDate(d) }}
                   onNext={() => { const d = new Date(weekDate); d.setDate(d.getDate() + 7); setWeekDate(d) }}
                 />
-                <div className="text-right">
-                  <div className={`text-3xl font-extrabold tabular-nums tracking-tight leading-none ${totalTimeHours > 0 ? 'text-gray-900' : 'text-gray-300'}`}>{totalTimeHours.toFixed(1)}</div>
-                  <div className="text-[9px] font-bold uppercase tracking-[0.1em] text-gray-400 mt-1">total hours</div>
+                <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400">
+                  {totalTimeHours > 0 ? 'Draft' : 'Not submitted'}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 divide-x divide-gray-100">
+                <div className="px-4 py-3">
+                  <div className="text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400 mb-1">This week</div>
+                  <div className={`text-xl font-medium tabular-nums tracking-tight ${totalTimeHours > 0 ? 'text-emerald-600' : 'text-gray-300'}`}>
+                    {totalTimeHours > 0 ? `${totalTimeHours.toFixed(1)}h` : '—'}
+                  </div>
+                </div>
+                <div className="px-4 py-3">
+                  <div className="text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400 mb-1">Month to date</div>
+                  <div className="text-xl font-medium tabular-nums tracking-tight text-gray-900">
+                    {assignments.length > 0 ? `${(existingEntries.reduce((s: number, e: any) => s + (e.hours || 0), 0)).toFixed(1)}h` : '—'}
+                  </div>
+                </div>
+                <div className="px-4 py-3">
+                  <div className="text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400 mb-1">Projects</div>
+                  <div className="text-xl font-medium tabular-nums tracking-tight text-gray-900">{assignments.length}</div>
                 </div>
               </div>
-              {timeSuccess && (
-                <div className="flex items-center gap-2 text-emerald-600 text-sm bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-lg mt-4">
-                  <CheckCircle size={15} /> Submitted successfully
-                </div>
-              )}
             </div>
 
-            {/* Client Sections */}
-            <div className="space-y-4">
-              {Object.entries(assignmentsByClient).map(([cid, { clientName, projects }], clientIndex) => {
-                const collapsed = collapsedClients.has(cid)
-                const clientHours = projects.reduce((s, p) => s + parseFloat(timeEntries[p.project_id]?.hours || '0'), 0)
-                const color = clientColorMap[cid] || '#6b7280'
+            {timeSuccess && (
+              <div className="flex items-center gap-2 text-emerald-700 text-[13px] bg-emerald-50 border border-emerald-200 px-3 py-2 rounded">
+                <CheckCircle size={13} className="shrink-0" /> Timesheet submitted successfully
+              </div>
+            )}
+
+            {/* Project rows */}
+            <div className={`${T.card} overflow-hidden divide-y divide-gray-100`}>
+              <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                <span className={T.sectionTitle}>Log hours — {week.label}</span>
+                <span className={`${T.sectionTitle} tabular-nums`}>{totalTimeHours > 0 ? `${totalTimeHours.toFixed(1)}h total` : ''}</span>
+              </div>
+
+              {Object.entries(assignmentsByClient).map(([cid, { clientName, projects }]) => {
+                const color = clientColorMap[cid] || '#9ca3af'
+                // desaturate: map vibrant colors to muted equivalents
+                const muted: Record<string, string> = {
+                  '#f59e0b': '#b08d57', '#f97316': '#b07a50', '#eab308': '#a89040',
+                  '#10b981': '#4a9e7a', '#14b8a6': '#4a9490', '#06b6d4': '#4a8fa8',
+                  '#3b82f6': '#5b7eb8', '#6366f1': '#6b6eb8', '#8b5cf6': '#7b6eb8',
+                  '#ec4899': '#b06080', '#ef4444': '#b06060', '#f43f5e': '#a06070',
+                }
+                const dotColor = muted[color] || color
+
                 return (
                   <div key={cid}>
-                    {/* Client divider — lightweight text with dot */}
-                    <button onClick={() => { const n = new Set(collapsedClients); collapsed ? n.delete(cid) : n.add(cid); setCollapsedClients(n) }}
-                      className="w-full flex items-center gap-2.5 px-1 py-2 group cursor-pointer hover:bg-gray-100/50 rounded-lg transition-colors">
-                      <div className="w-[6px] h-[6px] rounded-sm shrink-0" style={{ background: color }} />
-                      <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400">{clientName}</span>
-                      <span className="text-[10px] text-gray-300">({projects.length})</span>
-                      <div className="flex-1 h-px bg-gray-100" />
-                      <span className={`text-[11px] font-bold tabular-nums ${clientHours > 0 ? 'text-gray-700' : 'text-gray-300'}`}>{clientHours.toFixed(1)}h</span>
-                      <ChevronDown size={12} className={`text-gray-300 transition-transform duration-200 ${collapsed ? '-rotate-90' : ''}`} />
-                    </button>
+                    {/* Client header — minimal */}
+                    <div className="flex items-center gap-2 px-4 py-2 bg-gray-50/50">
+                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: dotColor }} />
+                      <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400">{clientName}</span>
+                    </div>
 
-                    {!collapsed && (
-                      <div className="rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm" style={{ borderLeft: `3px solid ${color}` }}>
-                        {projects.map((p, i) => {
-                          const hasHours = parseFloat(timeEntries[p.project_id]?.hours || '0') > 0
-                          return (
-                            <div key={p.project_id} className={i < projects.length - 1 ? 'border-b border-gray-100' : ''}>
-                              <div className="flex items-center px-4 sm:px-5 h-[48px] sm:h-[52px]">
-                                <span className={`flex-1 text-[13px] truncate ${hasHours ? 'text-gray-900 font-semibold' : 'text-gray-400'}`}>{p.project_name}</span>
-                                <div className="flex items-center gap-1.5">
-                                  <input type="text" inputMode="decimal" placeholder="—"
-                                    value={timeEntries[p.project_id]?.hours || ''} 
-                                    onChange={e => { const v = e.target.value; if (v === '' || /^\d*\.?\d*$/.test(v)) setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], hours: v } })) }}
-                                    className="w-[50px] py-1 bg-transparent border-b-2 border-gray-200 text-gray-900 text-[15px] font-bold text-right tabular-nums focus:outline-none focus:border-emerald-500 transition-colors placeholder-gray-300" />
-                                  <span className="text-gray-300 text-[10px] font-semibold w-4">h</span>
-                                </div>
-                              </div>
-                              {/* Contextual description — appears when hours entered or field has content */}
-                              {(hasHours || timeEntries[p.project_id]?.notes) && (
-                                <div className="px-4 sm:px-5 pb-3">
-                                  <input type="text" placeholder="What did you work on?" 
-                                    value={timeEntries[p.project_id]?.notes || ''} 
-                                    onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], notes: e.target.value } }))}
-                                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-600 text-xs placeholder-gray-300 focus:outline-none focus:border-emerald-300 transition-all" style={{ colorScheme: 'light' }} />
-                                </div>
-                              )}
+                    {projects.map((p, i) => {
+                      const hasHours = parseFloat(timeEntries[p.project_id]?.hours || '0') > 0
+                      const hasNote = !!(timeEntries[p.project_id]?.notes)
+                      const noteOpen = hasHours || hasNote
+
+                      return (
+                        <div key={p.project_id} className="border-t border-gray-100 first:border-t-0">
+                          {/* Hour row */}
+                          <div className="flex items-center px-4 h-11 gap-3">
+                            <span className={`flex-1 text-[13px] truncate ${hasHours ? 'text-gray-900' : 'text-gray-500'}`}>
+                              {p.project_name}
+                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="—"
+                                value={timeEntries[p.project_id]?.hours || ''}
+                                onChange={e => {
+                                  const v = e.target.value
+                                  if (v === '' || /^\d*\.?\d*$/.test(v))
+                                    setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], hours: v } }))
+                                }}
+                                className="w-12 py-1 bg-transparent border-b border-gray-200 text-gray-900 text-[14px] font-medium text-right tabular-nums focus:outline-none focus:border-gray-900 transition-colors placeholder-gray-300"
+                              />
+                              <span className="text-[11px] text-gray-300 w-3">h</span>
                             </div>
-                          )
-                        })}
-                      </div>
-                    )}
+                            {/* Note toggle — only show when row has hours or already has a note */}
+                            {(hasHours || hasNote) && (
+                              <button
+                                onClick={() => {
+                                  const current = timeEntries[p.project_id]?.notes
+                                  if (current !== undefined && !hasHours) return
+                                  setTimeEntries(prev => ({
+                                    ...prev,
+                                    [p.project_id]: {
+                                      ...prev[p.project_id],
+                                      notes: hasNote ? '' : (prev[p.project_id]?.notes ?? '')
+                                    }
+                                  }))
+                                }}
+                                className="text-[11px] text-gray-300 hover:text-gray-600 transition-colors shrink-0 px-1"
+                              >
+                                {hasNote ? '− note' : '+ note'}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Expandable note — Option A */}
+                          {noteOpen && (
+                            <div className="px-4 pb-2.5 pt-0">
+                              <input
+                                type="text"
+                                placeholder="What did you work on this week?"
+                                value={timeEntries[p.project_id]?.notes || ''}
+                                onChange={e => setTimeEntries(prev => ({
+                                  ...prev,
+                                  [p.project_id]: { ...prev[p.project_id], notes: e.target.value }
+                                }))}
+                                className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded text-[12px] text-gray-600 placeholder-gray-300 focus:outline-none focus:border-gray-400 focus:bg-white transition-colors"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )
               })}
             </div>
 
-            {/* Submit */}
-            <button onClick={submitTime} disabled={submittingTime || totalTimeHours === 0} className={`w-full ${T.btnPrimary} py-3.5 rounded-xl text-[15px]`}>
-              {submittingTime ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <><Send size={16} /> Submit Timesheet</>}
-            </button>
+            {/* Footer — submit */}
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-[12px] text-gray-400">
+                {totalTimeHours > 0
+                  ? `Submitting ${totalTimeHours.toFixed(1)}h across ${Object.values(timeEntries).filter(e => parseFloat(e.hours || '0') > 0).length} project${Object.values(timeEntries).filter(e => parseFloat(e.hours || '0') > 0).length !== 1 ? 's' : ''}`
+                  : 'Enter hours above to submit'}
+              </span>
+              <button
+                onClick={submitTime}
+                disabled={submittingTime || totalTimeHours === 0}
+                className={T.btnPrimary}
+              >
+                {submittingTime ? <><Loader2 size={13} className="animate-spin" /> Submitting...</> : <><Send size={13} /> Submit timesheet</>}
+              </button>
+            </div>
           </div>
         )}
 
