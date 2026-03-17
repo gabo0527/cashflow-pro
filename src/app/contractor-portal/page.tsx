@@ -62,18 +62,18 @@ const getClientColor = (index: number) => CLIENT_COLORS[index % CLIENT_COLORS.le
 // ============ STATUS CONFIG (light theme) ============
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; dot: string }> = {
   pending:   { label: 'Pending',   color: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-200', dot: 'bg-amber-500' },
-  submitted: { label: 'Submitted', color: 'text-sky-600',     bg: 'bg-sky-50',     border: 'border-sky-200', dot: 'bg-sky-500' },
-  approved:  { label: 'Approved',  color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', dot: 'bg-emerald-500' },
-  rejected:  { label: 'Rejected',  color: 'text-rose-600',    bg: 'bg-rose-50',    border: 'border-rose-200', dot: 'bg-rose-500' },
-  paid:      { label: 'Paid',      color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', dot: 'bg-emerald-600' },
+  submitted: { label: 'Submitted', color: 'text-sky-600',     bg: 'bg-sky-50',     border: 'border-gray-200', dot: 'bg-sky-500' },
+  approved:  { label: 'Approved',  color: 'text-emerald-600', bg: 'bg-gray-50', border: 'border-gray-200', dot: 'bg-gray-900' },
+  rejected:  { label: 'Rejected',  color: 'text-red-600',    bg: 'bg-red-50',    border: 'border-red-200', dot: 'bg-red-500' },
+  paid:      { label: 'Paid',      color: 'text-emerald-700', bg: 'bg-gray-50', border: 'border-gray-200', dot: 'bg-emerald-600' },
 }
 
 // ============ DESIGN TOKENS — financial/institutional ============
 const T = {
   card: "bg-white border border-gray-200 rounded",
   cardHover: "bg-white border border-gray-200 rounded transition-colors hover:border-gray-300",
-  input: "w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-gray-900 text-sm placeholder-gray-300 focus:outline-none focus:border-gray-900 focus:bg-white transition-colors",
-  select: "w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-gray-900 text-sm focus:outline-none focus:border-gray-900 focus:bg-white transition-colors cursor-pointer appearance-none",
+  input: "w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-gray-900 text-[13px] placeholder-gray-300 focus:outline-none focus:border-gray-900 focus:bg-white transition-colors",
+  select: "w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-gray-900 text-[13px] focus:outline-none focus:border-gray-900 focus:bg-white transition-colors cursor-pointer appearance-none",
   label: "block text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400 mb-1.5",
   btnPrimary: "px-4 py-2 bg-gray-900 hover:bg-gray-800 active:bg-black text-white text-[13px] font-medium rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2",
   btnGhost: "px-3 py-1.5 rounded text-[13px] text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors border border-gray-200 hover:border-gray-300",
@@ -101,13 +101,13 @@ function StatusPill({ status }: { status: string }) {
   const sharpStyles: Record<string, string> = {
     pending:   'bg-amber-50 text-amber-700 border border-amber-200',
     submitted: 'bg-blue-50 text-blue-700 border border-blue-200',
-    approved:  'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    approved:  'bg-gray-50 text-emerald-700 border border-gray-200',
     rejected:  'bg-red-50 text-red-700 border border-red-200',
     paid:      'bg-gray-100 text-gray-600 border border-gray-200',
   }
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium tracking-wide ${sharpStyles[status] || sharpStyles.pending}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
+      <span className={`w-1.5 h-1.5 rounded ${config.dot}`} />
       {config.label}
     </span>
   )
@@ -131,20 +131,20 @@ function DropZone({ file, onFile, onRemove, uploading, label, accept }: {
   if (file) {
     const isImage = file.type.startsWith('image/')
     return (
-      <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg group">
+      <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded group">
         {isImage ? (
-          <img src={URL.createObjectURL(file)} alt="" className="w-10 h-10 rounded-lg object-cover border border-gray-200" />
+          <img src={URL.createObjectURL(file)} alt="" className="w-10 h-10 rounded object-cover border border-gray-200" />
         ) : (
-          <div className="w-10 h-10 rounded-lg bg-rose-50 flex items-center justify-center shrink-0">
-            <FileText size={16} className="text-rose-500" />
+          <div className="w-10 h-10 rounded bg-red-50 flex items-center justify-center shrink-0">
+            <FileText size={16} className="text-red-500" />
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <p className="text-gray-900 text-sm font-medium truncate">{file.name}</p>
+          <p className="text-gray-900 text-[13px] font-medium truncate">{file.name}</p>
           <p className="text-gray-400 text-xs tabular-nums">{file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}</p>
         </div>
-        {uploading ? <Loader2 size={16} className="text-emerald-500 animate-spin shrink-0" /> : (
-          <button onClick={onRemove} className="p-1.5 rounded-lg text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-all duration-200 shrink-0 opacity-0 group-hover:opacity-100"><X size={14} /></button>
+        {uploading ? <Loader2 size={16} className="text-gray-700 animate-spin shrink-0" /> : (
+          <button onClick={onRemove} className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0 opacity-0 group-hover:opacity-100"><X size={14} /></button>
         )}
       </div>
     )
@@ -153,14 +153,14 @@ function DropZone({ file, onFile, onRemove, uploading, label, accept }: {
   return (
     <div onDragEnter={handleDragIn} onDragLeave={handleDragOut} onDragOver={handleDrag} onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
-      className={`relative cursor-pointer rounded-xl border-2 border-dashed transition-all duration-300 group ${
-        dragging ? 'border-emerald-400 bg-emerald-50/50 scale-[1.01]' : 'border-gray-200 bg-gray-50/50 hover:border-gray-300 hover:bg-gray-50'
+      className={`relative cursor-pointer rounded border-2 border-dashed transition-colors group ${
+        dragging ? 'border-gray-400 bg-gray-50 scale-[1.01]' : 'border-gray-200 bg-gray-50/50 hover:border-gray-300 hover:bg-gray-50'
       }`}>
-      <div className="flex flex-col items-center justify-center py-8 px-4">
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 transition-all duration-300 ${dragging ? 'bg-emerald-100 scale-110' : 'bg-gray-100 group-hover:bg-gray-200'}`}>
-          <Upload size={18} className={`transition-colors duration-200 ${dragging ? 'text-emerald-500' : 'text-gray-400 group-hover:text-gray-500'}`} />
+      <div className="flex flex-col items-center justify-center py-6 px-4">
+        <div className={`w-11 h-11 rounded flex items-center justify-center mb-3 transition-colors ${dragging ? 'bg-emerald-100 scale-110' : 'bg-gray-100 group-hover:bg-gray-200'}`}>
+          <Upload size={18} className={`transition-colors duration-200 ${dragging ? 'text-gray-700' : 'text-gray-400 group-hover:text-gray-500'}`} />
         </div>
-        <p className={`text-sm font-medium transition-colors duration-200 ${dragging ? 'text-emerald-600' : 'text-gray-500'}`}>{dragging ? 'Drop file here' : label}</p>
+        <p className={`text-[13px] font-medium transition-colors duration-200 ${dragging ? 'text-emerald-600' : 'text-gray-500'}`}>{dragging ? 'Drop file here' : label}</p>
         <p className="text-[11px] text-gray-400 mt-1.5">or click to browse</p>
       </div>
       <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={e => { if (e.target.files?.[0]) onFile(e.target.files[0]) }} />
@@ -188,14 +188,14 @@ function MultiDropZone({ files, onAddFiles, onRemoveFile, uploading, label, acce
     <div className="space-y-2">
       <div onDragEnter={handleDragIn} onDragLeave={handleDragOut} onDragOver={handleDrag} onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
-        className={`relative cursor-pointer rounded-xl border-2 border-dashed transition-all duration-300 group ${
-          dragging ? 'border-emerald-400 bg-emerald-50/50 scale-[1.01]' : 'border-gray-200 bg-gray-50/50 hover:border-gray-300 hover:bg-gray-50'
+        className={`relative cursor-pointer rounded border-2 border-dashed transition-colors group ${
+          dragging ? 'border-gray-400 bg-gray-50 scale-[1.01]' : 'border-gray-200 bg-gray-50/50 hover:border-gray-300 hover:bg-gray-50'
         }`}>
         <div className="flex flex-col items-center justify-center py-6 px-4">
-          <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 transition-all duration-300 ${dragging ? 'bg-emerald-100 scale-110' : 'bg-gray-100 group-hover:bg-gray-200'}`}>
-            <Upload size={18} className={`transition-colors duration-200 ${dragging ? 'text-emerald-500' : 'text-gray-400 group-hover:text-gray-500'}`} />
+          <div className={`w-11 h-11 rounded flex items-center justify-center mb-3 transition-colors ${dragging ? 'bg-emerald-100 scale-110' : 'bg-gray-100 group-hover:bg-gray-200'}`}>
+            <Upload size={18} className={`transition-colors duration-200 ${dragging ? 'text-gray-700' : 'text-gray-400 group-hover:text-gray-500'}`} />
           </div>
-          <p className={`text-sm font-medium transition-colors duration-200 ${dragging ? 'text-emerald-600' : 'text-gray-500'}`}>{dragging ? 'Drop files here' : label}</p>
+          <p className={`text-[13px] font-medium transition-colors duration-200 ${dragging ? 'text-emerald-600' : 'text-gray-500'}`}>{dragging ? 'Drop files here' : label}</p>
           <p className="text-[11px] text-gray-400 mt-1.5">PDF, JPEG, PNG — multiple files</p>
         </div>
         <input ref={inputRef} type="file" accept={accept} multiple className="hidden" onChange={e => {
@@ -207,20 +207,20 @@ function MultiDropZone({ files, onAddFiles, onRemoveFile, uploading, label, acce
         }} />
       </div>
       {files.map((file, i) => (
-        <div key={i} className="flex items-center gap-3 px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-lg group">
+        <div key={i} className="flex items-center gap-3 px-3 py-2 bg-gray-50 border border-gray-200 rounded group">
           {file.type.startsWith('image/') ? (
-            <img src={URL.createObjectURL(file)} alt="" className="w-8 h-8 rounded-lg object-cover border border-gray-200" />
+            <img src={URL.createObjectURL(file)} alt="" className="w-8 h-8 rounded object-cover border border-gray-200" />
           ) : (
-            <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center shrink-0">
-              <FileText size={14} className="text-rose-500" />
+            <div className="w-8 h-8 rounded bg-red-50 flex items-center justify-center shrink-0">
+              <FileText size={14} className="text-red-500" />
             </div>
           )}
           <div className="flex-1 min-w-0">
             <p className="text-gray-900 text-xs font-medium truncate">{file.name}</p>
             <p className="text-gray-400 text-[11px] tabular-nums">{file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}</p>
           </div>
-          {uploading ? <Loader2 size={14} className="text-emerald-500 animate-spin shrink-0" /> : (
-            <button onClick={(e) => { e.stopPropagation(); onRemoveFile(i) }} className="p-1 rounded-lg text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-all duration-200 shrink-0 opacity-0 group-hover:opacity-100"><X size={12} /></button>
+          {uploading ? <Loader2 size={14} className="text-gray-700 animate-spin shrink-0" /> : (
+            <button onClick={(e) => { e.stopPropagation(); onRemoveFile(i) }} className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0 opacity-0 group-hover:opacity-100"><X size={12} /></button>
           )}
         </div>
       ))}
@@ -893,13 +893,13 @@ export default function ContractorPortal() {
         <div className="w-full max-w-[380px]">
           {/* Logo */}
           <div className="text-center mb-10">
-            <div className="inline-flex items-center justify-center mb-5">
+            <div className="inline-flex items-center justify-center mb-4">
               <svg width={52} height={52} viewBox="0 0 40 40" fill="none">
                 <path d="M8 8L20 32L32 8" stroke="#10b981" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Vantage</h1>
-            <p className="text-gray-400 text-sm mt-1.5 tracking-wide">Contractor Portal</p>
+            <h1 className="text-2xl font-medium text-gray-900 tracking-tight">Vantage</h1>
+            <p className="text-gray-400 text-[13px] mt-1.5 tracking-wide">Contractor Portal</p>
           </div>
 
           <div className={`${T.card} p-7`}>
@@ -908,10 +908,10 @@ export default function ContractorPortal() {
               type="email" value={email} onChange={e => setEmail(e.target.value)} 
               onKeyDown={e => e.key === 'Enter' && lookupEmail()} 
               placeholder="you@company.com"
-              className={`${T.input} mb-5`} 
+              className={`${T.input} mb-4`} 
             />
             {error && (
-              <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-2.5 text-rose-600 text-sm">
+              <div className="mb-4 p-3.5 bg-red-50 border border-red-200 rounded flex items-center gap-2.5 text-red-600 text-[13px]">
                 <AlertCircle size={15} className="shrink-0" /> {error}
               </div>
             )}
@@ -1015,7 +1015,7 @@ export default function ContractorPortal() {
             </div>
 
             {timeSuccess && (
-              <div className="flex items-center gap-2 text-emerald-700 text-[13px] bg-emerald-50 border border-emerald-200 px-3 py-2 rounded">
+              <div className="flex items-center gap-2 text-emerald-700 text-[13px] bg-gray-50 border border-gray-200 px-3 py-2 rounded">
                 <CheckCircle size={13} className="shrink-0" /> Timesheet submitted successfully
               </div>
             )}
@@ -1042,7 +1042,7 @@ export default function ContractorPortal() {
                   <div key={cid}>
                     {/* Client header — minimal */}
                     <div className="flex items-center gap-2 px-4 py-2 bg-gray-50/50">
-                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: dotColor }} />
+                      <div className="w-1.5 h-1.5 rounded shrink-0" style={{ background: dotColor }} />
                       <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400">{clientName}</span>
                     </div>
 
@@ -1137,22 +1137,22 @@ export default function ContractorPortal() {
 
         {/* ====== EXPENSES ====== */}
         {activeTab === 'expenses' && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {/* New Expense Button */}
             {!showExpenseForm && (
-              <button onClick={() => setShowExpenseForm(true)} className="w-full py-3 border-2 border-dashed border-emerald-200 rounded-xl text-emerald-600 text-sm font-semibold hover:bg-emerald-50/50 hover:border-emerald-300 transition-all duration-200">
-                <Plus size={14} className="inline mr-1.5" /> New Expense
+              <button onClick={() => setShowExpenseForm(true)} className="w-full py-2.5 border border-dashed border-gray-300 rounded text-[13px] text-gray-500 hover:border-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors">
+                <Plus size={13} className="inline mr-1.5" /> New expense
               </button>
             )}
 
             {/* New Expense Form */}
             {showExpenseForm && (
-              <div className={`${T.card} p-5 sm:p-6 border-emerald-200`}>
-                <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-gray-900 font-bold text-sm">New Expense</h2>
-                  <button onClick={() => { setShowExpenseForm(false); setExpenseFiles([]) }} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"><X size={16} /></button>
+              <div className={`${T.card} p-4`}>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-gray-900 font-medium text-[13px]">New expense</h2>
+                  <button onClick={() => { setShowExpenseForm(false); setExpenseFiles([]) }} className="p-1 rounded text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"><X size={14} /></button>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={T.label}>Date</label>
                     <input type="date" value={expenseForm.date} onChange={e => setExpenseForm(p => ({ ...p, date: e.target.value }))} className={T.input} />
@@ -1189,7 +1189,7 @@ export default function ContractorPortal() {
                     <MultiDropZone files={expenseFiles} onAddFiles={(f) => setExpenseFiles(prev => [...prev, ...f])} onRemoveFile={(i) => setExpenseFiles(prev => prev.filter((_, idx) => idx !== i))} uploading={submittingExpense} label="Drop receipts here" accept="image/*,.pdf" />
                   </div>
                 </div>
-                <button onClick={submitExpense} disabled={submittingExpense || !expenseForm.description || !expenseForm.amount} className={`w-full mt-5 ${T.btnPrimary} py-3`}>
+                <button onClick={submitExpense} disabled={submittingExpense || !expenseForm.description || !expenseForm.amount} className={`w-full mt-4 ${T.btnPrimary} py-3`}>
                   {submittingExpense ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <><Send size={16} /> Submit Expense</>}
                 </button>
               </div>
@@ -1205,45 +1205,45 @@ export default function ContractorPortal() {
                     ? supabase.storage.from('contractor-uploads').getPublicUrl(exp.receipt_url).data.publicUrl
                     : null
                   return (
-                    <div key={exp.id} className={`${T.cardHover} px-4 sm:px-5 py-4 flex items-center gap-3 sm:gap-4`}>
-                      <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
-                        <Receipt size={15} className="text-amber-500" />
+                    <div key={exp.id} className={`${T.cardHover} px-4 py-3 flex items-center gap-3 sm:gap-3`}>
+                      <div className="w-10 h-10 rounded bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
+                        <Receipt size={15} className="text-gray-400" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-gray-900 text-sm font-medium truncate">{exp.description}</p>
+                        <p className="text-gray-900 text-[13px] font-medium truncate">{exp.description}</p>
                         <div className="flex items-center gap-2 text-gray-400 text-xs mt-1">
                           <span>{formatDate(exp.date)}</span>
-                          <span className="w-0.5 h-0.5 rounded-full bg-gray-300" />
+                          <span className="w-0.5 h-0.5 rounded bg-gray-300" />
                           <span>{cat?.label || exp.category}</span>
                           {clientName && (
                             <>
-                              <span className="w-0.5 h-0.5 rounded-full bg-gray-300" />
+                              <span className="w-0.5 h-0.5 rounded bg-gray-300" />
                               <span className="text-emerald-600 font-medium">{clientName}</span>
                             </>
                           )}
                           {receiptUrl ? (
                             <>
-                              <span className="w-0.5 h-0.5 rounded-full bg-gray-300" />
+                              <span className="w-0.5 h-0.5 rounded bg-gray-300" />
                               <a href={receiptUrl} target="_blank" rel="noopener noreferrer"
-                                className="text-sky-500 hover:text-sky-700 transition-colors" title="View receipt">
+                                className="text-blue-500 hover:text-blue-700 transition-colors" title="View receipt">
                                 <Paperclip size={10} />
                               </a>
                             </>
                           ) : null}
                         </div>
                       </div>
-                      <span className="text-gray-900 font-semibold text-sm tabular-nums">{formatCurrency(exp.amount)}</span>
+                      <span className="text-gray-900 font-medium text-[13px] tabular-nums">{formatCurrency(exp.amount)}</span>
                       <StatusPill status={exp.status} />
                     </div>
                   )
                 })}
               </div>
             ) : (
-              <div className={`${T.card} text-center py-16`}>
-                <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto mb-4">
+              <div className={`${T.card} text-center py-12`}>
+                <div className="w-14 h-14 rounded bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto mb-4">
                   <Receipt size={22} className="text-gray-300" />
                 </div>
-                <p className="text-gray-500 text-sm font-medium">No expenses yet</p>
+                <p className="text-gray-500 text-[13px] font-medium">No expenses yet</p>
                 <p className="text-gray-400 text-xs mt-1.5">Click "New Expense" to submit your first report</p>
               </div>
             )}
@@ -1252,7 +1252,7 @@ export default function ContractorPortal() {
 
         {/* ====== INVOICES ====== */}
         {activeTab === 'invoices' && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {/* New Invoice Button */}
             {!showInvoiceForm && (
               <button onClick={() => { 
@@ -1260,21 +1260,21 @@ export default function ContractorPortal() {
                 const defaultAmount = contractorType === 'pure_ls' && member?.cost_amount ? String(member.cost_amount) : ''
                 setInvoiceForm(p => ({ ...p, client_id: defaultClient, amount: defaultAmount }))
                 setShowInvoiceForm(true) 
-              }} className={`w-full ${T.btnPrimary} py-3 rounded-xl text-[15px]`}>
-                <Plus size={15} /> New Invoice
+              }} className={`w-full ${T.btnPrimary} py-2.5`}>
+                <Plus size={13} /> New invoice
               </button>
             )}
 
             {/* New Invoice Form */}
             {showInvoiceForm && (
-              <div className={`${T.card} p-5 sm:p-6 border-sky-200`}>
-                <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-gray-900 font-bold text-sm">Submit Invoice</h2>
-                  <button onClick={() => { setShowInvoiceForm(false); setInvoiceFile(null) }} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"><X size={16} /></button>
+              <div className={`${T.card} p-4`}>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-gray-900 font-medium text-[13px]">Submit invoice</h2>
+                  <button onClick={() => { setShowInvoiceForm(false); setInvoiceFile(null) }} className="p-1 rounded text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"><X size={14} /></button>
                 </div>
 
                 {/* Row 1 */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-2 gap-3 mb-4">
                   <div>
                     <label className={T.label}>Invoice Number</label>
                     <div className="relative">
@@ -1300,13 +1300,13 @@ export default function ContractorPortal() {
                 </div>
 
                 {/* Row 2 */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-2 gap-3 mb-4">
                   <div>
                     <label className={T.label}>Billing Period</label>
-                    <div className="inline-flex items-center gap-0 bg-white border border-gray-200 rounded-xl overflow-hidden w-full shadow-sm">
-                      <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() - 1); setInvoiceMonth(d) }} className="p-2.5 text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-all duration-200 border-r border-gray-200"><ChevronLeft size={14} /></button>
-                      <span className="text-gray-900 text-sm font-medium flex-1 text-center py-2">{billingMonth.label}</span>
-                      <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() + 1); setInvoiceMonth(d) }} className="p-2.5 text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-all duration-200 border-l border-gray-200"><ChevronRight size={14} /></button>
+                    <div className="inline-flex items-center gap-0 bg-white border border-gray-200 rounded overflow-hidden w-full">
+                      <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() - 1); setInvoiceMonth(d) }} className="p-2.5 text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-colors border-r border-gray-200"><ChevronLeft size={14} /></button>
+                      <span className="text-gray-900 text-[13px] font-medium flex-1 text-center py-2">{billingMonth.label}</span>
+                      <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() + 1); setInvoiceMonth(d) }} className="p-2.5 text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-colors border-l border-gray-200"><ChevronRight size={14} /></button>
                     </div>
                   </div>
                   <div>
@@ -1322,32 +1322,32 @@ export default function ContractorPortal() {
                 {invoiceDistribution.length > 0 ? (
                   <div className="mb-4">
                     <p className={`${T.label} mb-2`}>Timesheet Reference — {billingMonth.label}</p>
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead><tr className="text-gray-400 text-[10px] uppercase tracking-wider">
-                          <th className="text-left px-4 py-2.5 font-bold">Client</th>
-                          {invoiceDistribution.some(l => l.project_name) && <th className="text-left px-4 py-2.5 font-bold">Project</th>}
-                          <th className="text-right px-4 py-2.5 font-bold">Hours</th>
-                          {invoiceDistribution.some(l => l.allocation_pct !== undefined) && <th className="text-right px-4 py-2.5 font-bold">%</th>}
+                    <div className="bg-gray-50 border border-gray-200 rounded overflow-hidden">
+                      <table className="w-full text-[13px]">
+                        <thead><tr className="text-gray-400 text-[10px] uppercase tracking-[0.04em]">
+                          <th className="text-left px-4 py-2 font-medium">Client</th>
+                          {invoiceDistribution.some(l => l.project_name) && <th className="text-left px-4 py-2 font-medium">Project</th>}
+                          <th className="text-right px-4 py-2 font-medium">Hours</th>
+                          {invoiceDistribution.some(l => l.allocation_pct !== undefined) && <th className="text-right px-4 py-2 font-medium">%</th>}
                         </tr></thead>
                         <tbody>{invoiceDistribution.map((l, i) => (
                           <tr key={i} className="border-t border-gray-100">
-                            <td className="px-4 py-2.5 text-gray-600 text-xs">{l.client_name}</td>
-                            {invoiceDistribution.some(x => x.project_name) && <td className="px-4 py-2.5 text-gray-400 text-xs">{l.project_name || '—'}</td>}
-                            <td className="px-4 py-2.5 text-right text-gray-700 text-xs font-medium tabular-nums">{l.hours?.toFixed(1)}</td>
-                            {invoiceDistribution.some(x => x.allocation_pct !== undefined) && <td className="px-4 py-2.5 text-right text-gray-400 text-xs tabular-nums">{l.allocation_pct !== undefined ? `${l.allocation_pct}%` : '—'}</td>}
+                            <td className="px-4 py-2 text-gray-600 text-xs">{l.client_name}</td>
+                            {invoiceDistribution.some(x => x.project_name) && <td className="px-4 py-2 text-gray-400 text-xs">{l.project_name || '—'}</td>}
+                            <td className="px-4 py-2 text-right text-gray-700 text-xs font-medium tabular-nums">{l.hours?.toFixed(1)}</td>
+                            {invoiceDistribution.some(x => x.allocation_pct !== undefined) && <td className="px-4 py-2 text-right text-gray-400 text-xs tabular-nums">{l.allocation_pct !== undefined ? `${l.allocation_pct}%` : '—'}</td>}
                           </tr>
                         ))}</tbody>
                         <tfoot><tr className="border-t border-gray-200">
-                          <td colSpan={invoiceDistribution.some(l => l.project_name) ? 2 : 1} className="px-4 py-2.5 text-gray-700 text-xs font-bold">Total</td>
-                          <td className="px-4 py-2.5 text-right text-gray-900 text-xs font-bold tabular-nums">{invoiceDistribution.reduce((s, l) => s + (l.hours || 0), 0).toFixed(1)}h</td>
-                          {invoiceDistribution.some(l => l.allocation_pct !== undefined) && <td className="px-4 py-2.5 text-right text-gray-400 text-xs tabular-nums">100%</td>}
+                          <td colSpan={invoiceDistribution.some(l => l.project_name) ? 2 : 1} className="px-4 py-2 text-gray-700 text-xs font-medium">Total</td>
+                          <td className="px-4 py-2 text-right text-gray-900 text-xs font-medium tabular-nums">{invoiceDistribution.reduce((s, l) => s + (l.hours || 0), 0).toFixed(1)}h</td>
+                          {invoiceDistribution.some(l => l.allocation_pct !== undefined) && <td className="px-4 py-2 text-right text-gray-400 text-xs tabular-nums">100%</td>}
                         </tr></tfoot>
                       </table>
                     </div>
                   </div>
                 ) : (contractorType !== 'pure_ls' && !invoiceForm.client_id) ? (
-                  <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-xl text-center text-gray-400 text-sm">Select a client above to see your timesheet hours.</div>
+                  <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded text-center text-gray-400 text-[13px]">Select a client above to see your timesheet hours.</div>
                 ) : null}
 
                 {/* Attachment + Notes */}
@@ -1405,25 +1405,25 @@ export default function ContractorPortal() {
                 const receiptUrl = inv.receipt_url ? supabase.storage.from('contractor-uploads').getPublicUrl(inv.receipt_url).data.publicUrl : null
                 return (
                   <div className={`${T.cardHover} overflow-hidden`} style={{ borderLeft: `3px solid ${color}` }}>
-                    <div className="px-4 sm:px-5 py-4 flex items-center gap-3 sm:gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center shrink-0">
-                        <FileText size={15} className="text-sky-500" />
+                    <div className="px-4 py-3 flex items-center gap-3 sm:gap-3">
+                      <div className="w-10 h-10 rounded bg-sky-50 border border-sky-100 flex items-center justify-center shrink-0">
+                        <FileText size={15} className="text-blue-500" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-gray-900 text-sm font-medium">{inv.invoice_number}</p>
-                          {receiptUrl && <a href={receiptUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-sky-500 hover:text-sky-700 transition-colors"><Paperclip size={11} /></a>}
+                          <p className="text-gray-900 text-[13px] font-medium">{inv.invoice_number}</p>
+                          {receiptUrl && <a href={receiptUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-blue-500 hover:text-blue-700 transition-colors"><Paperclip size={11} /></a>}
                         </div>
                         <p className="text-gray-400 text-xs mt-0.5">{bMonth}</p>
                       </div>
-                      <span className="text-gray-900 font-semibold text-sm tabular-nums">{formatCurrency(inv.total_amount)}</span>
+                      <span className="text-gray-900 font-medium text-[13px] tabular-nums">{formatCurrency(inv.total_amount)}</span>
                       <StatusPill status={inv.status} />
                       {inv.status === 'submitted' && (
-                        <button onClick={() => deleteInvoice(inv.id)} className="p-2 rounded-lg text-gray-300 hover:text-rose-500 hover:bg-rose-50 transition-all duration-200"><Trash2 size={14} /></button>
+                        <button onClick={() => deleteInvoice(inv.id)} className="p-2 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 size={14} /></button>
                       )}
                     </div>
                     {lines.length > 0 && (
-                      <div className="px-4 sm:px-5 pb-4 pt-0">
+                      <div className="px-4 pb-4 pt-0">
                         <div className="border-t border-gray-100 pt-3 space-y-1.5">
                           {lines.map((l: any, i: number) => (
                             <div key={i} className="flex items-center justify-between text-xs py-0.5">
@@ -1439,15 +1439,15 @@ export default function ContractorPortal() {
               }
 
               return (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {/* Grouping toggle */}
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] text-gray-400 font-medium">{invoices.length} invoice{invoices.length !== 1 ? 's' : ''}</span>
-                    <div className="inline-flex bg-gray-100 rounded-lg p-0.5">
+                    <div className="inline-flex border border-gray-200 rounded overflow-hidden">
                       {([['client', 'Client → Month'], ['month', 'Month → Client']] as const).map(([v, l]) => (
                         <button key={v} onClick={() => setInvoiceGrouping(v)}
-                          className={`px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all whitespace-nowrap ${
-                            invoiceGrouping === v ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                          className={`px-3 py-1.5 text-[11px] font-medium transition-colors border-r border-gray-200 last:border-r-0 whitespace-nowrap ${
+                            invoiceGrouping === v ? 'bg-gray-900 text-white' : 'bg-white text-gray-400 hover:text-gray-700'
                           }`}>
                           {l}
                         </button>
@@ -1461,12 +1461,12 @@ export default function ContractorPortal() {
                     return (
                       <div key={clientKey}>
                         <button onClick={() => { const n = new Set(collapsedInvoiceClients); collapsed ? n.delete(clientKey) : n.add(clientKey); setCollapsedInvoiceClients(n) }}
-                          className="w-full flex items-center gap-2.5 px-1 py-2 hover:bg-gray-100/50 rounded-lg transition-colors">
+                          className="w-full flex items-center gap-2.5 px-1 py-2 hover:bg-gray-100/50 rounded transition-colors">
                           <div className="w-[6px] h-[6px] rounded-sm shrink-0" style={{ background: g.color }} />
-                          <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-500">{g.clientName}</span>
+                          <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-gray-500">{g.clientName}</span>
                           <span className="text-[10px] text-gray-300">({g.invoices.length})</span>
                           <div className="flex-1 h-px bg-gray-100" />
-                          <span className="text-[11px] font-semibold text-gray-600 tabular-nums">{formatCurrency(g.total)}</span>
+                          <span className="text-[11px] font-medium text-gray-600 tabular-nums">{formatCurrency(g.total)}</span>
                           <ChevronDown size={12} className={`text-gray-300 transition-transform duration-200 ${collapsed ? '-rotate-90' : ''}`} />
                         </button>
                         {!collapsed && (
@@ -1484,20 +1484,20 @@ export default function ContractorPortal() {
                     return (
                       <div key={monthKey}>
                         <button onClick={() => { const n = new Set(collapsedInvoiceClients); collapsed ? n.delete(monthKey) : n.add(monthKey); setCollapsedInvoiceClients(n) }}
-                          className="w-full flex items-center gap-2.5 px-1 py-2 hover:bg-gray-100/50 rounded-lg transition-colors">
+                          className="w-full flex items-center gap-2.5 px-1 py-2 hover:bg-gray-100/50 rounded transition-colors">
                           <ChevronDown size={12} className={`text-gray-300 transition-transform duration-200 ${collapsed ? '-rotate-90' : ''}`} />
-                          <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-500">{m.monthLabel}</span>
+                          <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-gray-500">{m.monthLabel}</span>
                           <span className="text-[10px] text-gray-300">({m.clients.reduce((s,c) => s + c.invoices.length, 0)})</span>
                           <div className="flex-1 h-px bg-gray-100" />
-                          <span className="text-[11px] font-semibold text-gray-600 tabular-nums">{formatCurrency(m.total)}</span>
+                          <span className="text-[11px] font-medium text-gray-600 tabular-nums">{formatCurrency(m.total)}</span>
                         </button>
                         {!collapsed && (
                           <div className="space-y-3">
                             {m.clients.map(c => (
                               <div key={c.key}>
                                 <div className="flex items-center gap-2 px-1 mb-1.5">
-                                  <span className="w-[5px] h-[5px] rounded-full" style={{ background: c.color }} />
-                                  <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{c.clientName}</span>
+                                  <span className="w-[5px] h-[5px] rounded" style={{ background: c.color }} />
+                                  <span className="text-[10px] font-medium text-gray-400 uppercase tracking-[0.04em]">{c.clientName}</span>
                                 </div>
                                 <div className="space-y-2">
                                   {c.invoices.map(inv => <InvCard key={inv.id} inv={inv} color={c.color} />)}
@@ -1512,11 +1512,11 @@ export default function ContractorPortal() {
                 </div>
               )
             })() : (
-              <div className={`${T.card} text-center py-16`}>
-                <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto mb-4">
+              <div className={`${T.card} text-center py-12`}>
+                <div className="w-14 h-14 rounded bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto mb-4">
                   <FileText size={22} className="text-gray-300" />
                 </div>
-                <p className="text-gray-500 text-sm font-medium">No invoices yet</p>
+                <p className="text-gray-500 text-[13px] font-medium">No invoices yet</p>
                 <p className="text-gray-400 text-xs mt-1.5">Click "New Invoice" to submit your first invoice</p>
               </div>
             )}
@@ -1525,19 +1525,18 @@ export default function ContractorPortal() {
 
         {/* ====== HISTORY ====== */}
         {activeTab === 'history' && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {/* Month Navigator + Filter */}
-            <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <WeekNav week={historyRange}
                 onPrev={() => { const d = new Date(historyMonth); d.setMonth(d.getMonth() - 1); setHistoryMonth(d) }}
                 onNext={() => { const d = new Date(historyMonth); d.setMonth(d.getMonth() + 1); setHistoryMonth(d) }}
               />
-
-              <div className="inline-flex items-center bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
-                {([['all', 'All'], ['time', 'Time'], ['expenses', 'Expenses'], ['invoices', 'Invoices']] as const).map(([key, label]) => (
+              <div className="inline-flex items-center border border-gray-200 rounded overflow-hidden bg-white">
+                {([['all', 'All'], ['time', 'Time'], ['expenses', 'Exp'], ['invoices', 'Inv']] as const).map(([key, label]) => (
                   <button key={key} onClick={() => setHistoryFilter(key)}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                      historyFilter === key ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'text-gray-400 hover:text-gray-600 border border-transparent'
+                    className={`px-3 py-1.5 text-[11px] font-medium transition-colors border-r border-gray-200 last:border-r-0 ${
+                      historyFilter === key ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-50'
                     }`}>
                     {label}
                   </button>
@@ -1546,31 +1545,30 @@ export default function ContractorPortal() {
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-1 bg-gray-200 border border-gray-200 rounded overflow-hidden">
               {[
-                { label: 'Hours Logged', value: historyTotals.totalHours.toFixed(1), color: '#10b981' },
-                { label: 'Expenses', value: formatCurrency(historyTotals.totalExpenses), color: '#f59e0b' },
-                { label: 'Invoiced', value: formatCurrency(historyTotals.totalInvoiced), color: '#0ea5e9' },
+                { label: 'Hours logged', value: historyTotals.totalHours.toFixed(1) + 'h' },
+                { label: 'Expenses', value: formatCurrency(historyTotals.totalExpenses) },
+                { label: 'Invoiced', value: formatCurrency(historyTotals.totalInvoiced) },
               ].map(card => (
-                <div key={card.label} className={`${T.card} p-4 sm:p-5 relative overflow-hidden`}>
-                  <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full" style={{ background: card.color }} />
-                  <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 mb-2 pl-3">{card.label}</p>
-                  <p className="text-lg sm:text-xl font-bold text-gray-900 tabular-nums tracking-tight pl-3">{card.value}</p>
+                <div key={card.label} className="bg-white px-4 py-3">
+                  <p className="text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400 mb-1">{card.label}</p>
+                  <p className="text-[18px] font-medium text-gray-900 tabular-nums">{card.value}</p>
                 </div>
               ))}
             </div>
 
             {historyLoading ? (
               <div className="flex items-center justify-center py-20">
-                <Loader2 size={22} className="text-emerald-500 animate-spin" />
+                <Loader2 size={22} className="text-gray-700 animate-spin" />
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-3">
                 {/* TIME ENTRIES — Collapsible Weeks */}
                 {(historyFilter === 'all' || historyFilter === 'time') && (
                   <div>
                     <div className="flex items-center gap-2 mb-3">
-                      <Timer size={13} className="text-emerald-500" />
+                      <Timer size={13} className="text-gray-700" />
                       <h2 className={T.sectionTitle}>Timesheet Entries</h2>
                       <span className="text-[11px] text-gray-300 ml-1 tabular-nums">{historyTotals.totalHours.toFixed(1)}h total</span>
                     </div>
@@ -1589,7 +1587,7 @@ export default function ContractorPortal() {
                           const projects = Object.values(projectSummary).sort((a, b) => b.hours - a.hours)
 
                           return (
-                            <div key={weekKey} className={`${T.card} overflow-hidden transition-all duration-200`}>
+                            <div key={weekKey} className={`${T.card} overflow-hidden transition-colors`}>
                               {/* Week Header — always visible, clickable */}
                               <button
                                 onClick={() => setExpandedHistoryWeeks(prev => {
@@ -1597,15 +1595,15 @@ export default function ContractorPortal() {
                                   if (next.has(weekKey)) next.delete(weekKey); else next.add(weekKey)
                                   return next
                                 })}
-                                className="w-full px-4 sm:px-5 py-3.5 hover:bg-gray-50/30 transition-colors"
+                                className="w-full px-4 py-2 hover:bg-gray-50/30 transition-colors"
                               >
                                 <div className="flex items-center justify-between mb-2.5">
                                   <div className="flex items-center gap-2.5">
                                     <ChevronDown size={13} className={`text-gray-300 transition-transform duration-200 ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
-                                    <span className="text-[13px] font-semibold text-gray-700">{week.label}</span>
+                                    <span className="text-[13px] font-medium text-gray-700">{week.label}</span>
                                     <span className="text-[11px] text-gray-300 font-medium">{week.entries.length} entr{week.entries.length === 1 ? 'y' : 'ies'}</span>
                                   </div>
-                                  <span className="text-[15px] font-bold text-emerald-600 tabular-nums">{week.totalHours.toFixed(1)}h</span>
+                                  <span className="text-[15px] font-medium text-emerald-600 tabular-nums">{week.totalHours.toFixed(1)}h</span>
                                 </div>
 
                                 {/* Chip tags — per-project colors */}
@@ -1613,9 +1611,9 @@ export default function ContractorPortal() {
                                   {projects.map((p, pi) => {
                                     const dotColor = clientColorMap[p.clientId] || CLIENT_COLORS[pi % CLIENT_COLORS.length]
                                     return (
-                                      <span key={pi} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold"
+                                      <span key={pi} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium"
                                         style={{ background: dotColor + '18', color: dotColor }}>
-                                        <span className="w-[5px] h-[5px] rounded-full shrink-0" style={{ background: dotColor }} />
+                                        <span className="w-[5px] h-[5px] rounded shrink-0" style={{ background: dotColor }} />
                                         {p.name} · {p.hours.toFixed(1)}h
                                       </span>
                                     )
@@ -1625,7 +1623,7 @@ export default function ContractorPortal() {
 
                               {/* Expanded: Full entry list with rank-colored bars */}
                               {isExpanded && (
-                                <div className="border-t border-gray-100 bg-gray-50/20 px-4 sm:px-5 pb-4 pt-3 ml-6">
+                                <div className="border-t border-gray-100 bg-gray-50/20 px-4 pb-4 pt-3 ml-6">
                                   <div className="space-y-2.5">
                                     {projects.map((p, pi) => {
                                       const dotColor = clientColorMap[p.clientId] || CLIENT_COLORS[pi % CLIENT_COLORS.length]
@@ -1639,10 +1637,10 @@ export default function ContractorPortal() {
                                               <span className="text-xs font-medium text-gray-700">{p.name}</span>
                                               {a?.client_name && <span className="text-[10px] text-gray-300">{a.client_name}</span>}
                                             </div>
-                                            <span className="text-xs font-bold text-gray-800 tabular-nums">{p.hours.toFixed(1)}h</span>
+                                            <span className="text-xs font-medium text-gray-800 tabular-nums">{p.hours.toFixed(1)}h</span>
                                           </div>
-                                          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                            <div className="h-full rounded-full transition-all duration-500"
+                                          <div className="h-1.5 bg-gray-100 rounded overflow-hidden">
+                                            <div className="h-full rounded transition-colors"
                                               style={{ width: `${pct}%`, background: dotColor, opacity: 0.8 }} />
                                           </div>
                                         </div>
@@ -1657,7 +1655,7 @@ export default function ContractorPortal() {
                       </div>
                     ) : (
                       <div className={`${T.card} text-center py-12`}>
-                        <p className="text-gray-400 text-sm">No timesheet entries for {historyRange.label}</p>
+                        <p className="text-gray-400 text-[13px]">No timesheet entries for {historyRange.label}</p>
                       </div>
                     )}
                   </div>
@@ -1667,7 +1665,7 @@ export default function ContractorPortal() {
                 {(historyFilter === 'all' || historyFilter === 'expenses') && (
                   <div>
                     <div className="flex items-center gap-2 mb-3">
-                      <CreditCard size={13} className="text-amber-500" />
+                      <CreditCard size={13} className="text-gray-400" />
                       <h2 className={T.sectionTitle}>Expenses</h2>
                       <span className="text-[11px] text-gray-300 ml-1">{historyExpenses.length} item{historyExpenses.length !== 1 ? 's' : ''}</span>
                     </div>
@@ -1675,13 +1673,13 @@ export default function ContractorPortal() {
                       <div className={`${T.card} overflow-hidden`}>
                         <table className="w-full text-xs">
                           <thead>
-                            <tr className="text-[10px] text-gray-400 font-bold uppercase tracking-wider border-b border-gray-100">
-                              <th className="text-left py-2.5 px-4">Date</th>
-                              <th className="text-left py-2.5">Description</th>
-                              <th className="text-left py-2.5">Client</th>
-                              <th className="text-left py-2.5">Category</th>
-                              <th className="text-right py-2.5">Amount</th>
-                              <th className="text-right py-2.5 px-4">Status</th>
+                            <tr className="text-[10px] text-gray-400 font-medium uppercase tracking-[0.04em] border-b border-gray-100">
+                              <th className="text-left py-2 px-4">Date</th>
+                              <th className="text-left py-2">Description</th>
+                              <th className="text-left py-2">Client</th>
+                              <th className="text-left py-2">Category</th>
+                              <th className="text-right py-2">Amount</th>
+                              <th className="text-right py-2 px-4">Status</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-50">
@@ -1693,22 +1691,22 @@ export default function ContractorPortal() {
                                 : null
                               return (
                                 <tr key={exp.id} className="hover:bg-gray-50/50 transition-colors">
-                                  <td className="py-2.5 px-4 text-gray-400 whitespace-nowrap">{formatDate(exp.date)}</td>
-                                  <td className="py-2.5 text-gray-700 font-medium">
+                                  <td className="py-2 px-4 text-gray-400 whitespace-nowrap">{formatDate(exp.date)}</td>
+                                  <td className="py-2 text-gray-700 font-medium">
                                     <div className="flex items-center gap-1.5">
                                       <span className="truncate max-w-[140px]">{exp.description}</span>
                                       {receiptUrl ? (
                                         <a href={receiptUrl} target="_blank" rel="noopener noreferrer"
-                                          className="text-sky-500 hover:text-sky-700 transition-colors shrink-0" title="View receipt">
+                                          className="text-blue-500 hover:text-blue-700 transition-colors shrink-0" title="View receipt">
                                           <Paperclip size={10} />
                                         </a>
                                       ) : null}
                                     </div>
                                   </td>
-                                  <td className="py-2.5 text-gray-400 whitespace-nowrap">{clientName}</td>
-                                  <td className="py-2.5 text-gray-400">{cat?.label || exp.category}</td>
-                                  <td className="py-2.5 text-right text-gray-900 font-semibold tabular-nums">{formatCurrency(exp.amount)}</td>
-                                  <td className="py-2.5 px-4 text-right"><StatusPill status={exp.status} /></td>
+                                  <td className="py-2 text-gray-400 whitespace-nowrap">{clientName}</td>
+                                  <td className="py-2 text-gray-400">{cat?.label || exp.category}</td>
+                                  <td className="py-2 text-right text-gray-900 font-medium tabular-nums">{formatCurrency(exp.amount)}</td>
+                                  <td className="py-2 px-4 text-right"><StatusPill status={exp.status} /></td>
                                 </tr>
                               )
                             })}
@@ -1717,7 +1715,7 @@ export default function ContractorPortal() {
                       </div>
                     ) : (
                       <div className={`${T.card} text-center py-10`}>
-                        <p className="text-gray-400 text-sm">No expenses for {historyRange.label}</p>
+                        <p className="text-gray-400 text-[13px]">No expenses for {historyRange.label}</p>
                       </div>
                     )}
                   </div>
@@ -1727,7 +1725,7 @@ export default function ContractorPortal() {
                 {(historyFilter === 'all' || historyFilter === 'invoices') && (
                   <div>
                     <div className="flex items-center gap-2 mb-3">
-                      <FileText size={13} className="text-sky-500" />
+                      <FileText size={13} className="text-blue-500" />
                       <h2 className={T.sectionTitle}>Invoices</h2>
                       <span className="text-[11px] text-gray-300 ml-1">{historyInvoices.length} invoice{historyInvoices.length !== 1 ? 's' : ''}</span>
                     </div>
@@ -1755,7 +1753,7 @@ export default function ContractorPortal() {
                                     return next
                                   })
                                 }}
-                                className={`w-full px-4 sm:px-5 py-3.5 flex items-center gap-3 hover:bg-gray-50/30 transition-colors ${lines.length > 0 ? 'cursor-pointer' : 'cursor-default'}`}
+                                className={`w-full px-4 py-2 flex items-center gap-3 hover:bg-gray-50/30 transition-colors ${lines.length > 0 ? 'cursor-pointer' : 'cursor-default'}`}
                               >
                                 {lines.length > 0 ? (
                                   <ChevronDown size={13} className={`text-gray-300 transition-transform duration-200 shrink-0 ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
@@ -1764,26 +1762,26 @@ export default function ContractorPortal() {
                                 )}
                                 <div className="flex-1 min-w-0 text-left">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-[13px] text-gray-900 font-semibold">#{inv.invoice_number}</span>
-                                    <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{clientName}</span>
+                                    <span className="text-[13px] text-gray-900 font-medium">#{inv.invoice_number}</span>
+                                    <span className="text-xs font-medium text-emerald-600 bg-gray-50 px-1.5 py-0.5 rounded">{clientName}</span>
                                     {receiptUrl ? (
                                       <a href={receiptUrl} target="_blank" rel="noopener noreferrer"
                                         onClick={e => e.stopPropagation()}
-                                        className="text-sky-500 hover:text-sky-700 transition-colors shrink-0" title="View attachment">
+                                        className="text-blue-500 hover:text-blue-700 transition-colors shrink-0" title="View attachment">
                                         <Paperclip size={10} />
                                       </a>
                                     ) : null}
                                   </div>
                                   <p className="text-[11px] text-gray-400 mt-0.5">{billingMonthLabel}</p>
                                 </div>
-                                <span className="text-[15px] font-bold text-gray-900 tabular-nums shrink-0">{formatCurrency(inv.total_amount)}</span>
+                                <span className="text-[15px] font-medium text-gray-900 tabular-nums shrink-0">{formatCurrency(inv.total_amount)}</span>
                                 <div className="shrink-0"><StatusPill status={inv.status} /></div>
                               </button>
                               {isExpanded && lines.length > 0 && (
-                                <div className="border-t border-gray-100 bg-gray-50/30 px-4 sm:px-5 py-3">
+                                <div className="border-t border-gray-100 bg-gray-50/30 px-4 py-3">
                                   <table className="w-full text-xs">
                                     <thead>
-                                      <tr className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                                      <tr className="text-[10px] text-gray-400 font-medium uppercase tracking-[0.04em]">
                                         <th className="text-left pb-1.5 pl-7">Description</th>
                                         <th className="text-right pb-1.5">Hours</th>
                                         <th className="text-right pb-1.5">Alloc</th>
@@ -1796,7 +1794,7 @@ export default function ContractorPortal() {
                                           <td className="py-2 text-gray-600 pl-7">{l.description}</td>
                                           <td className="py-2 text-right text-gray-400 tabular-nums">{l.hours ? `${Number(l.hours).toFixed(1)}h` : '—'}</td>
                                           <td className="py-2 text-right text-gray-400 tabular-nums">{l.allocation_pct ? `${l.allocation_pct}%` : '—'}</td>
-                                          <td className="py-2 text-right text-gray-800 font-semibold tabular-nums">{l.amount ? formatCurrency(l.amount) : '—'}</td>
+                                          <td className="py-2 text-right text-gray-800 font-medium tabular-nums">{l.amount ? formatCurrency(l.amount) : '—'}</td>
                                         </tr>
                                       ))}
                                     </tbody>
@@ -1809,7 +1807,7 @@ export default function ContractorPortal() {
                       </div>
                     ) : (
                       <div className={`${T.card} text-center py-10`}>
-                        <p className="text-gray-400 text-sm">No invoices for {historyRange.label}</p>
+                        <p className="text-gray-400 text-[13px]">No invoices for {historyRange.label}</p>
                       </div>
                     )}
                   </div>
@@ -1817,11 +1815,11 @@ export default function ContractorPortal() {
 
                 {/* Empty state when all filtered sections are empty */}
                 {historyFilter === 'all' && historyTime.length === 0 && historyExpenses.length === 0 && historyInvoices.length === 0 && (
-                  <div className={`${T.card} text-center py-16`}>
-                    <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto mb-4">
+                  <div className={`${T.card} text-center py-12`}>
+                    <div className="w-14 h-14 rounded bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto mb-4">
                       <History size={22} className="text-gray-300" />
                     </div>
-                    <p className="text-gray-500 text-sm font-medium">No submissions for {historyRange.label}</p>
+                    <p className="text-gray-500 text-[13px] font-medium">No submissions for {historyRange.label}</p>
                     <p className="text-gray-400 text-xs mt-1.5">Try navigating to a different month</p>
                   </div>
                 )}
@@ -1861,12 +1859,12 @@ export default function ContractorPortal() {
               const allOptions = presetGroups.flatMap(g => g.options)
               const currentLabel = allOptions.find(o => o.value === analyticsPreset)?.label || analyticsRange.label
               return (
-                <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3">
                   <div className="relative">
                     <select
                       value={analyticsPreset}
                       onChange={e => setAnalyticsPreset(e.target.value as any)}
-                      className="appearance-none pl-4 pr-9 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 shadow-sm cursor-pointer transition-all"
+                      className="appearance-none pl-3 pr-8 py-1.5 bg-white border border-gray-200 rounded text-[12px] font-medium text-gray-700 focus:outline-none focus:border-gray-900 cursor-pointer transition-colors"
                     >
                       {presetGroups.map(group => (
                         <optgroup key={group.label} label={group.label}>
@@ -1876,22 +1874,22 @@ export default function ContractorPortal() {
                         </optgroup>
                       ))}
                     </select>
-                    <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                   </div>
-                  <span className="text-xs font-medium text-gray-400 tracking-wide">{analyticsRange.label}</span>
+                  <span className="text-[11px] text-gray-400">{analyticsRange.label}</span>
                 </div>
               )
             })()}
 
             {/* Custom Date Picker */}
             {analyticsPreset === 'custom' && (
-              <div className={`${T.card} p-4 flex items-center gap-3 flex-wrap`}>
+              <div className={`${T.card} p-3 flex items-center gap-3 flex-wrap`}>
                 <div className="flex items-center gap-2">
-                  <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">From</label>
+                  <label className="text-[10px] font-medium text-gray-400 uppercase tracking-[0.06em]">From</label>
                   <input type="date" value={analyticsCustomStart} onChange={e => setAnalyticsCustomStart(e.target.value)} className={`${T.input} w-auto`} style={{ colorScheme: 'light' }} />
                 </div>
                 <div className="flex items-center gap-2">
-                  <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">To</label>
+                  <label className="text-[10px] font-medium text-gray-400 uppercase tracking-[0.06em]">To</label>
                   <input type="date" value={analyticsCustomEnd} onChange={e => setAnalyticsCustomEnd(e.target.value)} className={`${T.input} w-auto`} style={{ colorScheme: 'light' }} />
                 </div>
               </div>
@@ -1899,41 +1897,40 @@ export default function ContractorPortal() {
 
             {analyticsLoading ? (
               <div className="flex items-center justify-center py-20">
-                <Loader2 size={22} className="text-emerald-500 animate-spin" />
+                <Loader2 size={22} className="text-gray-400 animate-spin" />
               </div>
             ) : (
               <>
                 {/* KPI Summary Row */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 bg-gray-200 border border-gray-200 rounded overflow-hidden">
                   {[
-                    { label: 'Total Hours', value: analyticsKPIs.totalHours.toFixed(1), sub: analyticsRange.granularity === 'monthly' ? `${analyticsKPIs.weekCount} months` : `${analyticsKPIs.avgWeeklyHours.toFixed(1)}h avg/wk`, color: '#10b981' },
-                    { label: 'Invoiced', value: formatCurrency(analyticsKPIs.totalInvoiced), sub: `${analyticsInvoices.length} invoice${analyticsInvoices.length !== 1 ? 's' : ''}`, color: '#0ea5e9' },
-                    { label: 'Expenses', value: formatCurrency(analyticsKPIs.totalExpenses), sub: `${analyticsExpenses.length} item${analyticsExpenses.length !== 1 ? 's' : ''}`, color: '#f59e0b' },
-                    { label: 'Projects', value: String(analyticsKPIs.uniqueProjects), sub: `${analyticsKPIs.weekCount} weeks tracked`, color: '#6366f1' },
+                    { label: 'Total hours', value: analyticsKPIs.totalHours.toFixed(1) + 'h', sub: analyticsRange.granularity === 'monthly' ? `${analyticsKPIs.weekCount} months` : `${analyticsKPIs.avgWeeklyHours.toFixed(1)}h avg/wk` },
+                    { label: 'Invoiced', value: formatCurrency(analyticsKPIs.totalInvoiced), sub: `${analyticsInvoices.length} invoice${analyticsInvoices.length !== 1 ? 's' : ''}` },
+                    { label: 'Expenses', value: formatCurrency(analyticsKPIs.totalExpenses), sub: `${analyticsExpenses.length} item${analyticsExpenses.length !== 1 ? 's' : ''}` },
+                    { label: 'Projects', value: String(analyticsKPIs.uniqueProjects), sub: `${analyticsKPIs.weekCount} weeks tracked` },
                   ].map(card => (
-                    <div key={card.label} className={`${T.card} p-4 relative overflow-hidden`}>
-                      <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full" style={{ background: card.color }} />
-                      <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 mb-1.5 pl-3">{card.label}</p>
-                      <p className="text-xl font-bold text-gray-900 tabular-nums tracking-tight pl-3">{card.value}</p>
-                      <p className="text-[11px] text-gray-400 pl-3 mt-0.5">{card.sub}</p>
+                    <div key={card.label} className="bg-white px-4 py-3">
+                      <p className="text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400 mb-1">{card.label}</p>
+                      <p className="text-[18px] font-medium text-gray-900 tabular-nums">{card.value}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">{card.sub}</p>
                     </div>
                   ))}
                 </div>
 
                 {/* ── WEEKLY HOURS ── */}
                 {analyticsWeeklyHours.length > 0 && (
-                  <div className={`${T.card} p-5`}>
+                  <div className={`${T.card} p-4`}>
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
-                        <TrendingUp className="w-[13px] h-[13px] text-emerald-500" />
+                        <TrendingUp className="w-[13px] h-[13px] text-gray-700" />
                         <h2 className={T.sectionTitle}>{analyticsRange.granularity === 'monthly' ? 'Monthly Hours' : 'Weekly Hours'}</h2>
                       </div>
                       {analyticsProjectNames.length > 1 && (
-                        <div className="inline-flex items-center bg-gray-100 rounded-lg p-0.5">
+                        <div className="inline-flex border border-gray-200 rounded overflow-hidden">
                           {(['byProject', 'total'] as const).map(mode => (
                             <button key={mode} onClick={() => setHoursChartMode(mode)}
-                              className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all duration-200 ${
-                                hoursChartMode === mode ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                              className={`px-3 py-1 text-[11px] font-medium transition-colors border-r border-gray-200 last:border-r-0 ${
+                                hoursChartMode === mode ? 'bg-gray-900 text-white' : 'bg-white text-gray-400 hover:text-gray-700'
                               }`}>
                               {mode === 'byProject' ? 'By Project' : 'Total'}
                             </button>
@@ -1979,9 +1976,9 @@ export default function ContractorPortal() {
                 )}
 
                 {/* ── TWO-COL: EFFORT + EXPENSES ── */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {analyticsEffortByClient.length > 0 && (
-                    <div className={`${T.card} p-5`}>
+                    <div className={`${T.card} p-4`}>
                       <div className="flex items-center gap-2 mb-3">
                         <Briefcase size={13} className="text-indigo-500" />
                         <h2 className={T.sectionTitle}>Effort by Client</h2>
@@ -2008,7 +2005,7 @@ export default function ContractorPortal() {
                                 <span className="text-gray-600 font-medium">{item.name}</span>
                               </div>
                               <div className="flex items-center gap-2">
-                                <span className="text-gray-900 font-semibold tabular-nums">{item.hours}h</span>
+                                <span className="text-gray-900 font-medium tabular-nums">{item.hours}h</span>
                                 <span className="text-gray-400 tabular-nums w-8 text-right">{pct}%</span>
                               </div>
                             </div>
@@ -2019,9 +2016,9 @@ export default function ContractorPortal() {
                   )}
 
                   {analyticsExpensesByCategory.length > 0 ? (
-                    <div className={`${T.card} p-5`}>
+                    <div className={`${T.card} p-4`}>
                       <div className="flex items-center gap-2 mb-3">
-                        <Receipt size={13} className="text-amber-500" />
+                        <Receipt size={13} className="text-gray-400" />
                         <h2 className={T.sectionTitle}>Expenses by Category</h2>
                       </div>
                       <ResponsiveContainer width="100%" height={180}>
@@ -2046,7 +2043,7 @@ export default function ContractorPortal() {
                                 <span className="text-gray-600 font-medium">{item.name}</span>
                               </div>
                               <div className="flex items-center gap-2">
-                                <span className="text-gray-900 font-semibold tabular-nums">{formatCurrency(item.amount)}</span>
+                                <span className="text-gray-900 font-medium tabular-nums">{formatCurrency(item.amount)}</span>
                                 <span className="text-gray-400 tabular-nums w-8 text-right">{pct}%</span>
                               </div>
                             </div>
@@ -2055,11 +2052,11 @@ export default function ContractorPortal() {
                       </div>
                     </div>
                   ) : (
-                    <div className={`${T.card} p-5 flex flex-col items-center justify-center text-center`}>
-                      <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mb-3">
+                    <div className={`${T.card} p-4 flex flex-col items-center justify-center text-center`}>
+                      <div className="w-12 h-12 rounded bg-gray-50 border border-gray-100 flex items-center justify-center mb-3">
                         <Receipt size={18} className="text-gray-300" />
                       </div>
-                      <p className="text-gray-400 text-sm font-medium">No expenses</p>
+                      <p className="text-gray-400 text-[13px] font-medium">No expenses</p>
                       <p className="text-gray-300 text-xs mt-1">for this period</p>
                     </div>
                   )}
@@ -2067,18 +2064,18 @@ export default function ContractorPortal() {
 
                 {/* ── INVOICE TREND ── */}
                 {analyticsInvoiceTrend.some(m => m.total > 0) && (
-                  <div className={`${T.card} p-5`}>
+                  <div className={`${T.card} p-4`}>
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
-                        <DollarSign size={13} className="text-sky-500" />
+                        <DollarSign size={13} className="text-blue-500" />
                         <h2 className={T.sectionTitle}>Invoice Trend</h2>
                       </div>
                       {analyticsInvoiceClientIds.length > 1 && (
-                        <div className="inline-flex items-center bg-gray-100 rounded-lg p-0.5">
+                        <div className="inline-flex items-center bg-gray-100 rounded p-0.5">
                           {(['total', 'byClient'] as const).map(mode => (
                             <button key={mode} onClick={() => setInvoiceChartMode(mode)}
-                              className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all duration-200 ${
-                                invoiceChartMode === mode ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                              className={`px-3 py-1 rounded text-[11px] font-medium transition-colors ${
+                                invoiceChartMode === mode ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-gray-600'
                               }`}>
                               {mode === 'total' ? 'Total' : 'By Client'}
                             </button>
@@ -2148,7 +2145,7 @@ export default function ContractorPortal() {
                   })).filter(p => p.hours > 0).sort((a, b) => b.hours - a.hours)
                   if (projectTotals.length === 0) return null
                   return (
-                    <div className={`${T.card} p-5`}>
+                    <div className={`${T.card} p-4`}>
                       <div className="flex items-center gap-2 mb-4">
                         <LayoutDashboard size={13} className="text-violet-500" />
                         <h2 className={T.sectionTitle}>Project Breakdown</h2>
@@ -2162,15 +2159,15 @@ export default function ContractorPortal() {
                               <div className="flex items-center justify-between mb-1.5">
                                 <div className="flex items-center gap-2">
                                   <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: p.color }} />
-                                  <span className="text-sm text-gray-700 font-medium">{p.name}</span>
+                                  <span className="text-[13px] text-gray-700 font-medium">{p.name}</span>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                  <span className="text-sm font-bold text-gray-900 tabular-nums">{p.hours.toFixed(1)}h</span>
+                                  <span className="text-[13px] font-medium text-gray-900 tabular-nums">{p.hours.toFixed(1)}h</span>
                                   <span className="text-[11px] text-gray-400 tabular-nums w-8 text-right">{pct.toFixed(0)}%</span>
                                 </div>
                               </div>
-                              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                <div className="h-full rounded-full transition-all duration-500"
+                              <div className="h-1.5 bg-gray-100 rounded overflow-hidden">
+                                <div className="h-full rounded transition-colors"
                                   style={{ width: `${pct}%`, background: p.color }} />
                               </div>
                             </div>
@@ -2183,11 +2180,11 @@ export default function ContractorPortal() {
 
                 {/* Empty state */}
                 {analyticsTime.length === 0 && analyticsExpenses.length === 0 && analyticsInvoices.length === 0 && (
-                  <div className={`${T.card} text-center py-16`}>
-                    <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto mb-4">
+                  <div className={`${T.card} text-center py-12`}>
+                    <div className="w-14 h-14 rounded bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto mb-4">
                       <TrendingUp size={22} className="text-gray-300" />
                     </div>
-                    <p className="text-gray-500 text-sm font-medium">No data for {analyticsRange.label}</p>
+                    <p className="text-gray-500 text-[13px] font-medium">No data for {analyticsRange.label}</p>
                     <p className="text-gray-400 text-xs mt-1.5">Try selecting a different time period</p>
                   </div>
                 )}
