@@ -5,7 +5,12 @@
 // ============================================================
 
 import { NextResponse } from "next/server"
-import { notifyInvoiceStatusChange, notifyExpenseStatusChange } from "@/lib/notifications"
+import {
+  notifyInvoiceStatusChange,
+  notifyExpenseStatusChange,
+  notifyAdminInvoiceSubmitted,
+  notifyAdminExpenseSubmitted,
+} from "@/lib/notifications"
 
 export async function POST(request: Request) {
   try {
@@ -19,11 +24,29 @@ export async function POST(request: Request) {
     let result
 
     if (type === "invoice") {
+      // Always notify contractor of status change
       result = await notifyInvoiceStatusChange(id, status, undefined, notes, paidDate, paymentMethod)
+      // On submission — also notify admin in real-time
+      if (status === "submitted") {
+        notifyAdminInvoiceSubmitted(id).catch(err =>
+          console.warn("Admin invoice notification failed (non-blocking):", err)
+        )
+      }
     } else if (type === "expense") {
+      // Always notify contractor of status change
       result = await notifyExpenseStatusChange(id, status, notes)
+      // On submission — also notify admin in real-time
+      if (status === "submitted") {
+        notifyAdminExpenseSubmitted(id).catch(err =>
+          console.warn("Admin expense notification failed (non-blocking):", err)
+        )
+      }
+    } else if (type === "timesheet") {
+      // Timesheet submissions are handled via the weekly digest cron
+      // No immediate contractor email needed — just return success
+      result = { success: true, id: null }
     } else {
-      return NextResponse.json({ error: "Invalid type. Use 'invoice' or 'expense'" }, { status: 400 })
+      return NextResponse.json({ error: "Invalid type. Use 'invoice', 'expense', or 'timesheet'" }, { status: 400 })
     }
 
     return NextResponse.json({ success: result.success, id: result.id || null })
