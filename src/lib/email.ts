@@ -343,6 +343,226 @@ export async function sendExpenseStatusEmail(data: ExpenseStatusEmailData) {
 }
 
 // ============================================================
+// ADMIN NOTIFICATION — INVOICE SUBMITTED
+// ============================================================
+export interface AdminInvoiceSubmittedData {
+  contractorName: string
+  contractorEmail: string
+  invoiceNumber: string
+  invoiceAmount: number
+  periodStart?: string
+  periodEnd?: string
+  notes?: string
+}
+
+export async function sendAdminInvoiceSubmittedEmail(data: AdminInvoiceSubmittedData) {
+  const adminEmail = process.env.EMAIL_REPLY_TO || "gabriel@manocg.com"
+  const period = data.periodStart && data.periodEnd
+    ? `${data.periodStart} – ${data.periodEnd}`
+    : "N/A"
+
+  const content = `
+    <p style="margin:0 0 4px; font-size:13px; color:#6b7280;">New submission</p>
+    <h2 style="margin:8px 0 16px; font-size:20px; color:#111827; font-weight:700;">Invoice Submitted</h2>
+    <p style="margin:0 0 20px; font-size:14px; color:#374151; line-height:1.6;">
+      <strong>${data.contractorName}</strong> has submitted an invoice and is awaiting your review.
+    </p>
+    <div style="background-color:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:16px 20px; margin:0 0 16px;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="padding:6px 0; color:#6b7280; font-size:13px;">Contractor</td>
+          <td style="padding:6px 0; font-size:13px; font-weight:600; text-align:right; color:#111827;">${data.contractorName}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0; color:#6b7280; font-size:13px;">Invoice #</td>
+          <td style="padding:6px 0; font-size:13px; text-align:right;">${data.invoiceNumber}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0; color:#6b7280; font-size:13px;">Amount</td>
+          <td style="padding:6px 0; font-size:15px; font-weight:700; text-align:right; color:#111827;">${formatCurrency(data.invoiceAmount)}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0; color:#6b7280; font-size:13px;">Period</td>
+          <td style="padding:6px 0; font-size:13px; text-align:right;">${period}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0; color:#6b7280; font-size:13px;">Status</td>
+          <td style="padding:6px 0; text-align:right;">${statusBadge("submitted")}</td>
+        </tr>
+      </table>
+    </div>
+    ${data.notes ? `<div style="margin-top:16px; padding:14px 16px; background-color:#f0fdf4; border-radius:8px; border-left:3px solid #10b981;"><p style="margin:0 0 4px; font-size:12px; font-weight:600; color:#065f46; text-transform:uppercase;">Contractor Note</p><p style="margin:0; font-size:13px; color:#374151; line-height:1.5;">${data.notes}</p></div>` : ""}
+    ${ctaButton("Review in Contractor Management", `${APP_URL}/contractor-management`)}
+  `
+
+  try {
+    const { data: result, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: adminEmail,
+      subject: `Invoice submitted — ${data.contractorName} · ${formatCurrency(data.invoiceAmount)}`,
+      html: emailWrapper(content),
+    })
+    if (error) { console.error("Admin invoice notification failed:", error); return { success: false, error } }
+    console.log(`Admin notified: invoice submitted by ${data.contractorName}`)
+    return { success: true, id: result?.id }
+  } catch (err) {
+    console.error("Admin invoice email error:", err)
+    return { success: false, error: err }
+  }
+}
+
+// ============================================================
+// ADMIN NOTIFICATION — EXPENSE SUBMITTED
+// ============================================================
+export interface AdminExpenseSubmittedData {
+  contractorName: string
+  contractorEmail: string
+  expenseDescription: string
+  expenseAmount: number
+  expenseDate: string
+  category: string
+  notes?: string
+}
+
+export async function sendAdminExpenseSubmittedEmail(data: AdminExpenseSubmittedData) {
+  const adminEmail = process.env.EMAIL_REPLY_TO || "gabriel@manocg.com"
+
+  const content = `
+    <p style="margin:0 0 4px; font-size:13px; color:#6b7280;">New submission</p>
+    <h2 style="margin:8px 0 16px; font-size:20px; color:#111827; font-weight:700;">Expense Submitted</h2>
+    <p style="margin:0 0 20px; font-size:14px; color:#374151; line-height:1.6;">
+      <strong>${data.contractorName}</strong> has submitted an expense for reimbursement.
+    </p>
+    <div style="background-color:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:16px 20px; margin:0 0 16px;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="padding:6px 0; color:#6b7280; font-size:13px;">Contractor</td>
+          <td style="padding:6px 0; font-size:13px; font-weight:600; text-align:right; color:#111827;">${data.contractorName}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0; color:#6b7280; font-size:13px;">Description</td>
+          <td style="padding:6px 0; font-size:13px; text-align:right;">${data.expenseDescription}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0; color:#6b7280; font-size:13px;">Category</td>
+          <td style="padding:6px 0; font-size:13px; text-align:right; text-transform:capitalize;">${data.category}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0; color:#6b7280; font-size:13px;">Amount</td>
+          <td style="padding:6px 0; font-size:15px; font-weight:700; text-align:right; color:#111827;">${formatCurrency(data.expenseAmount)}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0; color:#6b7280; font-size:13px;">Date</td>
+          <td style="padding:6px 0; font-size:13px; text-align:right;">${data.expenseDate}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0; color:#6b7280; font-size:13px;">Status</td>
+          <td style="padding:6px 0; text-align:right;">${statusBadge("submitted")}</td>
+        </tr>
+      </table>
+    </div>
+    ${data.notes ? `<div style="margin-top:16px; padding:14px 16px; background-color:#f0fdf4; border-radius:8px; border-left:3px solid #10b981;"><p style="margin:0 0 4px; font-size:12px; font-weight:600; color:#065f46; text-transform:uppercase;">Contractor Note</p><p style="margin:0; font-size:13px; color:#374151; line-height:1.5;">${data.notes}</p></div>` : ""}
+    ${ctaButton("Review in Contractor Management", `${APP_URL}/contractor-management`)}
+  `
+
+  try {
+    const { data: result, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: adminEmail,
+      subject: `Expense submitted — ${data.contractorName} · ${formatCurrency(data.expenseAmount)}`,
+      html: emailWrapper(content),
+    })
+    if (error) { console.error("Admin expense notification failed:", error); return { success: false, error } }
+    console.log(`Admin notified: expense submitted by ${data.contractorName}`)
+    return { success: true, id: result?.id }
+  } catch (err) {
+    console.error("Admin expense email error:", err)
+    return { success: false, error: err }
+  }
+}
+
+// ============================================================
+// ADMIN NOTIFICATION — WEEKLY TIMESHEET DIGEST
+// ============================================================
+export interface TimesheetDigestContractor {
+  name: string
+  submitted: boolean
+  totalHours: number
+  projects: { name: string; hours: number }[]
+}
+
+export interface AdminTimesheetDigestData {
+  weekLabel: string       // "Mar 10 – Mar 16, 2026"
+  weekStart: string       // "2026-03-10"
+  contractors: TimesheetDigestContractor[]
+}
+
+export async function sendAdminTimesheetDigestEmail(data: AdminTimesheetDigestData) {
+  const adminEmail = process.env.EMAIL_REPLY_TO || "gabriel@manocg.com"
+  const submitted = data.contractors.filter(c => c.submitted)
+  const missing = data.contractors.filter(c => !c.submitted)
+  const totalHours = submitted.reduce((s, c) => s + c.totalHours, 0)
+
+  const submittedRows = submitted.map(c => `
+    <tr>
+      <td style="padding:8px 0; font-size:13px; color:#111827; font-weight:500; border-bottom:1px solid #f3f4f6;">${c.name}</td>
+      <td style="padding:8px 0; font-size:13px; font-weight:700; text-align:right; color:#111827; border-bottom:1px solid #f3f4f6;">${c.totalHours.toFixed(1)}h</td>
+      <td style="padding:8px 0; text-align:right; border-bottom:1px solid #f3f4f6;">${statusBadge("approved")}</td>
+    </tr>
+  `).join("")
+
+  const missingRows = missing.length > 0 ? `
+    <div style="margin-top:20px; padding:14px 16px; background-color:#fef3c7; border-radius:8px; border-left:3px solid #f59e0b;">
+      <p style="margin:0 0 8px; font-size:12px; font-weight:700; color:#92400e; text-transform:uppercase;">No Timesheet Submitted</p>
+      ${missing.map(c => `<p style="margin:2px 0; font-size:13px; color:#78350f;">· ${c.name}</p>`).join("")}
+    </div>
+  ` : `<div style="margin-top:16px; padding:12px 16px; background-color:#f0fdf4; border-radius:8px; border-left:3px solid #10b981;"><p style="margin:0; font-size:13px; color:#065f46; font-weight:600;">✓ All contractors submitted this week</p></div>`
+
+  const content = `
+    <p style="margin:0 0 4px; font-size:13px; color:#6b7280;">Weekly digest</p>
+    <h2 style="margin:8px 0 4px; font-size:20px; color:#111827; font-weight:700;">Timesheet Summary</h2>
+    <p style="margin:0 0 20px; font-size:13px; color:#6b7280;">${data.weekLabel}</p>
+
+    <div style="display:grid; margin-bottom:20px;">
+      <div style="background-color:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:14px 18px; display:inline-block; margin-bottom:12px;">
+        <p style="margin:0; font-size:11px; color:#065f46; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Total Hours Logged</p>
+        <p style="margin:4px 0 0; font-size:24px; font-weight:700; color:#111827;">${totalHours.toFixed(1)}h</p>
+        <p style="margin:2px 0 0; font-size:12px; color:#6b7280;">${submitted.length} of ${data.contractors.length} contractors submitted</p>
+      </div>
+    </div>
+
+    <div style="background-color:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:16px 20px; margin:0 0 8px;">
+      <p style="margin:0 0 12px; font-size:12px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px;">Submitted This Week</p>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <th style="padding:0 0 8px; text-align:left; font-size:11px; font-weight:600; color:#9ca3af; text-transform:uppercase;">Contractor</th>
+          <th style="padding:0 0 8px; text-align:right; font-size:11px; font-weight:600; color:#9ca3af; text-transform:uppercase;">Hours</th>
+          <th style="padding:0 0 8px; text-align:right; font-size:11px; font-weight:600; color:#9ca3af; text-transform:uppercase;">Status</th>
+        </tr>
+        ${submittedRows || `<tr><td colspan="3" style="padding:12px 0; font-size:13px; color:#9ca3af; text-align:center;">No timesheets submitted this week</td></tr>`}
+      </table>
+    </div>
+    ${missingRows}
+    ${ctaButton("View Contractor Management", `${APP_URL}/contractor-management`)}
+  `
+
+  try {
+    const { data: result, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: adminEmail,
+      subject: `Weekly timesheet digest — ${data.weekLabel} · ${totalHours.toFixed(1)}h logged`,
+      html: emailWrapper(content),
+    })
+    if (error) { console.error("Timesheet digest failed:", error); return { success: false, error } }
+    console.log(`Timesheet digest sent for week ${data.weekLabel}`)
+    return { success: true, id: result?.id }
+  } catch (err) {
+    console.error("Timesheet digest email error:", err)
+    return { success: false, error: err }
+  }
+}
+
+// ============================================================
 // END-OF-MONTH INVOICE REMINDER
 // ============================================================
 export async function sendEOMReminderEmail(data: EOMReminderEmailData) {
