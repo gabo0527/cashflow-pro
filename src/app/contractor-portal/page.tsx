@@ -506,6 +506,16 @@ export default function ContractorPortal() {
         .lte('date', week.end)
       setExistingEntries(newEntries || [])
 
+      // Notify admin of timesheet submission — fire and forget
+      const totalHours = entries.reduce((s, e) => s + e.hours, 0)
+      if (totalHours > 0) {
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'timesheet', id: member.id, status: 'submitted', weekStart: week.start })
+        }).catch(err => console.warn('Timesheet notification failed:', err))
+      }
+
       setTimeSuccess(true); setTimeout(() => setTimeSuccess(false), 3000)
     } catch (err: any) { setError(err.message || 'Failed to submit') } finally { setSubmittingTime(false) }
   }
@@ -524,7 +534,7 @@ export default function ContractorPortal() {
       const clientName = expenseForm.client_id ? (assignmentsByClient[expenseForm.client_id]?.clientName || '') : ''
       const isInternal = clientName.toLowerCase().includes('mano') || clientName.toLowerCase().includes('internal') || clientName.toLowerCase().includes('overhead')
       const isBillable = !!expenseForm.client_id && !isInternal
-      const { data: newExp, error: ie } = await supabase.from('contractor_expenses').insert({ team_member_id: member.id, date: expenseForm.date, category: expenseForm.category, description: expenseForm.description, amount: parseFloat(expenseForm.amount), project_id: expenseForm.project_id || null, client_id: expenseForm.client_id || null, receipt_url: receiptUrl, is_billable: isBillable, status: 'pending' }).select().single()
+      const { data: newExp, error: ie } = await supabase.from('contractor_expenses').insert({ team_member_id: member.id, date: expenseForm.date, category: expenseForm.category, description: expenseForm.description, amount: parseFloat(expenseForm.amount), project_id: expenseForm.project_id || null, client_id: expenseForm.client_id || null, receipt_url: receiptUrl, is_billable: isBillable, company_id: 'a1b2c3d4-0000-4000-a000-000000000001', status: 'submitted' }).select().single()
       if (ie) throw ie
 
       // Notify — fire and forget, don't block UI
@@ -532,7 +542,7 @@ export default function ContractorPortal() {
         fetch('/api/notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'expense', id: newExp.id, status: 'pending' })
+          body: JSON.stringify({ type: 'expense', id: newExp.id, status: 'submitted' })
         }).catch(err => console.warn('Expense notification failed:', err))
       }
 
