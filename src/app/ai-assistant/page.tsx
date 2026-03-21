@@ -1311,7 +1311,7 @@ AI Summary: ${d.summary || result.summary}`
     if (h >= 5 && h < 12) return "Good morning"
     if (h >= 12 && h < 17) return "Good afternoon"
     if (h >= 17 && h < 21) return "Good evening"
-    return "Working late,"
+    return "Working late"
   }
   const filteredConversations = useMemo(() => {
     if (!searchQuery.trim()) return conversations
