@@ -1332,7 +1332,9 @@ AI Summary: ${d.summary || result.summary}`
   if (dataLoading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 80px)', background: '#fff' }}>
       <div style={{ textAlign: 'center' }}>
-        <SageLogo size={48} className="animate-pulse" style={{ margin: '0 auto 16px' }} />
+        <div style={{ margin: '0 auto 16px', width: 'fit-content' }}>
+          <SageLogo size={48} className="animate-pulse" />
+        </div>
         <p style={{ fontSize: '13px', color: '#9ca3af' }}>Loading your financial data...</p>
       </div>
     </div>
