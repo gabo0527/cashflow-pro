@@ -34,7 +34,7 @@ function SageLogo({ size = 32, className = "" }: { size?: number, className?: st
           <stop offset="100%" stopColor="#10b981"/>
         </linearGradient>
       </defs>
-      <path d="M12 11L24 37L36 11" stroke={`url(#${id})`} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M10 10L24 40L38 10" stroke={`url(#${id})`} strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   )
 }
@@ -907,7 +907,7 @@ function ChatMessage({ message }: { message: Message }) {
 
   return (
     <div style={{ display: 'flex', gap: '14px', marginBottom: '28px', maxWidth: '720px', margin: '0 auto 28px', width: '100%' }}>
-      <div style={{ width: 32, height: 32, borderRadius: "7px", background: "#111827", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: "2px" }}><SageLogo size={22} /></div>
+      <div style={{ flexShrink: 0, marginTop: '2px' }}><SageLogo size={32} /></div>
       <div style={{ flex: 1, minWidth: 0, paddingTop: '4px' }}>
         <div style={{ fontSize: '12px', fontWeight: 500, color: '#10b981', marginBottom: '8px' }}>Sage</div>
         {message.attachments && message.attachments.length > 0 && (
@@ -1306,6 +1306,13 @@ AI Summary: ${d.summary || result.summary}`
   const deleteConversation = async (id: string) => { await supabase.from("sage_conversations").delete().eq("id", id); setConversations(prev => prev.filter(c => c.id !== id)); if (currentConversationId === id) startNewConversation() }
   const renameConversation = async (id: string, title: string) => { await supabase.from("sage_conversations").update({ title }).eq("id", id); setConversations(prev => prev.map(c => c.id === id ? { ...c, title } : c)) }
   const hasMessages = messages.length > 0
+  const getGreeting = () => {
+    const h = new Date().getHours()
+    if (h >= 5 && h < 12) return "Good morning"
+    if (h >= 12 && h < 17) return "Good afternoon"
+    if (h >= 17 && h < 21) return "Good evening"
+    return "Working late,"
+  }
   const filteredConversations = useMemo(() => {
     if (!searchQuery.trim()) return conversations
     return conversations.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -1330,7 +1337,7 @@ AI Summary: ${d.summary || result.summary}`
   if (dataLoading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 80px)', background: '#fff' }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 48, height: 48, borderRadius: "10px", background: "#111827", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><SageLogo size={34} className="animate-pulse" /></div>
+        <div style={{ margin: "0 auto 16px", width: "fit-content" }}><SageLogo size={48} className="animate-pulse" /></div>
         <p style={{ fontSize: '13px', color: '#9ca3af' }}>Loading your financial data...</p>
       </div>
     </div>
@@ -1338,9 +1345,7 @@ AI Summary: ${d.summary || result.summary}`
 
   // Sage owl avatar reused inline
   const OwlAvatar = ({ size = 32 }: { size?: number }) => (
-    <div style={{ width: size, height: size, borderRadius: Math.round(size * 0.22) + 'px', background: '#111827', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <SageLogo size={Math.round(size * 0.72)} />
-    </div>
+    <SageLogo size={size} />
   )
 
   return (
@@ -1465,7 +1470,7 @@ AI Summary: ${d.summary || result.summary}`
                 <OwlAvatar size={48} />
                 <div>
                   <h1 style={{ fontSize: '22px', fontWeight: 500, color: '#111827', margin: '0 0 5px' }}>
-                    Good morning, Gabriel.
+                    {getGreeting()}, Gabriel.
                   </h1>
                   <p style={{ fontSize: '14px', color: '#6b7280', lineHeight: 1.6, margin: 0 }}>
                     Ask me anything about your business — revenue, margins, your team, cash flow, or what needs your attention today.
