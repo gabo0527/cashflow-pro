@@ -25,16 +25,16 @@ const CHART_COLORS = ["#10B981", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444", "#E
 
 // ============ SAGE LOGO ============
 function SageLogo({ size = 32, className = "" }: { size?: number, className?: string }) {
+  const id = `vg-${size}`
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" className={className}>
-      <circle cx="20" cy="20" r="19" fill="#0a1a12"/>
-      <path d="M12 15 Q20 9 28 15 L26 27 Q20 31 14 27 Z" fill="#0f2820" stroke="#10b981" strokeWidth="0.7"/>
-      <circle cx="15.5" cy="18.5" r="3.2" fill="#10b981"/>
-      <circle cx="24.5" cy="18.5" r="3.2" fill="#10b981"/>
-      <circle cx="15.5" cy="18.5" r="1.5" fill="#061208"/>
-      <circle cx="24.5" cy="18.5" r="1.5" fill="#061208"/>
-      <path d="M17 24 Q20 26.5 23 24" stroke="#10b981" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-      <path d="M14 13 L17 11 L20 9 L23 11 L26 13" stroke="#10b981" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" className={className}>
+      <defs>
+        <linearGradient id={id} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#6ee7b7"/>
+          <stop offset="100%" stopColor="#10b981"/>
+        </linearGradient>
+      </defs>
+      <path d="M12 11L24 37L36 11" stroke={`url(#${id})`} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   )
 }
@@ -886,7 +886,7 @@ function ChatMessage({ message }: { message: Message }) {
   if (isUser) {
     return (
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px', maxWidth: '720px', margin: '0 auto 24px', width: '100%' }}>
-        <div style={{ maxWidth: '75%' }}>
+        <div style={{ maxWidth: '65%' }}>
           {message.attachments && message.attachments.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '6px', justifyContent: 'flex-end' }}>
               {message.attachments.map(att => (
@@ -907,9 +907,7 @@ function ChatMessage({ message }: { message: Message }) {
 
   return (
     <div style={{ display: 'flex', gap: '14px', marginBottom: '28px', maxWidth: '720px', margin: '0 auto 28px', width: '100%' }}>
-      <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#0a1a12', border: '1px solid #1a3a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
-        <SageLogo size={20} />
-      </div>
+      <div style={{ width: 32, height: 32, borderRadius: "7px", background: "#111827", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: "2px" }}><SageLogo size={22} /></div>
       <div style={{ flex: 1, minWidth: 0, paddingTop: '4px' }}>
         <div style={{ fontSize: '12px', fontWeight: 500, color: '#10b981', marginBottom: '8px' }}>Sage</div>
         {message.attachments && message.attachments.length > 0 && (
@@ -1332,9 +1330,7 @@ AI Summary: ${d.summary || result.summary}`
   if (dataLoading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 80px)', background: '#fff' }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ margin: '0 auto 16px', width: 'fit-content' }}>
-          <SageLogo size={48} className="animate-pulse" />
-        </div>
+        <div style={{ width: 48, height: 48, borderRadius: "10px", background: "#111827", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><SageLogo size={34} className="animate-pulse" /></div>
         <p style={{ fontSize: '13px', color: '#9ca3af' }}>Loading your financial data...</p>
       </div>
     </div>
@@ -1342,8 +1338,8 @@ AI Summary: ${d.summary || result.summary}`
 
   // Sage owl avatar reused inline
   const OwlAvatar = ({ size = 32 }: { size?: number }) => (
-    <div style={{ width: size, height: size, borderRadius: '8px', background: '#0a1a12', border: '1px solid #1a3a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <SageLogo size={Math.round(size * 0.62)} />
+    <div style={{ width: size, height: size, borderRadius: Math.round(size * 0.22) + 'px', background: '#111827', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <SageLogo size={Math.round(size * 0.72)} />
     </div>
   )
 
@@ -1356,7 +1352,7 @@ AI Summary: ${d.summary || result.summary}`
         {/* Brand + new button */}
         <div style={{ padding: '16px 14px 10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-            <SageLogo size={28} />
+            <OwlAvatar size={32} />
             <div>
               <div style={{ fontSize: '14px', fontWeight: 500, color: '#111827' }}>Sage</div>
               <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '1px' }}>Financial AI · Vantage</div>
@@ -1433,7 +1429,7 @@ AI Summary: ${d.summary || result.summary}`
                 <PanelLeft size={16} />
               </button>
             )}
-            <SageLogo size={22} />
+            <OwlAvatar size={28} />
             <span style={{ fontSize: '14px', fontWeight: 500, color: '#111827' }}>Sage</span>
             <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', letterSpacing: '0.03em' }}>Financial AI</span>
           </div>
@@ -1466,7 +1462,7 @@ AI Summary: ${d.summary || result.summary}`
 
               {/* Owl + greeting */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '32px' }}>
-                <SageLogo size={48} />
+                <OwlAvatar size={48} />
                 <div>
                   <h1 style={{ fontSize: '22px', fontWeight: 500, color: '#111827', margin: '0 0 5px' }}>
                     Good morning, Gabriel.
@@ -1479,7 +1475,7 @@ AI Summary: ${d.summary || result.summary}`
 
               {/* Quick actions — plain text, no boxes */}
               <p style={{ fontSize: '11px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: '10px' }}>Start here</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '36px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '28px' }}>
                 {QUICK_ACTIONS.map((action, i) => (
                   <button key={i} onClick={() => handleQuickAction(action)}
                     style={{ padding: '11px 14px', background: '#fff', border: '1px solid #e8e8e4', borderRadius: '8px', fontSize: '13px', color: '#374151', textAlign: 'left', cursor: 'pointer', lineHeight: 1.4, fontFamily: 'inherit' }}
@@ -1529,9 +1525,7 @@ AI Summary: ${d.summary || result.summary}`
               {messages.map(message => <ChatMessage key={message.id} message={message} />)}
               {loading && (
                 <div style={{ display: 'flex', gap: '14px', marginBottom: '28px' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#0a1a12', border: '1px solid #1a3a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
-                    <SageLogo size={20} />
-                  </div>
+                  <OwlAvatar size={32} />
                   <div style={{ paddingTop: '4px' }}>
                     <div style={{ fontSize: '12px', fontWeight: 500, color: '#10b981', marginBottom: '10px' }}>Sage</div>
                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
