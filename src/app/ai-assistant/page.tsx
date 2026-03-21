@@ -25,137 +25,16 @@ const CHART_COLORS = ["#10B981", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444", "#E
 
 // ============ SAGE LOGO ============
 function SageLogo({ size = 32, className = "" }: { size?: number, className?: string }) {
-  const id = React.useId().replace(/:/g, "")
-  const full = size >= 48
-  const mid = size >= 28
-  const sm = size < 28
   return (
-    <svg width={size} height={size} viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      <defs>
-        <radialGradient id={`sphere${id}`} cx="45%" cy="40%" r="50%" fx="35%" fy="35%">
-          <stop offset="0%" stopColor="#34d399" stopOpacity="0.35" />
-          <stop offset="40%" stopColor="#10b981" stopOpacity="0.20" />
-          <stop offset="70%" stopColor="#059669" stopOpacity="0.12" />
-          <stop offset="100%" stopColor="#047857" stopOpacity="0.04" />
-        </radialGradient>
-        <radialGradient id={`rim${id}`} cx="50%" cy="50%" r="50%">
-          <stop offset="85%" stopColor="#10b981" stopOpacity="0" />
-          <stop offset="95%" stopColor="#10b981" stopOpacity="0.25" />
-          <stop offset="100%" stopColor="#34d399" stopOpacity="0.08" />
-        </radialGradient>
-        <radialGradient id={`spec${id}`} cx="38%" cy="30%" r="30%" fx="35%" fy="25%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.22" />
-          <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-        </radialGradient>
-        <linearGradient id={`bar${id}`} x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0%" stopColor="#059669" stopOpacity="0.7" />
-          <stop offset="100%" stopColor="#34d399" stopOpacity="0.9" />
-        </linearGradient>
-        <linearGradient id={`arrow${id}`} x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0%" stopColor="#10b981" />
-          <stop offset="100%" stopColor="#6ee7b7" />
-        </linearGradient>
-        <filter id={`ng${id}`}><feGaussianBlur stdDeviation="1.5" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
-        <filter id={`og${id}`}><feGaussianBlur stdDeviation="6" /></filter>
-      </defs>
-      {mid && <circle cx="60" cy="60" r="52" fill="#10b981" opacity="0.08" filter={`url(#og${id})`} />}
-      <circle cx="60" cy="60" r={sm ? "48" : "46"} fill={`url(#sphere${id})`} />
-      <circle cx="60" cy="60" r={sm ? "48" : "46"} fill={`url(#rim${id})`} />
-      <circle cx="60" cy="60" r={sm ? "48" : "46"} fill={`url(#spec${id})`} />
-      <circle cx="60" cy="60" r={sm ? "47" : "45"} fill="none" stroke="#10b981" strokeWidth={sm ? "1.5" : "1"} opacity="0.3" />
-      {mid && <circle cx="60" cy="60" r="45" fill="none" stroke="#34d399" strokeWidth="0.5" opacity="0.15" />}
-      {mid && <>
-        <ellipse cx="60" cy="42" rx="34" ry="8" fill="none" stroke="#34d399" strokeWidth="0.4" opacity="0.15" />
-        <ellipse cx="60" cy="60" rx="40" ry="10" fill="none" stroke="#10b981" strokeWidth="0.3" opacity="0.10" />
-        <ellipse cx="60" cy="78" rx="32" ry="7" fill="none" stroke="#34d399" strokeWidth="0.4" opacity="0.12" />
-      </>}
-      {full && <>
-        <line x1="30" y1="28" x2="52" y2="44" stroke="#34d399" strokeWidth="0.4" opacity="0.18" />
-        <line x1="90" y1="30" x2="70" y2="46" stroke="#34d399" strokeWidth="0.4" opacity="0.15" />
-        <line x1="25" y1="55" x2="42" y2="52" stroke="#10b981" strokeWidth="0.35" opacity="0.14" />
-        <line x1="95" y1="58" x2="78" y2="54" stroke="#10b981" strokeWidth="0.35" opacity="0.12" />
-        <line x1="32" y1="80" x2="48" y2="72" stroke="#34d399" strokeWidth="0.35" opacity="0.14" />
-        <line x1="88" y1="82" x2="72" y2="74" stroke="#34d399" strokeWidth="0.35" opacity="0.12" />
-        <line x1="52" y1="44" x2="70" y2="46" stroke="#10b981" strokeWidth="0.4" opacity="0.16" />
-        <line x1="42" y1="52" x2="78" y2="54" stroke="#10b981" strokeWidth="0.3" opacity="0.10" />
-        <line x1="48" y1="72" x2="72" y2="74" stroke="#10b981" strokeWidth="0.3" opacity="0.10" />
-        <line x1="30" y1="28" x2="25" y2="55" stroke="#34d399" strokeWidth="0.3" opacity="0.10" />
-        <line x1="90" y1="30" x2="95" y2="58" stroke="#34d399" strokeWidth="0.3" opacity="0.08" />
-        <line x1="25" y1="55" x2="32" y2="80" stroke="#34d399" strokeWidth="0.3" opacity="0.10" />
-        <line x1="95" y1="58" x2="88" y2="82" stroke="#34d399" strokeWidth="0.3" opacity="0.08" />
-        <line x1="52" y1="44" x2="48" y2="72" stroke="#10b981" strokeWidth="0.25" opacity="0.08" strokeDasharray="2 3" />
-        <line x1="70" y1="46" x2="72" y2="74" stroke="#10b981" strokeWidth="0.25" opacity="0.08" strokeDasharray="2 3" />
-      </>}
-      {full && <>
-        <circle cx="30" cy="28" r="2.2" fill="#34d399" opacity="0.5" filter={`url(#ng${id})`} />
-        <circle cx="30" cy="28" r="1.2" fill="#6ee7b7" opacity="0.8" />
-        <circle cx="90" cy="30" r="2" fill="#34d399" opacity="0.4" filter={`url(#ng${id})`} />
-        <circle cx="90" cy="30" r="1" fill="#6ee7b7" opacity="0.7" />
-        <circle cx="25" cy="55" r="1.8" fill="#34d399" opacity="0.35" filter={`url(#ng${id})`} />
-        <circle cx="25" cy="55" r="0.9" fill="#6ee7b7" opacity="0.6" />
-        <circle cx="95" cy="58" r="1.8" fill="#34d399" opacity="0.3" filter={`url(#ng${id})`} />
-        <circle cx="95" cy="58" r="0.9" fill="#6ee7b7" opacity="0.55" />
-        <circle cx="32" cy="80" r="1.8" fill="#34d399" opacity="0.35" filter={`url(#ng${id})`} />
-        <circle cx="32" cy="80" r="0.9" fill="#6ee7b7" opacity="0.6" />
-        <circle cx="88" cy="82" r="1.8" fill="#34d399" opacity="0.3" filter={`url(#ng${id})`} />
-        <circle cx="88" cy="82" r="0.9" fill="#6ee7b7" opacity="0.55" />
-        <circle cx="52" cy="44" r="1.8" fill="#34d399" opacity="0.4" filter={`url(#ng${id})`} />
-        <circle cx="52" cy="44" r="0.9" fill="#6ee7b7" opacity="0.7" />
-        <circle cx="70" cy="46" r="1.8" fill="#34d399" opacity="0.35" filter={`url(#ng${id})`} />
-        <circle cx="70" cy="46" r="0.9" fill="#6ee7b7" opacity="0.65" />
-        <circle cx="42" cy="52" r="1.5" fill="#34d399" opacity="0.3" />
-        <circle cx="42" cy="52" r="0.7" fill="#6ee7b7" opacity="0.55" />
-        <circle cx="78" cy="54" r="1.5" fill="#34d399" opacity="0.28" />
-        <circle cx="78" cy="54" r="0.7" fill="#6ee7b7" opacity="0.5" />
-        <circle cx="48" cy="72" r="1.5" fill="#34d399" opacity="0.3" />
-        <circle cx="48" cy="72" r="0.7" fill="#6ee7b7" opacity="0.55" />
-        <circle cx="72" cy="74" r="1.5" fill="#34d399" opacity="0.28" />
-        <circle cx="72" cy="74" r="0.7" fill="#6ee7b7" opacity="0.5" />
-        <circle cx="40" cy="30" r="0.8" fill="#6ee7b7" opacity="0.3" />
-        <circle cx="80" cy="40" r="0.8" fill="#6ee7b7" opacity="0.25" />
-        <circle cx="22" cy="68" r="0.7" fill="#6ee7b7" opacity="0.2" />
-        <circle cx="98" cy="48" r="0.6" fill="#6ee7b7" opacity="0.15" />
-        <circle cx="60" cy="22" r="0.8" fill="#6ee7b7" opacity="0.25" />
-        <circle cx="60" cy="98" r="0.7" fill="#6ee7b7" opacity="0.2" />
-      </>}
-      {mid && !full && <>
-        <circle cx="32" cy="34" r="1.8" fill="#34d399" opacity="0.4" filter={`url(#ng${id})`} />
-        <circle cx="32" cy="34" r="0.9" fill="#6ee7b7" opacity="0.7" />
-        <circle cx="88" cy="36" r="1.6" fill="#34d399" opacity="0.35" filter={`url(#ng${id})`} />
-        <circle cx="88" cy="36" r="0.8" fill="#6ee7b7" opacity="0.65" />
-        <circle cx="28" cy="65" r="1.5" fill="#34d399" opacity="0.3" />
-        <circle cx="28" cy="65" r="0.7" fill="#6ee7b7" opacity="0.55" />
-        <circle cx="92" cy="68" r="1.5" fill="#34d399" opacity="0.28" />
-        <circle cx="92" cy="68" r="0.7" fill="#6ee7b7" opacity="0.5" />
-        <circle cx="40" cy="85" r="1.3" fill="#34d399" opacity="0.25" />
-        <circle cx="80" cy="86" r="1.3" fill="#34d399" opacity="0.22" />
-      </>}
-      {mid && <>
-        <rect x="42" y="72" width={full ? "5" : "6"} height="10" rx="1" fill={`url(#bar${id})`} opacity="0.75" />
-        <rect x="49" y="67" width={full ? "5" : "6"} height="15" rx="1" fill={`url(#bar${id})`} opacity="0.80" />
-        <rect x="56" y="62" width={full ? "5" : "6"} height="20" rx="1" fill={`url(#bar${id})`} opacity="0.85" />
-        <rect x="63" y="56" width={full ? "5" : "6"} height="26" rx="1" fill={`url(#bar${id})`} opacity="0.90" />
-        <rect x="70" y="50" width={full ? "5" : "6"} height="32" rx="1" fill={`url(#bar${id})`} opacity="0.95" />
-      </>}
-      {sm && <>
-        <rect x="40" y="68" width="10" height="16" rx="2" fill={`url(#bar${id})`} opacity="0.75" />
-        <rect x="54" y="58" width="10" height="26" rx="2" fill={`url(#bar${id})`} opacity="0.85" />
-        <rect x="68" y="46" width="10" height="38" rx="2" fill={`url(#bar${id})`} opacity="0.95" />
-      </>}
-      {mid && (
-        <path d="M45 68 C50 55, 58 48, 68 40 L74 38" stroke={`url(#arrow${id})`} strokeWidth="2.5" strokeLinecap="round" fill="none" opacity="0.85" />
-      )}
-      {mid && <>
-        <polygon points="74,38 68,36 71,42" fill="#6ee7b7" opacity="0.9" />
-        <path d="M45 68 C50 55, 58 48, 68 40 L74 38" stroke="#6ee7b7" strokeWidth="4" strokeLinecap="round" fill="none" opacity="0.08" filter={`url(#ng${id})`} />
-      </>}
-      {sm && (
-        <>
-          <path d="M42 72 C50 58, 58 50, 72 40" stroke={`url(#arrow${id})`} strokeWidth="3.5" strokeLinecap="round" fill="none" opacity="0.85" />
-          <polygon points="72,40 65,38 68,45" fill="#6ee7b7" opacity="0.9" />
-        </>
-      )}
-      {mid && <ellipse cx="48" cy="30" rx="14" ry="6" fill="white" opacity="0.06" />}
+    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" className={className}>
+      <circle cx="20" cy="20" r="19" fill="#0a1a12"/>
+      <path d="M12 15 Q20 9 28 15 L26 27 Q20 31 14 27 Z" fill="#0f2820" stroke="#10b981" strokeWidth="0.7"/>
+      <circle cx="15.5" cy="18.5" r="3.2" fill="#10b981"/>
+      <circle cx="24.5" cy="18.5" r="3.2" fill="#10b981"/>
+      <circle cx="15.5" cy="18.5" r="1.5" fill="#061208"/>
+      <circle cx="24.5" cy="18.5" r="1.5" fill="#061208"/>
+      <path d="M17 24 Q20 26.5 23 24" stroke="#10b981" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
+      <path d="M14 13 L17 11 L20 9 L23 11 L26 13" stroke="#10b981" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   )
 }
@@ -676,18 +555,18 @@ PATTERN_LEARNED format: vendor="VENDOR" category="CATEGORY" sub_category="SUB_CA
 function TableRenderer({ table }: { table: TableData }) {
   if (!table || !table.headers || !table.rows) return null
   return (
-    <div className="my-4 rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+    <div style={{ margin: "12px 0", border: "1px solid #e8e8e4", borderRadius: "4px", overflow: "hidden" }}>
+      <div style={{ background: "#f7f7f5", padding: "8px 14px", borderBottom: "1px solid #e8e8e4" }}>
         <h4 className="text-sm font-medium text-gray-800">{table.title}</h4>
       </div>
       <div className="bg-white overflow-x-auto">
         <table className="w-full text-sm">
           <thead><tr className="border-b border-gray-200">
-            {table.headers.map((h, i) => <th key={i} className="text-left py-3 px-4 text-gray-500 font-medium text-xs uppercase tracking-wider">{h}</th>)}
+            {table.headers.map((h, i) => <th key={i} className="text-left py-3 px-4 text-gray-500 font-medium text-xs uppercase tracking-[0.04em]">{h}</th>)}
           </tr></thead>
           <tbody>{table.rows.map((row, ri) => (
             <tr key={ri} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-              {row.map((cell, ci) => <td key={ci} className="py-2.5 px-4 text-gray-800">{cell}</td>)}
+              {row.map((cell, ci) => <td key={ci} className="py-2 px-4 text-gray-800">{cell}</td>)}
             </tr>
           ))}</tbody>
         </table>
@@ -732,11 +611,11 @@ function ChartRenderer({ chart }: { chart: ChartData }) {
     }
   }
   return (
-    <div className="my-4 rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-        <h4 className="text-sm font-medium text-gray-800">{chart.title}</h4>
+    <div style={{ margin: "16px 0", border: "1px solid #e8e8e4", borderRadius: "12px", overflow: "hidden" }}>
+      <div style={{ background: "#fafaf9", padding: "10px 16px", borderBottom: "1px solid #e8e8e4" }}>
+        <h4 style={{ fontSize: "13px", fontWeight: 500, color: "#374151", margin: 0 }}>{chart.title}</h4>
       </div>
-      <div className="bg-white p-4 h-72">
+      <div style={{ background: "#fff", padding: "16px", height: "272px" }}>
         <ResponsiveContainer width="100%" height="100%">{renderChart()}</ResponsiveContainer>
       </div>
     </div>
@@ -747,7 +626,7 @@ function ChartRenderer({ chart }: { chart: ChartData }) {
 function AgentResultRenderer({ result }: { result: AgentResult }) {
   if (!result || result.status === "error") {
     return (
-      <div className="my-3 p-4 rounded-xl border border-rose-200 bg-rose-50">
+      <div className="my-3 p-4 rounded border border-rose-200 bg-rose-50">
         <div className="flex items-center gap-2 text-rose-700 text-sm font-medium mb-1">
           <XOctagon size={14} />
           <span>Agent Error: {result?.agent || "Unknown"}</span>
@@ -766,11 +645,11 @@ function AgentResultRenderer({ result }: { result: AgentResult }) {
   }
 
   return (
-    <div className="my-3 p-4 rounded-xl border border-emerald-200 bg-emerald-50/50">
-      <div className="flex items-center gap-2 text-emerald-700 text-sm font-medium mb-2">
+    <div className="my-3 p-4 rounded border border-gray-200 bg-gray-50">
+      <div className="flex items-center gap-2 text-gray-700 text-sm font-medium mb-2">
         <Shield size={14} />
         <span>{agentLabels[result.agent] || result.agent}</span>
-        <span className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-100 text-emerald-600 uppercase tracking-wider">Complete</span>
+        <span className="px-1.5 py-0.5 rounded text-[9px] bg-gray-100 text-gray-600 uppercase tracking-[0.04em]">Complete</span>
       </div>
       <p className="text-gray-700 text-sm">{result.summary}</p>
     </div>
@@ -801,8 +680,8 @@ function ApprovalCard({ approval, onApprove, onReject }: { approval: PendingAppr
 
   if (decided === "approved") {
     return (
-      <div className="my-3 p-4 rounded-xl border border-emerald-200 bg-emerald-50">
-        <div className="flex items-center gap-2 text-emerald-700 text-sm font-medium">
+      <div className="my-3 p-4 rounded border border-gray-200 bg-gray-50">
+        <div className="flex items-center gap-2 text-gray-700 text-sm font-medium">
           <CheckCircle2 size={16} />
           <span>Approved and applied. {approval.items.length} items updated.</span>
         </div>
@@ -812,7 +691,7 @@ function ApprovalCard({ approval, onApprove, onReject }: { approval: PendingAppr
 
   if (decided === "rejected") {
     return (
-      <div className="my-3 p-4 rounded-xl border border-gray-200 bg-gray-50">
+      <div className="my-3 p-4 rounded border border-gray-200 bg-gray-50">
         <div className="flex items-center gap-2 text-gray-500 text-sm">
           <X size={14} />
           <span>Changes discarded.</span>
@@ -822,7 +701,7 @@ function ApprovalCard({ approval, onApprove, onReject }: { approval: PendingAppr
   }
 
   return (
-    <div className="my-3 rounded-xl border border-amber-200 bg-amber-50/50 overflow-hidden">
+    <div className="my-3 rounded border border-amber-200 bg-amber-50/50 overflow-hidden">
       <div className="px-4 py-3 border-b border-amber-200 bg-amber-50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-amber-800 text-sm font-medium">
@@ -858,7 +737,7 @@ function ApprovalCard({ approval, onApprove, onReject }: { approval: PendingAppr
                 {approval.type === "invoice_approve" && <>
                   <td className="py-1.5 px-3 text-gray-700">{item.name || item.id}</td>
                   <td className="py-1.5 px-3 text-gray-700 tabular-nums">{formatCurrency(item.amount || 0)}</td>
-                  <td className="py-1.5 px-3"><span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-700">Clean</span></td>
+                  <td className="py-1.5 px-3"><span className="px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-700">Clean</span></td>
                 </>}
               </tr>
             ))}</tbody>
@@ -867,11 +746,11 @@ function ApprovalCard({ approval, onApprove, onReject }: { approval: PendingAppr
         </div>
       )}
       <div className="px-4 py-3 flex items-center gap-3 bg-white border-t border-gray-100">
-        <button onClick={handleApprove} disabled={processing} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium transition-colors disabled:opacity-50">
+        <button onClick={handleApprove} disabled={processing} className="flex items-center gap-2 px-4 py-2 rounded bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium transition-colors disabled:opacity-50">
           {processing ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
           {processing ? "Applying..." : "Approve"}
         </button>
-        <button onClick={handleReject} disabled={processing} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors">
+        <button onClick={handleReject} disabled={processing} className="flex items-center gap-2 px-4 py-2 rounded bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors">
           <X size={14} /> Reject
         </button>
       </div>
@@ -887,7 +766,7 @@ function EmailDraftCard({ draft, onSend }: { draft: EmailDraftData; onSend: (dra
   const [editBody, setEditBody] = useState(draft.body)
 
   const toneColors: Record<string, string> = {
-    info: "border-emerald-200 bg-emerald-50/50",
+    info: "border-gray-200 bg-gray-50",
     reminder: "border-amber-200 bg-amber-50/50",
     urgent: "border-rose-200 bg-rose-50/50",
     appreciation: "border-violet-200 bg-violet-50/50",
@@ -908,8 +787,8 @@ function EmailDraftCard({ draft, onSend }: { draft: EmailDraftData; onSend: (dra
 
   if (status === "sent") {
     return (
-      <div className="my-3 p-4 rounded-xl border border-emerald-200 bg-emerald-50">
-        <div className="flex items-center gap-2 text-emerald-700 text-sm font-medium">
+      <div className="my-3 p-4 rounded border border-gray-200 bg-gray-50">
+        <div className="flex items-center gap-2 text-gray-700 text-sm font-medium">
           <CheckCircle2 size={16} />
           <span>Email sent to {draft.isTeamWide ? "all contractors" : draft.recipientName}.</span>
         </div>
@@ -918,13 +797,13 @@ function EmailDraftCard({ draft, onSend }: { draft: EmailDraftData; onSend: (dra
   }
 
   return (
-    <div className={`my-3 rounded-xl border overflow-hidden ${toneColors[draft.tone] || toneColors.info}`}>
+    <div className={`my-3 rounded border overflow-hidden ${toneColors[draft.tone] || toneColors.info}`}>
       <div className="px-4 py-3 border-b border-gray-200 bg-white/60">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-gray-800 text-sm font-medium">
-            <Mail size={14} className="text-emerald-600" />
+            <Mail size={14} className="text-gray-600" />
             <span>Email Draft</span>
-            <span className="px-1.5 py-0.5 rounded text-[9px] bg-gray-100 text-gray-500 uppercase tracking-wider">{draft.tone}</span>
+            <span className="px-1.5 py-0.5 rounded text-[9px] bg-gray-100 text-gray-500 uppercase tracking-[0.04em]">{draft.tone}</span>
           </div>
           <span className="text-xs text-gray-500">
             To: {draft.isTeamWide ? "All Contractors" : `${draft.recipientName} (${draft.recipientEmail})`}
@@ -935,29 +814,29 @@ function EmailDraftCard({ draft, onSend }: { draft: EmailDraftData; onSend: (dra
         {editMode ? (
           <div className="space-y-3">
             <div>
-              <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">Subject</label>
-              <input value={editSubject} onChange={e => setEditSubject(e.target.value)} className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400" />
+              <label className="text-[10px] font-medium text-gray-500 uppercase tracking-[0.04em]">Subject</label>
+              <input value={editSubject} onChange={e => setEditSubject(e.target.value)} className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:outline-none focus:border-gray-900" />
             </div>
             <div>
-              <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">Body</label>
-              <textarea value={editBody} onChange={e => setEditBody(e.target.value)} rows={6} className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 resize-none" />
+              <label className="text-[10px] font-medium text-gray-500 uppercase tracking-[0.04em]">Body</label>
+              <textarea value={editBody} onChange={e => setEditBody(e.target.value)} rows={6} className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:outline-none focus:border-gray-900 resize-none" />
             </div>
           </div>
         ) : (
           <>
             <p className="text-xs font-medium text-gray-800 mb-2">Subject: {draft.subject}</p>
-            <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
+            <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-gray-50 rounded px-3 py-2 border border-gray-100">
               {draft.body}
             </div>
           </>
         )}
       </div>
       <div className="px-4 py-3 flex items-center gap-2 bg-white border-t border-gray-100">
-        <button onClick={handleSend} disabled={status === "sending"} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium transition-colors disabled:opacity-50">
+        <button onClick={handleSend} disabled={status === "sending"} className="flex items-center gap-2 px-4 py-2 rounded bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium transition-colors disabled:opacity-50">
           {status === "sending" ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
           {status === "sending" ? "Sending..." : status === "error" ? "Retry" : "Approve & Send"}
         </button>
-        <button onClick={() => setEditMode(!editMode)} disabled={status === "sending"} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors">
+        <button onClick={() => setEditMode(!editMode)} disabled={status === "sending"} className="flex items-center gap-2 px-4 py-2 rounded bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors">
           <Pencil size={14} /> {editMode ? "Preview" : "Edit"}
         </button>
         {status === "error" && <span className="text-xs text-rose-500 ml-2">Failed to send. Try again.</span>}
@@ -992,68 +871,73 @@ function ChatMessage({ message }: { message: Message }) {
         if (linkMatch) {
           const t = linkMatch[1].toLowerCase()
           const href = t.includes("forecast") ? "/forecast" : t.includes("report") ? "/reports" : t.includes("invoice") ? "/invoices" : t.includes("project") ? "/projects" : t.includes("client") ? "/clients" : t.includes("time") ? "/time-tracking" : t.includes("team") ? "/team" : t.includes("expense") ? "/expense-mgmt" : "/dashboard"
-          return <p key={i} className="my-1"><Link href={href} className="text-emerald-600 hover:text-emerald-500 inline-flex items-center gap-1 transition-colors font-medium">{linkMatch[1]} <ChevronRight size={12} /></Link></p>
+          return <p key={i} className="my-1"><Link href={href} className="text-gray-600 hover:text-gray-400 inline-flex items-center gap-1 transition-colors font-medium">{linkMatch[1]} <ChevronRight size={12} /></Link></p>
         }
       }
       if (line.trim().startsWith("- ") || line.trim().startsWith("\u2022 ")) {
-        return <p key={i} className="my-0.5 pl-3 text-gray-700">{"\u2022"} {line.replace(/^[-\u2022]\s*/, "").replace(/\*\*/g, "")}</p>
+        return <p key={i} style={{ margin: "3px 0", paddingLeft: "14px", color: "#374151", fontSize: "15px", lineHeight: 1.75 }}>{"• "}{line.replace(/^[-•]\s*/, "").replace(/\*\*/g, "")}</p>
       }
-      if (/^\d+\.\s/.test(line.trim())) return <p key={i} className="my-0.5 pl-3 text-gray-700">{line.replace(/\*\*/g, "")}</p>
-      if (line.trim().endsWith(":") && line.trim().length < 60 && !line.includes("$")) return <p key={i} className="my-2.5 text-gray-800 font-medium text-[13px] uppercase tracking-wide">{line.replace(/\*\*/g, "")}</p>
-      return <p key={i} className="my-1 text-gray-700">{line.replace(/\*\*/g, "")}</p>
+      if (/^\d+\.\s/.test(line.trim())) return <p key={i} style={{ margin: "3px 0", paddingLeft: "14px", color: "#374151", fontSize: "15px", lineHeight: 1.75 }}>{line.replace(/\*\*/g, "")}</p>
+      if (line.trim().endsWith(":") && line.trim().length < 60 && !line.includes("$")) return <p key={i} style={{ margin: "10px 0 4px", color: "#111827", fontWeight: 500, fontSize: "13px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{line.replace(/\*\*/g, "")}</p>
+      return <p key={i} style={{ margin: "4px 0", color: "#374151", fontSize: "15px", lineHeight: 1.75 }}>{line.replace(/\*\*/g, "")}</p>
     })
   }
   
-  return (
-    <div className={`flex gap-3.5 ${isUser ? "flex-row-reverse" : ""} max-w-4xl mx-auto`}>
-      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${isUser ? "bg-blue-50 ring-1 ring-blue-200" : "bg-emerald-50 ring-1 ring-emerald-200"}`}>
-        {isUser ? <User size={16} className="text-blue-600" /> : <SageLogo size={22} />}
-      </div>
-      <div className={`flex-1 min-w-0 ${isUser ? "text-right" : ""}`}>
-        <p className={`text-[11px] font-medium mb-1 px-1 ${isUser ? "text-blue-500" : "text-emerald-600"}`}>{isUser ? "You" : "Sage"}</p>
-        <div className={`inline-block rounded-xl px-4 py-3 max-w-[90%] text-left ${isUser ? "bg-blue-50 border border-blue-200 text-gray-800" : "bg-white border border-gray-200 text-gray-700 shadow-sm"}`}>
+  if (isUser) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px', maxWidth: '720px', margin: '0 auto 24px', width: '100%' }}>
+        <div style={{ maxWidth: '75%' }}>
           {message.attachments && message.attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b border-gray-200">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '6px', justifyContent: 'flex-end' }}>
               {message.attachments.map(att => (
-                <div key={att.id} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg text-xs border border-gray-200">
-                  {att.type.startsWith("image/") ? <ImageIcon size={14} className="text-emerald-500" /> : <FileText size={14} className="text-emerald-500" />}
-                  <span className="truncate max-w-[150px] text-gray-700">{att.name}</span>
-                  <span className="text-gray-400">{formatFileSize(att.size)}</span>
+                <div key={att.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '3px 8px', background: '#f4f4f2', borderRadius: '8px', fontSize: '11px' }}>
+                  {att.type.startsWith("image/") ? <ImageIcon size={12} style={{ color: '#6b7280' }} /> : <FileText size={12} style={{ color: '#6b7280' }} />}
+                  <span style={{ color: '#374151' }}>{att.name}</span>
                 </div>
               ))}
             </div>
           )}
-          {/* Agent result badge */}
-          {message.agentResult && <AgentResultRenderer result={message.agentResult} />}
-          <div className="text-sm leading-relaxed whitespace-pre-wrap">{formatContent(text)}</div>
-          {tables.map((t, i) => <TableRenderer key={`t-${i}`} table={t} />)}
-          {charts.map((c, i) => <ChartRenderer key={`c-${i}`} chart={c} />)}
-          {/* Approval card */}
-          {message.pendingApproval && (
-            <ApprovalCard 
-              approval={message.pendingApproval} 
-              onApprove={message.pendingApproval.onApprove}
-              onReject={message.pendingApproval.onReject}
-            />
-          )}
-          {/* Email draft card */}
-          {message.emailDraft && (
-            <EmailDraftCard 
-              draft={message.emailDraft}
-              onSend={async (finalDraft) => {
-                const res = await fetch("/api/agents/email-send", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(finalDraft),
-                })
-                if (!res.ok) throw new Error("Send failed")
-                const data = await res.json()
-                if (!data.success) throw new Error("Send failed")
-              }}
-            />
-          )}
+          <div style={{ background: '#f4f4f2', borderRadius: '18px 18px 4px 18px', padding: '12px 16px', fontSize: '14px', color: '#374151', lineHeight: 1.6 }}>
+            {formatContent(text)}
+          </div>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1 px-1">{new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: '14px', marginBottom: '28px', maxWidth: '720px', margin: '0 auto 28px', width: '100%' }}>
+      <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#0a1a12', border: '1px solid #1a3a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
+        <SageLogo size={20} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0, paddingTop: '4px' }}>
+        <div style={{ fontSize: '12px', fontWeight: 500, color: '#10b981', marginBottom: '8px' }}>Sage</div>
+        {message.attachments && message.attachments.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '12px' }}>
+            {message.attachments.map(att => (
+              <div key={att.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '3px 8px', background: '#f7f7f5', borderRadius: '6px', fontSize: '11px', border: '1px solid #e8e8e4' }}>
+                {att.type.startsWith("image/") ? <ImageIcon size={12} style={{ color: '#6b7280' }} /> : <FileText size={12} style={{ color: '#6b7280' }} />}
+                <span style={{ color: '#374151' }}>{att.name}</span>
+                <span style={{ color: '#9ca3af' }}>{formatFileSize(att.size)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {message.agentResult && <AgentResultRenderer result={message.agentResult} />}
+        <div style={{ fontSize: '15px', lineHeight: 1.75, color: '#374151' }}>{formatContent(text)}</div>
+        {tables.map((t, i) => <TableRenderer key={`t-${i}`} table={t} />)}
+        {charts.map((c, i) => <ChartRenderer key={`c-${i}`} chart={c} />)}
+        {message.pendingApproval && (
+          <ApprovalCard approval={message.pendingApproval} onApprove={message.pendingApproval.onApprove} onReject={message.pendingApproval.onReject} />
+        )}
+        {message.emailDraft && (
+          <EmailDraftCard draft={message.emailDraft} onSend={async (finalDraft) => {
+            const res = await fetch("/api/agents/email-send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(finalDraft) })
+            if (!res.ok) throw new Error("Send failed")
+            const data = await res.json()
+            if (!data.success) throw new Error("Send failed")
+          }} />
+        )}
       </div>
     </div>
   )
@@ -1072,18 +956,21 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, onRename 
     return `${Math.floor(hrs / 24)}d`
   }, [conversation.updated_at])
   return (
-    <div className={`group relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-all ${isActive ? "bg-emerald-50 border-l-2 border-l-emerald-500" : "hover:bg-gray-50 border-l-2 border-transparent"}`} onClick={() => !isEditing && onClick()}>
-      <MessageSquare size={14} className={isActive ? "text-emerald-600 flex-shrink-0" : "text-gray-400 flex-shrink-0"} />
+    <div style={{ position: "relative", display: "flex", alignItems: "flex-start", gap: "8px", padding: "8px 10px", borderRadius: "8px", cursor: "pointer", background: isActive ? "#fff" : "transparent", boxShadow: isActive ? "0 1px 3px rgba(0,0,0,0.07)" : "none", marginBottom: "2px" }}
+      onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "#f0f0ec" }}
+      onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent" }}
+      onClick={() => !isEditing && onClick()}>
+      <MessageSquare size={13} style={{ color: isActive ? "#374151" : "#9ca3af", flexShrink: 0, marginTop: "2px" }} />
       {isEditing ? (
         <div className="flex-1 flex items-center gap-1">
-          <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} className="flex-1 bg-white text-sm text-gray-900 px-2 py-1 rounded border border-gray-200 focus:outline-none focus:border-emerald-400" autoFocus onClick={e => e.stopPropagation()} onKeyDown={e => { if (e.key === "Enter") { onRename(editTitle); setIsEditing(false) } if (e.key === "Escape") setIsEditing(false) }} />
-          <button onClick={e => { e.stopPropagation(); onRename(editTitle); setIsEditing(false) }} className="p-1 text-emerald-600"><Check size={14} /></button>
+          <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} className="flex-1 bg-white text-sm text-gray-900 px-2 py-1 rounded border border-gray-200 focus:outline-none focus:border-gray-900" autoFocus onClick={e => e.stopPropagation()} onKeyDown={e => { if (e.key === "Enter") { onRename(editTitle); setIsEditing(false) } if (e.key === "Escape") setIsEditing(false) }} />
+          <button onClick={e => { e.stopPropagation(); onRename(editTitle); setIsEditing(false) }} className="p-1 text-gray-600"><Check size={14} /></button>
           <button onClick={e => { e.stopPropagation(); setIsEditing(false) }} className="p-1 text-gray-400"><X size={14} /></button>
         </div>
       ) : (
         <>
           <div className="flex-1 min-w-0">
-            <span className={`text-sm truncate block ${isActive ? "text-gray-900 font-medium" : "text-gray-700"}`}>{conversation.title}</span>
+            <span style={{ fontSize: "13px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block", color: isActive ? "#111827" : "#374151", fontWeight: isActive ? 500 : 400 }}>{conversation.title}</span>
             <span className="text-[10px] text-gray-400">{timeAgo} ago</span>
           </div>
           <div className={`flex items-center gap-0.5 ${isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
@@ -1104,7 +991,7 @@ function AlertCard({ icon: Icon, label, count, color, onClick }: { icon: any, la
     orange: "bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100",
   }
   return (
-    <button onClick={onClick} className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border text-xs font-medium transition-all ${cm[color] || cm.amber}`}>
+    <button onClick={onClick} className={`flex items-center gap-2.5 px-3 py-2 rounded border text-xs font-medium transition-all ${cm[color] || cm.amber}`}>
       <Icon size={14} /><span>{count} {label}</span><ChevronRight size={12} className="opacity-50" />
     </button>
   )
@@ -1443,169 +1330,213 @@ AI Summary: ${d.summary || result.summary}`
 
   // ---- LOADING STATE ----
   if (dataLoading) return (
-    <div className="flex items-center justify-center h-[calc(100vh-80px)] bg-[#f4f5f7]">
-      <div className="text-center">
-        <div className="mx-auto mb-4"><SageLogo size={64} className="animate-pulse" /></div>
-        <p className="text-sm text-gray-400">Loading financial data...</p>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 80px)', background: '#fff' }}>
+      <div style={{ textAlign: 'center' }}>
+        <SageLogo size={48} className="animate-pulse" style={{ margin: '0 auto 16px' }} />
+        <p style={{ fontSize: '13px', color: '#9ca3af' }}>Loading your financial data...</p>
       </div>
     </div>
   )
 
+  // Sage owl avatar reused inline
+  const OwlAvatar = ({ size = 32 }: { size?: number }) => (
+    <div style={{ width: size, height: size, borderRadius: '8px', background: '#0a1a12', border: '1px solid #1a3a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <SageLogo size={Math.round(size * 0.62)} />
+    </div>
+  )
+
   return (
-    <div className="flex h-[calc(100vh-80px)] bg-[#f4f5f7]">
-      {/* ========== SIDEBAR ========== */}
-      <div className={`${sidebarOpen ? "w-72" : "w-0"} border-r border-gray-200 bg-white flex flex-col transition-all duration-300 overflow-hidden flex-shrink-0`}>
-        <div className="p-3 border-b border-gray-200">
-          <div className="flex items-center gap-2 mb-3">
-            <button onClick={startNewConversation} className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-700 text-sm font-medium transition-all">
-              <Plus size={16} /> New Chat
-            </button>
-            <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors" title="Collapse">
-              <PanelLeftClose size={16} />
-            </button>
+    <div style={{ display: 'flex', height: 'calc(100vh - 80px)', background: '#fff' }}>
+
+      {/* ── SIDEBAR ── */}
+      <div style={{ width: sidebarOpen ? '260px' : '0', background: '#fafaf9', borderRight: '1px solid #e8e8e4', display: 'flex', flexDirection: 'column', transition: 'width 0.2s', overflow: 'hidden', flexShrink: 0 }}>
+
+        {/* Brand + new button */}
+        <div style={{ padding: '16px 14px 10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+            <SageLogo size={28} />
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: 500, color: '#111827' }}>Sage</div>
+              <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '1px' }}>Financial AI · Vantage</div>
+            </div>
           </div>
-          <div className="relative">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search conversations..." className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-8 pr-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/20" />
-          </div>
+          <button onClick={startNewConversation}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '7px', padding: '7px 12px', background: '#fff', border: '1px solid #e0e0db', borderRadius: '6px', fontSize: '13px', color: '#374151', cursor: 'pointer', fontFamily: 'inherit' }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#f5f5f3' }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#fff' }}>
+            <Plus size={13} /> New conversation
+          </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-          {filteredConversations.map(c => <ConversationItem key={c.id} conversation={c} isActive={c.id === currentConversationId} onClick={() => loadConversation(c)} onDelete={() => deleteConversation(c.id)} onRename={title => renameConversation(c.id, title)} />)}
-          {filteredConversations.length === 0 && <p className="text-xs text-gray-400 text-center py-8">{searchQuery ? "No matches found" : "No conversations yet"}</p>}
+
+        {/* Conversation list */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '4px 8px' }}>
+          {filteredConversations.map(c => (
+            <ConversationItem key={c.id} conversation={c} isActive={c.id === currentConversationId}
+              onClick={() => loadConversation(c)} onDelete={() => deleteConversation(c.id)}
+              onRename={title => renameConversation(c.id, title)} />
+          ))}
+          {filteredConversations.length === 0 && (
+            <p style={{ fontSize: '12px', color: '#9ca3af', textAlign: 'center', padding: '24px 8px' }}>
+              {searchQuery ? "No matches" : "No conversations yet"}
+            </p>
+          )}
         </div>
+
+        {/* Live data footer */}
         {dataStats && (
-          <div className="p-3 border-t border-gray-200 bg-gray-50">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Data Connected</p>
-            <div className="space-y-1.5">
-              {dataStats.uncatTxns > 0 && <div className="flex items-center gap-2 text-amber-600 text-[11px] font-medium"><div className="w-1.5 h-1.5 rounded-full bg-amber-400" /><span>{dataStats.uncatTxns} uncategorized</span></div>}
-              {dataStats.overdueInvs > 0 && <div className="flex items-center gap-2 text-rose-600 text-[11px] font-medium"><div className="w-1.5 h-1.5 rounded-full bg-rose-400" /><span>{dataStats.overdueInvs} overdue</span></div>}
-              <div className="flex items-center gap-2 text-gray-500 text-[11px]"><Activity size={11} /><span>{dataStats.totalDataPoints.toLocaleString()} data points</span></div>
-              {dataStats.learnedCount > 0 && <div className="flex items-center gap-2 text-emerald-600 text-[11px]"><Brain size={11} /><span>{dataStats.learnedCount} learned patterns</span></div>}
+          <div style={{ padding: '12px 14px', borderTop: '1px solid #e8e8e4' }}>
+            <p style={{ fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', marginBottom: '6px' }}>Live data</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+              {dataStats.uncatTxns > 0 && (
+                <button onClick={() => sendMessage("Categorize my uncategorized transactions")}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#92400e', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', fontFamily: 'inherit', textAlign: 'left' }}>
+                  <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }} />
+                  {dataStats.uncatTxns} uncategorized transactions
+                </button>
+              )}
+              {dataStats.overdueInvs > 0 && (
+                <button onClick={() => sendMessage("Show me overdue invoices and recommend follow-up actions")}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#991b1b', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', fontFamily: 'inherit', textAlign: 'left' }}>
+                  <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
+                  {dataStats.overdueInvs} overdue invoices
+                </button>
+              )}
+              {[
+                { k: 'Transactions', v: companyData?.transactions?.length || 0 },
+                { k: 'Time entries', v: companyData?.timeEntries?.length || 0 },
+                { k: 'Projects', v: companyData?.projects?.length || 0 },
+              ].map(row => (
+                <div key={row.k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                  <span style={{ color: '#9ca3af' }}>{row.k}</span>
+                  <span style={{ color: '#374151', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{row.v.toLocaleString()}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}
       </div>
 
-      {/* ========== MAIN AREA ========== */}
-      <div className="flex-1 flex flex-col relative min-w-0" onDragOver={e => { e.preventDefault(); setIsDragging(true) }} onDragLeave={() => setIsDragging(false)} onDrop={handleDrop}>
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-white">
-          <div className="flex items-center gap-3">
-            {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors mr-1" title="Open sidebar"><PanelLeft size={16} /></button>}
-            <SageLogo size={32} />
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-sm font-semibold text-gray-900">Sage</h1>
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase tracking-wider">Agent</span>
-              </div>
-              <p className="text-[11px] text-gray-400">Financial Intelligence & Operations</p>
+      {/* ── MAIN ── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: '#fff' }}
+        onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={handleDrop}>
+
+        {/* Top bar */}
+        <div style={{ height: '52px', borderBottom: '1px solid #f0f0ec', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {!sidebarOpen && (
+              <button onClick={() => setSidebarOpen(true)}
+                style={{ padding: '6px', background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', display: 'flex', marginRight: '4px' }}>
+                <PanelLeft size={16} />
+              </button>
+            )}
+            <SageLogo size={22} />
+            <span style={{ fontSize: '14px', fontWeight: 500, color: '#111827' }}>Sage</span>
+            <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', letterSpacing: '0.03em' }}>Financial AI</span>
+          </div>
+          {kpis && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '12px' }}>
+              {[
+                { l: 'GM%', v: `${kpis.teamMarginPct.toFixed(1)}%`, danger: kpis.teamMarginPct < 10 },
+                { l: 'Runway', v: `${kpis.runway.toFixed(1)}mo`, danger: kpis.runway < 3 },
+                { l: 'AR', v: formatCurrency(kpis.arOutstanding), danger: false },
+                { l: 'Util', v: `${kpis.utilizationRate.toFixed(0)}%`, danger: false },
+              ].map((k, i, arr) => (
+                <React.Fragment key={k.l}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ color: '#9ca3af' }}>{k.l}</span>
+                    <span style={{ fontWeight: 500, fontVariantNumeric: 'tabular-nums', color: k.danger ? '#dc2626' : '#374151' }}>{k.v}</span>
+                  </div>
+                  {i < arr.length - 1 && <div style={{ width: '1px', height: '13px', background: '#e8e8e4' }} />}
+                </React.Fragment>
+              ))}
             </div>
-          </div>
-          <div className="flex items-center gap-5">
-            {dataStats && (
-              <div className="hidden md:flex items-center gap-2">
-                {dataStats.uncatTxns > 0 && (
-                  <button onClick={() => sendMessage("Categorize my uncategorized transactions")} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-[11px] font-medium hover:bg-amber-100 transition-colors">
-                    <CreditCard size={11} />{dataStats.uncatTxns} uncat
-                  </button>
-                )}
-                {dataStats.overdueInvs > 0 && (
-                  <button onClick={() => sendMessage("Show me overdue invoices and recommend follow-up actions")} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-[11px] font-medium hover:bg-rose-100 transition-colors">
-                    <AlertTriangle size={11} />{dataStats.overdueInvs} overdue
-                  </button>
-                )}
-              </div>
-            )}
-            {kpis && (
-              <div className="hidden lg:flex items-center gap-5 text-xs">
-                <div className="flex items-center gap-1.5"><span className="text-gray-400">GM%</span><span className={`font-semibold tabular-nums ${kpis.teamMarginPct >= 20 ? "text-emerald-600" : kpis.teamMarginPct >= 10 ? "text-amber-600" : "text-rose-500"}`}>{kpis.teamMarginPct.toFixed(1)}%</span></div>
-                <div className="w-px h-4 bg-gray-200" />
-                <div className="flex items-center gap-1.5"><span className="text-gray-400">Runway</span><span className={`font-semibold tabular-nums ${kpis.runway >= 6 ? "text-emerald-600" : kpis.runway >= 3 ? "text-amber-600" : "text-rose-500"}`}>{kpis.runway.toFixed(1)}mo</span></div>
-                <div className="w-px h-4 bg-gray-200" />
-                <div className="flex items-center gap-1.5"><span className="text-gray-400">AR</span><span className="text-blue-600 font-semibold tabular-nums">{formatCurrency(kpis.arOutstanding)}</span></div>
-                <div className="w-px h-4 bg-gray-200" />
-                <div className="flex items-center gap-1.5"><span className="text-gray-400">Util</span><span className="text-purple-600 font-semibold tabular-nums">{kpis.utilizationRate.toFixed(0)}%</span></div>
-              </div>
-            )}
-            <button onClick={startNewConversation} className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors" title="New conversation"><Plus size={16} /></button>
-          </div>
+          )}
         </div>
-        {/* Drop Zone */}
-        {isDragging && (
-          <div className="absolute inset-0 bg-white/95 z-50 flex items-center justify-center border-2 border-dashed border-emerald-400 m-4 rounded-xl">
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto mb-4"><Paperclip size={28} className="text-emerald-500" /></div>
-              <p className="text-lg text-gray-800 font-medium">Drop files here</p>
-              <p className="text-sm text-gray-400 mt-1">Images, CSV, Excel, PDF, Text</p>
-            </div>
-          </div>
-        )}
-        {/* ========== CONTENT ========== */}
-        <div className="flex-1 overflow-y-auto">
+
+        {/* ── CONTENT AREA ── */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
           {!hasMessages ? (
-            <div className="h-full flex flex-col px-6 py-8 overflow-y-auto">
-              <div className="max-w-4xl mx-auto w-full flex flex-col">
-                <div className="flex items-center gap-4 mb-6">
-                  <SageLogo size={56} className="flex-shrink-0" />
-                  <div>
-                    <h1 className="text-xl font-bold text-gray-900">Welcome back, Gabriel</h1>
-                    <p className="text-sm text-gray-400">Here is your financial snapshot. Ask me anything about your business.</p>
-                  </div>
+
+            /* ── WELCOME ── */
+            <div style={{ maxWidth: '620px', margin: '0 auto', padding: '52px 24px 24px' }}>
+
+              {/* Owl + greeting */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '32px' }}>
+                <SageLogo size={48} />
+                <div>
+                  <h1 style={{ fontSize: '22px', fontWeight: 500, color: '#111827', margin: '0 0 5px' }}>
+                    Good morning, Gabriel.
+                  </h1>
+                  <p style={{ fontSize: '14px', color: '#6b7280', lineHeight: 1.6, margin: 0 }}>
+                    Ask me anything about your business — revenue, margins, your team, cash flow, or what needs your attention today.
+                  </p>
                 </div>
-                {dataStats && (dataStats.uncatTxns > 0 || dataStats.overdueInvs > 0 || (kpis && kpis.teamMarginPct > 0 && kpis.teamMarginPct < 15)) && (
-                  <div className="flex flex-wrap gap-2 mb-6">
-                    {dataStats.uncatTxns > 0 && <AlertCard icon={CreditCard} label="uncategorized transactions" count={dataStats.uncatTxns} color="amber" onClick={() => sendMessage("Categorize my uncategorized transactions")} />}
-                    {dataStats.overdueInvs > 0 && <AlertCard icon={AlertTriangle} label="overdue invoices" count={dataStats.overdueInvs} color="rose" onClick={() => sendMessage("Show me overdue invoices and recommend follow-up actions")} />}
-                    {kpis && kpis.teamMarginPct > 0 && kpis.teamMarginPct < 15 && <AlertCard icon={TrendingDown} label={`margin at ${kpis.teamMarginPct.toFixed(1)}%`} count={1} color="orange" onClick={() => sendMessage("My team margin is below 15%. What is driving this and how can I improve it?")} />}
+              </div>
+
+              {/* Quick actions — plain text, no boxes */}
+              <p style={{ fontSize: '11px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: '10px' }}>Start here</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '36px' }}>
+                {QUICK_ACTIONS.map((action, i) => (
+                  <button key={i} onClick={() => handleQuickAction(action)}
+                    style={{ padding: '11px 14px', background: '#fff', border: '1px solid #e8e8e4', borderRadius: '8px', fontSize: '13px', color: '#374151', textAlign: 'left', cursor: 'pointer', lineHeight: 1.4, fontFamily: 'inherit' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#9ca3af'; e.currentTarget.style.background = '#fafaf9' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#e8e8e4'; e.currentTarget.style.background = '#fff' }}>
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Big Claude-style input */}
+              <div style={{ border: '1px solid #d1d5db', borderRadius: '14px', background: '#fff', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                {attachments.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '10px 16px 0' }}>
+                    {attachments.map(att => (
+                      <div key={att.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '3px 8px', background: '#f7f7f5', borderRadius: '6px', fontSize: '11px', border: '1px solid #e8e8e4' }}>
+                        {att.type.startsWith("image/") ? <ImageIcon size={12} style={{ color: '#6b7280' }} /> : <FileText size={12} style={{ color: '#6b7280' }} />}
+                        <span style={{ color: '#374151' }}>{att.name}</span>
+                        <button onClick={() => removeAttachment(att.id)} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', display: 'flex', padding: 0 }}><XCircle size={11} /></button>
+                      </div>
+                    ))}
                   </div>
                 )}
-                <div className="mb-8">
-                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Quick Actions</p>
-                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
-                    {QUICK_ACTIONS.map((action, i) => {
-                      const Icon = action.icon
-                      return (
-                        <button key={i} onClick={() => handleQuickAction(action)} className={`flex items-center gap-3 px-3.5 py-3 rounded-lg bg-white border hover:shadow-sm transition-all text-sm text-gray-600 hover:text-gray-900 text-left group ${action.accent ? "border-emerald-200 hover:border-emerald-300" : "border-gray-200 hover:border-gray-300"}`}>
-                          <div className={`w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 transition-colors ${action.accent ? "bg-emerald-50 group-hover:bg-emerald-100" : "bg-gray-50 group-hover:bg-gray-100"}`}>
-                            <Icon size={16} className={`transition-colors ${action.accent ? "text-emerald-600" : "text-gray-400 group-hover:text-gray-600"}`} />
-                          </div>
-                          <span className="leading-tight">{action.label}</span>
-                        </button>
-                      )
-                    })}
+                <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyPress}
+                  placeholder={smartPlaceholder} rows={2}
+                  style={{ width: '100%', border: 'none', outline: 'none', background: 'transparent', padding: '16px 18px 8px', fontSize: '15px', color: '#111827', resize: 'none', fontFamily: 'inherit', minHeight: '60px', maxHeight: '200px', lineHeight: 1.55, boxSizing: 'border-box' }} />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px 10px' }}>
+                  <span style={{ fontSize: '11px', color: '#c8c5bc' }}>Enter to send · Drop files to attach</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button onClick={() => fileInputRef.current?.click()}
+                      style={{ width: '32px', height: '32px', border: 'none', borderRadius: '7px', background: 'none', color: '#9ca3af', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Paperclip size={16} />
+                    </button>
+                    <button onClick={() => sendMessage(input)} disabled={!input.trim() && attachments.length === 0}
+                      style={{ width: '32px', height: '32px', border: 'none', borderRadius: '7px', background: (input.trim() || attachments.length > 0) && !loading ? '#111827' : '#f0f0ec', color: (input.trim() || attachments.length > 0) && !loading ? '#fff' : '#9ca3af', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {loading ? <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={14} />}
+                    </button>
                   </div>
-                </div>
-                <div className="w-full max-w-3xl mx-auto mt-4">
-                  <div className="relative">
-                    <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyPress} placeholder={smartPlaceholder} rows={2} className="w-full bg-white border border-gray-200 rounded-2xl pl-5 pr-28 py-5 text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 text-[15px] transition-all shadow-sm" style={{ minHeight: "72px", maxHeight: "200px" }} />
-                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-                      <button onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-md hover:bg-gray-50" title="Attach file"><Paperclip size={16} /></button>
-                      <button onClick={() => sendMessage(input)} disabled={!input.trim() || loading} className="w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-100 disabled:cursor-not-allowed flex items-center justify-center transition-colors">
-                        {loading ? <RefreshCw size={16} className="text-white animate-spin" /> : <Send size={16} className="text-white" />}
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-gray-400 mt-2.5 text-center">Enter to send · Drop files to attach · Charts, tables, agents</p>
                 </div>
               </div>
             </div>
+
           ) : (
-            <div className="py-6 px-4 space-y-5">
+
+            /* ── CHAT MESSAGES ── */
+            <div style={{ maxWidth: '680px', margin: '0 auto', padding: '32px 24px' }}>
               {messages.map(message => <ChatMessage key={message.id} message={message} />)}
               {loading && (
-                <div className="flex gap-3.5 max-w-4xl mx-auto">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-50 ring-1 ring-emerald-200 flex items-center justify-center mt-0.5"><SageLogo size={22} /></div>
-                  <div>
-                    <p className="text-[11px] font-medium text-emerald-600 mb-1 px-1">Sage</p>
-                    <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm">
-                      <div className="flex items-center gap-3">
-                        <div className="flex gap-1">
-                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                        </div>
-                        <span className="text-xs text-gray-400">{loadingLabel}</span>
-                      </div>
+                <div style={{ display: 'flex', gap: '14px', marginBottom: '28px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#0a1a12', border: '1px solid #1a3a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
+                    <SageLogo size={20} />
+                  </div>
+                  <div style={{ paddingTop: '4px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 500, color: '#10b981', marginBottom: '10px' }}>Sage</div>
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                      {[0, 150, 300].map(d => (
+                        <span key={d} style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#9ca3af', display: 'inline-block', animation: 'bounce 1s infinite', animationDelay: `${d}ms` }} />
+                      ))}
+                      <span style={{ fontSize: '13px', color: '#9ca3af', marginLeft: '6px' }}>{loadingLabel}</span>
                     </div>
                   </div>
                 </div>
@@ -1614,32 +1545,46 @@ AI Summary: ${d.summary || result.summary}`
             </div>
           )}
         </div>
-        {/* ===== BOTTOM INPUT ===== */}
+
+        {/* ── BOTTOM INPUT (when chat is active) ── */}
         {hasMessages && (
-          <div className="border-t border-gray-200 px-4 py-3.5 bg-white">
-            {attachments.length > 0 && (
-              <div className="max-w-4xl mx-auto mb-2.5 flex flex-wrap gap-2">
-                {attachments.map(att => (
-                  <div key={att.id} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs">
-                    {att.type.startsWith("image/") ? <ImageIcon size={13} className="text-emerald-500" /> : <FileText size={13} className="text-emerald-500" />}
-                    <span className="text-gray-700 truncate max-w-[150px]">{att.name}</span>
-                    <button onClick={() => removeAttachment(att.id)} className="text-gray-400 hover:text-red-500 transition-colors"><XCircle size={13} /></button>
+          <div style={{ borderTop: '1px solid #f0f0ec', padding: '12px 24px 16px', background: '#fff', flexShrink: 0 }}>
+            <div style={{ maxWidth: '680px', margin: '0 auto' }}>
+              <div style={{ border: '1px solid #d1d5db', borderRadius: '14px', background: '#fff', overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+                {attachments.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '10px 14px 0' }}>
+                    {attachments.map(att => (
+                      <div key={att.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '3px 8px', background: '#f7f7f5', borderRadius: '6px', fontSize: '11px', border: '1px solid #e8e8e4' }}>
+                        {att.type.startsWith("image/") ? <ImageIcon size={12} style={{ color: '#6b7280' }} /> : <FileText size={12} style={{ color: '#6b7280' }} />}
+                        <span style={{ color: '#374151' }}>{att.name}</span>
+                        <button onClick={() => removeAttachment(att.id)} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', display: 'flex', padding: 0 }}><XCircle size={11} /></button>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-            <div className="max-w-4xl mx-auto relative">
-              <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyPress} placeholder="Ask a follow-up..." rows={2} className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-5 pr-28 py-4 text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 text-[15px] transition-all" style={{ minHeight: "64px", maxHeight: "200px" }} />
-              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-                <button onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-md hover:bg-gray-100" title="Attach file"><Paperclip size={16} /></button>
-                <button onClick={() => sendMessage(input)} disabled={(!input.trim() && attachments.length === 0) || loading} className="w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-100 disabled:cursor-not-allowed flex items-center justify-center transition-colors">
-                  {loading ? <RefreshCw size={16} className="text-white animate-spin" /> : <Send size={16} className="text-white" />}
-                </button>
+                )}
+                <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyPress}
+                  placeholder="Ask a follow-up..." rows={1}
+                  style={{ width: '100%', border: 'none', outline: 'none', background: 'transparent', padding: '12px 16px 6px', fontSize: '14px', color: '#111827', resize: 'none', fontFamily: 'inherit', minHeight: '44px', maxHeight: '200px', lineHeight: 1.5, boxSizing: 'border-box' }} />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 10px 8px' }}>
+                  <span style={{ fontSize: '11px', color: '#c8c5bc' }}>Enter to send · Drop files to attach</span>
+                  <div style={{ display: 'flex', gap: '5px' }}>
+                    <button onClick={() => fileInputRef.current?.click()}
+                      style={{ width: '28px', height: '28px', border: 'none', borderRadius: '6px', background: 'none', color: '#9ca3af', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Paperclip size={15} />
+                    </button>
+                    <button onClick={() => sendMessage(input)} disabled={(!input.trim() && attachments.length === 0) || loading}
+                      style={{ width: '28px', height: '28px', border: 'none', borderRadius: '6px', background: (input.trim() || attachments.length > 0) && !loading ? '#111827' : '#f0f0ec', color: (input.trim() || attachments.length > 0) && !loading ? '#fff' : '#9ca3af', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {loading ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={13} />}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         )}
-        <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.csv,.xlsx,.xls,.txt,.json" onChange={e => handleFileSelect(e.target.files)} className="hidden" />
+
+        <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.csv,.xlsx,.xls,.txt,.json"
+          onChange={e => handleFileSelect(e.target.files)} className="hidden" />
       </div>
     </div>
   )
