@@ -928,9 +928,9 @@ export default function ContractorPortal() {
 
   // ============ PORTAL ============
   return (
-    <div className="min-h-screen bg-[#f5f5f3] text-gray-900" style={{ colorScheme: 'light' }}>
+    <div className="min-h-screen text-gray-900" style={{ background: '#f5f5f3', colorScheme: 'light' }}>
       {/* Top Bar */}
-      <header className="sticky top-0 z-40 border-b border-gray-200 bg-white">
+      <header style={{ position: 'sticky', top: 0, zIndex: 40, borderBottom: '1px solid #e0e0db', background: '#fff' }}>
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-[48px]">
             {/* Logo + Name */}
@@ -938,7 +938,7 @@ export default function ContractorPortal() {
               <svg width={18} height={18} viewBox="0 0 40 40" fill="none">
                 <path d="M8 8L20 32L32 8" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
               </svg>
-              <div className="h-3.5 w-px bg-gray-200" />
+              <div style={{ width: '1px', height: '14px', background: '#e0e0db' }} />
               <span className="text-[13px] font-medium text-gray-600">{member?.name}</span>
             </div>
 
@@ -946,16 +946,18 @@ export default function ContractorPortal() {
             <nav className="flex items-center overflow-x-auto">
               {navItems.map(item => (
                 <button key={item.id} onClick={() => { setActiveTab(item.id); setError(null) }}
-                  className={`relative flex items-center gap-1.5 px-3 sm:px-4 h-[48px] text-[12px] font-medium transition-colors whitespace-nowrap ${
-                    activeTab === item.id
-                      ? 'text-gray-900'
-                      : 'text-gray-400 hover:text-gray-700'
-                  }`}>
-                  <item.icon size={13} className={activeTab === item.id ? 'text-gray-700' : ''} />
+                  style={{
+                    position: 'relative', display: 'flex', alignItems: 'center', gap: '5px',
+                    padding: '0 14px', height: '48px', fontSize: '12px',
+                    fontWeight: activeTab === item.id ? 500 : 400,
+                    color: activeTab === item.id ? '#111827' : '#9ca3af',
+                    background: 'none', border: 'none',
+                    borderBottom: activeTab === item.id ? '1.5px solid #111827' : '1.5px solid transparent',
+                    cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 0.15s',
+                    fontFamily: 'inherit'
+                  }}>
+                  <item.icon size={13} style={{ color: activeTab === item.id ? '#374151' : '#9ca3af' }} />
                   <span className="hidden sm:inline">{item.label}</span>
-                  {activeTab === item.id && (
-                    <span className="absolute bottom-0 left-2 right-2 h-[1.5px] bg-gray-900" />
-                  )}
                 </button>
               ))}
             </nav>
@@ -982,54 +984,49 @@ export default function ContractorPortal() {
 
         {/* ====== TIMESHEET ====== */}
         {activeTab === 'time' && (
-          <div className="space-y-3">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
             {/* Week Nav + KPI strip */}
-            <div className={`${T.card} overflow-hidden`}>
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+            <div style={{ background: '#fff', border: '1px solid #e0e0db', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid #e8e8e4' }}>
                 <WeekNav week={week}
                   onPrev={() => { const d = new Date(weekDate); d.setDate(d.getDate() - 7); setWeekDate(d) }}
                   onNext={() => { const d = new Date(weekDate); d.setDate(d.getDate() + 7); setWeekDate(d) }}
                 />
-                <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400">
+                <span style={{ fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af' }}>
                   {totalTimeHours > 0 ? 'Draft' : 'Not submitted'}
                 </span>
               </div>
-              <div className="grid grid-cols-3 divide-x divide-gray-100">
-                <div className="px-4 py-3">
-                  <div className="text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400 mb-1">This week</div>
-                  <div className={`text-xl font-medium tabular-nums tracking-tight ${totalTimeHours > 0 ? 'text-emerald-600' : 'text-gray-300'}`}>
-                    {totalTimeHours > 0 ? `${totalTimeHours.toFixed(1)}h` : '—'}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr' }}>
+                {[
+                  { label: 'This week', value: totalTimeHours > 0 ? `${totalTimeHours.toFixed(1)}h` : '—', em: totalTimeHours > 0 },
+                  { label: 'Month to date', value: assignments.length > 0 ? `${(existingEntries.reduce((s: number, e: any) => s + (e.hours || 0), 0)).toFixed(1)}h` : '—', em: false },
+                  { label: 'Projects', value: String(assignments.length), em: false },
+                ].map((kpi, i) => (
+                  <div key={kpi.label} style={{ padding: '10px 16px', borderRight: i < 2 ? '1px solid #e8e8e4' : 'none' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', marginBottom: '3px' }}>{kpi.label}</div>
+                    <div style={{ fontSize: '20px', fontWeight: 500, fontVariantNumeric: 'tabular-nums', color: kpi.em ? '#10b981' : '#111827' }}>{kpi.value}</div>
                   </div>
-                </div>
-                <div className="px-4 py-3">
-                  <div className="text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400 mb-1">Month to date</div>
-                  <div className="text-xl font-medium tabular-nums tracking-tight text-gray-900">
-                    {assignments.length > 0 ? `${(existingEntries.reduce((s: number, e: any) => s + (e.hours || 0), 0)).toFixed(1)}h` : '—'}
-                  </div>
-                </div>
-                <div className="px-4 py-3">
-                  <div className="text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400 mb-1">Projects</div>
-                  <div className="text-xl font-medium tabular-nums tracking-tight text-gray-900">{assignments.length}</div>
-                </div>
+                ))}
               </div>
             </div>
 
             {timeSuccess && (
-              <div className="flex items-center gap-2 text-emerald-700 text-[13px] bg-gray-50 border border-gray-200 px-3 py-2 rounded">
-                <CheckCircle size={13} className="shrink-0" /> Timesheet submitted successfully
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#065f46', fontSize: '13px', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '8px 12px', borderRadius: '4px' }}>
+                <CheckCircle size={13} style={{ flexShrink: 0 }} /> Timesheet submitted successfully
               </div>
             )}
 
             {/* Project rows */}
-            <div className={`${T.card} overflow-hidden divide-y divide-gray-100`}>
-              <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                <span className={T.sectionTitle}>Log hours — {week.label}</span>
-                <span className={`${T.sectionTitle} tabular-nums`}>{totalTimeHours > 0 ? `${totalTimeHours.toFixed(1)}h total` : ''}</span>
+            <div style={{ background: '#fff', border: '1px solid #e0e0db', borderRadius: '4px', overflow: 'hidden' }}>
+              {/* Section header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 16px', background: '#f7f7f5', borderBottom: '1px solid #e8e8e4' }}>
+                <span style={{ fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af' }}>Log hours — {week.label}</span>
+                {totalTimeHours > 0 && <span style={{ fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{totalTimeHours.toFixed(1)}h total</span>}
               </div>
 
               {Object.entries(assignmentsByClient).map(([cid, { clientName, projects }]) => {
                 const color = clientColorMap[cid] || '#9ca3af'
-                // desaturate: map vibrant colors to muted equivalents
                 const muted: Record<string, string> = {
                   '#f59e0b': '#b08d57', '#f97316': '#b07a50', '#eab308': '#a89040',
                   '#10b981': '#4a9e7a', '#14b8a6': '#4a9490', '#06b6d4': '#4a8fa8',
@@ -1039,26 +1036,26 @@ export default function ContractorPortal() {
                 const dotColor = muted[color] || color
 
                 return (
-                  <div key={cid}>
-                    {/* Client header — minimal */}
-                    <div className="flex items-center gap-2 px-4 py-2 bg-gray-50/50">
-                      <div className="w-1.5 h-1.5 rounded shrink-0" style={{ background: dotColor }} />
-                      <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400">{clientName}</span>
+                  <div key={cid} style={{ borderTop: '1px solid #e8e8e4' }}>
+                    {/* Client header */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 16px', background: '#fafaf9' }}>
+                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
+                      <span style={{ fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af' }}>{clientName}</span>
                     </div>
 
-                    {projects.map((p, i) => {
+                    {projects.map((p) => {
                       const hasHours = parseFloat(timeEntries[p.project_id]?.hours || '0') > 0
                       const hasNote = !!(timeEntries[p.project_id]?.notes)
                       const noteOpen = hasHours || hasNote
 
                       return (
-                        <div key={p.project_id} className="border-t border-gray-100 first:border-t-0">
+                        <div key={p.project_id} style={{ borderTop: '1px solid #f0f0ec' }}>
                           {/* Hour row */}
-                          <div className="flex items-center px-4 h-11 gap-3">
-                            <span className={`flex-1 text-[13px] truncate ${hasHours ? 'text-gray-900' : 'text-gray-500'}`}>
+                          <div style={{ display: 'flex', alignItems: 'center', padding: '0 16px', height: '44px', gap: '12px' }}>
+                            <span style={{ flex: 1, fontSize: '13px', color: hasHours ? '#111827' : '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {p.project_name}
                             </span>
-                            <div className="flex items-center gap-1.5 shrink-0">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                               <input
                                 type="text"
                                 inputMode="decimal"
@@ -1069,34 +1066,36 @@ export default function ContractorPortal() {
                                   if (v === '' || /^\d*\.?\d*$/.test(v))
                                     setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], hours: v } }))
                                 }}
-                                className="w-12 py-1 bg-transparent border-b border-gray-200 text-gray-900 text-[14px] font-medium text-right tabular-nums focus:outline-none focus:border-gray-900 transition-colors placeholder-gray-300"
+                                style={{
+                                  width: '52px', height: '28px', border: '1px solid #d1d5db',
+                                  borderRadius: '3px', background: hasHours ? '#fff' : '#f9fafb',
+                                  textAlign: 'right', fontSize: '14px', fontWeight: 500,
+                                  fontVariantNumeric: 'tabular-nums', color: '#111827',
+                                  padding: '0 8px', outline: 'none'
+                                }}
+                                onFocus={e => { e.currentTarget.style.borderColor = '#111827'; e.currentTarget.style.background = '#fff' }}
+                                onBlur={e => { e.currentTarget.style.borderColor = '#d1d5db'; e.currentTarget.style.background = hasHours ? '#fff' : '#f9fafb' }}
                               />
-                              <span className="text-[11px] text-gray-300 w-3">h</span>
+                              <span style={{ fontSize: '11px', color: '#d1d5db', width: '10px' }}>h</span>
                             </div>
-                            {/* Note toggle — only show when row has hours or already has a note */}
                             {(hasHours || hasNote) && (
                               <button
                                 onClick={() => {
-                                  const current = timeEntries[p.project_id]?.notes
-                                  if (current !== undefined && !hasHours) return
                                   setTimeEntries(prev => ({
                                     ...prev,
-                                    [p.project_id]: {
-                                      ...prev[p.project_id],
-                                      notes: hasNote ? '' : (prev[p.project_id]?.notes ?? '')
-                                    }
+                                    [p.project_id]: { ...prev[p.project_id], notes: hasNote ? '' : (prev[p.project_id]?.notes ?? '') }
                                   }))
                                 }}
-                                className="text-[11px] text-gray-300 hover:text-gray-600 transition-colors shrink-0 px-1"
+                                style={{ fontSize: '11px', color: hasNote ? '#6b7280' : '#9ca3af', padding: '0 4px', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit' }}
                               >
                                 {hasNote ? '− note' : '+ note'}
                               </button>
                             )}
                           </div>
 
-                          {/* Expandable note — Option A */}
+                          {/* Expandable note */}
                           {noteOpen && (
-                            <div className="px-4 pb-2.5 pt-0">
+                            <div style={{ padding: '0 16px 10px' }}>
                               <input
                                 type="text"
                                 placeholder="What did you work on this week?"
@@ -1105,7 +1104,13 @@ export default function ContractorPortal() {
                                   ...prev,
                                   [p.project_id]: { ...prev[p.project_id], notes: e.target.value }
                                 }))}
-                                className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded text-[12px] text-gray-600 placeholder-gray-300 focus:outline-none focus:border-gray-400 focus:bg-white transition-colors"
+                                style={{
+                                  width: '100%', padding: '6px 10px', border: '1px solid #e8e8e4',
+                                  borderRadius: '3px', background: '#f7f7f5', fontSize: '12px',
+                                  color: '#374151', outline: 'none', fontFamily: 'inherit'
+                                }}
+                                onFocus={e => { e.currentTarget.style.borderColor = '#9ca3af'; e.currentTarget.style.background = '#fff' }}
+                                onBlur={e => { e.currentTarget.style.borderColor = '#e8e8e4'; e.currentTarget.style.background = '#f7f7f5' }}
                               />
                             </div>
                           )}
@@ -1118,8 +1123,8 @@ export default function ContractorPortal() {
             </div>
 
             {/* Footer — submit */}
-            <div className="flex items-center justify-between pt-1">
-              <span className="text-[12px] text-gray-400">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '4px' }}>
+              <span style={{ fontSize: '12px', color: '#9ca3af' }}>
                 {totalTimeHours > 0
                   ? `Submitting ${totalTimeHours.toFixed(1)}h across ${Object.values(timeEntries).filter(e => parseFloat(e.hours || '0') > 0).length} project${Object.values(timeEntries).filter(e => parseFloat(e.hours || '0') > 0).length !== 1 ? 's' : ''}`
                   : 'Enter hours above to submit'}
