@@ -1113,15 +1113,27 @@ export default function SageAssistantPage() {
     if (result.status === "error") return `AGENT ERROR (${result.agent}): ${result.summary}`
     const d = result.data
     switch (result.agent) {
-      case "timesheet-reconciler":
-        return `TIMESHEET RECONCILER RESULTS:
+     case "timesheet-reconciler": {
+  const weeklyTable = (d.weekly_by_client || []).map((row: any) => {
+    const clients = Object.entries(row.clients || {}).map(([c, h]) => `${c}: ${(h as number).toFixed(1)}h`).join(" | ")
+    return `  Week of ${row.week_label}: ${clients} (total ${row.total.toFixed(1)}h)`
+  }).join("\n") || "  All hours submitted in one batch — no weekly breakdown available"
+
+  const clientTotals = Object.entries(d.client_totals || {}).map(([c, h]) => `  ${c}: ${(h as number).toFixed(1)}h`).join("\n") || "  None"
+
+  return `TIMESHEET RECONCILER RESULTS:
 Week: ${d.week?.start} to ${d.week?.end}
 Team: ${d.team_summary?.total_members || 0} contractors, ${d.team_summary?.submitted || 0} submitted, ${d.team_summary?.missing || 0} missing, ${d.team_summary?.partial || 0} partial
 Total hours: ${d.team_summary?.total_hours || 0}
-${(d.members || []).map((m: any) => `  ${m.name}: ${m.status} (${m.hours_logged}h/${m.expected_hours}h) — ${m.projects?.map((p: any) => `${p.name}: ${p.hours}h`).join(", ") || "no entries"}`).join("\n")}
+${(d.members || []).map((m: any) => `  ${m.name}: ${m.status} (${m.hours_logged}h) — ${m.projects?.map((p: any) => `${p.name}: ${p.hours}h`).join(", ") || "no entries"}`).join("\n")}
+WEEKLY HOURS BY CLIENT:
+${weeklyTable}
+CLIENT PERIOD TOTALS:
+${clientTotals}
 Budget alerts: ${(d.budget_alerts || []).map((b: any) => `${b.project_name} (${b.client_name}): ${b.hours_used}/${b.budget_hours}h = ${b.burn_pct}% [${b.status}]`).join("; ") || "None"}
 AI Analysis: ${d.ai_analysis || ""}
 Reminders drafted: ${(d.reminders || []).length}`
+}
 
       case "cashflow-forecaster":
         return `CASH FLOW FORECAST RESULTS:
