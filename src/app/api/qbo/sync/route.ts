@@ -102,7 +102,7 @@ async function syncPurchases(
         account_name: accountName,
         direction: 'debit',
         type: 'expense',
-      }, { onConflict: 'qb_id', ignoreDuplicates: false })
+      }, { onConflict: 'company_id,qb_id', ignoreDuplicates: false })
 
       if (error) { console.error(`Purchase upsert ${row.Id}:`, error.message); errors++ }
       else synced++
@@ -150,7 +150,7 @@ async function syncDeposits(
         account_name: accountName,
         direction: 'credit',
         type: 'income',
-      }, { onConflict: 'qb_id', ignoreDuplicates: false })
+      }, { onConflict: 'company_id,qb_id', ignoreDuplicates: false })
 
       if (error) { console.error(`Deposit upsert ${row.Id}:`, error.message); errors++ }
       else synced++
@@ -197,7 +197,7 @@ async function syncTransfers(
         account_name: fromAccount,
         direction: 'transfer',
         type: 'transfer',
-      }, { onConflict: 'qb_id', ignoreDuplicates: false })
+      }, { onConflict: 'company_id,qb_id', ignoreDuplicates: false })
 
       if (error) { console.error(`Transfer upsert ${row.Id}:`, error.message); errors++ }
       else synced++
@@ -242,7 +242,7 @@ async function syncPayments(
         account_name: row.DepositToAccountRef?.name || '',
         direction: 'credit',
         type: 'payment',
-      }, { onConflict: 'qb_id', ignoreDuplicates: false })
+      }, { onConflict: 'company_id,qb_id', ignoreDuplicates: false })
 
       if (error) { console.error(`Payment upsert ${row.Id}:`, error.message); errors++ }
       else synced++
@@ -288,7 +288,7 @@ async function syncBillPayments(
         account_name: accountName,
         direction: 'debit',
         type: 'bill_payment',
-      }, { onConflict: 'qb_id', ignoreDuplicates: false })
+      }, { onConflict: 'company_id,qb_id', ignoreDuplicates: false })
 
       if (error) { console.error(`BillPayment upsert ${row.Id}:`, error.message); errors++ }
       else synced++
@@ -340,7 +340,7 @@ async function syncJournalEntries(
           account_name: accountName,
           direction,
           type: 'journal',
-        }, { onConflict: 'qb_id', ignoreDuplicates: false })
+        }, { onConflict: 'company_id,qb_id', ignoreDuplicates: false })
 
         if (error) { console.error(`JournalEntry upsert ${row.Id}_${line.Id}:`, error.message); errors++ }
         else synced++
