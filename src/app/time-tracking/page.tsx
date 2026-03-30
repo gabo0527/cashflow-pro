@@ -551,6 +551,7 @@ export default function TimeTrackingPage() {
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
 
   const [showEntryModal, setShowEntryModal] = useState(false)
+  const [notesModal, setNotesModal] = useState<{ open: boolean; notes: string; employee: string; project: string; date: string } | null>(null)
   const [formData, setFormData] = useState({ date: new Date().toISOString().split('T')[0], team_member_id: '', project_id: '', hours: '', billable_hours: '', notes: '', is_billable: true })
 
   // Toast
@@ -1376,7 +1377,17 @@ export default function TimeTrackingPage() {
                       <td className="px-3 py-2.5 text-right text-gray-500 text-xs tabular-nums">{formatCurrency(cost)}</td>
                       <td className="px-3 py-2.5 text-right text-gray-900 text-xs tabular-nums">{formatCurrency(revenue)}</td>
                       <td className={`px-3 py-2.5 text-right text-xs font-medium tabular-nums ${margin >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCurrency(margin)}</td>
-                      <td className={`px-3 py-2.5 ${THEME.textDim} text-xs max-w-[120px] truncate`}>{entry.notes || '—'}</td>
+                      <td className={`px-3 py-2.5 text-xs max-w-[160px]`}>
+                        {entry.notes ? (
+                          <button
+                            onClick={() => setNotesModal({ open: true, notes: entry.notes!, employee: entry.team_member_name, project: entry.project_name, date: formatDate(entry.date) })}
+                            className="text-left w-full truncate text-gray-500 hover:text-gray-900 hover:underline underline-offset-2 transition-colors cursor-pointer"
+                            title="Click to view full note"
+                          >
+                            {entry.notes}
+                          </button>
+                        ) : <span className={THEME.textDim}>—</span>}
+                      </td>
                       <td className="px-3 py-2.5">
                         <button onClick={() => deleteEntry(entry.id)} className="p-1.5 rounded bg-gray-100 text-gray-500 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Delete">
                           <Trash2 size={13} />
@@ -1499,6 +1510,27 @@ export default function TimeTrackingPage() {
             <div className="flex gap-3 mt-6">
               <button onClick={() => setShowEntryModal(false)} className={`flex-1 px-4 py-2.5 bg-white hover:bg-gray-100 border ${THEME.border} rounded-lg text-sm font-medium text-gray-600 transition-colors`}>Cancel</button>
               <button onClick={saveNewEntry} className="flex-1 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm font-medium text-white transition-colors">Add Entry</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ NOTES MODAL ============ */}
+      {notesModal?.open && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setNotesModal(null)}>
+          <div className={`${THEME.card} border rounded-xl p-6 w-full max-w-md shadow-2xl`} onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-0.5">Note</p>
+                <p className="text-sm font-semibold text-gray-900">{notesModal.employee} · {notesModal.project}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{notesModal.date}</p>
+              </div>
+              <button onClick={() => setNotesModal(null)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{notesModal.notes}</p>
             </div>
           </div>
         </div>
