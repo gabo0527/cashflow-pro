@@ -427,6 +427,10 @@ export default function BankFeedSection({
   const [dateOpen,   setDateOpen]       = useState(false)
   const [catDropOpen,setCatDropOpen]    = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [qboSyncing,   setQboSyncing]   = useState(false)
+  const [qboProgress,  setQboProgress]  = useState<string | null>(null)  // e.g. 'Purchase (1/7)...'
+  const [qboLastSync,  setQboLastSync]  = useState<string | null>(null)
+  const [qboError,     setQboError]     = useState<string | null>(null)
 
   const dateRef   = useRef<HTMLDivElement>(null)
   const catDropRef= useRef<HTMLDivElement>(null)
@@ -504,6 +508,50 @@ export default function BankFeedSection({
     setIsRefreshing(true)
     await onRefresh()
     setIsRefreshing(false)
+  }
+
+  const handleQboSync = async () => {
+    if (!companyId || qboSyncing) return
+    setQboSyncing(true)
+    setQboError(null)
+
+    const entities = ['Purchase', 'Deposit', 'Transfer', 'Payment', 'BillPayment', 'JournalEntry', 'Invoice']
+    let anyError = false
+
+    for (let i = 0; i < entities.length; i++) {
+      const entity = entities[i]
+      setQboProgress(`${entity} (${i + 1}/${entities.length})…`)
+      try {
+        const res = await fetch('/api/qbo/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ companyId, entity }),
+        })
+        const data = await res.json()
+        if (!res.ok || !data.success) {
+          if (data.reconnect) {
+            setQboError('QBO session expired — reconnect in Settings')
+            break
+          }
+          anyError = true
+          console.error(`QBO sync error for ${entity}:`, data.error)
+        }
+      } catch (e) {
+        anyError = true
+        console.error(`QBO sync network error for ${entity}:`, e)
+      }
+    }
+
+    setQboSyncing(false)
+    setQboProgress(null)
+
+    if (!anyError) {
+      const now = new Date()
+      setQboLastSync(now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }))
+      if (onRefresh) await onRefresh() // reload transactions from DB
+    } else if (!qboError) {
+      setQboError('Some entities failed — check Vercel logs')
+    }
   }
 
   const handleSave = useCallback(async (cat: string, sub: string, ch?: string) => {
@@ -672,15 +720,33 @@ export default function BankFeedSection({
               )}
             </div>
 
-            {/* Sync status */}
+            {/* Sync status — QBO */}
             <div className="flex items-center gap-2 text-[10px] text-slate-400 pb-1">
-              <div className={`w-1.5 h-1.5 rounded-full ${plaidConnected ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-              {lastSynced ? `Synced ${lastSynced}` : 'Not connected'}
-              {plaidConnected && (
-                <button onClick={handleRefresh} disabled={isRefreshing}
-                  className={`px-2 py-0.5 text-[10px] font-semibold border border-slate-200 rounded bg-white text-slate-500 hover:border-slate-300 transition-colors ${isRefreshing ? 'opacity-50' : ''}`}>
-                  {isRefreshing ? '…' : 'Refresh'}
-                </button>
+              {qboSyncing ? (
+                <>
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  <span className="text-amber-600 font-medium">{qboProgress || 'Syncing…'}</span>
+                </>
+              ) : qboError ? (
+                <>
+                  <div className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                  <span className="text-rose-500">{qboError}</span>
+                  <button onClick={handleQboSync}
+                    className="px-2 py-0.5 text-[10px] font-semibold border border-slate-200 rounded bg-white text-slate-500 hover:border-slate-300 transition-colors">
+                    Retry
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className={`w-1.5 h-1.5 rounded-full ${qboLastSync || lastSynced ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                  <span>{qboLastSync ? `Synced ${qboLastSync}` : lastSynced ? `Synced ${lastSynced}` : 'Not synced'}</span>
+                  {companyId && (
+                    <button onClick={handleQboSync}
+                      className="px-2 py-0.5 text-[10px] font-semibold border border-slate-200 rounded bg-white text-slate-500 hover:border-slate-300 transition-colors">
+                      Sync QBO
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
