@@ -1,5 +1,7 @@
 // src/app/api/qbo/sync/route.ts
-// Invoices ONLY — bank feed removed. Plaid handles all bank/CC transactions.
+// Invoices + Bank Transactions (Purchase, Deposit, Transfer) via QBO
+// Chunked per entity — each POST call handles one entity type to stay under Vercel 10s free tier limit
+// Supported entity values: 'Invoice' | 'Purchase' | 'Deposit' | 'Transfer'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -37,6 +39,316 @@ async function buildLookups(supabase: any, companyId: string) {
   const projectMap: Record<string, string> = {}
   for (const p of (projects || [])) projectMap[p.name.toLowerCase().trim()] = p.id
   return { clientMap, projectMap }
+}
+
+// ─── Entity → direction/type map (for reference) ─────────────────────────────
+// Purchase      → debit    / expense      (checks, CC charges, cash expenses)
+// Deposit       → credit   / income       (bank deposits, misc income)
+// Transfer      → transfer / transfer     (bank-to-bank, CC payments)
+// Payment       → credit   / payment      (customer payments received)
+// BillPayment   → debit    / bill_payment (paying vendor bills)
+// JournalEntry  → mixed    / journal      (manual accounting entries)
+
+// ─── Bank Transaction Sync ───────────────────────────────────────────────────
+
+/**
+ * Normalize QBO line items into a human-readable description.
+ * Falls back to payee name, memo, or entity type.
+ */
+function buildDescription(txn: any, entityType: string): string {
+  const lines = txn.Line || []
+  const lineDesc = lines
+    .map((l: any) => l.Description || l.AccountBasedExpenseLineDetail?.AccountRef?.name || '')
+    .filter(Boolean)
+    .join('; ')
+  return lineDesc || txn.PrivateNote || txn.EntityRef?.name || txn.PaymentMethodRef?.name || entityType
+}
+
+/**
+ * Pull Purchase transactions (expenses, checks, credit card charges).
+ * direction = 'debit', amount stored as negative.
+ */
+async function syncPurchases(
+  accessToken: string, realmId: string, companyId: string, supabase: any
+): Promise<{ entity: string; synced: number; skipped: number; errors: number }> {
+  let synced = 0, skipped = 0, errors = 0
+
+  const rows = await qboQuery(
+    accessToken, realmId,
+    `SELECT * FROM Purchase WHERE TxnDate >= '${START_DATE}' ORDER BY TxnDate DESC MAXRESULTS 500`,
+    'Purchase'
+  )
+  console.log(`QBO Purchase: ${rows.length} found`)
+
+  for (const row of rows) {
+    try {
+      const qbId = `purchase_${row.Id}`
+      const amount = -(Math.abs(row.TotalAmt || 0)) // expenses are negative
+      const payee = row.EntityRef?.name || row.AccountRef?.name || ''
+      const description = buildDescription(row, 'Purchase')
+      const qbCategory = row.AccountRef?.name || row.Line?.[0]?.AccountBasedExpenseLineDetail?.AccountRef?.name || ''
+      const accountName = row.AccountRef?.name || ''
+
+      const { error } = await supabase.from('transactions').upsert({
+        company_id: companyId,
+        qb_id: qbId,
+        sync_source: 'quickbooks',
+        synced_at: new Date().toISOString(),
+        date: row.TxnDate,
+        description,
+        amount,
+        payee,
+        qb_category: qbCategory,
+        account_name: accountName,
+        direction: 'debit',
+        type: 'expense',
+      }, { onConflict: 'qb_id', ignoreDuplicates: false })
+
+      if (error) { console.error(`Purchase upsert ${row.Id}:`, error.message); errors++ }
+      else synced++
+    } catch (e: any) { console.error('Purchase parse error:', e.message); errors++ }
+  }
+
+  return { entity: 'Purchase', synced, skipped, errors }
+}
+
+/**
+ * Pull Deposit transactions (bank deposits, income received).
+ * direction = 'credit', amount stored as positive.
+ */
+async function syncDeposits(
+  accessToken: string, realmId: string, companyId: string, supabase: any
+): Promise<{ entity: string; synced: number; skipped: number; errors: number }> {
+  let synced = 0, skipped = 0, errors = 0
+
+  const rows = await qboQuery(
+    accessToken, realmId,
+    `SELECT * FROM Deposit WHERE TxnDate >= '${START_DATE}' ORDER BY TxnDate DESC MAXRESULTS 500`,
+    'Deposit'
+  )
+  console.log(`QBO Deposit: ${rows.length} found`)
+
+  for (const row of rows) {
+    try {
+      const qbId = `deposit_${row.Id}`
+      const amount = Math.abs(row.TotalAmt || 0)
+      const lines = row.Line || []
+      const payee = lines[0]?.LinkedTxn?.[0]?.TxnType || lines[0]?.DepositLineDetail?.Entity?.name || ''
+      const description = lines.map((l: any) => l.Description || '').filter(Boolean).join('; ') || 'Deposit'
+      const accountName = row.DepositToAccountRef?.name || ''
+
+      const { error } = await supabase.from('transactions').upsert({
+        company_id: companyId,
+        qb_id: qbId,
+        sync_source: 'quickbooks',
+        synced_at: new Date().toISOString(),
+        date: row.TxnDate,
+        description,
+        amount,
+        payee,
+        qb_category: 'Deposit',
+        account_name: accountName,
+        direction: 'credit',
+        type: 'income',
+      }, { onConflict: 'qb_id', ignoreDuplicates: false })
+
+      if (error) { console.error(`Deposit upsert ${row.Id}:`, error.message); errors++ }
+      else synced++
+    } catch (e: any) { console.error('Deposit parse error:', e.message); errors++ }
+  }
+
+  return { entity: 'Deposit', synced, skipped, errors }
+}
+
+/**
+ * Pull Transfer transactions (bank-to-bank, CC payments).
+ * Stored as direction = 'transfer'.
+ */
+async function syncTransfers(
+  accessToken: string, realmId: string, companyId: string, supabase: any
+): Promise<{ entity: string; synced: number; skipped: number; errors: number }> {
+  let synced = 0, skipped = 0, errors = 0
+
+  const rows = await qboQuery(
+    accessToken, realmId,
+    `SELECT * FROM Transfer WHERE TxnDate >= '${START_DATE}' ORDER BY TxnDate DESC MAXRESULTS 500`,
+    'Transfer'
+  )
+  console.log(`QBO Transfer: ${rows.length} found`)
+
+  for (const row of rows) {
+    try {
+      const qbId = `transfer_${row.Id}`
+      const amount = Math.abs(row.Amount || 0)
+      const fromAccount = row.FromAccountRef?.name || ''
+      const toAccount = row.ToAccountRef?.name || ''
+      const description = `Transfer: ${fromAccount} → ${toAccount}`
+
+      const { error } = await supabase.from('transactions').upsert({
+        company_id: companyId,
+        qb_id: qbId,
+        sync_source: 'quickbooks',
+        synced_at: new Date().toISOString(),
+        date: row.TxnDate,
+        description,
+        amount,
+        payee: toAccount,
+        qb_category: 'Transfer',
+        account_name: fromAccount,
+        direction: 'transfer',
+        type: 'transfer',
+      }, { onConflict: 'qb_id', ignoreDuplicates: false })
+
+      if (error) { console.error(`Transfer upsert ${row.Id}:`, error.message); errors++ }
+      else synced++
+    } catch (e: any) { console.error('Transfer parse error:', e.message); errors++ }
+  }
+
+  return { entity: 'Transfer', synced, skipped, errors }
+}
+
+/**
+ * Pull Payment transactions (customer payments received).
+ * direction = 'credit', type = 'payment'
+ */
+async function syncPayments(
+  accessToken: string, realmId: string, companyId: string, supabase: any
+): Promise<{ entity: string; synced: number; skipped: number; errors: number }> {
+  let synced = 0, skipped = 0, errors = 0
+
+  const rows = await qboQuery(
+    accessToken, realmId,
+    `SELECT * FROM Payment WHERE TxnDate >= '${START_DATE}' ORDER BY TxnDate DESC MAXRESULTS 500`,
+    'Payment'
+  )
+  console.log(`QBO Payment: ${rows.length} found`)
+
+  for (const row of rows) {
+    try {
+      const qbId = `payment_${row.Id}`
+      const amount = Math.abs(row.TotalAmt || 0)
+      const payee = row.CustomerRef?.name || ''
+
+      const { error } = await supabase.from('transactions').upsert({
+        company_id: companyId,
+        qb_id: qbId,
+        sync_source: 'quickbooks',
+        synced_at: new Date().toISOString(),
+        date: row.TxnDate,
+        description: `Payment received: ${payee}`,
+        amount,
+        payee,
+        qb_category: 'Customer Payment',
+        account_name: row.DepositToAccountRef?.name || '',
+        direction: 'credit',
+        type: 'payment',
+      }, { onConflict: 'qb_id', ignoreDuplicates: false })
+
+      if (error) { console.error(`Payment upsert ${row.Id}:`, error.message); errors++ }
+      else synced++
+    } catch (e: any) { console.error('Payment parse error:', e.message); errors++ }
+  }
+
+  return { entity: 'Payment', synced, skipped, errors }
+}
+
+/**
+ * Pull BillPayment transactions (paying vendor/contractor bills).
+ * direction = 'debit', type = 'bill_payment'
+ */
+async function syncBillPayments(
+  accessToken: string, realmId: string, companyId: string, supabase: any
+): Promise<{ entity: string; synced: number; skipped: number; errors: number }> {
+  let synced = 0, skipped = 0, errors = 0
+
+  const rows = await qboQuery(
+    accessToken, realmId,
+    `SELECT * FROM BillPayment WHERE TxnDate >= '${START_DATE}' ORDER BY TxnDate DESC MAXRESULTS 500`,
+    'BillPayment'
+  )
+  console.log(`QBO BillPayment: ${rows.length} found`)
+
+  for (const row of rows) {
+    try {
+      const qbId = `billpayment_${row.Id}`
+      const amount = -(Math.abs(row.TotalAmt || 0))
+      const payee = row.VendorRef?.name || ''
+      const accountName = row.CheckPayment?.BankAccountRef?.name || row.CreditCardPayment?.CCAccountRef?.name || ''
+
+      const { error } = await supabase.from('transactions').upsert({
+        company_id: companyId,
+        qb_id: qbId,
+        sync_source: 'quickbooks',
+        synced_at: new Date().toISOString(),
+        date: row.TxnDate,
+        description: `Bill payment: ${payee}`,
+        amount,
+        payee,
+        qb_category: 'Bill Payment',
+        account_name: accountName,
+        direction: 'debit',
+        type: 'bill_payment',
+      }, { onConflict: 'qb_id', ignoreDuplicates: false })
+
+      if (error) { console.error(`BillPayment upsert ${row.Id}:`, error.message); errors++ }
+      else synced++
+    } catch (e: any) { console.error('BillPayment parse error:', e.message); errors++ }
+  }
+
+  return { entity: 'BillPayment', synced, skipped, errors }
+}
+
+/**
+ * Pull JournalEntry transactions (manual entries — overhead allocations, adjustments).
+ * Each debit/credit line becomes its own row for full cash flow visibility.
+ */
+async function syncJournalEntries(
+  accessToken: string, realmId: string, companyId: string, supabase: any
+): Promise<{ entity: string; synced: number; skipped: number; errors: number }> {
+  let synced = 0, skipped = 0, errors = 0
+
+  const rows = await qboQuery(
+    accessToken, realmId,
+    `SELECT * FROM JournalEntry WHERE TxnDate >= '${START_DATE}' ORDER BY TxnDate DESC MAXRESULTS 500`,
+    'JournalEntry'
+  )
+  console.log(`QBO JournalEntry: ${rows.length} found`)
+
+  for (const row of rows) {
+    for (const line of (row.Line || [])) {
+      try {
+        const detail = line.JournalEntryLineDetail || {}
+        const postingType = detail.PostingType || ''
+        if (!postingType) continue
+
+        const qbId = `journal_${row.Id}_${line.Id}`
+        const lineAmount = Math.abs(line.Amount || 0)
+        const amount = postingType === 'Debit' ? -lineAmount : lineAmount
+        const direction = postingType === 'Debit' ? 'debit' : 'credit'
+        const accountName = detail.AccountRef?.name || ''
+
+        const { error } = await supabase.from('transactions').upsert({
+          company_id: companyId,
+          qb_id: qbId,
+          sync_source: 'quickbooks',
+          synced_at: new Date().toISOString(),
+          date: row.TxnDate,
+          description: line.Description || row.PrivateNote || `Journal Entry ${row.DocNumber || row.Id}`,
+          amount,
+          payee: detail.Entity?.name || '',
+          qb_category: accountName,
+          account_name: accountName,
+          direction,
+          type: 'journal',
+        }, { onConflict: 'qb_id', ignoreDuplicates: false })
+
+        if (error) { console.error(`JournalEntry upsert ${row.Id}_${line.Id}:`, error.message); errors++ }
+        else synced++
+      } catch (e: any) { console.error('JournalEntry line error:', e.message); errors++ }
+    }
+  }
+
+  return { entity: 'JournalEntry', synced, skipped, errors }
 }
 
 async function syncInvoices(
@@ -100,23 +412,56 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Silently no-op any legacy bank entity calls — prevents accidental re-sync
-    if (entity && entity !== 'Invoice') {
-      return NextResponse.json({
-        success: true,
-        result: { entity, synced: 0, skipped: 0, errors: 0 },
-        message: 'Bank sync disabled — use Plaid',
-      })
+    // Default to Invoice if no entity specified (backwards compat)
+    const target = entity || 'Invoice'
+
+    let result: { entity: string; synced: number; skipped: number; errors: number; unmatchedClients?: string[] }
+
+    if (target === 'Invoice') {
+      const { clientMap, projectMap } = await buildLookups(supabase, companyId)
+      result = await syncInvoices(auth.accessToken, auth.realmId, companyId, supabase, clientMap, projectMap)
+      await supabase.from('company_settings')
+        .update({ qbo_last_invoice_sync: new Date().toISOString() })
+        .eq('company_id', companyId)
+    } else if (target === 'Purchase') {
+      result = await syncPurchases(auth.accessToken, auth.realmId, companyId, supabase)
+      await supabase.from('company_settings')
+        .update({ qbo_last_bank_sync: new Date().toISOString() })
+        .eq('company_id', companyId)
+    } else if (target === 'Deposit') {
+      result = await syncDeposits(auth.accessToken, auth.realmId, companyId, supabase)
+      await supabase.from('company_settings')
+        .update({ qbo_last_bank_sync: new Date().toISOString() })
+        .eq('company_id', companyId)
+    } else if (target === 'Transfer') {
+      result = await syncTransfers(auth.accessToken, auth.realmId, companyId, supabase)
+      await supabase.from('company_settings')
+        .update({ qbo_last_bank_sync: new Date().toISOString() })
+        .eq('company_id', companyId)
+    } else if (target === 'Payment') {
+      result = await syncPayments(auth.accessToken, auth.realmId, companyId, supabase)
+      await supabase.from('company_settings')
+        .update({ qbo_last_bank_sync: new Date().toISOString() })
+        .eq('company_id', companyId)
+    } else if (target === 'BillPayment') {
+      result = await syncBillPayments(auth.accessToken, auth.realmId, companyId, supabase)
+      await supabase.from('company_settings')
+        .update({ qbo_last_bank_sync: new Date().toISOString() })
+        .eq('company_id', companyId)
+    } else if (target === 'JournalEntry') {
+      result = await syncJournalEntries(auth.accessToken, auth.realmId, companyId, supabase)
+      await supabase.from('company_settings')
+        .update({ qbo_last_bank_sync: new Date().toISOString() })
+        .eq('company_id', companyId)
+    } else {
+      return NextResponse.json({ error: `Unknown entity: ${target}` }, { status: 400 })
     }
 
-    const { clientMap, projectMap } = await buildLookups(supabase, companyId)
-    const result = await syncInvoices(auth.accessToken, auth.realmId, companyId, supabase, clientMap, projectMap)
-
-    await supabase.from('company_settings')
-      .update({ qbo_last_invoice_sync: new Date().toISOString() })
-      .eq('company_id', companyId)
-
-    return NextResponse.json({ success: true, result, entities: ['Invoice'] })
+    return NextResponse.json({
+      success: true,
+      result,
+      message: `${result.entity}: ${result.synced} synced, ${result.errors} errors`,
+    })
 
   } catch (err: any) {
     console.error('QBO sync error:', err)
@@ -136,7 +481,7 @@ export async function GET(request: NextRequest) {
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
   const { data: settings } = await supabase
     .from('company_settings')
-    .select('qbo_realm_id, qbo_connected_at, qbo_token_expires_at, qbo_last_invoice_sync')
+    .select('qbo_realm_id, qbo_connected_at, qbo_token_expires_at, qbo_last_invoice_sync, qbo_last_bank_sync')
     .eq('company_id', companyId)
     .single()
 
@@ -146,10 +491,18 @@ export async function GET(request: NextRequest) {
     .eq('company_id', companyId)
     .eq('sync_source', 'quickbooks')
 
+  const { count: txnCount } = await supabase
+    .from('transactions')
+    .select('*', { count: 'exact', head: true })
+    .eq('company_id', companyId)
+    .eq('sync_source', 'quickbooks')
+
   return NextResponse.json({
     connected: !!settings?.qbo_realm_id,
     lastInvoiceSync: settings?.qbo_last_invoice_sync || null,
-    bankFeed: 'plaid',
-    counts: { invoices: invoiceCount || 0 },
+    lastBankSync: settings?.qbo_last_bank_sync || null,
+    counts: { invoices: invoiceCount || 0, transactions: txnCount || 0 },
+    // Entity sequence for chunked sync — call each one individually
+    entities: ['Purchase', 'Deposit', 'Transfer', 'Payment', 'BillPayment', 'JournalEntry', 'Invoice'],
   })
 }
