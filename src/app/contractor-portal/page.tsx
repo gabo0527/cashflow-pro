@@ -6,7 +6,7 @@ import {
   AlertCircle, CheckCircle, Loader2, Upload, X, Plus, Trash2, Calendar,
   DollarSign, Send, Eye, Building2, User, FileUp, LogOut, Paperclip, File,
   ArrowRight, CircleDot, Briefcase, Timer, CreditCard, Hash, History,
-  LayoutDashboard, TrendingUp, Menu
+  LayoutDashboard, TrendingUp, Menu, Shield, MapPin, Phone
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart } from 'recharts'
@@ -17,7 +17,14 @@ const supabase = createClient(
 )
 
 // ============ TYPES ============
-interface TeamMember { id: string; name: string; email: string; cost_type?: string; cost_amount?: number; company_id?: string }
+interface TeamMember {
+  id: string; name: string; email: string; cost_type?: string; cost_amount?: number; company_id?: string
+  phone?: string; address?: string; city?: string; state?: string; zip?: string; country?: string
+  bank_name?: string; routing_number?: string; account_number?: string; account_type?: string
+  swift_code?: string; iban?: string; bank_address?: string; intermediary_bank?: string
+  nda_url?: string; mspa_url?: string; psa_schedule_url?: string; w9_url?: string
+  nda_expires?: string; mspa_expires?: string; psa_expires?: string
+}
 interface Assignment { project_id: string; project_name: string; client_id: string; client_name: string; payment_type: string; rate: number }
 interface RateCard { team_member_id: string; client_id: string; client_name: string; cost_type: string; cost_amount: number; rate: number }
 interface TimeEntryForm { project_id: string; hours: string; notes: string }
@@ -255,7 +262,7 @@ export default function ContractorPortal() {
   const [rateCards, setRateCards] = useState<RateCard[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'time' | 'expenses' | 'invoices' | 'history' | 'analytics'>('time')
+  const [activeTab, setActiveTab] = useState<'time' | 'expenses' | 'invoices' | 'history' | 'analytics' | 'profile'>('time')
 
   // Time
   const [weekDate, setWeekDate] = useState(new Date())
@@ -355,7 +362,7 @@ export default function ContractorPortal() {
     if (!email.trim()) { setError('Please enter your email'); return }
     setLoading(true); setError(null)
     try {
-      const { data: md, error: me } = await supabase.from('team_members').select('id, name, email, cost_type, cost_amount, company_id').eq('email', email.trim().toLowerCase()).eq('status', 'active').single()
+      const { data: md, error: me } = await supabase.from('team_members').select('id, name, email, cost_type, cost_amount, company_id, phone, address, city, state, zip, country, bank_name, routing_number, account_number, account_type, swift_code, iban, bank_address, intermediary_bank, nda_url, mspa_url, psa_schedule_url, w9_url, nda_expires, mspa_expires, psa_expires').eq('email', email.trim().toLowerCase()).eq('status', 'active').single()
       if (me || !md) { setError('Email not found. Contact your administrator.'); setLoading(false); return }
 
       const { data: rcData } = await supabase.from('bill_rates').select('team_member_id, client_id, rate, cost_type, cost_amount').eq('team_member_id', md.id).eq('is_active', true)
@@ -882,7 +889,8 @@ export default function ContractorPortal() {
     { id: 'expenses' as const, label: 'Expenses', icon: CreditCard },
     { id: 'invoices' as const, label: 'Invoices', icon: FileText },
     { id: 'history' as const, label: 'History', icon: History },
-    { id: 'analytics' as const, label: 'Analytics', icon: TrendingUp }
+    { id: 'analytics' as const, label: 'Analytics', icon: TrendingUp },
+    { id: 'profile' as const, label: 'Profile', icon: User },
   ]
   const totalTimeHours = Object.values(timeEntries).reduce((s, e) => s + parseFloat(e.hours || '0'), 0)
 
@@ -2195,6 +2203,160 @@ export default function ContractorPortal() {
                 )}
               </>
             )}
+          </div>
+        )}
+        )}
+
+        {/* ===================== PROFILE TAB ===================== */}
+        {activeTab === 'profile' && member && (
+          <div className="space-y-4 pb-8">
+
+            {/* Personal Info */}
+            <div className={T.card}>
+              <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
+                <User size={13} className="text-gray-400" />
+                <h2 className={T.sectionTitle}>Personal Information</h2>
+              </div>
+              <div className="px-5 py-4 grid grid-cols-2 gap-4">
+                <div>
+                  <p className={T.label}>Full Name</p>
+                  <p className="text-[13px] text-gray-900 font-medium">{member.name || '—'}</p>
+                </div>
+                <div>
+                  <p className={T.label}>Email</p>
+                  <p className="text-[13px] text-gray-900">{member.email || '—'}</p>
+                </div>
+                <div>
+                  <p className={T.label}>Phone</p>
+                  <p className="text-[13px] text-gray-900">{member.phone || <span className="text-gray-300">Not on file</span>}</p>
+                </div>
+                <div>
+                  <p className={T.label}>Country</p>
+                  <p className="text-[13px] text-gray-900">{member.country || <span className="text-gray-300">Not on file</span>}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className={T.label}>Address</p>
+                  <p className="text-[13px] text-gray-900">
+                    {member.address ? (
+                      `${member.address}${member.city ? `, ${member.city}` : ''}${member.state ? `, ${member.state}` : ''}${member.zip ? ` ${member.zip}` : ''}`
+                    ) : <span className="text-gray-300">Not on file</span>}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Banking — ACH */}
+            <div className={T.card}>
+              <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
+                <CreditCard size={13} className="text-gray-400" />
+                <h2 className={T.sectionTitle}>Banking — ACH (Domestic)</h2>
+              </div>
+              <div className="px-5 py-4 grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <p className={T.label}>Bank Name</p>
+                  <p className="text-[13px] text-gray-900">{member.bank_name || <span className="text-gray-300">Not on file</span>}</p>
+                </div>
+                <div>
+                  <p className={T.label}>Routing Number</p>
+                  <p className="text-[13px] text-gray-900 font-mono">{member.routing_number || <span className="text-gray-300">—</span>}</p>
+                </div>
+                <div>
+                  <p className={T.label}>Account Number</p>
+                  <p className="text-[13px] text-gray-900 font-mono">
+                    {member.account_number
+                      ? `••••${member.account_number.slice(-4)}`
+                      : <span className="text-gray-300">—</span>}
+                  </p>
+                </div>
+                <div>
+                  <p className={T.label}>Account Type</p>
+                  <p className="text-[13px] text-gray-900 capitalize">{member.account_type || <span className="text-gray-300">—</span>}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Banking — Wire / International */}
+            {(member.swift_code || member.iban || member.bank_address || member.intermediary_bank) && (
+              <div className={T.card}>
+                <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
+                  <CreditCard size={13} className="text-blue-400" />
+                  <h2 className={T.sectionTitle}>Banking — Wire / International</h2>
+                </div>
+                <div className="px-5 py-4 grid grid-cols-2 gap-4">
+                  <div>
+                    <p className={T.label}>SWIFT / BIC</p>
+                    <p className="text-[13px] text-gray-900 font-mono">{member.swift_code || <span className="text-gray-300">—</span>}</p>
+                  </div>
+                  <div>
+                    <p className={T.label}>IBAN</p>
+                    <p className="text-[13px] text-gray-900 font-mono">{member.iban || <span className="text-gray-300">—</span>}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className={T.label}>Bank Address</p>
+                    <p className="text-[13px] text-gray-900">{member.bank_address || <span className="text-gray-300">—</span>}</p>
+                  </div>
+                  {member.intermediary_bank && (
+                    <div className="col-span-2">
+                      <p className={T.label}>Intermediary Bank</p>
+                      <p className="text-[13px] text-gray-900">{member.intermediary_bank}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Legal Documents */}
+            <div className={T.card}>
+              <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
+                <Shield size={13} className="text-gray-400" />
+                <h2 className={T.sectionTitle}>Legal Documents</h2>
+              </div>
+              <div className="px-5 py-4 space-y-3">
+                {([
+                  { field: 'nda_url' as const, label: 'Non-Disclosure Agreement (NDA)', expires: member.nda_expires },
+                  { field: 'mspa_url' as const, label: 'Master Services & Purchase Agreement (MSPA)', expires: member.mspa_expires },
+                  { field: 'psa_schedule_url' as const, label: 'PSA Schedule', expires: member.psa_expires },
+                  { field: 'w9_url' as const, label: 'W-9 Tax Form', expires: null },
+                ] as const).map(({ field, label, expires }) => {
+                  const url = member[field]
+                  const isExpiringSoon = expires && new Date(expires) < new Date(Date.now() + 30 * 86400000)
+                  const isExpired = expires && new Date(expires) < new Date()
+                  return (
+                    <div key={field} className="flex items-center justify-between p-4 bg-gray-50 border border-gray-100 rounded">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded flex items-center justify-center shrink-0 ${url ? 'bg-emerald-50' : 'bg-gray-100'}`}>
+                          <FileText size={14} className={url ? 'text-emerald-600' : 'text-gray-300'} />
+                        </div>
+                        <div>
+                          <p className="text-[13px] text-gray-900 font-medium">{label}</p>
+                          {expires && (
+                            <p className={`text-[11px] mt-0.5 ${isExpired ? 'text-red-500' : isExpiringSoon ? 'text-amber-500' : 'text-gray-400'}`}>
+                              {isExpired ? 'Expired' : 'Expires'}: {new Date(expires + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {url ? (
+                        <button
+                          onClick={async () => {
+                            const { data } = await supabase.storage.from('contractor-uploads').createSignedUrl(url, 3600)
+                            if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+                          }}
+                          className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded hover:bg-emerald-100 flex items-center gap-1.5 transition-colors">
+                          <Eye size={12} /> View PDF
+                        </button>
+                      ) : (
+                        <span className="text-[11px] text-gray-300 font-medium">Not uploaded</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            <p className="text-center text-[11px] text-gray-300 pb-2">
+              To update your information, contact your administrator.
+            </p>
           </div>
         )}
       </main>
