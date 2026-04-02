@@ -5,7 +5,8 @@ import {
   FileText, Receipt, Search, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
   CheckCircle, XCircle, Clock, DollarSign, Download, Eye, Building2,
   Loader2, X, Calendar, TrendingUp, Check,
-  ExternalLink, Tag, Ban, Layers, MessageSquare, Send, Edit2, Trash2
+  ExternalLink, Tag, Ban, Layers, MessageSquare, Send, Edit2, Trash2,
+  User, Phone, MapPin, CreditCard, FileUp, Shield, Save, Upload
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 
@@ -42,7 +43,14 @@ interface ContractorExpense {
   date: string; category: string; description: string; amount: number; receipt_url: string | null
   status: string; submitted_at: string; reviewed_at: string | null; notes: string | null; is_billable: boolean | null
 }
-interface TeamMember { id: string; name: string; email: string }
+interface TeamMember {
+  id: string; name: string; email: string
+  phone?: string; address?: string; city?: string; state?: string; zip?: string; country?: string
+  bank_name?: string; routing_number?: string; account_number?: string; account_type?: string
+  swift_code?: string; iban?: string; bank_address?: string; intermediary_bank?: string
+  nda_url?: string; mspa_url?: string; psa_schedule_url?: string; w9_url?: string
+  nda_expires?: string; mspa_expires?: string; psa_expires?: string
+}
 interface Client { id: string; name: string }
 interface Project { id: string; name: string; client_id: string }
 
@@ -321,7 +329,7 @@ function GroupBySelector({ dimensions, onChange }: { dimensions: GroupDimension[
 
 // ============ MAIN COMPONENT ============
 export default function ContractorManagement() {
-  const [activeTab, setActiveTab] = useState<'invoices' | 'expenses'>('invoices')
+  const [activeTab, setActiveTab] = useState<'invoices' | 'expenses' | 'contractors'>('invoices')
   const [loading, setLoading] = useState(true)
   const [invoices, setInvoices] = useState<ContractorInvoice[]>([])
   const [expenses, setExpenses] = useState<ContractorExpense[]>([])
@@ -367,6 +375,12 @@ export default function ContractorManagement() {
   const [editExpense, setEditExpense] = useState<ContractorExpense | null>(null)
   const [editForm, setEditForm] = useState<Record<string, any>>({})
   const [saving, setSaving] = useState(false)
+
+  // Profile drawer
+  const [profileMember, setProfileMember] = useState<TeamMember | null>(null)
+  const [profileForm, setProfileForm] = useState<Partial<TeamMember>>({})
+  const [profileSaving, setProfileSaving] = useState(false)
+  const [profileUploading, setProfileUploading] = useState<string | null>(null)
 
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; type: 'invoice' | 'expense'; label: string } | null>(null)
@@ -416,7 +430,7 @@ export default function ContractorManagement() {
       const [invRes, expRes, teamRes, clientRes, projRes] = await Promise.all([
         supabase.from('contractor_invoices').select('*, contractor_invoice_lines(*)').order('submitted_at', { ascending: false }),
         supabase.from('contractor_expenses').select('*').order('date', { ascending: false }),
-        supabase.from('team_members').select('id, name, email').eq('status', 'active'),
+        supabase.from('team_members').select('id, name, email, phone, address, city, state, zip, country, bank_name, routing_number, account_number, account_type, swift_code, iban, bank_address, intermediary_bank, nda_url, mspa_url, psa_schedule_url, w9_url, nda_expires, mspa_expires, psa_expires').eq('status', 'active'),
         supabase.from('clients').select('id, name'),
         supabase.from('projects').select('id, name, client_id'),
       ])
@@ -670,6 +684,64 @@ export default function ContractorManagement() {
     setProcessing(null)
   }
 
+  // ============ PROFILE HANDLERS ============
+  const openProfile = (member: TeamMember) => {
+    setProfileMember(member)
+    setProfileForm({ ...member })
+  }
+
+  const saveProfile = async () => {
+    if (!profileMember) return
+    setProfileSaving(true)
+    const updates: Partial<TeamMember> = {
+      phone: profileForm.phone || null,
+      address: profileForm.address || null,
+      city: profileForm.city || null,
+      state: profileForm.state || null,
+      zip: profileForm.zip || null,
+      country: profileForm.country || null,
+      bank_name: profileForm.bank_name || null,
+      routing_number: profileForm.routing_number || null,
+      account_number: profileForm.account_number || null,
+      account_type: profileForm.account_type || null,
+      swift_code: profileForm.swift_code || null,
+      iban: profileForm.iban || null,
+      bank_address: profileForm.bank_address || null,
+      intermediary_bank: profileForm.intermediary_bank || null,
+      nda_expires: profileForm.nda_expires || null,
+      mspa_expires: profileForm.mspa_expires || null,
+      psa_expires: profileForm.psa_expires || null,
+    } as any
+    const { error } = await supabase.from('team_members').update(updates).eq('id', profileMember.id)
+    if (!error) {
+      setTeamMembers(prev => prev.map(m => m.id === profileMember.id ? { ...m, ...updates } : m))
+      setProfileMember(prev => prev ? { ...prev, ...updates } : prev)
+    }
+    setProfileSaving(false)
+  }
+
+  const uploadProfileDoc = async (file: File, field: 'nda_url' | 'mspa_url' | 'psa_schedule_url' | 'w9_url') => {
+    if (!profileMember) return
+    setProfileUploading(field)
+    const ext = file.name.split('.').pop() || 'pdf'
+    const path = `contracts/${profileMember.id}/${field}_${Date.now()}.${ext}`
+    const { data, error } = await supabase.storage.from('contractor-uploads').upload(path, file, { contentType: file.type, upsert: true })
+    if (!error && data) {
+      const { error: dbErr } = await supabase.from('team_members').update({ [field]: data.path }).eq('id', profileMember.id)
+      if (!dbErr) {
+        setTeamMembers(prev => prev.map(m => m.id === profileMember.id ? { ...m, [field]: data.path } : m))
+        setProfileMember(prev => prev ? { ...prev, [field]: data.path } : prev)
+        setProfileForm(prev => ({ ...prev, [field]: data.path }))
+      }
+    }
+    setProfileUploading(null)
+  }
+
+  const openProfileDoc = async (path: string) => {
+    const { data } = await supabase.storage.from('contractor-uploads').createSignedUrl(path, 3600)
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+  }
+
   // ============ INVOICE ROW GRID ============
   const invGrid = 'grid-cols-[1fr_120px_90px_100px_120px_130px]'
 
@@ -849,6 +921,7 @@ export default function ContractorManagement() {
         {[
           { id: 'invoices' as const, label: 'AP Invoices', icon: FileText, count: invMetrics.pendingCount },
           { id: 'expenses' as const, label: 'Expenses', icon: Receipt, count: expMetrics.pendingCount },
+          { id: 'contractors' as const, label: 'Contractors', icon: User, count: 0 },
         ].map(tab => (
           <button key={tab.id} onClick={() => { setActiveTab(tab.id); clearFilters() }}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium vBtn border-b-2 -mb-px transition-all duration-300 ${
@@ -1179,7 +1252,249 @@ export default function ContractorManagement() {
       )}
 
       {/* ===================== DELETE CONFIRMATION ===================== */}
-      {deleteConfirm && (
+      {/* ===================== CONTRACTORS ===================== */}
+      {activeTab === 'contractors' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-3">
+            {teamMembers.map(m => {
+              const hasProfile = !!(m.phone || m.address || m.bank_name || m.nda_url)
+              const docsExpiring = [
+                m.nda_expires && new Date(m.nda_expires) < new Date(Date.now() + 30 * 86400000) ? 'NDA' : null,
+                m.mspa_expires && new Date(m.mspa_expires) < new Date(Date.now() + 30 * 86400000) ? 'MSPA' : null,
+                m.psa_expires && new Date(m.psa_expires) < new Date(Date.now() + 30 * 86400000) ? 'PSA' : null,
+              ].filter(Boolean)
+              return (
+                <div key={m.id} className="flex items-center justify-between px-5 py-4 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center text-sm font-bold text-emerald-700">
+                      {m.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-gray-900 text-sm font-semibold">{m.name}</p>
+                      <p className="text-gray-400 text-xs">{m.email}</p>
+                    </div>
+                    {docsExpiring.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                        {docsExpiring.join(', ')} expiring soon
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${hasProfile ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>
+                      {hasProfile ? 'Profile complete' : 'Profile incomplete'}
+                    </span>
+                    <button onClick={() => openProfile(m)}
+                      className="px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-1.5">
+                      <User size={12} /> View Profile
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ===================== PROFILE DRAWER ===================== */}
+      {profileMember && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-sm" onClick={() => setProfileMember(null)}>
+          <div className="relative bg-white w-full max-w-2xl h-full overflow-y-auto shadow-2xl border-l border-gray-200 flex flex-col" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white sticky top-0 z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center text-sm font-bold text-emerald-700">
+                  {profileMember.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-gray-900 text-sm font-semibold">{profileMember.name}</p>
+                  <p className="text-gray-400 text-xs">{profileMember.email}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={saveProfile} disabled={profileSaving}
+                  className="px-4 py-2 bg-gray-900 text-white text-xs font-semibold rounded-lg hover:bg-gray-800 disabled:opacity-50 flex items-center gap-1.5">
+                  {profileSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Save
+                </button>
+                <button onClick={() => setProfileMember(null)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={16} /></button>
+              </div>
+            </div>
+
+            <div className="flex-1 p-6 space-y-6">
+              {/* Personal Info */}
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <User size={13} className="text-gray-400" />
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Personal Information</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Phone</label>
+                    <input value={profileForm.phone || ''} onChange={e => setProfileForm(p => ({ ...p, phone: e.target.value }))}
+                      placeholder="+1 (787) 000-0000"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Country</label>
+                    <input value={profileForm.country || ''} onChange={e => setProfileForm(p => ({ ...p, country: e.target.value }))}
+                      placeholder="United States"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Street Address</label>
+                    <input value={profileForm.address || ''} onChange={e => setProfileForm(p => ({ ...p, address: e.target.value }))}
+                      placeholder="123 Main St"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">City</label>
+                    <input value={profileForm.city || ''} onChange={e => setProfileForm(p => ({ ...p, city: e.target.value }))}
+                      placeholder="San Juan"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">State</label>
+                      <input value={profileForm.state || ''} onChange={e => setProfileForm(p => ({ ...p, state: e.target.value }))}
+                        placeholder="PR"
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">ZIP</label>
+                      <input value={profileForm.zip || ''} onChange={e => setProfileForm(p => ({ ...p, zip: e.target.value }))}
+                        placeholder="00901"
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Banking — ACH */}
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <CreditCard size={13} className="text-gray-400" />
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Banking — ACH (Domestic)</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Bank Name</label>
+                    <input value={profileForm.bank_name || ''} onChange={e => setProfileForm(p => ({ ...p, bank_name: e.target.value }))}
+                      placeholder="Chase Bank"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Routing Number</label>
+                    <input value={profileForm.routing_number || ''} onChange={e => setProfileForm(p => ({ ...p, routing_number: e.target.value }))}
+                      placeholder="021000021"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Account Number</label>
+                    <input value={profileForm.account_number || ''} onChange={e => setProfileForm(p => ({ ...p, account_number: e.target.value }))}
+                      placeholder="000123456789"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Account Type</label>
+                    <select value={profileForm.account_type || ''} onChange={e => setProfileForm(p => ({ ...p, account_type: e.target.value }))}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400">
+                      <option value="">Select type</option>
+                      <option value="checking">Checking</option>
+                      <option value="savings">Savings</option>
+                    </select>
+                  </div>
+                </div>
+              </section>
+
+              {/* Banking — Wire / International */}
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <CreditCard size={13} className="text-blue-400" />
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Banking — Wire / International</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">SWIFT / BIC Code</label>
+                    <input value={profileForm.swift_code || ''} onChange={e => setProfileForm(p => ({ ...p, swift_code: e.target.value }))}
+                      placeholder="CHASUS33"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">IBAN</label>
+                    <input value={profileForm.iban || ''} onChange={e => setProfileForm(p => ({ ...p, iban: e.target.value }))}
+                      placeholder="GB29 NWBK 6016 1331 9268 19"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Bank Address</label>
+                    <input value={profileForm.bank_address || ''} onChange={e => setProfileForm(p => ({ ...p, bank_address: e.target.value }))}
+                      placeholder="270 Park Ave, New York, NY 10017"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Intermediary Bank (if applicable)</label>
+                    <input value={profileForm.intermediary_bank || ''} onChange={e => setProfileForm(p => ({ ...p, intermediary_bank: e.target.value }))}
+                      placeholder="Bank of America, SWIFT: BOFAUS3N"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                  </div>
+                </div>
+              </section>
+
+              {/* Legal Documents */}
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <Shield size={13} className="text-gray-400" />
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Legal Documents</h3>
+                </div>
+                <div className="space-y-4">
+                  {([
+                    { field: 'nda_url' as const, label: 'NDA', expiresField: 'nda_expires' as const },
+                    { field: 'mspa_url' as const, label: 'MSPA', expiresField: 'mspa_expires' as const },
+                    { field: 'psa_schedule_url' as const, label: 'PSA / Schedule', expiresField: 'psa_expires' as const },
+                    { field: 'w9_url' as const, label: 'W-9', expiresField: null },
+                  ] as const).map(({ field, label, expiresField }) => {
+                    const url = profileMember[field]
+                    const isUploading = profileUploading === field
+                    return (
+                      <div key={field} className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded flex items-center justify-center ${url ? 'bg-emerald-50' : 'bg-gray-100'}`}>
+                            <FileText size={14} className={url ? 'text-emerald-600' : 'text-gray-400'} />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{label}</p>
+                            {expiresField && (
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <span className="text-[10px] text-gray-400 uppercase tracking-wide">Expires</span>
+                                <input type="date" value={profileForm[expiresField] || ''}
+                                  onChange={e => setProfileForm(p => ({ ...p, [expiresField]: e.target.value }))}
+                                  className="text-[11px] text-gray-600 bg-transparent border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-emerald-400" />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {url && (
+                            <button onClick={() => openProfileDoc(url)}
+                              className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 flex items-center gap-1.5">
+                              <Eye size={12} /> View
+                            </button>
+                          )}
+                          <label className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer flex items-center gap-1.5">
+                            {isUploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                            {url ? 'Replace' : 'Upload'}
+                            <input type="file" accept=".pdf,image/*" className="hidden" disabled={isUploading}
+                              onChange={e => { if (e.target.files?.[0]) uploadProfileDoc(e.target.files[0], field) }} />
+                          </label>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm vFade" onClick={() => setDeleteConfirm(null)}>
           <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-200 bg-red-50">
