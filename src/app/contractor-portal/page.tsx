@@ -2205,7 +2205,6 @@ export default function ContractorPortal() {
             )}
           </div>
         )}
-        )}
 
         {/* ===================== PROFILE TAB ===================== */}
         {activeTab === 'profile' && member && (
