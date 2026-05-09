@@ -357,12 +357,95 @@ export default function ContractorPortal() {
     return 'mixed'
   }, [rateCards, member])
 
+  // ============ AUTH: Google SSO ============
+  // Step 1: User types email + clicks Sign In → verify email exists in team_members → redirect to Google with login_hint
+  const handleSignIn = async () => {
+    const typedEmail = email.trim().toLowerCase()
+    if (!typedEmail) { setError('Please enter your email'); return }
+    setLoading(true); setError(null)
+
+    // Pre-check: does this email belong to an active team member?
+    const { data: md, error: me } = await supabase
+      .from('team_members')
+      .select('id, email, status')
+      .eq('email', typedEmail)
+      .eq('status', 'active')
+      .single()
+
+    if (me || !md) {
+      setError('Email not found. Contact your administrator.')
+      setLoading(false)
+      return
+    }
+
+    // Stash typed email so we can verify it after OAuth callback
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('vantage_pending_email', typedEmail)
+    }
+
+    // Redirect to Google with the typed email pre-filled
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/contractor-portal`,
+        queryParams: {
+          login_hint: typedEmail,
+          prompt: 'select_account'
+        }
+      }
+    })
+    if (oauthError) {
+      setError(oauthError.message)
+      setLoading(false)
+    }
+  }
+
+  const signOutGoogle = async () => {
+    if (typeof window !== 'undefined') sessionStorage.removeItem('vantage_pending_email')
+    await supabase.auth.signOut()
+    setStep('email'); setMember(null); setAssignments([]); setRateCards([]); setEmail(''); setError(null)
+  }
+
+  // Step 2: After Google redirects back, verify the authenticated email matches the typed email
+  useEffect(() => {
+    let mounted = true
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!mounted || !session?.user?.email) return
+
+      const authEmail = session.user.email.toLowerCase()
+      const pendingEmail = typeof window !== 'undefined' ? sessionStorage.getItem('vantage_pending_email') : null
+
+      // If a typed email was pending, enforce strict match
+      if (pendingEmail && pendingEmail !== authEmail) {
+        setError(`You signed in as ${authEmail} but entered ${pendingEmail}. Please sign in with the matching Google account.`)
+        sessionStorage.removeItem('vantage_pending_email')
+        await supabase.auth.signOut()
+        return
+      }
+
+      sessionStorage.removeItem('vantage_pending_email')
+      setEmail(authEmail)
+      await lookupEmail(authEmail)
+    }
+    init()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setStep('email'); setMember(null); setAssignments([]); setRateCards([]); setEmail('')
+      }
+    })
+    return () => { mounted = false; subscription.unsubscribe() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // ============ LOOKUP EMAIL ============
-  const lookupEmail = async () => {
-    if (!email.trim()) { setError('Please enter your email'); return }
+  const lookupEmail = async (emailArg?: string) => {
+    const lookupValue = (emailArg ?? email).trim().toLowerCase()
+    if (!lookupValue) { setError('Please enter your email'); return }
     setLoading(true); setError(null)
     try {
-      const { data: md, error: me } = await supabase.from('team_members').select('id, name, email, cost_type, cost_amount, company_id, phone, address, city, state, zip, country, bank_name, routing_number, account_number, account_type, swift_code, iban, bank_address, intermediary_bank, nda_url, mspa_url, psa_schedule_url, w9_url, nda_expires, mspa_expires, psa_expires').eq('email', email.trim().toLowerCase()).eq('status', 'active').single()
+      const { data: md, error: me } = await supabase.from('team_members').select('id, name, email, cost_type, cost_amount, company_id, phone, address, city, state, zip, country, bank_name, routing_number, account_number, account_type, swift_code, iban, bank_address, intermediary_bank, nda_url, mspa_url, psa_schedule_url, w9_url, nda_expires, mspa_expires, psa_expires').eq('email', lookupValue).eq('status', 'active').single()
       if (me || !md) { setError('Email not found. Contact your administrator.'); setLoading(false); return }
 
       const { data: rcData } = await supabase.from('bill_rates').select('team_member_id, client_id, rate, cost_type, cost_amount').eq('team_member_id', md.id).eq('is_active', true)
@@ -914,7 +997,7 @@ export default function ContractorPortal() {
             <label className={T.label}>Email address</label>
             <input 
               type="email" value={email} onChange={e => setEmail(e.target.value)} 
-              onKeyDown={e => e.key === 'Enter' && lookupEmail()} 
+              onKeyDown={e => e.key === 'Enter' && handleSignIn()} 
               placeholder="you@company.com"
               className={`${T.input} mb-4`} 
             />
@@ -923,7 +1006,7 @@ export default function ContractorPortal() {
                 <AlertCircle size={15} className="shrink-0" /> {error}
               </div>
             )}
-            <button onClick={lookupEmail} disabled={loading} className={`w-full ${T.btnPrimary} py-3`}>
+            <button onClick={handleSignIn} disabled={loading} className={`w-full ${T.btnPrimary} py-3`}>
               {loading ? <><Loader2 size={16} className="animate-spin" /> Verifying...</> : <>Sign In <ArrowRight size={15} /></>}
             </button>
           </div>
@@ -971,7 +1054,7 @@ export default function ContractorPortal() {
             </nav>
 
             {/* Sign out */}
-            <button onClick={() => { setStep('email'); setMember(null); setAssignments([]); setRateCards([]); setEmail('') }}
+            <button onClick={signOutGoogle}
               className="flex items-center gap-1.5 px-2 py-1.5 rounded text-[12px] text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
               <LogOut size={13} />
             </button>
