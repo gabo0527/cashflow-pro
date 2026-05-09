@@ -690,6 +690,70 @@ export default function ContractorManagement() {
     setProfileForm({ ...member })
   }
 
+  // ============ DELETE / DEACTIVATE HANDLERS ============
+  const [deleteTarget, setDeleteTarget] = useState<TeamMember | null>(null)
+  const [deleteCounts, setDeleteCounts] = useState<{ bill_rates: number; assignments: number; expenses: number; invoices: number; time_entries: number } | null>(null)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleteMode, setDeleteMode] = useState<'deactivate' | 'hard'>('deactivate')
+  const [deleteWorking, setDeleteWorking] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const openDeleteDialog = async (member: TeamMember) => {
+    setDeleteTarget(member)
+    setDeleteConfirmText('')
+    setDeleteError(null)
+    setDeleteMode('deactivate')
+    setDeleteCounts(null)
+    // Fetch child counts to know if hard delete is even possible
+    const [br, tpa, exp, inv, te] = await Promise.all([
+      supabase.from('bill_rates').select('id', { count: 'exact', head: true }).eq('team_member_id', member.id),
+      supabase.from('team_project_assignments').select('id', { count: 'exact', head: true }).eq('team_member_id', member.id),
+      supabase.from('contractor_expenses').select('id', { count: 'exact', head: true }).eq('team_member_id', member.id),
+      supabase.from('contractor_invoices').select('id', { count: 'exact', head: true }).eq('team_member_id', member.id),
+      supabase.from('time_entries').select('id', { count: 'exact', head: true }).eq('team_member_id', member.id),
+    ])
+    setDeleteCounts({
+      bill_rates: br.count || 0,
+      assignments: tpa.count || 0,
+      expenses: exp.count || 0,
+      invoices: inv.count || 0,
+      time_entries: te.count || 0,
+    })
+  }
+
+  const closeDeleteDialog = () => {
+    setDeleteTarget(null); setDeleteCounts(null); setDeleteConfirmText('')
+    setDeleteMode('deactivate'); setDeleteError(null); setDeleteWorking(false)
+  }
+
+  const executeDeactivate = async () => {
+    if (!deleteTarget) return
+    setDeleteWorking(true); setDeleteError(null)
+    const newStatus = deleteTarget.status === 'active' ? 'inactive' : 'active'
+    const { error } = await supabase.from('team_members').update({ status: newStatus }).eq('id', deleteTarget.id)
+    if (error) { setDeleteError(error.message); setDeleteWorking(false); return }
+    setTeamMembers(prev => prev.map(m => m.id === deleteTarget.id ? { ...m, status: newStatus } : m))
+    closeDeleteDialog()
+  }
+
+  const executeHardDelete = async () => {
+    if (!deleteTarget || !deleteCounts) return
+    if (deleteConfirmText !== deleteTarget.name) {
+      setDeleteError('Name does not match. Type the contractor\'s exact name to confirm.')
+      return
+    }
+    const totalChildren = deleteCounts.bill_rates + deleteCounts.assignments + deleteCounts.expenses + deleteCounts.invoices + deleteCounts.time_entries
+    if (totalChildren > 0) {
+      setDeleteError('Cannot hard delete — contractor has linked records. Deactivate instead.')
+      return
+    }
+    setDeleteWorking(true); setDeleteError(null)
+    const { error } = await supabase.from('team_members').delete().eq('id', deleteTarget.id)
+    if (error) { setDeleteError(error.message); setDeleteWorking(false); return }
+    setTeamMembers(prev => prev.filter(m => m.id !== deleteTarget.id))
+    closeDeleteDialog()
+  }
+
   const saveProfile = async () => {
     if (!profileMember) return
     setProfileSaving(true)
@@ -1280,17 +1344,115 @@ export default function ContractorManagement() {
                     )}
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${hasProfile ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>
-                      {hasProfile ? 'Profile complete' : 'Profile incomplete'}
+                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${m.status === 'inactive' ? 'bg-gray-100 text-gray-500 border-gray-300' : (hasProfile ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-50 text-gray-400 border-gray-200')}`}>
+                      {m.status === 'inactive' ? 'Inactive' : (hasProfile ? 'Profile complete' : 'Profile incomplete')}
                     </span>
                     <button onClick={() => openProfile(m)}
                       className="px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-1.5">
                       <User size={12} /> View Profile
                     </button>
+                    <button onClick={() => openDeleteDialog(m)}
+                      title={m.status === 'inactive' ? 'Reactivate or delete' : 'Deactivate or delete'}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ===================== DELETE / DEACTIVATE MODAL ===================== */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={closeDeleteDialog}>
+          <div className="bg-white w-full max-w-md rounded-xl shadow-2xl border border-gray-200" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center"><Trash2 size={15} className="text-red-600" /></div>
+                <h3 className="text-base font-semibold text-gray-900">Manage {deleteTarget.name}</h3>
+              </div>
+              <button onClick={closeDeleteDialog} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={16} /></button>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              {!deleteCounts ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500"><Loader2 size={14} className="animate-spin" /> Loading record activity...</div>
+              ) : (
+                <>
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-xs text-gray-700 space-y-1">
+                    <div className="font-semibold text-gray-900 mb-1">Linked records</div>
+                    <div className="flex justify-between"><span>Bill rates</span><span className="font-mono">{deleteCounts.bill_rates}</span></div>
+                    <div className="flex justify-between"><span>Project assignments</span><span className="font-mono">{deleteCounts.assignments}</span></div>
+                    <div className="flex justify-between"><span>Expenses</span><span className="font-mono">{deleteCounts.expenses}</span></div>
+                    <div className="flex justify-between"><span>Invoices</span><span className="font-mono">{deleteCounts.invoices}</span></div>
+                    <div className="flex justify-between"><span>Time entries</span><span className="font-mono">{deleteCounts.time_entries}</span></div>
+                  </div>
+
+                  <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
+                    <button onClick={() => setDeleteMode('deactivate')}
+                      className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${deleteMode === 'deactivate' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                      {deleteTarget.status === 'active' ? 'Deactivate' : 'Reactivate'}
+                    </button>
+                    <button onClick={() => setDeleteMode('hard')}
+                      className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${deleteMode === 'hard' ? 'bg-white text-red-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                      Delete permanently
+                    </button>
+                  </div>
+
+                  {deleteMode === 'deactivate' ? (
+                    <div className="text-xs text-gray-600 leading-relaxed">
+                      {deleteTarget.status === 'active' ? (
+                        <>Sets status to <span className="font-mono font-semibold">inactive</span>. Contractor can no longer log into the portal. All historical records (invoices, time entries, expenses) are preserved. <span className="font-semibold text-gray-900">Reversible.</span></>
+                      ) : (
+                        <>Sets status back to <span className="font-mono font-semibold">active</span>. Contractor can log into the portal again.</>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {(deleteCounts.bill_rates + deleteCounts.assignments + deleteCounts.expenses + deleteCounts.invoices + deleteCounts.time_entries) > 0 ? (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-800">
+                          <span className="font-semibold">Hard delete blocked.</span> Contractor has linked records. Deactivate instead to preserve history.
+                        </div>
+                      ) : (
+                        <>
+                          <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-xs text-red-800">
+                            <span className="font-semibold">Permanent.</span> Removes the contractor row entirely. Cannot be undone.
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">Type the contractor's name to confirm</label>
+                            <input type="text" value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)}
+                              placeholder={deleteTarget.name}
+                              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-400" />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {deleteError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{deleteError}</div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200 bg-gray-50">
+              <button onClick={closeDeleteDialog} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg">Cancel</button>
+              {deleteMode === 'deactivate' ? (
+                <button onClick={executeDeactivate} disabled={deleteWorking || !deleteCounts}
+                  className="px-4 py-2 bg-gray-900 text-white text-sm font-semibold rounded-lg hover:bg-gray-800 disabled:opacity-50 flex items-center gap-1.5">
+                  {deleteWorking ? <><Loader2 size={13} className="animate-spin" /> Saving...</> : (deleteTarget.status === 'active' ? 'Deactivate' : 'Reactivate')}
+                </button>
+              ) : (
+                <button onClick={executeHardDelete}
+                  disabled={deleteWorking || !deleteCounts || deleteConfirmText !== deleteTarget.name || (deleteCounts.bill_rates + deleteCounts.assignments + deleteCounts.expenses + deleteCounts.invoices + deleteCounts.time_entries) > 0}
+                  className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
+                  {deleteWorking ? <><Loader2 size={13} className="animate-spin" /> Deleting...</> : 'Delete permanently'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
