@@ -45,6 +45,7 @@ interface ContractorExpense {
 }
 interface TeamMember {
   id: string; name: string; email: string
+  status?: string
   phone?: string; address?: string; city?: string; state?: string; zip?: string; country?: string
   bank_name?: string; routing_number?: string; account_number?: string; account_type?: string
   swift_code?: string; iban?: string; bank_address?: string; intermediary_bank?: string
@@ -430,7 +431,7 @@ export default function ContractorManagement() {
       const [invRes, expRes, teamRes, clientRes, projRes] = await Promise.all([
         supabase.from('contractor_invoices').select('*, contractor_invoice_lines(*)').order('submitted_at', { ascending: false }),
         supabase.from('contractor_expenses').select('*').order('date', { ascending: false }),
-        supabase.from('team_members').select('id, name, email, phone, address, city, state, zip, country, bank_name, routing_number, account_number, account_type, swift_code, iban, bank_address, intermediary_bank, nda_url, mspa_url, psa_schedule_url, w9_url, nda_expires, mspa_expires, psa_expires').eq('status', 'active'),
+        supabase.from('team_members').select('id, name, email, status, phone, address, city, state, zip, country, bank_name, routing_number, account_number, account_type, swift_code, iban, bank_address, intermediary_bank, nda_url, mspa_url, psa_schedule_url, w9_url, nda_expires, mspa_expires, psa_expires').order('name'),
         supabase.from('clients').select('id, name'),
         supabase.from('projects').select('id, name, client_id'),
       ])
@@ -1320,7 +1321,12 @@ export default function ContractorManagement() {
       {activeTab === 'contractors' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3">
-            {teamMembers.map(m => {
+            {[...teamMembers].sort((a, b) => {
+              const aActive = (a.status || 'active') === 'active' ? 0 : 1
+              const bActive = (b.status || 'active') === 'active' ? 0 : 1
+              if (aActive !== bActive) return aActive - bActive
+              return a.name.localeCompare(b.name)
+            }).map(m => {
               const hasProfile = !!(m.phone || m.address || m.bank_name || m.nda_url)
               const docsExpiring = [
                 m.nda_expires && new Date(m.nda_expires) < new Date(Date.now() + 30 * 86400000) ? 'NDA' : null,
@@ -1328,7 +1334,7 @@ export default function ContractorManagement() {
                 m.psa_expires && new Date(m.psa_expires) < new Date(Date.now() + 30 * 86400000) ? 'PSA' : null,
               ].filter(Boolean)
               return (
-                <div key={m.id} className="flex items-center justify-between px-5 py-4 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 transition-colors">
+                <div key={m.id} className={`flex items-center justify-between px-5 py-4 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 transition-colors ${m.status === 'inactive' ? 'opacity-60' : ''}`}>
                   <div className="flex items-center gap-4">
                     <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center text-sm font-bold text-emerald-700">
                       {m.name.charAt(0).toUpperCase()}
