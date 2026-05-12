@@ -357,12 +357,89 @@ export default function ContractorPortal() {
     return 'mixed'
   }, [rateCards, member])
 
-  // ============ LOOKUP EMAIL ============
-  const lookupEmail = async () => {
-    if (!email.trim()) { setError('Please enter your email'); return }
+  // ============ AUTH: GOOGLE SSO ============
+  // The login button calls /api/contractor-auth/start. The server validates
+  // the email exists in team_members, then returns a Google OAuth URL. We
+  // redirect the browser to Google. After Google authenticates the user,
+  // they get sent to /api/contractor-auth/callback which sets a session
+  // cookie and redirects back to /contractor-portal.
+
+  const handleSignIn = async () => {
+    const typedEmail = email.trim().toLowerCase()
+    if (!typedEmail) { setError('Please enter your email'); return }
     setLoading(true); setError(null)
     try {
-      const { data: md, error: me } = await supabase.from('team_members').select('id, name, email, cost_type, cost_amount, company_id, phone, address, city, state, zip, country, bank_name, routing_number, account_number, account_type, swift_code, iban, bank_address, intermediary_bank, nda_url, mspa_url, psa_schedule_url, w9_url, nda_expires, mspa_expires, psa_expires').eq('email', email.trim().toLowerCase()).eq('status', 'active').single()
+      const res = await fetch('/api/contractor-auth/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: typedEmail })
+      })
+      const data = await res.json()
+      if (!res.ok || !data.url) {
+        setError(data.error || 'Login could not be started. Try again.')
+        setLoading(false)
+        return
+      }
+      // Hand off to Google. Browser navigates away.
+      window.location.href = data.url
+    } catch (err) {
+      setError('Network error. Please try again.')
+      setLoading(false)
+    }
+  }
+
+  const handleSignOut = async () => {
+    try {
+      await fetch('/api/contractor-auth/logout', { method: 'POST' })
+    } catch { /* ignore */ }
+    setStep('email'); setMember(null); setAssignments([]); setRateCards([]); setEmail(''); setError(null)
+  }
+
+  // On mount: check if a session cookie exists. If yes, load the portal
+  // for that contractor. If no, show the login screen. Also surface any
+  // ?auth_error=... query param from a failed callback redirect.
+  useEffect(() => {
+    let mounted = true
+    const init = async () => {
+      // Check for redirect-with-error from /api/contractor-auth/callback
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search)
+        const authError = params.get('auth_error')
+        if (authError) {
+          setError(authError)
+          // Clean the URL so the error doesn't persist on refresh
+          window.history.replaceState({}, '', window.location.pathname)
+        }
+      }
+
+      try {
+        const res = await fetch('/api/contractor-auth/me', { method: 'GET' })
+        if (!mounted) return
+        if (res.status === 401) return // not logged in, show login screen
+        const data = await res.json()
+        if (data?.authenticated && data?.contractor?.email) {
+          setEmail(data.contractor.email)
+          await lookupEmail(data.contractor.email)
+        }
+      } catch {
+        // Network error — let user log in manually
+      }
+    }
+    init()
+    return () => { mounted = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ============ LOOKUP EMAIL ============
+  // Called AFTER authentication has succeeded. Loads all the contractor's data.
+  // The `emailArg` parameter lets us call this with the verified email from
+  // /api/contractor-auth/me, not just the typed email.
+  const lookupEmail = async (emailArg?: string) => {
+    const lookupValue = (emailArg ?? email).trim().toLowerCase()
+    if (!lookupValue) { setError('Please enter your email'); return }
+    setLoading(true); setError(null)
+    try {
+      const { data: md, error: me } = await supabase.from('team_members').select('id, name, email, cost_type, cost_amount, company_id, phone, address, city, state, zip, country, bank_name, routing_number, account_number, account_type, swift_code, iban, bank_address, intermediary_bank, nda_url, mspa_url, psa_schedule_url, w9_url, nda_expires, mspa_expires, psa_expires').eq('email', lookupValue).eq('status', 'active').single()
       if (me || !md) { setError('Email not found. Contact your administrator.'); setLoading(false); return }
 
       const { data: rcData } = await supabase.from('bill_rates').select('team_member_id, client_id, rate, cost_type, cost_amount').eq('team_member_id', md.id).eq('is_active', true)
@@ -914,7 +991,7 @@ export default function ContractorPortal() {
             <label className={T.label}>Email address</label>
             <input 
               type="email" value={email} onChange={e => setEmail(e.target.value)} 
-              onKeyDown={e => e.key === 'Enter' && lookupEmail()} 
+              onKeyDown={e => e.key === 'Enter' && handleSignIn()} 
               placeholder="you@company.com"
               className={`${T.input} mb-4`} 
             />
@@ -923,7 +1000,7 @@ export default function ContractorPortal() {
                 <AlertCircle size={15} className="shrink-0" /> {error}
               </div>
             )}
-            <button onClick={lookupEmail} disabled={loading} className={`w-full ${T.btnPrimary} py-3`}>
+            <button onClick={handleSignIn} disabled={loading} className={`w-full ${T.btnPrimary} py-3`}>
               {loading ? <><Loader2 size={16} className="animate-spin" /> Verifying...</> : <>Sign In <ArrowRight size={15} /></>}
             </button>
           </div>
@@ -971,7 +1048,7 @@ export default function ContractorPortal() {
             </nav>
 
             {/* Sign out */}
-            <button onClick={() => { setStep('email'); setMember(null); setAssignments([]); setRateCards([]); setEmail('') }}
+            <button onClick={handleSignOut}
               className="flex items-center gap-1.5 px-2 py-1.5 rounded text-[12px] text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
               <LogOut size={13} />
             </button>
