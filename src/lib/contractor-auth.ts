@@ -27,7 +27,7 @@ import { cookies } from 'next/headers'
 // ============================================================
 
 const COOKIE_NAME = 'contractor_session'
-const COOKIE_PATH = '/contractor-portal'
+const COOKIE_PATH = '/'
 const SESSION_DURATION_HOURS = 8
 
 // ============================================================
