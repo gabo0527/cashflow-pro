@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
   Search, Filter, Download, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
-  Clock, Plus, Edit2, X, Check, Trash2, Calendar, Users, DollarSign, BarChart3,
+  Clock, Plus, Edit2, X, Check, Trash2, Calendar, Users, DollarSign,
   TrendingUp, TrendingDown, Target, PieChart, Activity, Building2, User, Briefcase,
   CheckCircle, AlertCircle, RefreshCw, Eye, EyeOff, ArrowUpDown, Percent, Layers,
   Lock, Unlock
@@ -285,14 +285,14 @@ const DATE_PRESETS: { id: DatePreset; label: string }[] = [
   { id: 'custom', label: 'Custom Range' },
 ]
 
-type ViewTab = 'trends' | 'byClient' | 'byEmployee' | 'detailed' | 'profitability'
+type ViewTab = 'hoursRevenue' | 'cost' | 'trends' | 'byEmployee' | 'detailed'
 
 const VIEW_TABS: { id: ViewTab; label: string; icon: React.ReactNode }[] = [
+  { id: 'hoursRevenue', label: 'Hours & Revenue', icon: <Building2 size={15} /> },
+  { id: 'cost', label: 'Cost', icon: <DollarSign size={15} /> },
   { id: 'trends', label: 'Trends', icon: <Activity size={15} /> },
-  { id: 'byClient', label: 'By Client', icon: <Building2 size={15} /> },
   { id: 'byEmployee', label: 'By Employee', icon: <Users size={15} /> },
   { id: 'detailed', label: 'Detailed', icon: <Calendar size={15} /> },
-  { id: 'profitability', label: 'Profitability', icon: <BarChart3 size={15} /> },
 ]
 
 // Emerald-based chart palette for light theme
@@ -546,7 +546,7 @@ export default function TimeTrackingPage() {
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [showDatePicker, setShowDatePicker] = useState(false)
 
-  const [activeTab, setActiveTab] = useState<ViewTab>('byClient')
+  const [activeTab, setActiveTab] = useState<ViewTab>('hoursRevenue')
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set())
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
 
@@ -716,7 +716,7 @@ export default function TimeTrackingPage() {
   const kpis = useMemo(() => {
     const totalActualHours = costAdjustedEntries.reduce((sum, e) => sum + e.hours, 0)
     const totalBillableHours = costAdjustedEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours : 0), 0)
-    const totalCost = costAdjustedEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0)
+    const totalCost = costAdjustedEntries.reduce((sum, e) => sum + (e.hours * e.display_cost_rate), 0)
     const totalRevenue = costAdjustedEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours * e.bill_rate : 0), 0)
     const grossMargin = totalRevenue - totalCost
     const marginPct = calcMarginPct(totalRevenue, totalCost)
@@ -725,7 +725,7 @@ export default function TimeTrackingPage() {
 
     const priorHours = costAdjustedPriorEntries.reduce((sum, e) => sum + e.hours, 0)
     const priorRevenue = costAdjustedPriorEntries.reduce((sum, e) => sum + (e.is_billable ? (e.billable_hours || e.hours) * e.bill_rate : 0), 0)
-    const priorCost = costAdjustedPriorEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0)
+    const priorCost = costAdjustedPriorEntries.reduce((sum, e) => sum + (e.hours * e.display_cost_rate), 0)
     
     const activeMembers = teamMembers.filter(m => m.status === 'active')
     const totalCapacity = activeMembers.length * 160
@@ -767,7 +767,7 @@ export default function TimeTrackingPage() {
       }
       member.totalActualHours += entry.hours
       member.totalBillableHours += entry.billable_hours
-      member.totalCost += entry.hours * entry.cost_rate
+      member.totalCost += entry.hours * entry.display_cost_rate
       member.totalRevenue += entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
       if (entry.bill_rate > member.billRate) member.billRate = entry.bill_rate
       if (entry.display_cost_rate > member.costRate) member.costRate = entry.display_cost_rate
@@ -796,26 +796,14 @@ export default function TimeTrackingPage() {
       }
       const emp = employeeData[entry.team_member_id]
       emp.totalActualHours += entry.hours; emp.totalBillableHours += entry.billable_hours
-      emp.totalCost += entry.hours * entry.cost_rate; emp.totalRevenue += entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
+      emp.totalCost += entry.hours * entry.display_cost_rate; emp.totalRevenue += entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
       const clientKey = entry.client_id || 'unassigned'
       if (!emp.clients[clientKey]) emp.clients[clientKey] = { name: entry.client_name || 'Unassigned', actualHours: 0, billableHours: 0, cost: 0, revenue: 0 }
       emp.clients[clientKey].actualHours += entry.hours; emp.clients[clientKey].billableHours += entry.billable_hours
-      emp.clients[clientKey].cost += entry.hours * entry.cost_rate; emp.clients[clientKey].revenue += entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
+      emp.clients[clientKey].cost += entry.hours * entry.display_cost_rate; emp.clients[clientKey].revenue += entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
     })
     return Object.values(employeeData).sort((a, b) => b.totalActualHours - a.totalActualHours)
   }, [costAdjustedEntries, teamMembers])
-
-  // ============ PROFITABILITY DATA ============
-  const profitabilityByProject = useMemo(() => {
-    const projectData: Record<string, { id: string; name: string; clientName: string; actualHours: number; billableHours: number; cost: number; revenue: number; margin: number; marginPct: number }> = {}
-    costAdjustedEntries.forEach(entry => {
-      if (!projectData[entry.project_id]) projectData[entry.project_id] = { id: entry.project_id, name: entry.project_name, clientName: entry.client_name, actualHours: 0, billableHours: 0, cost: 0, revenue: 0, margin: 0, marginPct: 0 }
-      const p = projectData[entry.project_id]
-      p.actualHours += entry.hours; p.billableHours += entry.billable_hours
-      p.cost += entry.hours * entry.cost_rate; p.revenue += entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
-    })
-    return Object.values(projectData).map(p => ({ ...p, margin: p.revenue - p.cost, marginPct: calcMarginPct(p.revenue, p.cost) })).sort((a, b) => b.margin - a.margin)
-  }, [costAdjustedEntries])
 
   const revenueByClientData = useMemo(() => dataByClient.map((c, i) => ({ name: c.name, value: c.totalRevenue, fill: CHART_COLORS[i % CHART_COLORS.length] })), [dataByClient])
 
@@ -828,7 +816,7 @@ export default function TimeTrackingPage() {
       week: week.label,
       actualHours: weekEntries.reduce((sum, e) => sum + e.hours, 0),
       billableHours: weekEntries.reduce((sum, e) => sum + e.billable_hours, 0),
-      cost: weekEntries.reduce((sum, e) => sum + (e.hours * e.cost_rate), 0),
+      cost: weekEntries.reduce((sum, e) => sum + (e.hours * e.display_cost_rate), 0),
       revenue: weekEntries.reduce((sum, e) => sum + (e.is_billable ? e.billable_hours * e.bill_rate : 0), 0),
     }
   }), [weekColumns, costAdjustedEntries])
@@ -911,8 +899,8 @@ export default function TimeTrackingPage() {
     const headers = ['Date', 'Employee', 'Client', 'Project', 'Actual Hours', 'Billable Hours', 'Cost Rate', 'Bill Rate', 'Cost', 'Revenue', 'Margin', 'Notes']
     const rows = costAdjustedEntries.map(e => [
       e.date, e.team_member_name, e.client_name, e.project_name, e.hours, e.billable_hours,
-      e.display_cost_rate, e.bill_rate, (e.hours * e.cost_rate).toFixed(2), (e.billable_hours * e.bill_rate).toFixed(2),
-      ((e.billable_hours * e.bill_rate) - (e.hours * e.cost_rate)).toFixed(2), e.notes || ''
+      e.display_cost_rate, e.bill_rate, (e.hours * e.display_cost_rate).toFixed(2), (e.billable_hours * e.bill_rate).toFixed(2),
+      ((e.billable_hours * e.bill_rate) - (e.hours * e.display_cost_rate)).toFixed(2), e.notes || ''
     ])
     const csv = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -1017,6 +1005,25 @@ export default function TimeTrackingPage() {
         ))}
       </div>
 
+      {/* Scope strip — always shows what the numbers represent */}
+      {(activeTab === 'hoursRevenue' || activeTab === 'cost') && (
+        <div className="flex items-center gap-2 text-sm text-gray-500 -mt-1 px-0.5">
+          <Search size={15} className="text-gray-400" />
+          <span>Viewing:&nbsp;
+            <span className="font-semibold text-gray-900">
+              {selectedProject !== 'all'
+                ? `${selectedClient !== 'all' ? (clients.find(c => c.id === selectedClient)?.name + ' › ') : ''}${projects.find(p => p.id === selectedProject)?.name || ''}`
+                : selectedClient !== 'all'
+                  ? clients.find(c => c.id === selectedClient)?.name
+                  : 'Company · all clients'}
+            </span>
+            <span className="text-gray-400">
+              {selectedProject === 'all' ? ' · all projects' : ''} · {formatDate(dateRange.start)} – {formatDate(dateRange.end)}
+            </span>
+          </span>
+        </div>
+      )}
+
       {/* ============ TRENDS VIEW ============ */}
       {activeTab === 'trends' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1095,8 +1102,8 @@ export default function TimeTrackingPage() {
         </div>
       )}
 
-      {/* ============ BY CLIENT VIEW ============ */}
-      {activeTab === 'byClient' && (
+      {/* ============ HOURS & REVENUE VIEW ============ */}
+      {activeTab === 'hoursRevenue' && (
         <div className="space-y-3">
           {dataByClient.length > 0 ? dataByClient.map((client, clientIndex) => (
             <div key={client.id} className={`rounded-xl ${THEME.card} border overflow-hidden`}>
@@ -1114,21 +1121,15 @@ export default function TimeTrackingPage() {
                     )}
                   </div>
                   <div className="text-right tabular-nums">
-                    <span className="text-gray-500">{formatCurrency(client.totalCost)}</span>
-                    <span className="text-gray-400 mx-1">/</span>
                     <span className="text-gray-900 font-medium">{formatCurrency(client.totalRevenue)}</span>
+                    <span className="text-gray-400 text-xs ml-1">revenue</span>
                   </div>
-                  {(() => { const mp = calcMarginPct(client.totalRevenue, client.totalCost); return (
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${marginBadgeClass(mp)}`}>
-                      {mp.toFixed(1)}%
-                    </span>
-                  ) })()}
                 </div>
               </button>
               {expandedClients.has(client.id) && (
                 <div className={`border-t ${THEME.border}`}>
-                  {Object.values(client.projects).map((project, projectIndex) => (
-                    <div key={project.id} className={`border-b ${THEME.border} last:border-b-0`}>
+                  {Object.values(client.projects).map((project) => (
+                    <div key={project.id} className="border-b-8 border-gray-50 last:border-b-0">
                       <button onClick={() => toggleProject(project.id)} className={`w-full flex items-center justify-between px-6 py-2.5 ${THEME.cardHover} transition-colors`}>
                         <div className="flex items-center gap-2">
                           {expandedProjects.has(project.id) ? <ChevronDown size={13} className="text-gray-400" /> : <ChevronRight size={13} className="text-gray-400" />}
@@ -1136,7 +1137,6 @@ export default function TimeTrackingPage() {
                         </div>
                         <div className="flex items-center gap-5 text-xs tabular-nums">
                           <span className="text-gray-500">{project.totalActualHours.toFixed(1)} hrs</span>
-                          <span className="text-gray-500">{formatCurrency(project.totalCost)}</span>
                           <span className="text-gray-700">{formatCurrency(project.totalRevenue)}</span>
                         </div>
                       </button>
@@ -1145,19 +1145,16 @@ export default function TimeTrackingPage() {
                           <table className="w-full text-sm">
                             <thead><tr className={`border-b ${THEME.border}`}>
                               <th className={`px-2 py-2 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-32`}>Name</th>
-                              <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-20`}>Cost</th>
                               <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-20`}>Bill</th>
                               {weekColumns.map(week => <th key={week.end} className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} w-16`}>{week.label}</th>)}
                               <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-20`}>Actual</th>
                               <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-20`}>Billed</th>
-                              <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-24`}>Cost</th>
                               <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-24`}>Revenue</th>
                             </tr></thead>
                             <tbody>
                               {Object.values(project.members).sort((a, b) => b.totalActualHours - a.totalActualHours).map(member => (
                                 <tr key={member.id} className={`border-b ${THEME.border} border-opacity-30 hover:bg-gray-50`}>
                                   <td className="px-2 py-2 text-gray-700 text-sm">{member.name}</td>
-                                  <td className="px-2 py-2 text-right text-gray-500 text-xs tabular-nums">{formatCurrency(member.costRate)}</td>
                                   <td className="px-2 py-2 text-right text-gray-600 text-xs tabular-nums">{formatCurrency(member.billRate)}</td>
                                   {weekColumns.map(week => (
                                     <td key={week.end} className="px-2 py-2 text-right text-gray-600 tabular-nums">
@@ -1171,19 +1168,17 @@ export default function TimeTrackingPage() {
                                   <td className={`px-2 py-2 text-right font-medium tabular-nums ${member.totalBillableHours !== member.totalActualHours ? 'text-amber-600' : 'text-gray-500'}`}>
                                     {member.totalBillableHours.toFixed(1)}
                                   </td>
-                                  <td className="px-2 py-2 text-right text-gray-500 tabular-nums">{formatCurrency(member.totalCost)}</td>
                                   <td className="px-2 py-2 text-right text-gray-900 font-medium tabular-nums">{formatCurrency(member.totalRevenue)}</td>
                                 </tr>
                               ))}
-                              <tr className="bg-gray-50 font-medium">
-                                <td className="px-2 py-2 text-gray-600 text-xs uppercase tracking-wider" colSpan={3}>Project Total</td>
+                              <tr className="bg-gray-100 font-semibold border-t-2 border-gray-300">
+                                <td className="px-2 py-2 text-gray-900 text-xs uppercase tracking-wider" colSpan={2}>Project Total</td>
                                 {weekColumns.map(week => {
                                   const weekTotal = Object.values(project.members).reduce((sum, m) => sum + (m.weekActualHours[week.end] || 0), 0)
-                                  return <td key={week.end} className="px-2 py-2 text-right text-gray-600 tabular-nums">{weekTotal.toFixed(1)}</td>
+                                  return <td key={week.end} className="px-2 py-2 text-right text-gray-900 tabular-nums">{weekTotal.toFixed(1)}</td>
                                 })}
                                 <td className="px-2 py-2 text-right text-gray-900 tabular-nums">{project.totalActualHours.toFixed(1)}</td>
                                 <td className="px-2 py-2 text-right text-amber-600 tabular-nums">{project.totalBillableHours.toFixed(1)}</td>
-                                <td className="px-2 py-2 text-right text-gray-500 tabular-nums">{formatCurrency(project.totalCost)}</td>
                                 <td className="px-2 py-2 text-right text-gray-900 tabular-nums">{formatCurrency(project.totalRevenue)}</td>
                               </tr>
                             </tbody>
@@ -1201,8 +1196,114 @@ export default function TimeTrackingPage() {
               <span className="text-sm font-semibold text-gray-600 uppercase tracking-wider">Grand Total</span>
               <div className="flex items-center gap-6 tabular-nums">
                 <span className="text-sm font-semibold text-gray-900">{kpis.totalActualHours.toFixed(1)} hrs</span>
-                <span className="text-sm text-gray-500">{formatCurrency(kpis.totalCost)}</span>
                 <span className="text-sm font-semibold text-gray-900">{formatCurrency(kpis.totalRevenue)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ============ COST VIEW ============ */}
+      {activeTab === 'cost' && (
+        <div className="space-y-3">
+          {dataByClient.length > 0 ? dataByClient.map((client, clientIndex) => (
+            <div key={client.id} className={`rounded-xl ${THEME.card} border overflow-hidden`}>
+              <button onClick={() => toggleClient(client.id)} className={`w-full flex items-center justify-between px-5 py-3.5 ${THEME.cardHover} transition-colors`}>
+                <div className="flex items-center gap-3">
+                  {expandedClients.has(client.id) ? <ChevronDown size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />}
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS[clientIndex % CHART_COLORS.length] }} />
+                  <h3 className="text-sm font-semibold text-gray-900">{client.name}</h3>
+                </div>
+                <div className="flex items-center gap-6 text-sm">
+                  <div className="text-right tabular-nums">
+                    <span className="text-gray-400 text-xs mr-1">cost</span>
+                    <span className="text-gray-600">{formatCurrency(client.totalCost)}</span>
+                    <span className="text-gray-400 text-xs mx-1">rev</span>
+                    <span className="text-gray-900 font-medium">{formatCurrency(client.totalRevenue)}</span>
+                  </div>
+                  {(() => { const mp = calcMarginPct(client.totalRevenue, client.totalCost); return (
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${marginBadgeClass(mp)}`}>
+                      {mp.toFixed(1)}%
+                    </span>
+                  ) })()}
+                </div>
+              </button>
+              {expandedClients.has(client.id) && (
+                <div className={`border-t ${THEME.border}`}>
+                  {Object.values(client.projects).map((project) => {
+                    const projMargin = project.totalRevenue - project.totalCost
+                    const projMarginPct = calcMarginPct(project.totalRevenue, project.totalCost)
+                    return (
+                    <div key={project.id} className="border-b-8 border-gray-50 last:border-b-0">
+                      <button onClick={() => toggleProject(project.id)} className={`w-full flex items-center justify-between px-6 py-2.5 ${THEME.cardHover} transition-colors`}>
+                        <div className="flex items-center gap-2">
+                          {expandedProjects.has(project.id) ? <ChevronDown size={13} className="text-gray-400" /> : <ChevronRight size={13} className="text-gray-400" />}
+                          <span className="text-sm font-medium text-gray-700">{project.name}</span>
+                        </div>
+                        <div className="flex items-center gap-5 text-xs tabular-nums">
+                          <span className="text-gray-500">{formatCurrency(project.totalCost)} cost</span>
+                          <span className={projMargin >= 0 ? 'text-emerald-600 font-medium' : 'text-rose-600 font-medium'}>{formatCurrency(projMargin)}</span>
+                          <span className={`px-2 py-0.5 rounded ${marginBadgeClass(projMarginPct)}`}>{projMarginPct.toFixed(0)}%</span>
+                        </div>
+                      </button>
+                      {expandedProjects.has(project.id) && (
+                        <div className="px-6 pb-3 overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead><tr className={`border-b ${THEME.border}`}>
+                              <th className={`px-2 py-2 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-32`}>Name</th>
+                              <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-20`}>Actual</th>
+                              <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-20`}>Cost rate</th>
+                              <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-24`}>Cost</th>
+                              <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-24`}>Revenue</th>
+                              <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-24`}>Margin</th>
+                              <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-20`}>Margin %</th>
+                            </tr></thead>
+                            <tbody>
+                              {Object.values(project.members).sort((a, b) => (b.totalRevenue - b.totalCost) - (a.totalRevenue - a.totalCost)).map(member => {
+                                const mMargin = member.totalRevenue - member.totalCost
+                                const mMarginPct = calcMarginPct(member.totalRevenue, member.totalCost)
+                                return (
+                                <tr key={member.id} className={`border-b ${THEME.border} border-opacity-30 hover:bg-gray-50`}>
+                                  <td className="px-2 py-2 text-gray-700 text-sm">{member.name}</td>
+                                  <td className="px-2 py-2 text-right text-gray-900 font-medium tabular-nums">{member.totalActualHours.toFixed(1)}</td>
+                                  <td className="px-2 py-2 text-right text-gray-500 text-xs tabular-nums">{formatCurrency(member.costRate)}</td>
+                                  <td className="px-2 py-2 text-right text-gray-500 tabular-nums">{formatCurrency(member.totalCost)}</td>
+                                  <td className="px-2 py-2 text-right text-gray-900 font-medium tabular-nums">{formatCurrency(member.totalRevenue)}</td>
+                                  <td className={`px-2 py-2 text-right font-medium tabular-nums ${mMargin >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCurrency(mMargin)}</td>
+                                  <td className="px-2 py-2 text-right tabular-nums">
+                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${marginBadgeClass(mMarginPct)}`}>{mMarginPct.toFixed(0)}%</span>
+                                  </td>
+                                </tr>
+                                )
+                              })}
+                              <tr className="bg-gray-100 font-semibold border-t-2 border-gray-300">
+                                <td className="px-2 py-2 text-gray-900 text-xs uppercase tracking-wider">Project Total</td>
+                                <td className="px-2 py-2 text-right text-gray-900 tabular-nums">{project.totalActualHours.toFixed(1)}</td>
+                                <td className="px-2 py-2"></td>
+                                <td className="px-2 py-2 text-right text-gray-900 tabular-nums">{formatCurrency(project.totalCost)}</td>
+                                <td className="px-2 py-2 text-right text-gray-900 tabular-nums">{formatCurrency(project.totalRevenue)}</td>
+                                <td className={`px-2 py-2 text-right tabular-nums ${projMargin >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCurrency(projMargin)}</td>
+                                <td className="px-2 py-2 text-right tabular-nums">
+                                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${marginBadgeClass(projMarginPct)}`}>{projMarginPct.toFixed(0)}%</span>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )) : <div className={`text-center py-12 ${THEME.textDim}`}>No time entries for this period</div>}
+          {dataByClient.length > 0 && (
+            <div className={`p-4 rounded-xl ${THEME.card} border flex items-center justify-between`}>
+              <span className="text-sm font-semibold text-gray-600 uppercase tracking-wider">Grand Total</span>
+              <div className="flex items-center gap-6 tabular-nums">
+                <span className="text-sm text-gray-500">{formatCurrency(kpis.totalCost)} cost</span>
+                <span className="text-sm font-semibold text-gray-900">{formatCurrency(kpis.totalRevenue)} rev</span>
                 <span className={`text-sm font-bold ${kpis.grossMargin >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCurrency(kpis.grossMargin)}</span>
               </div>
             </div>
@@ -1401,83 +1502,6 @@ export default function TimeTrackingPage() {
           </div>
           {costAdjustedEntries.length > 100 && <p className="text-center text-sm text-gray-400 mt-2">Showing first 100 of {costAdjustedEntries.length} entries</p>}
         </CollapsibleSection>
-      )}
-
-      {/* ============ PROFITABILITY VIEW ============ */}
-      {activeTab === 'profitability' && (
-        <div className="space-y-6">
-          {/* Margin Chart */}
-          <div className={`${THEME.card} border rounded-xl p-6`}>
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">Profitability by Project</h3>
-            {profitabilityByProject.length > 0 ? (
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={profitabilityByProject.slice(0, 10)} margin={{ left: 20, right: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                    <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 10 }} angle={-20} textAnchor="end" height={60} />
-                    <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} tickFormatter={v => formatCompactCurrency(v)} />
-                    <Tooltip {...TOOLTIP_STYLE} formatter={(value: number, name: string) => [formatCurrency(value), name]} />
-                    <Legend wrapperStyle={{ color: '#6b7280', fontSize: '12px' }} />
-                    <Bar dataKey="cost" name="Cost" fill="#64748b" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="revenue" name="Revenue" fill="#059669" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : <div className={`text-center py-12 ${THEME.textDim}`}><BarChart3 size={48} className="mx-auto text-gray-300 mb-4" /><p>No profitability data yet</p></div>}
-          </div>
-
-          {/* Margin Table */}
-          {profitabilityByProject.length > 0 && (
-            <div className={`${THEME.card} border rounded-xl overflow-hidden`}>
-              <div className={`px-6 py-4 border-b ${THEME.border}`}>
-                <h3 className="text-sm font-semibold text-gray-900">Margin Detail by Project</h3>
-              </div>
-              <table className="w-full text-sm">
-                <thead><tr className="bg-gray-50">
-                  <th className={`px-4 py-3 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Project</th>
-                  <th className={`px-4 py-3 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Client</th>
-                  <th className={`px-4 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Actual Hrs</th>
-                  <th className={`px-4 py-3 text-right text-xs font-medium text-amber-600 uppercase tracking-wider`}>Billed Hrs</th>
-                  <th className={`px-4 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Cost</th>
-                  <th className={`px-4 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Revenue</th>
-                  <th className={`px-4 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Margin</th>
-                  <th className={`px-4 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Margin %</th>
-                </tr></thead>
-                <tbody>
-                  {profitabilityByProject.map(row => (
-                    <tr key={row.id} className={`border-t ${THEME.border} hover:bg-gray-50`}>
-                      <td className="px-4 py-3 font-medium text-gray-900">{row.name}</td>
-                      <td className={`px-4 py-3 ${THEME.textDim}`}>{row.clientName || '—'}</td>
-                      <td className="px-4 py-3 text-right text-gray-600 tabular-nums">{row.actualHours.toFixed(1)}</td>
-                      <td className={`px-4 py-3 text-right tabular-nums ${row.billableHours !== row.actualHours ? 'text-amber-600' : THEME.textMuted}`}>{row.billableHours.toFixed(1)}</td>
-                      <td className="px-4 py-3 text-right text-gray-500 tabular-nums">{formatCurrency(row.cost)}</td>
-                      <td className="px-4 py-3 text-right text-gray-900 tabular-nums">{formatCurrency(row.revenue)}</td>
-                      <td className={`px-4 py-3 text-right font-medium tabular-nums ${row.margin >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCurrency(row.margin)}</td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${marginBadgeClass(row.marginPct)}`}>
-                          {row.marginPct.toFixed(1)}%
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="bg-gray-50 font-medium">
-                    <td className="px-4 py-3 text-gray-600 text-xs uppercase tracking-wider" colSpan={2}>Total</td>
-                    <td className="px-4 py-3 text-right text-gray-900 tabular-nums">{kpis.totalActualHours.toFixed(1)}</td>
-                    <td className="px-4 py-3 text-right text-amber-600 tabular-nums">{kpis.totalBillableHours.toFixed(1)}</td>
-                    <td className="px-4 py-3 text-right text-gray-500 tabular-nums">{formatCurrency(kpis.totalCost)}</td>
-                    <td className="px-4 py-3 text-right text-gray-900 tabular-nums">{formatCurrency(kpis.totalRevenue)}</td>
-                    <td className={`px-4 py-3 text-right font-bold tabular-nums ${kpis.grossMargin >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCurrency(kpis.grossMargin)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={`px-2 py-1 rounded text-sm font-bold ${kpis.marginPct >= 20 ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-amber-50 text-amber-600 border border-amber-200'}`}>
-                        {kpis.marginPct.toFixed(1)}%
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
       )}
 
       {/* ============ ENTRY MODAL ============ */}
