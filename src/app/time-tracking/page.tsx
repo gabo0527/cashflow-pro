@@ -909,6 +909,103 @@ export default function TimeTrackingPage() {
     addToast('success', 'Export complete')
   }
 
+  // ============ PDF REPORT (print to PDF, no dependencies) ============
+  const openPdfReport = () => {
+    const mode: 'cost' | 'hours' = activeTab === 'cost' ? 'cost' : 'hours'
+    const scopeLabel = selectedProject !== 'all'
+      ? `${selectedClient !== 'all' ? (clients.find(c => c.id === selectedClient)?.name || '') + ' › ' : ''}${projects.find(p => p.id === selectedProject)?.name || ''}`
+      : selectedClient !== 'all'
+        ? (clients.find(c => c.id === selectedClient)?.name || '')
+        : 'Company · all clients'
+    const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const fmt = (n: number) => formatCurrency(n)
+    const generatedOn = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+
+    const parts: string[] = []
+    parts.push(`<div class="rpt-clients">`)
+    dataByClient.forEach(client => {
+      parts.push(`<div class="rpt-client"><div class="rpt-client-head"><span class="rpt-cname">${esc(client.name)}</span>`)
+      if (mode === 'hours') {
+        parts.push(`<span class="rpt-cmeta">${client.totalActualHours.toFixed(1)} hrs &nbsp;·&nbsp; ${fmt(client.totalRevenue)} revenue</span>`)
+      } else {
+        const mp = calcMarginPct(client.totalRevenue, client.totalCost)
+        parts.push(`<span class="rpt-cmeta">Cost ${fmt(client.totalCost)} &nbsp;·&nbsp; Rev ${fmt(client.totalRevenue)} &nbsp;·&nbsp; ${mp.toFixed(0)}% margin</span>`)
+      }
+      parts.push(`</div>`)
+
+      Object.values(client.projects).forEach(project => {
+        parts.push(`<div class="rpt-proj"><div class="rpt-proj-name">${esc(project.name)}</div><table class="rpt-table"><thead><tr>`)
+        if (mode === 'hours') {
+          parts.push(`<th class="l">Name</th><th>Bill</th>`)
+          weekColumns.forEach(w => parts.push(`<th>${esc(w.label)}</th>`))
+          parts.push(`<th>Actual</th><th>Billed</th><th>Revenue</th></tr></thead><tbody>`)
+          Object.values(project.members).sort((a, b) => b.totalActualHours - a.totalActualHours).forEach(m => {
+            parts.push(`<tr><td class="l">${esc(m.name)}</td><td>${fmt(m.billRate)}</td>`)
+            weekColumns.forEach(w => parts.push(`<td>${(m.weekActualHours[w.end] || 0).toFixed(1)}</td>`))
+            parts.push(`<td>${m.totalActualHours.toFixed(1)}</td><td>${m.totalBillableHours.toFixed(1)}</td><td>${fmt(m.totalRevenue)}</td></tr>`)
+          })
+          parts.push(`<tr class="rpt-total"><td class="l">Project Total</td><td></td>`)
+          weekColumns.forEach(w => { const wt = Object.values(project.members).reduce((s, m) => s + (m.weekActualHours[w.end] || 0), 0); parts.push(`<td>${wt.toFixed(1)}</td>`) })
+          parts.push(`<td>${project.totalActualHours.toFixed(1)}</td><td>${project.totalBillableHours.toFixed(1)}</td><td>${fmt(project.totalRevenue)}</td></tr>`)
+        } else {
+          parts.push(`<th class="l">Name</th><th>Actual</th><th>Cost rate</th><th>Cost</th><th>Revenue</th><th>Margin</th><th>Margin %</th></tr></thead><tbody>`)
+          Object.values(project.members).sort((a, b) => (b.totalRevenue - b.totalCost) - (a.totalRevenue - a.totalCost)).forEach(m => {
+            const mg = m.totalRevenue - m.totalCost; const mpct = calcMarginPct(m.totalRevenue, m.totalCost)
+            parts.push(`<tr><td class="l">${esc(m.name)}</td><td>${m.totalActualHours.toFixed(1)}</td><td>${fmt(m.costRate)}</td><td>${fmt(m.totalCost)}</td><td>${fmt(m.totalRevenue)}</td><td class="${mg >= 0 ? 'pos' : 'neg'}">${fmt(mg)}</td><td>${mpct.toFixed(0)}%</td></tr>`)
+          })
+          const pmg = project.totalRevenue - project.totalCost; const pmpct = calcMarginPct(project.totalRevenue, project.totalCost)
+          parts.push(`<tr class="rpt-total"><td class="l">Project Total</td><td>${project.totalActualHours.toFixed(1)}</td><td></td><td>${fmt(project.totalCost)}</td><td>${fmt(project.totalRevenue)}</td><td class="${pmg >= 0 ? 'pos' : 'neg'}">${fmt(pmg)}</td><td>${pmpct.toFixed(0)}%</td></tr>`)
+        }
+        parts.push(`</tbody></table></div>`)
+      })
+      parts.push(`</div>`)
+    })
+    parts.push(`</div>`)
+
+    const summary = mode === 'hours'
+      ? `<div class="rpt-kpi"><span>Total Hours</span><b>${kpis.totalActualHours.toFixed(1)}</b></div><div class="rpt-kpi"><span>Billable Hours</span><b>${kpis.totalBillableHours.toFixed(1)}</b></div><div class="rpt-kpi"><span>Revenue</span><b>${fmt(kpis.totalRevenue)}</b></div>`
+      : `<div class="rpt-kpi"><span>Cost</span><b>${fmt(kpis.totalCost)}</b></div><div class="rpt-kpi"><span>Revenue</span><b>${fmt(kpis.totalRevenue)}</b></div><div class="rpt-kpi"><span>Margin</span><b class="${kpis.grossMargin >= 0 ? 'pos' : 'neg'}">${fmt(kpis.grossMargin)}</b></div><div class="rpt-kpi"><span>Margin %</span><b>${kpis.marginPct.toFixed(1)}%</b></div>`
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${mode === 'cost' ? 'Cost Report' : 'Time Report'} — ${esc(scopeLabel)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Instrument Sans',system-ui,sans-serif;color:#111827;font-size:12px;padding:32px 28px}
+.rpt-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111827;padding-bottom:14px;margin-bottom:16px}
+.rpt-title{font-size:22px;font-weight:600;letter-spacing:-.02em}
+.rpt-sub{font-size:12px;color:#6b7280;margin-top:3px}
+.rpt-gen{font-size:11px;color:#9ca3af;text-align:right}
+.rpt-summary{display:flex;gap:28px;margin-bottom:20px;flex-wrap:wrap}
+.rpt-kpi{display:flex;flex-direction:column}
+.rpt-kpi span{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;font-weight:600}
+.rpt-kpi b{font-size:18px;font-weight:600;margin-top:2px}
+.rpt-client{margin-bottom:18px;break-inside:avoid}
+.rpt-client-head{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px solid #e5e7eb;margin-bottom:8px}
+.rpt-cname{font-size:14px;font-weight:600}
+.rpt-cmeta{font-size:11px;color:#6b7280}
+.rpt-proj{margin:0 0 12px;break-inside:avoid}
+.rpt-proj-name{font-size:12px;font-weight:600;color:#374151;margin:8px 0 4px}
+.rpt-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.rpt-table th{font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#9ca3af;font-weight:600;text-align:right;padding:5px 7px;border-bottom:1px solid #e5e7eb}
+.rpt-table th.l,.rpt-table td.l{text-align:left}
+.rpt-table td{font-size:11px;text-align:right;padding:5px 7px;border-bottom:1px solid #f3f4f6}
+.rpt-total td{background:#f3f4f6;font-weight:600;border-top:1.5px solid #d1d5db;border-bottom:1px solid #d1d5db}
+.pos{color:#059669}.neg{color:#dc2626}
+@media print{body{padding:0}.rpt-client,.rpt-proj{break-inside:avoid}}
+</style></head><body>
+<div class="rpt-head"><div><div class="rpt-title">${mode === 'cost' ? 'Cost & Margin Report' : 'Time Report'}</div><div class="rpt-sub">${esc(scopeLabel)} · ${formatDate(dateRange.start)} – ${formatDate(dateRange.end)}</div></div><div class="rpt-gen">Mano CG LLC<br>Generated ${generatedOn}</div></div>
+<div class="rpt-summary">${summary}</div>
+${parts.join('')}
+</body></html>`
+
+    const w = window.open('', '_blank')
+    if (!w) { addToast('error', 'Allow pop-ups to generate the PDF report'); return }
+    w.document.write(html)
+    w.document.close()
+    w.onload = () => { w.focus(); w.print() }
+    addToast('success', 'Report ready — choose "Save as PDF"')
+  }
+
   const getFilterTitle = () => {
     if (selectedClient !== 'all') return clients.find(c => c.id === selectedClient)?.name || ''
     if (selectedEmployee !== 'all') return teamMembers.find(t => t.id === selectedEmployee)?.name || ''
@@ -931,7 +1028,8 @@ export default function TimeTrackingPage() {
           <p className={`text-sm mt-0.5 ${THEME.textDim}`}>{getFilterTitle()}</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={exportToCSV} className={`flex items-center gap-2 px-4 py-2 ${THEME.card} border hover:bg-white rounded-lg text-sm font-medium text-gray-600 transition-colors`}><Download size={16} />Export</button>
+          <button onClick={openPdfReport} className={`flex items-center gap-2 px-4 py-2 ${THEME.card} border hover:bg-white rounded-lg text-sm font-medium text-gray-600 transition-colors`}><Download size={16} />PDF Report</button>
+          <button onClick={exportToCSV} className={`flex items-center gap-2 px-3 py-2 ${THEME.card} border hover:bg-white rounded-lg text-sm font-medium text-gray-500 transition-colors`}>CSV</button>
           <button onClick={() => setShowEntryModal(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm font-medium text-white transition-colors"><Plus size={16} />Add Entry</button>
         </div>
       </div>
