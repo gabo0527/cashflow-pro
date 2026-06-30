@@ -1,11 +1,11 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { 
   Search, Filter, Download, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
   Clock, Plus, Edit2, X, Check, Trash2, Calendar, Users, DollarSign,
-  TrendingUp, TrendingDown, Target, PieChart, Activity, Building2, User, Briefcase,
-  CheckCircle, AlertCircle, RefreshCw, Eye, EyeOff, ArrowUpDown, Layers,
+  TrendingUp, TrendingDown, Gauge, PieChart, Activity, Building2, User, Briefcase,
+  CheckCircle, AlertCircle, RefreshCw, Eye, EyeOff, ArrowUpDown, BadgeCheck, FileText,
   Lock, Unlock
 } from 'lucide-react'
 import { 
@@ -446,37 +446,65 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
   )
 }
 
-// ============ KPI CARD — Light Theme ============
-function KPICard({ title, value, format = 'number', trend, trendLabel, icon, accentColor = '#059669' }: { 
+// ============ Count-up animation hook ============
+// Smoothly animates a number toward its target — on mount (from 0) and whenever
+// the value changes (e.g. filters/date), so the cards feel alive and react to scope.
+function useCountUp(target: number, duration = 750) {
+  const [val, setVal] = useState(0)
+  const fromRef = useRef(0)
+  const rafRef = useRef<number | null>(null)
+  useEffect(() => {
+    const from = fromRef.current
+    const start = performance.now()
+    const step = (now: number) => {
+      const t = Math.min((now - start) / duration, 1)
+      const eased = 1 - Math.pow(1 - t, 3) // easeOutCubic
+      setVal(from + (target - from) * eased)
+      if (t < 1) rafRef.current = requestAnimationFrame(step)
+      else fromRef.current = target
+    }
+    rafRef.current = requestAnimationFrame(step)
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
+  }, [target, duration])
+  return val
+}
+
+// ============ KPI CARD — premium glass-gradient (Vantage) ============
+function KPICard({ title, value, format = 'number', trend, trendLabel, icon, accentColor = '#10B981' }: {
   title: string; value: number; format?: 'number' | 'currency' | 'percent' | 'hours'
   trend?: number; trendLabel?: string; icon?: React.ReactNode; accentColor?: string
 }) {
-  const formatValue = () => {
+  const animated = useCountUp(value)
+  const fmt = (v: number) => {
     switch (format) {
-      case 'currency': return formatCurrency(value)
-      case 'percent': return `${value.toFixed(1)}%`
-      case 'hours': return `${value.toFixed(1)}`
-      default: return value.toLocaleString()
+      case 'currency': return formatCurrency(v)
+      case 'percent': return `${v.toFixed(1)}%`
+      case 'hours': return v.toFixed(1)
+      default: return Math.round(v).toLocaleString()
     }
   }
-  const isNegative = value < 0
-  const valueColor = isNegative ? 'text-rose-600' : 'text-gray-900'
 
   return (
-    <div className="relative p-4 rounded-xl bg-white border border-gray-200 shadow-sm overflow-hidden">
-      {/* Left accent bar */}
-      <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full" style={{ backgroundColor: accentColor }} />
-      <div className="pl-2">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{title}</span>
-          {icon && <span className="text-gray-400">{icon}</span>}
+    <div
+      className="group relative rounded-2xl overflow-hidden transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_26px_54px_-22px_rgba(6,40,30,0.8)]"
+      style={{ background: 'linear-gradient(120deg,#08221c 0%,#0b3025 40%,#0e5b43 100%)', boxShadow: '0 18px 40px -22px rgba(6,40,30,0.7)' }}
+    >
+      {/* pinstripe weave */}
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 13px)' }} />
+      {/* hover glow */}
+      <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background: 'radial-gradient(120% 90% at 100% 0%, rgba(110,231,183,0.22), transparent 55%)' }} />
+
+      <div className="relative p-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[10.5px] font-bold uppercase tracking-[0.08em]" style={{ color: 'rgba(174,221,205,0.8)' }}>{title}</span>
+          <span className="transition-transform duration-300 group-hover:scale-110" style={{ color: '#6EE7B7' }}>{icon}</span>
         </div>
-        <p className={`text-2xl font-semibold ${valueColor} tabular-nums tracking-tight`}>{formatValue()}</p>
+        <p className="text-[26px] leading-none font-extrabold tabular-nums tracking-tight text-white" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{fmt(animated)}</p>
         {trend !== undefined && (
-          <div className="flex items-center gap-1.5 mt-1.5">
-            {trend >= 0 ? <TrendingUp size={12} className="text-emerald-600" /> : <TrendingDown size={12} className="text-rose-600" />}
-            <span className={`text-xs font-medium tabular-nums ${trend >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{trend >= 0 ? '+' : ''}{trend.toFixed(1)}%</span>
-            {trendLabel && <span className="text-xs text-gray-400">{trendLabel}</span>}
+          <div className="flex items-center gap-1.5 mt-2.5">
+            {trend >= 0 ? <TrendingUp size={12} style={{ color: '#6EE7B7' }} /> : <TrendingDown size={12} style={{ color: '#fb7185' }} />}
+            <span className="text-[11px] font-semibold tabular-nums" style={{ color: trend >= 0 ? '#6EE7B7' : '#fb7185' }}>{trend >= 0 ? '+' : ''}{trend.toFixed(1)}%</span>
+            {trendLabel && <span className="text-[11px]" style={{ color: 'rgba(174,221,205,0.7)' }}>{trendLabel}</span>}
           </div>
         )}
       </div>
@@ -560,6 +588,7 @@ export default function TimeTrackingPage() {
   const [selectedClient, setSelectedClient] = useState<string>('all')
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all')
   const [selectedProject, setSelectedProject] = useState<string>('all')
+  const [ttSearch, setTtSearch] = useState('')
   const [showDatePicker, setShowDatePicker] = useState(false)
 
   const [activeTab, setActiveTab] = useState<ViewTab>('billing')
@@ -584,6 +613,18 @@ export default function TimeTrackingPage() {
   const dateRange = useMemo(() => getDateRange(datePreset, customStartDate, customEndDate), [datePreset, customStartDate, customEndDate])
   const priorPeriod = useMemo(() => getPriorPeriodRange(dateRange.start, dateRange.end), [dateRange])
   const priorMonthLabel = useMemo(() => new Date(priorPeriod.start + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }), [priorPeriod])
+
+  // Load brand display font (Archivo) once, for the premium KPI numerals
+  useEffect(() => {
+    const id = 'vantage-brand-fonts'
+    if (typeof document !== 'undefined' && !document.getElementById(id)) {
+      const link = document.createElement('link')
+      link.id = id
+      link.rel = 'stylesheet'
+      link.href = 'https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Instrument+Sans:wght@400;500;600;700&display=swap'
+      document.head.appendChild(link)
+    }
+  }, [])
 
   // ============ DATA LOADING ============
   useEffect(() => {
@@ -718,12 +759,16 @@ export default function TimeTrackingPage() {
   )
 
   // ============ DISPLAY FILTERS (applied AFTER cost allocation) ============
-  const costAdjustedEntries = useMemo(() => allCostAdjustedEntries.filter(entry => {
-    if (selectedClient !== 'all' && entry.client_id !== selectedClient) return false
-    if (selectedEmployee !== 'all' && entry.team_member_id !== selectedEmployee) return false
-    if (selectedProject !== 'all' && entry.project_id !== selectedProject) return false
-    return true
-  }), [allCostAdjustedEntries, selectedClient, selectedEmployee, selectedProject])
+  const costAdjustedEntries = useMemo(() => {
+    const q = ttSearch.trim().toLowerCase()
+    return allCostAdjustedEntries.filter(entry => {
+      if (selectedClient !== 'all' && entry.client_id !== selectedClient) return false
+      if (selectedEmployee !== 'all' && entry.team_member_id !== selectedEmployee) return false
+      if (selectedProject !== 'all' && entry.project_id !== selectedProject) return false
+      if (q && !`${entry.client_name || ''} ${entry.project_name || ''} ${entry.team_member_name || ''}`.toLowerCase().includes(q)) return false
+      return true
+    })
+  }, [allCostAdjustedEntries, selectedClient, selectedEmployee, selectedProject, ttSearch])
 
   const costAdjustedPriorEntries = useMemo(() => allCostAdjustedPriorEntries.filter(entry => {
     if (selectedClient !== 'all' && entry.client_id !== selectedClient) return false
@@ -1056,35 +1101,40 @@ ${parts.join('')}
 
   if (loading) return <div className="flex items-center justify-center h-64"><RefreshCw className="w-6 h-6 text-emerald-500 animate-spin" /></div>
 
-  // ============ SELECT STYLING ============
-  const selectClass = `px-3 py-2 bg-white border ${THEME.border} rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-colors`
-
   return (
     <div className="space-y-5">
       <ToastContainer toasts={toasts} onDismiss={id => setToasts(prev => prev.filter(t => t.id !== id))} />
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900 tracking-tight">Time Analytics</h1>
-          <p className={`text-sm mt-0.5 ${THEME.textDim}`}>{getFilterTitle()}</p>
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-emerald-600" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>Operations</p>
+          <h1 className="text-3xl font-extrabold uppercase tracking-tight text-gray-900 mt-1 leading-none" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>Time Tracking</h1>
+          <p className={`text-sm mt-2 ${THEME.textDim}`}>{getFilterTitle()}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={openPdfReport} className={`flex items-center gap-2 px-4 py-2 ${THEME.card} border hover:bg-white rounded-lg text-sm font-medium text-gray-600 transition-colors`}><Download size={16} />PDF Report</button>
-          <button onClick={exportToCSV} className={`flex items-center gap-2 px-3 py-2 ${THEME.card} border hover:bg-white rounded-lg text-sm font-medium text-gray-500 transition-colors`}>CSV</button>
-          <button onClick={() => setShowEntryModal(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm font-medium text-white transition-colors"><Plus size={16} />Add Entry</button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button onClick={openPdfReport} className="flex items-center gap-2 px-3.5 py-2 bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm rounded-xl text-sm font-medium text-gray-600 transition-all"><Download size={15} />Export PDF</button>
+          <button onClick={exportToCSV} className="flex items-center gap-2 px-3.5 py-2 bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm rounded-xl text-sm font-medium text-gray-600 transition-all"><FileText size={15} />Export CSV</button>
+          <button onClick={() => setShowEntryModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:shadow-[0_10px_22px_-8px_rgba(16,185,129,0.75)]" style={{ background: 'linear-gradient(135deg,#10B981,#059669)' }}><Plus size={16} />Add Entry</button>
         </div>
       </div>
 
-      {/* Date Range & Filters */}
-      <div className={`p-4 rounded-xl ${THEME.card} border relative z-20`}>
-        <div className="flex flex-wrap items-center gap-3">
+      {/* Search + Filters */}
+      <div className={`p-2.5 rounded-2xl bg-white border ${THEME.border} shadow-sm relative z-20`}>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[220px]">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input type="text" value={ttSearch} onChange={(e) => setTtSearch(e.target.value)} placeholder="Search client, project, person…"
+              className="w-full pl-9 pr-3 py-2 bg-gray-50/70 border border-transparent hover:bg-gray-50 focus:bg-white focus:border-emerald-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 transition-all" />
+          </div>
+          {/* Date */}
           <div className="relative">
-            <button onClick={() => setShowDatePicker(!showDatePicker)} className={`flex items-center gap-2 px-3 py-2 bg-white border ${THEME.border} hover:bg-gray-100 rounded-lg text-sm font-medium text-gray-900 transition-colors`}>
+            <button onClick={() => setShowDatePicker(!showDatePicker)} className="flex items-center gap-2 px-3.5 py-2 bg-white border border-gray-200 hover:border-emerald-300 rounded-xl text-sm font-medium text-gray-900 transition-colors">
               <Calendar size={14} className="text-emerald-600" />{DATE_PRESETS.find(p => p.id === datePreset)?.label}<ChevronDown size={14} className="text-gray-400" />
             </button>
             {showDatePicker && (
-              <div className={`absolute top-full left-0 mt-2 w-56 p-2 bg-white border ${THEME.border} rounded-xl shadow-lg z-[100]`}>
+              <div className={`absolute top-full right-0 mt-2 w-56 p-2 bg-white border ${THEME.border} rounded-xl shadow-lg z-[100]`}>
                 <div className="space-y-0.5">
                   {DATE_PRESETS.map(preset => (
                     <button key={preset.id} onClick={() => { setDatePreset(preset.id); if (preset.id !== 'custom') setShowDatePicker(false) }}
@@ -1101,31 +1151,40 @@ ${parts.join('')}
               </div>
             )}
           </div>
-          <span className={`text-sm ${THEME.textMuted} tabular-nums`}>{formatDate(dateRange.start)} — {formatDate(dateRange.end)}</span>
-          <div className="h-5 w-px bg-gray-100" />
-          <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className={selectClass}>
-            <option value="all">All Clients</option>
-            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)} className={selectClass}>
-            <option value="all">All Employees</option>
-            {teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-          <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className={selectClass}>
-            <option value="all">All Projects</option>
-            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-          {(selectedClient !== 'all' || selectedEmployee !== 'all' || selectedProject !== 'all') && (
-            <button onClick={() => { setSelectedClient('all'); setSelectedEmployee('all'); setSelectedProject('all') }} className={`flex items-center gap-1 px-3 py-2 text-sm ${THEME.textMuted} hover:text-gray-900 transition-colors`}><X size={14} />Clear</button>
+          {/* Pill selects */}
+          <div className="relative">
+            <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className={`appearance-none pl-3.5 pr-8 py-2 bg-white border rounded-xl text-sm hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 transition-colors cursor-pointer ${selectedClient !== 'all' ? 'border-emerald-400 text-gray-900' : 'border-gray-200 text-gray-700'}`}>
+              <option value="all">All Clients</option>
+              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+          <div className="relative">
+            <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)} className={`appearance-none pl-3.5 pr-8 py-2 bg-white border rounded-xl text-sm hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 transition-colors cursor-pointer ${selectedEmployee !== 'all' ? 'border-emerald-400 text-gray-900' : 'border-gray-200 text-gray-700'}`}>
+              <option value="all">All Employees</option>
+              {teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+          <div className="relative">
+            <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className={`appearance-none pl-3.5 pr-8 py-2 bg-white border rounded-xl text-sm hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 transition-colors cursor-pointer ${selectedProject !== 'all' ? 'border-emerald-400 text-gray-900' : 'border-gray-200 text-gray-700'}`}>
+              <option value="all">All Projects</option>
+              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+          {(selectedClient !== 'all' || selectedEmployee !== 'all' || selectedProject !== 'all' || ttSearch) && (
+            <button onClick={() => { setSelectedClient('all'); setSelectedEmployee('all'); setSelectedProject('all'); setTtSearch('') }} className={`flex items-center gap-1 px-3 py-2 text-sm ${THEME.textMuted} hover:text-gray-900 transition-colors`}><X size={14} />Clear</button>
           )}
         </div>
+        <span className={`block mt-2 px-1 text-xs ${THEME.textMuted} tabular-nums`}>{formatDate(dateRange.start)} — {formatDate(dateRange.end)}</span>
       </div>
 
       {/* KPI Cards — 3 operational metrics */}
       <div className="grid grid-cols-3 gap-3 relative z-10">
-        <KPICard title="Actual Hours" value={kpis.totalActualHours} format="hours" trend={kpis.hoursTrend} trendLabel="vs prior" icon={<Clock size={15} />} accentColor="#059669" />
-        <KPICard title="Billable Hours" value={kpis.totalBillableHours} format="hours" icon={<Layers size={15} />} accentColor="#0891b2" />
-        <KPICard title="Utilization" value={kpis.utilization} format="percent" icon={<Target size={15} />} accentColor="#d97706" />
+        <KPICard title="Actual Hours" value={kpis.totalActualHours} format="hours" trend={kpis.hoursTrend} trendLabel="vs prior" icon={<Clock size={15} />} accentColor="#10B981" />
+        <KPICard title="Billable Hours" value={kpis.totalBillableHours} format="hours" icon={<BadgeCheck size={15} />} accentColor="#0E9F6E" />
+        <KPICard title="Utilization" value={kpis.utilization} format="percent" icon={<Gauge size={15} />} accentColor="#059669" />
       </div>
 
       {/* View Tabs */}
@@ -1225,14 +1284,17 @@ ${parts.join('')}
             {[...dataByClient].sort(billingCmp).map((client, ci) => (
               <div key={client.id} className="border-t border-gray-100 first:border-t-0">
                 {/* CLIENT */}
-                <button onClick={() => toggleClient(client.id)} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50/70 transition-colors text-left bg-gradient-to-r from-emerald-50/40 to-transparent">
-                  {expandedClients.has(client.id) ? <ChevronDown size={15} className="text-gray-400 shrink-0" /> : <ChevronRight size={15} className="text-gray-400 shrink-0" />}
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: CHART_COLORS[ci % CHART_COLORS.length] }} />
-                  <span className="font-bold text-sm tracking-wide text-gray-900 uppercase">{client.name}</span>
-                  <div className="ml-auto flex items-center gap-5 text-sm shrink-0">
-                    <span className="w-16 text-right" />
-                    <span className="w-20 text-right text-gray-500 tabular-nums text-xs">{client.totalBillableHours.toFixed(1)} hrs</span>
-                    <span className={`w-24 text-right font-bold tabular-nums ${client.totalRevenue ? 'text-emerald-700' : 'text-gray-400'}`}>{formatCurrency(client.totalRevenue)}</span>
+                <button onClick={() => toggleClient(client.id)} className="relative w-full text-left overflow-hidden transition hover:brightness-[0.98]" style={{ background: 'linear-gradient(90deg, rgba(16,185,129,0.12), rgba(16,185,129,0.03) 55%, transparent)' }}>
+                  <span className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(6,40,30,0.028) 0 1px, transparent 1px 12px)' }} />
+                  <div className="relative flex items-center gap-3 px-5 py-3.5">
+                    {expandedClients.has(client.id) ? <ChevronDown size={15} className="text-gray-400 shrink-0" /> : <ChevronRight size={15} className="text-gray-400 shrink-0" />}
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-white" style={{ backgroundColor: CHART_COLORS[ci % CHART_COLORS.length] }} />
+                    <span className="font-bold text-sm tracking-wide text-gray-900 uppercase">{client.name}</span>
+                    <div className="ml-auto flex items-center gap-5 text-sm shrink-0">
+                      <span className="w-16 text-right" />
+                      <span className="w-20 text-right text-gray-500 tabular-nums text-xs">{client.totalBillableHours.toFixed(1)} hrs</span>
+                      <span className={`w-24 text-right font-bold tabular-nums ${client.totalRevenue ? 'text-emerald-700' : 'text-gray-400'}`}>{formatCurrency(client.totalRevenue)}</span>
+                    </div>
                   </div>
                 </button>
 
