@@ -285,10 +285,11 @@ const DATE_PRESETS: { id: DatePreset; label: string }[] = [
   { id: 'custom', label: 'Custom Range' },
 ]
 
-type ViewTab = 'hoursRevenue' | 'cost' | 'trends' | 'byEmployee' | 'detailed'
+type ViewTab = 'hoursRevenue' | 'billing' | 'cost' | 'trends' | 'byEmployee' | 'detailed'
 
 const VIEW_TABS: { id: ViewTab; label: string; icon: React.ReactNode }[] = [
   { id: 'hoursRevenue', label: 'Hours & Revenue', icon: <Building2 size={15} /> },
+  { id: 'billing', label: 'Billing', icon: <Briefcase size={15} /> },
   { id: 'cost', label: 'Cost', icon: <DollarSign size={15} /> },
   { id: 'trends', label: 'Trends', icon: <Activity size={15} /> },
   { id: 'byEmployee', label: 'By Employee', icon: <Users size={15} /> },
@@ -841,6 +842,20 @@ export default function TimeTrackingPage() {
     }
   }), [weekColumns, costAdjustedEntries])
 
+  // ============ BILLING (burn-up + totals) ============
+  // "To bill" = billable_hours × bill_rate (sell rate). Time tracking captures hours;
+  // this view does the billing math separately, by week, accumulating across the period.
+  const billingBurnUp = useMemo(() => {
+    let cum = 0
+    return weeklyTrendData.map(w => { cum += w.revenue; return { week: w.week, billed: w.revenue, cumulative: cum } })
+  }, [weeklyTrendData])
+
+  const billingTotals = useMemo(() => ({
+    toBill: dataByClient.reduce((s, c) => s + c.totalRevenue, 0),
+    billable: dataByClient.reduce((s, c) => s + c.totalBillableHours, 0),
+    resources: new Set(costAdjustedEntries.map(e => e.team_member_id).filter(Boolean)).size,
+  }), [dataByClient, costAdjustedEntries])
+
   // ============ ACTIONS ============
   const saveNewEntry = async () => {
     if (!companyId || !formData.team_member_id || !formData.project_id || !formData.hours) return
@@ -1139,6 +1154,92 @@ ${parts.join('')}
               {selectedProject === 'all' ? ' · all projects' : ''} · {formatDate(dateRange.start)} – {formatDate(dateRange.end)}
             </span>
           </span>
+        </div>
+      )}
+
+      {/* ============ BILLING VIEW ============ */}
+      {activeTab === 'billing' && (
+        <div className="space-y-4">
+          {/* Summary + burn-up */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="rounded-2xl p-5 text-white relative overflow-hidden" style={{ background: 'linear-gradient(135deg,#0a2a22 0%,#0d3a2e 30%,#10B981 100%)' }}>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-white/70">To bill this period</p>
+              <p className="text-4xl font-bold tracking-tight mt-2">{formatCurrency(billingTotals.toBill)}</p>
+              <p className="text-sm text-white/70 mt-1">{billingTotals.billable.toFixed(1)} billable hrs · {billingTotals.resources} resources</p>
+            </div>
+            <div className={`lg:col-span-2 rounded-2xl border ${THEME.border} bg-white p-4`}>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Billing burn-up</p>
+                <p className="text-[11px] text-gray-400">cumulative $ by week</p>
+              </div>
+              <ResponsiveContainer width="100%" height={150}>
+                <AreaChart data={billingBurnUp} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <defs><linearGradient id="billFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#10b981" stopOpacity={0.25} /><stop offset="100%" stopColor="#10b981" stopOpacity={0} /></linearGradient></defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                  <XAxis dataKey="week" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => formatCompactCurrency(v)} width={56} />
+                  <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => [formatCurrency(value), 'Cumulative billed']} />
+                  <Area type="monotone" dataKey="cumulative" stroke="#10b981" strokeWidth={2.5} fill="url(#billFill)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Billing table: Client → Project → Resource */}
+          {dataByClient.map(client => (
+            <div key={client.id} className={`rounded-2xl border ${THEME.border} bg-white overflow-hidden`}>
+              <div className="flex items-center justify-between px-5 py-3.5 bg-gradient-to-r from-emerald-50/60 to-transparent">
+                <span className="font-bold text-sm tracking-wide text-gray-900 uppercase">{client.name}</span>
+                <span className="font-bold text-sm text-emerald-700 tabular-nums">{formatCurrency(client.totalRevenue)}</span>
+              </div>
+              {Object.values(client.projects).map(project => (
+                <div key={project.id}>
+                  <div className="px-5 py-2 bg-gray-50/70 border-t border-gray-100 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-gray-600">{project.name}</span>
+                    <span className="text-xs text-gray-500 tabular-nums">{formatCurrency(project.totalRevenue)}</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead><tr>
+                        <th className="text-left text-[10px] font-semibold uppercase tracking-wide text-gray-400 px-5 py-2">Resource</th>
+                        <th className="text-right text-[10px] font-semibold uppercase tracking-wide text-gray-400 px-2 py-2">Rate</th>
+                        {weekColumns.map(w => <th key={w.end} className="text-right text-[10px] font-semibold uppercase tracking-wide text-gray-300 px-2 py-2">{w.label}</th>)}
+                        <th className="text-right text-[10px] font-semibold uppercase tracking-wide text-gray-400 px-2 py-2">Hrs</th>
+                        <th className="text-right text-[10px] font-semibold uppercase tracking-wide text-gray-400 px-5 py-2">To bill</th>
+                      </tr></thead>
+                      <tbody>
+                        {Object.values(project.members).map(m => (
+                          <tr key={m.id} className="border-t border-gray-50 hover:bg-gray-50/50">
+                            <td className="text-left text-[13px] font-medium text-gray-900 px-5 py-2.5">{m.name}</td>
+                            <td className="text-right text-[12px] text-gray-500 px-2 py-2.5 tabular-nums">{m.billRate ? `$${m.billRate}/hr` : '—'}</td>
+                            {weekColumns.map(w => {
+                              const h = m.weekBillableHours[w.end] || 0
+                              return <td key={w.end} className={`text-right text-[13px] px-2 py-2.5 tabular-nums ${h ? 'text-gray-700' : 'text-gray-300'}`}>{h.toFixed(1)}</td>
+                            })}
+                            <td className="text-right text-[13px] font-semibold text-gray-900 px-2 py-2.5 tabular-nums">{m.totalBillableHours.toFixed(1)}</td>
+                            <td className="text-right text-[13px] font-bold text-emerald-700 px-5 py-2.5 tabular-nums">{formatCurrency(m.totalRevenue)}</td>
+                          </tr>
+                        ))}
+                        <tr className="border-t border-gray-100 bg-gray-50/70">
+                          <td className="text-left text-[12px] font-bold text-gray-900 px-5 py-2.5">Total</td>
+                          <td></td>
+                          {weekColumns.map(w => {
+                            const wt = Object.values(project.members).reduce((s, m) => s + (m.weekBillableHours[w.end] || 0), 0)
+                            return <td key={w.end} className="text-right text-[12px] font-semibold text-gray-700 px-2 py-2.5 tabular-nums">{wt.toFixed(1)}</td>
+                          })}
+                          <td className="text-right text-[12px] font-bold text-gray-900 px-2 py-2.5 tabular-nums">{project.totalBillableHours.toFixed(1)}</td>
+                          <td className="text-right text-[12px] font-bold text-gray-900 px-5 py-2.5 tabular-nums">{formatCurrency(project.totalRevenue)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+          {dataByClient.length === 0 && (
+            <div className={`rounded-2xl border ${THEME.border} bg-white p-10 text-center text-gray-400 text-sm`}>No billable time in this period.</div>
+          )}
         </div>
       )}
 
