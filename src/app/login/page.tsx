@@ -4,7 +4,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { ArrowRight, Lock, Shield, Link as LinkIcon } from 'lucide-react'
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false)
@@ -35,237 +34,258 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0c0f14] flex overflow-hidden relative">
-      {/* ── Google Font ── */}
-      <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <div className="v-page">
+      {/* Fonts */}
+      <link
+        href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Instrument+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet"
+      />
 
-      <style jsx>{`
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-        .anim-up { animation: fadeUp 0.7s ease-out forwards; opacity: 0; }
-        .anim-in { animation: fadeIn 0.8s ease-out forwards; opacity: 0; }
-        .d1 { animation-delay: 0.1s; }
-        .d2 { animation-delay: 0.2s; }
-        .d3 { animation-delay: 0.3s; }
-        .d4 { animation-delay: 0.4s; }
-        .d5 { animation-delay: 0.5s; }
-        .shimmer-btn { background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent); background-size: 200% 100%; animation: shimmer 3s ease-in-out infinite; }
-      `}</style>
+      <div className="v-bg" />
 
-      {/* ══════════ LEFT PANEL ══════════ */}
-      <div className="hidden lg:flex lg:w-[55%] relative flex-col justify-between p-14 xl:p-16 overflow-hidden"
-        style={{ fontFamily: "'Instrument Sans', system-ui, sans-serif" }}>
+      <div className={`v-frame ${mounted ? 'v-in' : ''}`}>
 
-        {/* Background layers */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0c0f14] via-[#0f1a17] to-[#0c0f14]" />
-        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full opacity-20 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #10b981 0%, transparent 70%)', filter: 'blur(80px)' }} />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full opacity-10 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #34d399 0%, transparent 70%)', filter: 'blur(100px)' }} />
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{
-          backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
-          backgroundSize: '64px 64px'
-        }} />
-        {/* Vertical accent divider */}
-        <div className="absolute right-0 top-[10%] bottom-[10%] w-px bg-gradient-to-b from-transparent via-emerald-500/20 to-transparent" />
-
-        {/* Top: Logo */}
-        <div className={`relative z-10 ${mounted ? 'anim-up' : ''}`}>
-          <div className="flex items-center gap-3.5">
-            <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
-              <defs>
-                <linearGradient id="vGradL" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#6ee7b7" />
-                  <stop offset="100%" stopColor="#10b981" />
-                </linearGradient>
-              </defs>
-              <path d="M12 11L24 37L36 11" stroke="url(#vGradL)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <div className="flex flex-col">
-              <span className="text-white text-2xl font-bold tracking-tight leading-none">Vantage</span>
-              <span className="text-emerald-400/60 text-[10px] font-semibold tracking-[0.25em] uppercase leading-none mt-1">Financial Intelligence</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Center: Hero */}
-        <div className="relative z-10 -mt-16">
-          <div className={`flex items-center gap-2 mb-6 ${mounted ? 'anim-up d1' : ''}`}>
-            <div className="h-px w-12 bg-emerald-500/40" />
-            <span className="text-emerald-400 text-xs font-semibold tracking-[0.15em] uppercase">Owner&apos;s Command Center</span>
-          </div>
-
-          <h1 className={`text-white text-[3.4rem] xl:text-[3.8rem] font-bold leading-[1.05] tracking-tight ${mounted ? 'anim-up d2' : ''}`}>
-            See everything.
-            <br />
-            <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text" style={{ WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              Control everything.
-            </span>
-          </h1>
-
-          <p className={`text-gray-400 text-[17px] mt-7 max-w-lg leading-relaxed ${mounted ? 'anim-up d3' : ''}`}>
-            Real-time cash flow, project profitability, and team performance
-            — built for consulting firms that move fast.
-          </p>
-
-          {/* Metric bar */}
-          <div className={`flex items-center gap-1 mt-10 ${mounted ? 'anim-up d4' : ''}`}>
-            {[
-              { value: "$2.4M", label: "Revenue tracked", accent: true },
-              { value: "38%", label: "Avg margin", accent: false },
-              { value: "94%", label: "Collection rate", accent: true },
-            ].map((m, i) => (
-              <div key={i} className="flex-1">
-                <div className="px-5 py-4 border border-gray-800/80 bg-gray-900/30 backdrop-blur-sm"
-                  style={{ borderRadius: i === 0 ? '14px 0 0 14px' : i === 2 ? '0 14px 14px 0' : '0' }}>
-                  <p className={`text-2xl font-bold tracking-tight ${m.accent ? 'text-emerald-400' : 'text-white'}`}>{m.value}</p>
-                  <p className="text-gray-500 text-[11px] font-medium mt-0.5 tracking-wide uppercase">{m.label}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Bottom: Sage + status */}
-        <div className={`relative z-10 ${mounted ? 'anim-up d5' : ''}`}>
-          <div className="flex items-center gap-4 px-5 py-4 bg-emerald-500/[0.06] border border-emerald-500/10 rounded-2xl max-w-lg">
-            <div className="w-11 h-11 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="#10b981" strokeWidth="1.5" />
-                <path d="M8 12.5l2.5 2.5 5-5" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-white text-sm font-semibold tracking-tight">Sage — your AI CFO</p>
-              <p className="text-gray-500 text-[13px] mt-0.5 leading-snug">
-                Automated categorization, anomaly detection, and proactive financial insights.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-10 mt-8 ml-1">
-            {[
-              { label: "Bank Feed Sync", sub: "QuickBooks connected" },
-              { label: "Project P&L", sub: "Real-time margins" },
-              { label: "Payment Scoring", sub: "AI-powered AR" },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center gap-2.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.4)]" />
-                <div>
-                  <p className="text-gray-300 text-xs font-medium">{item.label}</p>
-                  <p className="text-gray-600 text-[10px]">{item.sub}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ══════════ RIGHT PANEL — Sign In ══════════ */}
-      <div className="flex-1 flex items-center justify-center bg-[#f7f8fa] relative"
-        style={{ fontFamily: "'Instrument Sans', system-ui, sans-serif" }}>
-
-        {/* Subtle accent */}
-        <div className="absolute top-0 right-0 w-64 h-64 opacity-30 pointer-events-none"
-          style={{ background: 'radial-gradient(circle at 100% 0%, #10b98115, transparent 70%)' }} />
-
-        <div className={`w-full max-w-[400px] px-8 ${mounted ? 'anim-up d2' : ''}`}>
-
-          {/* Mobile logo */}
-          <div className="lg:hidden flex items-center justify-center gap-3 mb-14">
-            <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
-              <path d="M12 11L24 37L36 11" stroke="#10b981" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="text-gray-900 text-xl font-bold tracking-tight">Vantage</span>
-          </div>
-
-          {/* Standalone V mark */}
-          <div className="flex justify-center mb-8">
-            <svg width="52" height="52" viewBox="0 0 48 48" fill="none">
-              <defs>
-                <linearGradient id="vGradR" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#6ee7b7" />
-                  <stop offset="50%" stopColor="#34d399" />
-                  <stop offset="100%" stopColor="#10b981" />
-                </linearGradient>
-              </defs>
-              <path d="M10 10L24 38L38 10" stroke="url(#vGradR)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+        {/* ───────── LEFT: sign-in ───────── */}
+        <div className="v-left">
+          <div className="v-tile">
+            <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+              <path d="M12 13 L24 37 L36 13" stroke="#fff" strokeWidth="4.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
 
-          <h2 className="text-gray-900 text-2xl font-bold text-center tracking-tight">Welcome back</h2>
-          <p className="text-gray-400 text-sm text-center mt-2">Sign in to your workspace</p>
+          <div className="v-eyebrow">Vantage</div>
+          <h1 className="v-h1">Welcome back</h1>
+          <p className="v-sub">Sign in to your workspace</p>
 
-          {/* Sign-in card */}
-          <div className="mt-8 bg-white rounded-2xl border border-gray-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.03)] p-7">
-
-            {/* Error */}
+          <div className="v-card">
             {error && (
-              <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-600 text-sm text-center">
-                {error}
-              </div>
+              <div className="v-error">{error}</div>
             )}
 
-            {/* Google SSO Button */}
-            <button
-              onClick={handleGoogleLogin}
-              disabled={loading}
-              className="relative w-full flex items-center justify-center gap-3 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] overflow-hidden group"
-              style={{
-                boxShadow: '0 2px 8px rgba(16,185,129,0.15)',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 8px 24px rgba(16,185,129,0.25)'}
-              onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 2px 8px rgba(16,185,129,0.15)'}
-            >
-              <div className="absolute inset-0 shimmer-btn pointer-events-none" />
-
+            <button className="v-gbtn" onClick={handleGoogleLogin} disabled={loading}>
               {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span className="v-spinner" />
               ) : (
-                <svg className="w-[18px] h-[18px] relative z-10" viewBox="0 0 24 24">
-                  <path fill="rgba(255,255,255,0.9)" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                  <path fill="rgba(255,255,255,0.8)" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path fill="rgba(255,255,255,0.7)" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                  <path fill="rgba(255,255,255,0.9)" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                <svg width="18" height="18" viewBox="0 0 24 24">
+                  <path fill="rgba(255,255,255,.95)" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="rgba(255,255,255,.8)" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="rgba(255,255,255,.7)" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                  <path fill="rgba(255,255,255,.95)" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                 </svg>
               )}
-              <span className="relative z-10 text-[15px]">{loading ? 'Signing in...' : 'Continue with Google'}</span>
-              {!loading && <ArrowRight className="w-4 h-4 relative z-10 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />}
+              <span>{loading ? 'Signing in…' : 'Continue with Google'}</span>
+              {!loading && (
+                <span className="v-arrow">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </span>
+              )}
             </button>
 
-            <p className="text-gray-400 text-[12px] text-center mt-4 leading-snug">
-              Use your company Google Workspace account
-            </p>
+            <p className="v-ws">Use your company Google Workspace account</p>
 
-            {/* Security badges */}
-            <div className="border-t border-gray-100 mt-5 pt-5">
-              <div className="flex items-center justify-center gap-5">
-                <div className="flex items-center gap-1.5">
-                  <Lock size={11} className="text-gray-400" />
-                  <span className="text-gray-400 text-[11px]">256-bit encrypted</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Shield size={11} className="text-gray-400" />
-                  <span className="text-gray-400 text-[11px]">SOC 2 compliant</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <LinkIcon size={11} className="text-gray-400" />
-                  <span className="text-gray-400 text-[11px]">SSO ready</span>
-                </div>
-              </div>
+            <div className="v-sec">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="2" /><path d="M8 11V8a4 4 0 018 0v3" stroke="currentColor" strokeWidth="2" /></svg>
+              Encrypted · Single sign-on
             </div>
           </div>
 
-          {/* Terms */}
-          <p className="text-gray-400 text-[11px] text-center mt-7 leading-relaxed">
-            By signing in, you agree to our{' '}
-            <a href="/terms" className="text-emerald-600 font-medium hover:underline">Terms</a>
-            {' '}and{' '}
-            <a href="/privacy" className="text-emerald-600 font-medium hover:underline">Privacy Policy</a>
+          <p className="v-legal">
+            By signing in, you agree to our <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>
           </p>
         </div>
+
+        {/* ───────── RIGHT: glass-gradient showcase ───────── */}
+        <div className="v-right">
+          <div className="v-pinstripe" />
+
+          <div className="v-brand">
+            <svg width="30" height="30" viewBox="0 0 48 48" fill="none">
+              <path d="M11 12 L24 38 L37 12" stroke="#fff" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="v-word">Vantage</span>
+          </div>
+
+          <div className="v-hero">
+            <h2>See everything.<br /><span className="v-mint">Control everything.</span></h2>
+            <p>Projects, contractors, and time — managed in one place.</p>
+          </div>
+
+          {/* Anonymized product peek — no real names or figures */}
+          <div className="v-mock">
+            <div className="v-mh">
+              <span className="v-mt">Time Analytics</span>
+              <span className="v-mchips"><span className="v-mchip" /><span className="v-mchip" /></span>
+            </div>
+            <div className="v-tiles">
+              <div className="v-tile2"><div className="v-lbl">Hours</div><div className="v-val">612</div></div>
+              <div className="v-tile2"><div className="v-lbl">Billable</div><div className="v-val">548</div></div>
+              <div className="v-tile2"><div className="v-lbl">Util</div><div className="v-val g">71%</div></div>
+              <div className="v-tile2"><div className="v-lbl">Margin</div><div className="v-val g">24%</div></div>
+            </div>
+            <div className="v-rows">
+              <div className="v-r"><div className="v-lft"><span className="v-dot" style={{ background: '#10B981' }} /><span className="v-nm">Project A</span></div><span className="v-hrs">142 hrs</span></div>
+              <div className="v-r"><div className="v-lft"><span className="v-dot" style={{ background: '#6571B2' }} /><span className="v-nm">Project B</span></div><span className="v-hrs">98 hrs</span></div>
+              <div className="v-r"><div className="v-lft"><span className="v-dot" style={{ background: '#66B0F8' }} /><span className="v-nm">Project C</span></div><span className="v-hrs">76 hrs</span></div>
+              <div className="v-r"><div className="v-lft"><span className="v-dot" style={{ background: '#FDD034' }} /><span className="v-nm">Project D</span></div><span className="v-hrs">54 hrs</span></div>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <style jsx>{`
+        .v-page {
+          position: relative;
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 40px;
+          font-family: 'Instrument Sans', system-ui, sans-serif;
+        }
+        .v-bg {
+          position: fixed; inset: 0; z-index: 0;
+          background:
+            radial-gradient(900px 500px at 80% 10%, rgba(16,185,129,.06), transparent 60%),
+            linear-gradient(180deg, #eef1f4, #e6eaee);
+        }
+
+        .v-frame {
+          position: relative; z-index: 1;
+          width: 100%; max-width: 1140px; height: 680px;
+          display: flex;
+          background: #fff;
+          border-radius: 26px;
+          overflow: hidden;
+          box-shadow: 0 30px 80px rgba(22,28,31,.18), 0 2px 6px rgba(22,28,31,.06);
+          opacity: 0; transform: translateY(14px);
+        }
+        .v-in { animation: vFade .6s ease-out forwards; }
+        @keyframes vFade { to { opacity: 1; transform: translateY(0); } }
+
+        /* LEFT */
+        .v-left {
+          width: 46%;
+          display: flex; flex-direction: column; justify-content: center;
+          padding: 0 64px;
+        }
+        .v-tile {
+          width: 46px; height: 46px; border-radius: 13px;
+          display: flex; align-items: center; justify-content: center;
+          background: linear-gradient(135deg, #6EE7B7, #10B981);
+          box-shadow: 0 6px 16px rgba(16,185,129,.28);
+        }
+        .v-eyebrow {
+          color: #10B981; font-family: 'Archivo', sans-serif; font-weight: 800;
+          font-size: 11px; letter-spacing: .16em; text-transform: uppercase; margin: 30px 0 10px;
+        }
+        .v-h1 {
+          font-family: 'Archivo', sans-serif; font-weight: 800; font-size: 38px;
+          line-height: 1.04; letter-spacing: -.01em; color: #161C1F; text-transform: uppercase;
+        }
+        .v-sub { color: #6b7682; font-size: 14.5px; margin-top: 12px; }
+
+        .v-card {
+          margin-top: 30px; max-width: 360px; background: #fff;
+          border: 1px solid #e7eaed; border-radius: 16px; padding: 22px;
+          box-shadow: 0 1px 2px rgba(22,28,31,.04), 0 10px 26px rgba(22,28,31,.05);
+        }
+        .v-error {
+          margin-bottom: 16px; padding: 11px 13px; border-radius: 11px;
+          background: #fef2f2; border: 1px solid #fecaca; color: #dc2626;
+          font-size: 13px; text-align: center;
+        }
+        .v-gbtn {
+          width: 100%; display: flex; align-items: center; justify-content: center; gap: 12px;
+          padding: 14px; border: none; cursor: pointer; border-radius: 12px;
+          color: #fff; font-size: 15px; font-weight: 600; font-family: 'Instrument Sans', sans-serif;
+          background: linear-gradient(180deg, #14c98c, #10B981);
+          box-shadow: 0 2px 10px rgba(16,185,129,.22);
+          transition: box-shadow .2s, transform .1s;
+        }
+        .v-gbtn:hover:not(:disabled) { box-shadow: 0 10px 28px rgba(16,185,129,.32); }
+        .v-gbtn:active:not(:disabled) { transform: scale(.985); }
+        .v-gbtn:disabled { opacity: .65; cursor: not-allowed; }
+        .v-arrow { opacity: .7; display: inline-flex; transition: transform .2s, opacity .2s; }
+        .v-gbtn:hover:not(:disabled) .v-arrow { opacity: 1; transform: translateX(2px); }
+        .v-spinner {
+          width: 18px; height: 18px; border-radius: 50%;
+          border: 2px solid rgba(255,255,255,.35); border-top-color: #fff;
+          animation: vSpin .7s linear infinite;
+        }
+        @keyframes vSpin { to { transform: rotate(360deg); } }
+
+        .v-ws { color: #6b7682; font-size: 12px; text-align: center; margin-top: 13px; }
+        .v-sec {
+          display: flex; align-items: center; justify-content: center; gap: 7px;
+          color: #9aa3ad; font-size: 11.5px; margin-top: 16px; padding-top: 15px;
+          border-top: 1px solid #eef0f2;
+        }
+        .v-legal { color: #9aa3ad; font-size: 11px; margin-top: 20px; line-height: 1.6; max-width: 360px; }
+        .v-legal a { color: #065F46; font-weight: 600; text-decoration: none; }
+        .v-legal a:hover { text-decoration: underline; }
+
+        /* RIGHT */
+        .v-right {
+          flex: 1; position: relative; overflow: hidden;
+          background: linear-gradient(135deg, #0a2a22 0%, #0d3a2e 26%, #10B981 56%, #6EE7B7 80%, #d9efe6 100%);
+        }
+        .v-right::before {
+          content: ""; position: absolute; inset: 0;
+          background: repeating-linear-gradient(135deg, rgba(255,255,255,.05) 0 2px, transparent 2px 26px);
+        }
+        .v-right::after {
+          content: ""; position: absolute; inset: 0;
+          background: linear-gradient(115deg, rgba(22,28,31,.78) 0%, rgba(22,28,31,.30) 42%, transparent 70%);
+        }
+        .v-pinstripe {
+          position: absolute; inset: 0; opacity: .5;
+          background: repeating-linear-gradient(135deg, rgba(255,255,255,.04) 0 1px, transparent 1px 9px);
+        }
+        .v-brand { position: absolute; top: 42px; left: 48px; z-index: 3; display: flex; align-items: center; gap: 12px; }
+        .v-word { color: #fff; font-family: 'Archivo', sans-serif; font-weight: 800; font-size: 21px; letter-spacing: -.01em; }
+
+        .v-hero { position: absolute; top: 140px; left: 48px; right: 48px; z-index: 3; }
+        .v-hero h2 {
+          color: #fff; font-family: 'Archivo', sans-serif; font-weight: 900; font-size: 42px;
+          line-height: 1.02; letter-spacing: -.01em; text-transform: uppercase;
+        }
+        .v-mint { color: #6EE7B7; }
+        .v-hero p { color: rgba(255,255,255,.72); font-size: 14.5px; margin-top: 16px; max-width: 330px; line-height: 1.5; }
+
+        .v-mock {
+          position: absolute; right: -30px; bottom: -26px; width: 430px; z-index: 2;
+          transform: perspective(1600px) rotateY(-14deg) rotateX(5deg);
+          background: #fff; border-radius: 14px; overflow: hidden;
+          box-shadow: 0 40px 90px rgba(8,20,16,.5); border: 1px solid rgba(255,255,255,.5);
+        }
+        .v-mh { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px; border-bottom: 1px solid #eef0f2; }
+        .v-mt { font-family: 'Archivo', sans-serif; font-weight: 800; font-size: 13px; color: #161C1F; text-transform: uppercase; letter-spacing: .03em; }
+        .v-mchips { display: flex; gap: 6px; }
+        .v-mchip { width: 42px; height: 14px; border-radius: 5px; background: #eef1f3; display: inline-block; }
+        .v-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #eef0f2; }
+        .v-tile2 { background: #fff; padding: 12px; }
+        .v-lbl { font-size: 8px; color: #9aa3ad; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+        .v-val { font-size: 18px; font-weight: 700; color: #161C1F; margin-top: 3px; letter-spacing: -.02em; }
+        .v-val.g { color: #10B981; }
+        .v-rows { padding: 6px 16px 16px; }
+        .v-r { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid #f3f5f6; }
+        .v-r:last-child { border-bottom: none; }
+        .v-lft { display: flex; align-items: center; gap: 9px; }
+        .v-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+        .v-nm { font-size: 11.5px; color: #3b454d; font-weight: 500; }
+        .v-hrs { font-size: 11px; color: #9aa3ad; font-variant-numeric: tabular-nums; }
+
+        @media (max-width: 920px) {
+          .v-page { padding: 0; }
+          .v-frame { flex-direction: column; height: auto; border-radius: 0; min-height: 100vh; }
+          .v-left, .v-right { width: 100%; }
+          .v-left { padding: 56px 32px; order: 2; }
+          .v-right { order: 1; height: 300px; }
+          .v-hero { top: 96px; }
+          .v-hero h2 { font-size: 30px; }
+          .v-mock { display: none; }
+        }
+      `}</style>
     </div>
   )
 }
