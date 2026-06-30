@@ -394,6 +394,20 @@ const getPriorPeriodRange = (start: string, end: string): { start: string; end: 
   return { start: priorStart.toISOString().split('T')[0], end: priorEnd.toISOString().split('T')[0] }
 }
 
+// Count working days (Mon–Fri) in a date range, inclusive. Used for utilization capacity.
+const countWorkingDays = (start: string, end: string): number => {
+  const startDate = new Date(start + 'T00:00:00')
+  const endDate = new Date(end + 'T00:00:00')
+  let count = 0
+  const cur = new Date(startDate)
+  while (cur <= endDate) {
+    const day = cur.getDay()
+    if (day !== 0 && day !== 6) count++ // skip Sun (0) and Sat (6)
+    cur.setDate(cur.getDate() + 1)
+  }
+  return count
+}
+
 const getWeekColumns = (start: string, end: string): { start: string; end: string; label: string }[] => {
   const weeks: { start: string; end: string; label: string }[] = []
   const startDate = new Date(start); const endDate = new Date(end)
@@ -727,16 +741,22 @@ export default function TimeTrackingPage() {
     const priorRevenue = costAdjustedPriorEntries.reduce((sum, e) => sum + (e.is_billable ? (e.billable_hours || e.hours) * e.bill_rate : 0), 0)
     const priorCost = costAdjustedPriorEntries.reduce((sum, e) => sum + (e.hours * e.display_cost_rate), 0)
     
-    const activeMembers = teamMembers.filter(m => m.status === 'active')
-    const totalCapacity = activeMembers.length * 160
-    const utilization = totalCapacity > 0 ? (totalActualHours / totalCapacity) * 100 : 0
+    // Utilization = billable hours ÷ available capacity of the people actually working in this view.
+    // Capacity scales with the selected period (working days × 8h) and follows the active filters,
+    // so overhead members who log no time are naturally excluded from the denominator.
+    const workingDays = countWorkingDays(dateRange.start, dateRange.end)
+    const billableMemberCount = new Set(
+      costAdjustedEntries.filter(e => e.hours > 0).map(e => e.team_member_id).filter(Boolean)
+    ).size
+    const totalCapacity = billableMemberCount * workingDays * 8
+    const utilization = totalCapacity > 0 ? (totalBillableHours / totalCapacity) * 100 : 0
 
     const hoursTrend = priorHours > 0 ? ((totalActualHours - priorHours) / priorHours) * 100 : 0
     const revenueTrend = priorRevenue > 0 ? ((totalRevenue - priorRevenue) / priorRevenue) * 100 : 0
     const costTrend = priorCost > 0 ? ((totalCost - priorCost) / priorCost) * 100 : 0
 
     return { totalActualHours, totalBillableHours, totalCost, totalRevenue, grossMargin, marginPct, avgBillRate, avgCostRate, utilization, hoursTrend, revenueTrend, costTrend, uniqueClients: new Set(costAdjustedEntries.map(e => e.client_id).filter(Boolean)).size }
-  }, [costAdjustedEntries, costAdjustedPriorEntries, teamMembers])
+  }, [costAdjustedEntries, costAdjustedPriorEntries, dateRange])
 
   const weekColumns = useMemo(() => getWeekColumns(dateRange.start, dateRange.end), [dateRange])
 
