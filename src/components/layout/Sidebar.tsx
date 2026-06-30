@@ -40,21 +40,37 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={18} />, adminOnly: true },
-  { label: 'Cash Flow', href: '/cash-flow', icon: <Wallet size={18} />, adminOnly: true },
-  { label: 'Invoices', href: '/invoices', icon: <FileText size={18} />, adminOnly: true },
-  { label: 'Cash Management', href: '/expenses', icon: <Receipt size={18} />, adminOnly: true },
+  // --- TOP ---
   { label: 'Projects', href: '/projects', icon: <FolderKanban size={18} />, adminOnly: true },
   { label: 'Clients', href: '/clients', icon: <Users size={18} />, adminOnly: true },
+
+  // --- OPERATIONS ---
   { label: 'Time Tracking', href: '/time-tracking', icon: <Clock size={18} />, section: 'Operations', adminOnly: true },
   { label: 'Contractor Mgmt', href: '/contractor-management', icon: <ClipboardList size={18} />, adminOnly: true },
   { label: 'Team', href: '/team', icon: <UserCog size={18} />, adminOnly: true },
+
+  // --- ANALYSIS ---
   { label: 'Reports', href: '/reports', icon: <BarChart3 size={18} />, section: 'Analysis', adminOnly: true },
-  { label: 'Forecast', href: '/forecast', icon: <Calculator size={18} />, adminOnly: true },
+
+  // --- INTELLIGENCE ---
   { label: 'Sage', href: '/ai-assistant', icon: <MessageSquare size={18} />, section: 'Intelligence', adminOnly: true },
+
+  // --- SYSTEM ---
   { label: 'Settings', href: '/settings', icon: <Settings size={18} />, section: 'System', adminOnly: true },
+
+  // --- CONTRACTOR PORTAL (non-admin users only) ---
   { label: 'My Timesheet', href: '/timesheet', icon: <Clock size={18} /> },
   { label: 'My Expenses', href: '/expense-report', icon: <Receipt size={18} /> },
+
+  // =========================================================
+  // TEMPORARILY HIDDEN — uncomment a line to restore it to the nav.
+  // Pages still exist; they're just removed from the menu for now.
+  // =========================================================
+  // { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={18} />, adminOnly: true },
+  // { label: 'Cash Flow', href: '/cash-flow', icon: <Wallet size={18} />, adminOnly: true },
+  // { label: 'Invoices', href: '/invoices', icon: <FileText size={18} />, adminOnly: true },
+  // { label: 'Cash Management', href: '/expenses', icon: <Receipt size={18} />, adminOnly: true },
+  // { label: 'Forecast', href: '/forecast', icon: <Calculator size={18} />, adminOnly: true },
 ]
 
 export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, userRole = 'owner' }: SidebarProps) {
