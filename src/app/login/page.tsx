@@ -106,8 +106,8 @@ export default function LoginPage() {
           </div>
 
           <div className="v-hero">
-            <h2>See everything.<br /><span className="v-mint">Control everything.</span></h2>
-            <p>Projects, contractors, and time — managed in one place.</p>
+            <h2>Business operations,<br /><span className="v-mint">all in one place.</span></h2>
+            <p>Clients, projects, contractors, time, and documents — one system.</p>
           </div>
 
           {/* Anonymized product peek — no real names or figures */}
@@ -139,7 +139,7 @@ export default function LoginPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 40px;
+          padding: 0;
           font-family: 'Instrument Sans', system-ui, sans-serif;
         }
         .v-bg {
@@ -151,12 +151,11 @@ export default function LoginPage() {
 
         .v-frame {
           position: relative; z-index: 1;
-          width: 100%; max-width: 1140px; height: 680px;
+          width: 100%; max-width: none; height: 100vh;
           display: flex;
           background: #fff;
-          border-radius: 26px;
+          border-radius: 0;
           overflow: hidden;
-          box-shadow: 0 30px 80px rgba(22,28,31,.18), 0 2px 6px rgba(22,28,31,.06);
           opacity: 0; transform: translateY(14px);
         }
         .v-in { animation: vFade .6s ease-out forwards; }
