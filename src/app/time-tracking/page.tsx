@@ -580,6 +580,7 @@ export default function TimeTrackingPage() {
 
   const dateRange = useMemo(() => getDateRange(datePreset, customStartDate, customEndDate), [datePreset, customStartDate, customEndDate])
   const priorPeriod = useMemo(() => getPriorPeriodRange(dateRange.start, dateRange.end), [dateRange])
+  const priorMonthLabel = useMemo(() => new Date(priorPeriod.start + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }), [priorPeriod])
 
   // ============ DATA LOADING ============
   useEffect(() => {
@@ -757,7 +758,7 @@ export default function TimeTrackingPage() {
     const revenueTrend = priorRevenue > 0 ? ((totalRevenue - priorRevenue) / priorRevenue) * 100 : 0
     const costTrend = priorCost > 0 ? ((totalCost - priorCost) / priorCost) * 100 : 0
 
-    return { totalActualHours, totalBillableHours, totalCost, totalRevenue, grossMargin, marginPct, avgBillRate, avgCostRate, utilization, hoursTrend, revenueTrend, costTrend, uniqueClients: new Set(costAdjustedEntries.map(e => e.client_id).filter(Boolean)).size }
+    return { totalActualHours, totalBillableHours, totalCost, totalRevenue, priorRevenue, grossMargin, marginPct, avgBillRate, avgCostRate, utilization, hoursTrend, revenueTrend, costTrend, uniqueClients: new Set(costAdjustedEntries.map(e => e.client_id).filter(Boolean)).size }
   }, [costAdjustedEntries, costAdjustedPriorEntries, dateRange])
 
   const weekColumns = useMemo(() => getWeekColumns(dateRange.start, dateRange.end), [dateRange])
@@ -1165,8 +1166,20 @@ ${parts.join('')}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="rounded-2xl p-5 text-white relative overflow-hidden" style={{ background: 'linear-gradient(135deg,#0a2a22 0%,#0d3a2e 30%,#10B981 100%)' }}>
               <p className="text-[11px] font-bold uppercase tracking-wider text-white/70">To bill this period</p>
-              <p className="text-4xl font-bold tracking-tight mt-2">{formatCurrency(billingTotals.toBill)}</p>
-              <p className="text-sm text-white/70 mt-1">{billingTotals.billable.toFixed(1)} billable hrs · {billingTotals.resources} resources</p>
+              <div className="flex items-baseline gap-2.5 mt-2 flex-wrap">
+                <p className="text-4xl font-bold tracking-tight">{formatCurrency(billingTotals.toBill)}</p>
+                {kpis.priorRevenue > 0 && (
+                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold tabular-nums border ${kpis.revenueTrend >= 0 ? 'bg-emerald-300/20 text-emerald-50 border-emerald-200/30' : 'bg-red-300/15 text-red-50 border-red-200/30'}`}>
+                    {kpis.revenueTrend >= 0 ? '▲' : '▼'} {Math.abs(kpis.revenueTrend).toFixed(1)}%
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-white/70 mt-1.5">
+                {billingTotals.billable.toFixed(1)} billable hrs · {billingTotals.resources} resources
+                {kpis.priorRevenue > 0 && (
+                  <span className="text-white/55"> · {kpis.totalRevenue - kpis.priorRevenue >= 0 ? '+' : '-'}{formatCurrency(Math.abs(kpis.totalRevenue - kpis.priorRevenue))} vs {priorMonthLabel}</span>
+                )}
+              </p>
             </div>
             <div className={`lg:col-span-2 rounded-2xl border ${THEME.border} bg-white p-4`}>
               <div className="flex items-center justify-between mb-1">
