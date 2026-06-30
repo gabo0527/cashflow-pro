@@ -47,8 +47,9 @@ export default function LoginPage() {
 
         {/* ───────── LEFT: sign-in ───────── */}
         <div className="v-left">
+          <div className="v-lwrap">
           <div className="v-tile">
-            <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+            <svg width="30" height="30" viewBox="0 0 48 48" fill="none">
               <path d="M12 13 L24 37 L36 13" stroke="#fff" strokeWidth="4.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
@@ -92,6 +93,7 @@ export default function LoginPage() {
           <p className="v-legal">
             By signing in, you agree to our <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>
           </p>
+          </div>
         </div>
 
         {/* ───────── RIGHT: glass-gradient showcase ───────── */}
@@ -99,12 +101,13 @@ export default function LoginPage() {
           <div className="v-pinstripe" />
 
           <div className="v-brand">
-            <svg width="30" height="30" viewBox="0 0 48 48" fill="none">
+            <svg width="38" height="38" viewBox="0 0 48 48" fill="none">
               <path d="M11 12 L24 38 L37 12" stroke="#fff" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <span className="v-word">Vantage</span>
           </div>
 
+          <div className="v-rcontent">
           <div className="v-hero">
             <h2>Business operations,<br /><span className="v-mint">all in one place.</span></h2>
             <p>Clients, projects, contractors, time, and documents — one system.</p>
@@ -128,6 +131,7 @@ export default function LoginPage() {
               <div className="v-r"><div className="v-lft"><span className="v-dot" style={{ background: '#66B0F8' }} /><span className="v-nm">Project C</span></div><span className="v-hrs">76 hrs</span></div>
               <div className="v-r"><div className="v-lft"><span className="v-dot" style={{ background: '#FDD034' }} /><span className="v-nm">Project D</span></div><span className="v-hrs">54 hrs</span></div>
             </div>
+          </div>
           </div>
         </div>
       </div>
@@ -164,11 +168,12 @@ export default function LoginPage() {
         /* LEFT */
         .v-left {
           width: 46%;
-          display: flex; flex-direction: column; justify-content: center;
+          display: flex; flex-direction: column; justify-content: center; align-items: center;
           padding: 0 64px;
         }
+        .v-lwrap { width: 100%; max-width: 380px; }
         .v-tile {
-          width: 46px; height: 46px; border-radius: 13px;
+          width: 56px; height: 56px; border-radius: 16px;
           display: flex; align-items: center; justify-content: center;
           background: linear-gradient(135deg, #6EE7B7, #10B981);
           box-shadow: 0 6px 16px rgba(16,185,129,.28);
@@ -241,9 +246,13 @@ export default function LoginPage() {
           background: repeating-linear-gradient(135deg, rgba(255,255,255,.04) 0 1px, transparent 1px 9px);
         }
         .v-brand { position: absolute; top: 42px; left: 48px; z-index: 3; display: flex; align-items: center; gap: 12px; }
-        .v-word { color: #fff; font-family: 'Archivo', sans-serif; font-weight: 800; font-size: 21px; letter-spacing: -.01em; }
+        .v-word { color: #fff; font-family: 'Archivo', sans-serif; font-weight: 800; font-size: 24px; letter-spacing: -.01em; }
 
-        .v-hero { position: absolute; top: 140px; left: 48px; right: 48px; z-index: 3; }
+        .v-rcontent {
+          position: absolute; inset: 0; padding: 0 56px;
+          display: flex; flex-direction: column; justify-content: center; z-index: 2;
+        }
+        .v-hero { position: relative; z-index: 3; max-width: 540px; }
         .v-hero h2 {
           color: #fff; font-family: 'Archivo', sans-serif; font-weight: 900; font-size: 42px;
           line-height: 1.02; letter-spacing: -.01em; text-transform: uppercase;
@@ -252,8 +261,9 @@ export default function LoginPage() {
         .v-hero p { color: rgba(255,255,255,.72); font-size: 14.5px; margin-top: 16px; max-width: 330px; line-height: 1.5; }
 
         .v-mock {
-          position: absolute; right: -30px; bottom: -26px; width: 430px; z-index: 2;
-          transform: perspective(1600px) rotateY(-14deg) rotateX(5deg);
+          position: relative; align-self: flex-end; width: 560px; max-width: 96%;
+          margin-top: 48px; margin-right: -56px; z-index: 2;
+          transform: perspective(1700px) rotateY(-13deg) rotateX(4deg);
           background: #fff; border-radius: 14px; overflow: hidden;
           box-shadow: 0 40px 90px rgba(8,20,16,.5); border: 1px solid rgba(255,255,255,.5);
         }
@@ -275,13 +285,13 @@ export default function LoginPage() {
         .v-hrs { font-size: 11px; color: #9aa3ad; font-variant-numeric: tabular-nums; }
 
         @media (max-width: 920px) {
-          .v-page { padding: 0; }
-          .v-frame { flex-direction: column; height: auto; border-radius: 0; min-height: 100vh; }
+          .v-frame { flex-direction: column; height: auto; min-height: 100vh; }
           .v-left, .v-right { width: 100%; }
-          .v-left { padding: 56px 32px; order: 2; }
-          .v-right { order: 1; height: 300px; }
-          .v-hero { top: 96px; }
+          .v-left { padding: 48px 28px; order: 2; }
+          .v-right { order: 1; min-height: 300px; padding-bottom: 32px; }
+          .v-rcontent { position: relative; inset: auto; padding: 92px 28px 0; }
           .v-hero h2 { font-size: 30px; }
+          .v-brand { top: 26px; left: 28px; }
           .v-mock { display: none; }
         }
       `}</style>
