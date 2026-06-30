@@ -5,7 +5,7 @@ import {
   Search, Filter, Download, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
   Clock, Plus, Edit2, X, Check, Trash2, Calendar, Users, DollarSign,
   TrendingUp, TrendingDown, Target, PieChart, Activity, Building2, User, Briefcase,
-  CheckCircle, AlertCircle, RefreshCw, Eye, EyeOff, ArrowUpDown, Percent, Layers,
+  CheckCircle, AlertCircle, RefreshCw, Eye, EyeOff, ArrowUpDown, Layers,
   Lock, Unlock
 } from 'lucide-react'
 import { 
@@ -288,7 +288,8 @@ const DATE_PRESETS: { id: DatePreset; label: string }[] = [
 type ViewTab = 'hoursRevenue' | 'billing' | 'cost' | 'trends' | 'byEmployee' | 'detailed'
 
 const VIEW_TABS: { id: ViewTab; label: string; icon: React.ReactNode }[] = [
-  { id: 'hoursRevenue', label: 'Hours & Revenue', icon: <Building2 size={15} /> },
+  // Hours & Revenue retired 06/30/2026 — convoluted/crowded; Billing + Cost cover it. Uncomment to restore.
+  // { id: 'hoursRevenue', label: 'Hours & Revenue', icon: <Building2 size={15} /> },
   { id: 'billing', label: 'Billing', icon: <Briefcase size={15} /> },
   { id: 'cost', label: 'Cost', icon: <DollarSign size={15} /> },
   { id: 'trends', label: 'Trends', icon: <Activity size={15} /> },
@@ -561,10 +562,12 @@ export default function TimeTrackingPage() {
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [showDatePicker, setShowDatePicker] = useState(false)
 
-  const [activeTab, setActiveTab] = useState<ViewTab>('hoursRevenue')
+  const [activeTab, setActiveTab] = useState<ViewTab>('billing')
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set())
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
   const [billingSort, setBillingSort] = useState<'amount' | 'az'>('amount')
+  const [expandedResources, setExpandedResources] = useState<Set<string>>(new Set())
+  const [billingWeekly, setBillingWeekly] = useState(false)
 
   const [showEntryModal, setShowEntryModal] = useState(false)
   const [notesModal, setNotesModal] = useState<{ open: boolean; notes: string; employee: string; project: string; date: string } | null>(null)
@@ -931,6 +934,8 @@ export default function TimeTrackingPage() {
 
   const toggleClient = (clientId: string) => setExpandedClients(prev => { const next = new Set(prev); if (next.has(clientId)) next.delete(clientId); else next.add(clientId); return next })
   const toggleProject = (projectId: string) => setExpandedProjects(prev => { const next = new Set(prev); if (next.has(projectId)) next.delete(projectId); else next.add(projectId); return next })
+  const toggleResource = (key: string) => setExpandedResources(prev => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next })
+  const billingCmp = (a: { name: string; totalRevenue: number }, b: { name: string; totalRevenue: number }) => billingSort === 'az' ? a.name.localeCompare(b.name) : b.totalRevenue - a.totalRevenue
 
   const exportToCSV = () => {
     const headers = ['Date', 'Employee', 'Client', 'Project', 'Actual Hours', 'Billable Hours', 'Cost Rate', 'Bill Rate', 'Cost', 'Revenue', 'Margin', 'Notes']
@@ -1116,14 +1121,10 @@ ${parts.join('')}
         </div>
       </div>
 
-      {/* KPI Cards — 7 metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-7 gap-3 relative z-10">
+      {/* KPI Cards — 3 operational metrics */}
+      <div className="grid grid-cols-3 gap-3 relative z-10">
         <KPICard title="Actual Hours" value={kpis.totalActualHours} format="hours" trend={kpis.hoursTrend} trendLabel="vs prior" icon={<Clock size={15} />} accentColor="#059669" />
         <KPICard title="Billable Hours" value={kpis.totalBillableHours} format="hours" icon={<Layers size={15} />} accentColor="#0891b2" />
-        <KPICard title="Revenue" value={kpis.totalRevenue} format="currency" trend={kpis.revenueTrend} trendLabel="vs prior" icon={<DollarSign size={15} />} accentColor="#059669" />
-        <KPICard title="Cost" value={kpis.totalCost} format="currency" trend={kpis.costTrend} trendLabel="vs prior" icon={<TrendingDown size={15} />} accentColor="#64748b" />
-        <KPICard title="Gross Margin" value={kpis.grossMargin} format="currency" icon={<TrendingUp size={15} />} accentColor={kpis.grossMargin >= 0 ? '#059669' : '#dc2626'} />
-        <KPICard title="Margin %" value={kpis.marginPct} format="percent" icon={<Percent size={15} />} accentColor={kpis.marginPct >= 20 ? '#059669' : kpis.marginPct >= 0 ? '#d97706' : '#dc2626'} />
         <KPICard title="Utilization" value={kpis.utilization} format="percent" icon={<Target size={15} />} accentColor="#d97706" />
       </div>
 
@@ -1199,77 +1200,94 @@ ${parts.join('')}
             </div>
           </div>
 
-          {/* Billing table: Client → Project → Resource */}
-          <div className="flex items-center justify-between gap-2 px-1">
+          {/* Billing — progressive disclosure: Client → Project → Resource → weekly */}
+          <div className="flex items-center justify-between gap-2 px-1 flex-wrap">
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mr-1">Sort</span>
               <button onClick={() => setBillingSort('amount')} className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${billingSort === 'amount' ? 'border-emerald-500 text-emerald-700 bg-emerald-50' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>Amount</button>
               <button onClick={() => setBillingSort('az')} className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${billingSort === 'az' ? 'border-emerald-500 text-emerald-700 bg-emerald-50' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>A–Z</button>
             </div>
-            <div className="flex items-center gap-1">
-              <button onClick={() => setExpandedClients(new Set(dataByClient.map(c => c.id)))} className="text-xs font-medium text-gray-500 hover:text-gray-900 px-2 py-1.5 transition-colors">Expand all</button>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setBillingWeekly(v => !v)} className="flex items-center gap-2 text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors">
+                <span className={`relative w-8 h-[18px] rounded-full transition-colors ${billingWeekly ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+                  <span className={`absolute top-[2px] w-3.5 h-3.5 rounded-full bg-white transition-all ${billingWeekly ? 'left-[16px]' : 'left-[2px]'}`} />
+                </span>
+                Weekly detail
+              </button>
+              <span className="text-gray-300">|</span>
+              <button onClick={() => setExpandedClients(new Set(dataByClient.map(c => c.id)))} className="text-xs font-medium text-gray-500 hover:text-gray-900 px-1 transition-colors">Expand all</button>
               <span className="text-gray-300">·</span>
-              <button onClick={() => setExpandedClients(new Set())} className="text-xs font-medium text-gray-500 hover:text-gray-900 px-2 py-1.5 transition-colors">Collapse all</button>
+              <button onClick={() => { setExpandedClients(new Set()); setExpandedProjects(new Set()); setExpandedResources(new Set()) }} className="text-xs font-medium text-gray-500 hover:text-gray-900 px-1 transition-colors">Collapse all</button>
             </div>
           </div>
-          {[...dataByClient].sort((a, b) => billingSort === 'az' ? a.name.localeCompare(b.name) : b.totalRevenue - a.totalRevenue).map(client => (
-            <div key={client.id} className={`rounded-2xl border ${THEME.border} bg-white overflow-hidden`}>
-              <button onClick={() => toggleClient(client.id)} className="w-full flex items-center justify-between px-5 py-3.5 bg-gradient-to-r from-emerald-50/60 to-transparent hover:from-emerald-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  {expandedClients.has(client.id) ? <ChevronDown size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />}
+
+          <div className={`rounded-2xl border ${THEME.border} bg-white overflow-hidden`}>
+            {[...dataByClient].sort(billingCmp).map((client, ci) => (
+              <div key={client.id} className="border-t border-gray-100 first:border-t-0">
+                {/* CLIENT */}
+                <button onClick={() => toggleClient(client.id)} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50/70 transition-colors text-left bg-gradient-to-r from-emerald-50/40 to-transparent">
+                  {expandedClients.has(client.id) ? <ChevronDown size={15} className="text-gray-400 shrink-0" /> : <ChevronRight size={15} className="text-gray-400 shrink-0" />}
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: CHART_COLORS[ci % CHART_COLORS.length] }} />
                   <span className="font-bold text-sm tracking-wide text-gray-900 uppercase">{client.name}</span>
-                  <span className="text-xs text-gray-400 font-medium tabular-nums">{client.totalBillableHours.toFixed(1)} hrs</span>
-                </div>
-                <span className="font-bold text-sm text-emerald-700 tabular-nums">{formatCurrency(client.totalRevenue)}</span>
-              </button>
-              {expandedClients.has(client.id) && Object.values(client.projects).map(project => (
-                <div key={project.id}>
-                  <div className="px-5 py-2 bg-gray-50/70 border-t border-gray-100 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-gray-600">{project.name}</span>
-                    <span className="text-xs text-gray-500 tabular-nums">{formatCurrency(project.totalRevenue)}</span>
+                  <div className="ml-auto flex items-center gap-5 text-sm shrink-0">
+                    <span className="w-16 text-right" />
+                    <span className="w-20 text-right text-gray-500 tabular-nums text-xs">{client.totalBillableHours.toFixed(1)} hrs</span>
+                    <span className={`w-24 text-right font-bold tabular-nums ${client.totalRevenue ? 'text-emerald-700' : 'text-gray-400'}`}>{formatCurrency(client.totalRevenue)}</span>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead><tr>
-                        <th className="text-left text-[10px] font-semibold uppercase tracking-wide text-gray-400 px-5 py-2">Resource</th>
-                        <th className="text-right text-[10px] font-semibold uppercase tracking-wide text-gray-400 px-2 py-2">Rate</th>
-                        {weekColumns.map(w => <th key={w.end} className="text-right text-[10px] font-semibold uppercase tracking-wide text-gray-300 px-2 py-2">{w.label}</th>)}
-                        <th className="text-right text-[10px] font-semibold uppercase tracking-wide text-gray-400 px-2 py-2">Hrs</th>
-                        <th className="text-right text-[10px] font-semibold uppercase tracking-wide text-gray-400 px-5 py-2">To bill</th>
-                      </tr></thead>
-                      <tbody>
-                        {Object.values(project.members).map(m => (
-                          <tr key={m.id} className="border-t border-gray-50 hover:bg-gray-50/50">
-                            <td className="text-left text-[13px] font-medium text-gray-900 px-5 py-2.5">{m.name}</td>
-                            <td className="text-right text-[12px] text-gray-500 px-2 py-2.5 tabular-nums">{m.billRate ? `$${m.billRate}/hr` : '—'}</td>
-                            {weekColumns.map(w => {
-                              const h = m.weekBillableHours[w.end] || 0
-                              return <td key={w.end} className={`text-right text-[13px] px-2 py-2.5 tabular-nums ${h ? 'text-gray-700' : 'text-gray-300'}`}>{h.toFixed(1)}</td>
-                            })}
-                            <td className="text-right text-[13px] font-semibold text-gray-900 px-2 py-2.5 tabular-nums">{m.totalBillableHours.toFixed(1)}</td>
-                            <td className="text-right text-[13px] font-bold text-emerald-700 px-5 py-2.5 tabular-nums">{formatCurrency(m.totalRevenue)}</td>
-                          </tr>
-                        ))}
-                        <tr className="border-t border-gray-100 bg-gray-50/70">
-                          <td className="text-left text-[12px] font-bold text-gray-900 px-5 py-2.5">Total</td>
-                          <td></td>
-                          {weekColumns.map(w => {
-                            const wt = Object.values(project.members).reduce((s, m) => s + (m.weekBillableHours[w.end] || 0), 0)
-                            return <td key={w.end} className="text-right text-[12px] font-semibold text-gray-700 px-2 py-2.5 tabular-nums">{wt.toFixed(1)}</td>
-                          })}
-                          <td className="text-right text-[12px] font-bold text-gray-900 px-2 py-2.5 tabular-nums">{project.totalBillableHours.toFixed(1)}</td>
-                          <td className="text-right text-[12px] font-bold text-gray-900 px-5 py-2.5 tabular-nums">{formatCurrency(project.totalRevenue)}</td>
-                        </tr>
-                      </tbody>
-                    </table>
+                </button>
+
+                {expandedClients.has(client.id) && Object.values(client.projects).sort(billingCmp).map(project => (
+                  <div key={project.id} className="border-t border-gray-50">
+                    {/* PROJECT */}
+                    <button onClick={() => toggleProject(project.id)} className="w-full flex items-center gap-2.5 pl-11 pr-5 py-2.5 hover:bg-gray-50/70 transition-colors text-left bg-gray-50/40">
+                      {expandedProjects.has(project.id) ? <ChevronDown size={13} className="text-gray-400 shrink-0" /> : <ChevronRight size={13} className="text-gray-400 shrink-0" />}
+                      <span className="text-xs font-semibold text-gray-700">{project.name}</span>
+                      <div className="ml-auto flex items-center gap-5 text-sm shrink-0">
+                        <span className="w-16 text-right" />
+                        <span className="w-20 text-right text-gray-500 tabular-nums text-xs">{project.totalBillableHours.toFixed(1)} hrs</span>
+                        <span className={`w-24 text-right font-semibold tabular-nums text-[13px] ${project.totalRevenue ? 'text-emerald-700' : 'text-gray-400'}`}>{formatCurrency(project.totalRevenue)}</span>
+                      </div>
+                    </button>
+
+                    {expandedProjects.has(project.id) && Object.values(project.members).sort(billingCmp).map(m => {
+                      const rkey = `${project.id}:${m.id}`
+                      const showWeekly = billingWeekly || expandedResources.has(rkey)
+                      return (
+                        <div key={rkey} className="border-t border-gray-50">
+                          {/* RESOURCE */}
+                          <button onClick={() => toggleResource(rkey)} className="w-full flex items-center gap-2 pl-[60px] pr-5 py-2.5 hover:bg-gray-50/70 transition-colors text-left">
+                            {showWeekly ? <ChevronDown size={12} className="text-gray-300 shrink-0" /> : <ChevronRight size={12} className="text-gray-300 shrink-0" />}
+                            <span className="text-[13px] font-medium text-gray-900">{m.name}</span>
+                            <div className="ml-auto flex items-center gap-5 text-sm shrink-0">
+                              <span className="w-16 text-right text-[11px] text-gray-400 tabular-nums">{m.billRate ? `$${m.billRate}/hr` : '—'}</span>
+                              <span className="w-20 text-right text-gray-600 tabular-nums text-xs">{m.totalBillableHours.toFixed(1)} hrs</span>
+                              <span className={`w-24 text-right font-bold tabular-nums text-[13px] ${m.totalRevenue ? 'text-emerald-700' : 'text-gray-400'}`}>{formatCurrency(m.totalRevenue)}</span>
+                            </div>
+                          </button>
+                          {showWeekly && (
+                            <div className="pl-[60px] pr-5 pb-3 pt-1 flex flex-wrap gap-1.5 bg-emerald-50/20">
+                              {weekColumns.map(w => {
+                                const h = m.weekBillableHours[w.end] || 0
+                                return (
+                                  <div key={w.end} className={`flex flex-col items-center min-w-[52px] px-2.5 py-1.5 rounded-lg border ${h ? 'bg-white border-emerald-200' : 'bg-gray-50/50 border-gray-100'}`}>
+                                    <span className="text-[9px] font-semibold text-gray-400">{w.label}</span>
+                                    <span className={`text-xs font-bold tabular-nums mt-0.5 ${h ? 'text-gray-900' : 'text-gray-300'}`}>{h.toFixed(1)}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
-                </div>
-              ))}
-            </div>
-          ))}
-          {dataByClient.length === 0 && (
-            <div className={`rounded-2xl border ${THEME.border} bg-white p-10 text-center text-gray-400 text-sm`}>No billable time in this period.</div>
-          )}
+                ))}
+              </div>
+            ))}
+            {dataByClient.length === 0 && (
+              <div className="p-10 text-center text-gray-400 text-sm">No billable time in this period.</div>
+            )}
+          </div>
         </div>
       )}
 
