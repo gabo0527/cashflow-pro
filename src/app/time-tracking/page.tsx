@@ -564,6 +564,7 @@ export default function TimeTrackingPage() {
   const [activeTab, setActiveTab] = useState<ViewTab>('hoursRevenue')
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set())
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
+  const [billingSort, setBillingSort] = useState<'amount' | 'az'>('amount')
 
   const [showEntryModal, setShowEntryModal] = useState(false)
   const [notesModal, setNotesModal] = useState<{ open: boolean; notes: string; employee: string; project: string; date: string } | null>(null)
@@ -1186,13 +1187,29 @@ ${parts.join('')}
           </div>
 
           {/* Billing table: Client → Project → Resource */}
-          {dataByClient.map(client => (
+          <div className="flex items-center justify-between gap-2 px-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mr-1">Sort</span>
+              <button onClick={() => setBillingSort('amount')} className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${billingSort === 'amount' ? 'border-emerald-500 text-emerald-700 bg-emerald-50' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>Amount</button>
+              <button onClick={() => setBillingSort('az')} className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${billingSort === 'az' ? 'border-emerald-500 text-emerald-700 bg-emerald-50' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>A–Z</button>
+            </div>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setExpandedClients(new Set(dataByClient.map(c => c.id)))} className="text-xs font-medium text-gray-500 hover:text-gray-900 px-2 py-1.5 transition-colors">Expand all</button>
+              <span className="text-gray-300">·</span>
+              <button onClick={() => setExpandedClients(new Set())} className="text-xs font-medium text-gray-500 hover:text-gray-900 px-2 py-1.5 transition-colors">Collapse all</button>
+            </div>
+          </div>
+          {[...dataByClient].sort((a, b) => billingSort === 'az' ? a.name.localeCompare(b.name) : b.totalRevenue - a.totalRevenue).map(client => (
             <div key={client.id} className={`rounded-2xl border ${THEME.border} bg-white overflow-hidden`}>
-              <div className="flex items-center justify-between px-5 py-3.5 bg-gradient-to-r from-emerald-50/60 to-transparent">
-                <span className="font-bold text-sm tracking-wide text-gray-900 uppercase">{client.name}</span>
+              <button onClick={() => toggleClient(client.id)} className="w-full flex items-center justify-between px-5 py-3.5 bg-gradient-to-r from-emerald-50/60 to-transparent hover:from-emerald-50 transition-colors">
+                <div className="flex items-center gap-3">
+                  {expandedClients.has(client.id) ? <ChevronDown size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />}
+                  <span className="font-bold text-sm tracking-wide text-gray-900 uppercase">{client.name}</span>
+                  <span className="text-xs text-gray-400 font-medium tabular-nums">{client.totalBillableHours.toFixed(1)} hrs</span>
+                </div>
                 <span className="font-bold text-sm text-emerald-700 tabular-nums">{formatCurrency(client.totalRevenue)}</span>
-              </div>
-              {Object.values(client.projects).map(project => (
+              </button>
+              {expandedClients.has(client.id) && Object.values(client.projects).map(project => (
                 <div key={project.id}>
                   <div className="px-5 py-2 bg-gray-50/70 border-t border-gray-100 flex items-center justify-between">
                     <span className="text-xs font-semibold text-gray-600">{project.name}</span>
