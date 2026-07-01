@@ -47,8 +47,8 @@ export default function Header({
       {/* Left section - Search */}
       <div className="flex items-center gap-4 flex-1 max-w-md">
         <div className={cn(
-          'relative flex-1 vSrch rounded-lg border border-gray-200 bg-gray-50',
-          searchFocused && 'scale-[1.01] bg-white'
+          'relative flex-1 rounded-xl border transition-all',
+          searchFocused ? 'bg-white border-emerald-300 ring-2 ring-emerald-500/15' : 'bg-gray-50 border-gray-200'
         )}>
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
@@ -57,7 +57,7 @@ export default function Header({
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
             className={cn(
-              'w-full pl-10 pr-4 py-2 rounded-lg text-sm',
+              'w-full pl-10 pr-4 py-2 rounded-xl text-sm',
               'bg-transparent text-gray-900',
               'placeholder:text-gray-400',
               'focus:outline-none',
@@ -73,7 +73,7 @@ export default function Header({
         <button
           onClick={onOpenChat}
           className={cn(
-            'vBtn p-2.5 rounded-lg',
+            'vBtn p-2.5 rounded-xl',
             'text-gray-400 hover:text-emerald-600',
             'hover:bg-emerald-50'
           )}
@@ -85,7 +85,7 @@ export default function Header({
         {/* Notifications */}
         <button
           className={cn(
-            'vBtn p-2.5 rounded-lg relative',
+            'vBtn p-2.5 rounded-xl relative',
             'text-gray-400 hover:text-gray-600',
             'hover:bg-gray-50'
           )}
@@ -108,10 +108,7 @@ export default function Header({
             )}
           >
             {/* Avatar */}
-            <div className={cn(
-              'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold',
-              'bg-emerald-100 text-emerald-700'
-            )}>
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg,#10B981,#065F46)' }}>
               {initials}
             </div>
             <span className="text-sm font-medium text-gray-700 hidden sm:block">
