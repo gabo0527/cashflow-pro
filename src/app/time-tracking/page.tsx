@@ -1032,9 +1032,25 @@ export default function TimeTrackingPage() {
 
   const updateBillableHours = async (entryId: string, newBillableHours: number) => {
     try {
+      const prevEntry = entries.find(e => e.id === entryId)
+      const oldValue = prevEntry ? prevEntry.billable_hours : newBillableHours
       const { error } = await supabase.from('time_entries').update({ billable_hours: newBillableHours }).eq('id', entryId)
       if (error) throw error
       setEntries(prev => prev.map(e => e.id === entryId ? { ...e, billable_hours: newBillableHours } : e))
+      // Audit trail: who/when/old→new. Internal only — never shown to contractors.
+      if (companyId && oldValue !== newBillableHours) {
+        try {
+          const who = await getCurrentUser()
+          await supabase.from('billable_adjustments').insert({
+            company_id: companyId,
+            time_entry_id: entryId,
+            old_hours: oldValue,
+            new_hours: newBillableHours,
+            changed_by: who?.user?.id || null,
+            changed_by_name: who?.user?.email || null,
+          })
+        } catch (logErr) { console.error('Audit log failed:', logErr) }
+      }
       addToast('success', 'Billable hours updated')
     } catch (error: any) { console.error('Error updating:', error); addToast('error', `Failed to update: ${error.message}`) }
   }
