@@ -79,12 +79,12 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
         'fixed left-0 top-0 h-full z-40 flex flex-col overflow-hidden transition-all duration-300',
         collapsed ? 'w-16' : 'w-60'
       )}
-      style={{ background: 'linear-gradient(165deg,#0f151a 0%,#0d1f18 52%,#0e3a2a 100%)' }}
+      style={{ background: 'linear-gradient(165deg,#181e23 0%,#151b1f 55%,#11161b 100%)' }}
     >
       {/* Texture overlays */}
       <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 13px)' }} />
-      <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(rgba(110,231,183,0.08) 1px, transparent 1px)', backgroundSize: '17px 17px', opacity: 0.5 }} />
-      <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(120% 45% at 100% 0%, rgba(110,231,183,0.14), transparent 60%)' }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)', backgroundSize: '17px 17px', opacity: 0.6 }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(100% 40% at 100% 0%, rgba(110,231,183,0.10), transparent 60%)' }} />
 
       {/* Brand */}
       <div className={cn('relative flex items-center h-16 border-b border-white/[0.07]', collapsed ? 'justify-center px-2' : 'px-4')}>
