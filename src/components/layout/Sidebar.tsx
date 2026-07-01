@@ -40,44 +40,32 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  // --- TOP ---
-  { label: 'Projects', href: '/projects', icon: <FolderKanban size={18} />, adminOnly: true },
-  { label: 'Clients', href: '/clients', icon: <Users size={18} />, adminOnly: true },
-
-  // --- OPERATIONS ---
-  { label: 'Time Tracking', href: '/time-tracking', icon: <Clock size={18} />, section: 'Operations', adminOnly: true },
-  { label: 'Contractor Mgmt', href: '/contractor-management', icon: <ClipboardList size={18} />, adminOnly: true },
-  { label: 'Team', href: '/team', icon: <UserCog size={18} />, adminOnly: true },
-
-  // --- ANALYSIS ---
-  { label: 'Reports', href: '/reports', icon: <BarChart3 size={18} />, section: 'Analysis', adminOnly: true },
-
-  // --- INTELLIGENCE ---
-  { label: 'Sage', href: '/ai-assistant', icon: <MessageSquare size={18} />, section: 'Intelligence', adminOnly: true },
-
-  // --- SYSTEM ---
-  { label: 'Settings', href: '/settings', icon: <Settings size={18} />, section: 'System', adminOnly: true },
-
-  // --- CONTRACTOR PORTAL (non-admin users only) ---
-  { label: 'My Timesheet', href: '/timesheet', icon: <Clock size={18} /> },
-  { label: 'My Expenses', href: '/expense-report', icon: <Receipt size={18} /> },
-
-  // =========================================================
-  // TEMPORARILY HIDDEN — uncomment a line to restore it to the nav.
-  // Pages still exist; they're just removed from the menu for now.
-  // =========================================================
+  // Financial nav commented out per operations repositioning (reversible)
   // { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={18} />, adminOnly: true },
   // { label: 'Cash Flow', href: '/cash-flow', icon: <Wallet size={18} />, adminOnly: true },
   // { label: 'Invoices', href: '/invoices', icon: <FileText size={18} />, adminOnly: true },
   // { label: 'Cash Management', href: '/expenses', icon: <Receipt size={18} />, adminOnly: true },
+  { label: 'Projects', href: '/projects', icon: <FolderKanban size={18} />, adminOnly: true },
+  { label: 'Clients', href: '/clients', icon: <Users size={18} />, adminOnly: true },
+  { label: 'Time Tracking', href: '/time-tracking', icon: <Clock size={18} />, section: 'Operations', adminOnly: true },
+  { label: 'Contractor Mgmt', href: '/contractor-management', icon: <ClipboardList size={18} />, adminOnly: true },
+  { label: 'Team', href: '/team', icon: <UserCog size={18} />, adminOnly: true },
+  { label: 'Reports', href: '/reports', icon: <BarChart3 size={18} />, section: 'Analysis', adminOnly: true },
   // { label: 'Forecast', href: '/forecast', icon: <Calculator size={18} />, adminOnly: true },
+  { label: 'Sage', href: '/ai-assistant', icon: <MessageSquare size={18} />, section: 'Intelligence', adminOnly: true },
+  { label: 'Settings', href: '/settings', icon: <Settings size={18} />, section: 'System', adminOnly: true },
+  { label: 'My Timesheet', href: '/timesheet', icon: <Clock size={18} /> },
+  { label: 'My Expenses', href: '/expense-report', icon: <Receipt size={18} /> },
 ]
+
+const MONO = "'JetBrains Mono', monospace"
+const DISPLAY = "'Archivo', system-ui, sans-serif"
 
 export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, userRole = 'owner' }: SidebarProps) {
   const pathname = usePathname()
-  
+
   const isLeadership = userRole === 'owner' || userRole === 'admin'
-  
+
   const visibleItems = navItems.filter(item => {
     if (isLeadership) return item.adminOnly === true
     return !item.adminOnly
@@ -88,40 +76,27 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 h-full z-40 flex flex-col transition-all duration-300',
-        'bg-white border-r border-gray-200',
+        'fixed left-0 top-0 h-full z-40 flex flex-col overflow-hidden transition-all duration-300',
         collapsed ? 'w-16' : 'w-60'
       )}
+      style={{ background: 'linear-gradient(165deg,#0f151a 0%,#0d1f18 52%,#0e3a2a 100%)' }}
     >
-      {/* Logo / Brand */}
-      <div className={cn(
-        'flex items-center h-16 border-b border-gray-200',
-        collapsed ? 'justify-center px-2' : 'px-4'
-      )}>
+      {/* Texture overlays */}
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 13px)' }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(rgba(110,231,183,0.08) 1px, transparent 1px)', backgroundSize: '17px 17px', opacity: 0.5 }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(120% 45% at 100% 0%, rgba(110,231,183,0.14), transparent 60%)' }} />
+
+      {/* Brand */}
+      <div className={cn('relative flex items-center h-16 border-b border-white/[0.07]', collapsed ? 'justify-center px-2' : 'px-4')}>
         <div className="flex items-center gap-3">
-          <div className="relative flex-shrink-0">
-            <svg 
-              width={collapsed ? 26 : 28} 
-              height={collapsed ? 26 : 28} 
-              viewBox="0 0 40 40" 
-              fill="none"
-            >
-              <path 
-                d="M8 8L20 32L32 8" 
-                stroke="#10b981" 
-                strokeWidth="3.5" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                fill="none"
-              />
-            </svg>
-          </div>
-          
+          <svg width={collapsed ? 26 : 28} height={collapsed ? 26 : 28} viewBox="0 0 40 40" fill="none" className="flex-shrink-0">
+            <path d="M8 8L20 32L32 8" stroke="#6EE7B7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 4px rgba(110,231,183,0.5))' }} />
+          </svg>
           {!collapsed && (
             <div>
-              <h1 className="text-base font-bold tracking-tight text-gray-900">VantageFP</h1>
+              <h1 className="text-base font-extrabold tracking-tight text-white" style={{ fontFamily: DISPLAY }}>VantageFP</h1>
               {companyName && (
-                <p className="text-[10px] text-gray-400 -mt-0.5 truncate max-w-32">{companyName}</p>
+                <p className="text-[9px] -mt-0.5 truncate max-w-32" style={{ fontFamily: MONO, color: 'rgba(110,231,183,0.5)' }}>{companyName}</p>
               )}
             </div>
           )}
@@ -129,57 +104,50 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2">
+      <nav className="relative flex-1 overflow-y-auto py-3 px-2">
         <ul className="space-y-0.5">
           {visibleItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             const showSection = item.section && item.section !== currentSection
-            
+
             if (item.section) {
               currentSection = item.section
             }
 
             return (
               <React.Fragment key={item.href}>
-                {/* Section divider */}
                 {showSection && !collapsed && (
-                  <li className="pt-6 pb-1.5 px-3">
-                    <span className="vLbl text-[10px] font-bold uppercase text-gray-400">
-                      {item.section}
+                  <li className="pt-4 pb-1.5 px-3">
+                    <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em]" style={{ fontFamily: MONO, color: 'rgba(110,231,183,0.42)' }}>
+                      // {item.section}
                     </span>
                   </li>
                 )}
                 {showSection && collapsed && (
-                  <li className="pt-4 pb-2">
-                    <div className="mx-3 border-t border-gray-100" />
+                  <li className="pt-3 pb-1">
+                    <div className="mx-3 border-t border-white/[0.06]" />
                   </li>
                 )}
-                
-                {/* Nav item */}
+
                 <li>
                   <Link
                     href={item.href}
-                    className={cn(
-                      'vBtn flex items-center gap-3 px-3 py-2 rounded-lg relative',
-                      collapsed && 'justify-center',
-                      isActive 
-                        ? 'bg-emerald-50 text-emerald-700' 
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-                    )}
                     title={collapsed ? item.label : undefined}
-                  >
-                    {/* Active indicator bar */}
-                    {isActive && (
-                      <div className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-emerald-500" />
+                    className={cn(
+                      'group relative flex items-center gap-3 px-3 py-2 rounded-lg transition-all',
+                      collapsed && 'justify-center',
+                      isActive ? 'text-white font-semibold' : 'text-white/60 hover:text-white hover:bg-white/[0.05]'
                     )}
-                    <span className={cn(
-                      'flex-shrink-0',
-                      isActive && 'text-emerald-600'
-                    )}>
+                    style={isActive ? { background: 'linear-gradient(90deg, rgba(16,185,129,0.24), rgba(16,185,129,0.05))', boxShadow: '0 0 18px -3px rgba(110,231,183,0.3) inset' } : undefined}
+                  >
+                    {isActive && (
+                      <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full" style={{ background: '#6EE7B7', boxShadow: '0 0 8px rgba(110,231,183,0.7)' }} />
+                    )}
+                    <span className="flex-shrink-0" style={{ color: isActive ? '#6EE7B7' : 'rgba(255,255,255,0.5)' }}>
                       {item.icon}
                     </span>
                     {!collapsed && (
-                      <span className="text-[13px] font-medium">{item.label}</span>
+                      <span className="text-[13px]">{item.label}</span>
                     )}
                   </Link>
                 </li>
@@ -190,13 +158,18 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
       </nav>
 
       {/* Bottom section */}
-      <div className="border-t border-gray-200 p-2">
-        {/* Sign Out */}
+      <div className="relative border-t border-white/[0.07] p-2">
+        {!collapsed && (
+          <div className="flex items-center gap-2 px-3 pb-2 pt-1">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#6EE7B7', boxShadow: '0 0 6px rgba(110,231,183,0.8)' }} />
+            <span className="text-[9.5px]" style={{ fontFamily: MONO, color: 'rgba(110,231,183,0.55)' }}>online</span>
+          </div>
+        )}
+
         <button
           onClick={onSignOut}
           className={cn(
-            'vBtn w-full flex items-center gap-3 px-3 py-2 rounded-lg',
-            'text-gray-400 hover:text-gray-600 hover:bg-gray-50',
+            'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-white/45 hover:text-white/80 hover:bg-white/[0.05] transition-colors',
             collapsed && 'justify-center'
           )}
           title={collapsed ? 'Sign Out' : undefined}
@@ -205,12 +178,10 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
           {!collapsed && <span className="text-[13px] font-medium">Sign Out</span>}
         </button>
 
-        {/* Collapse Toggle */}
         <button
           onClick={onToggle}
           className={cn(
-            'vBtn w-full flex items-center gap-3 px-3 py-2 rounded-lg mt-0.5',
-            'text-gray-400 hover:text-gray-600 hover:bg-gray-50',
+            'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-white/45 hover:text-white/80 hover:bg-white/[0.05] transition-colors mt-0.5',
             collapsed && 'justify-center'
           )}
           title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
