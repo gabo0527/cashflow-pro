@@ -4,13 +4,13 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { 
   Search, Filter, Download, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
   Clock, Plus, Edit2, X, Check, Trash2, Calendar, Users, DollarSign,
-  TrendingUp, TrendingDown, Gauge, PieChart, Activity, Building2, User, Briefcase,
+  TrendingUp, TrendingDown, Gauge, Activity, Building2, User, Briefcase,
   CheckCircle, AlertCircle, RefreshCw, Eye, EyeOff, ArrowUpDown, BadgeCheck, FileText,
   Lock, Unlock
 } from 'lucide-react'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-  PieChart as RechartsPie, Pie, LineChart, Line, Legend, Area, AreaChart
+  PieChart as RechartsPie, Pie, LineChart, Line, Legend, Area, AreaChart, ComposedChart
 } from 'recharts'
 import { getCurrentUser } from '@/lib/supabase'
 import { createClient } from '@supabase/supabase-js'
@@ -523,6 +523,37 @@ function KPICard({ title, value, format = 'number', trend, trendLabel, icon, acc
   )
 }
 
+// ============ TRENDS (T&M) helpers ============
+const TREND_COLORS = ['#6EE7B7', '#34d399', '#22d3ee', '#fbbf24', '#a78bfa', '#f472b6', '#5eead4', '#fca5a5']
+
+function TrendStat({ label, value, format }: { label: string; value: number; format: 'hours' | 'currency' | 'rate' }) {
+  const v = useCountUp(value)
+  const txt = format === 'currency' ? formatCurrency(v) : format === 'rate' ? `${formatCurrency(v)}/hr` : v.toFixed(1)
+  return (
+    <div className="rounded-xl px-3.5 py-3 border border-white/10" style={{ background: 'rgba(255,255,255,0.06)' }}>
+      <p className="text-[10px] font-bold uppercase tracking-[0.07em]" style={{ color: 'rgba(174,221,205,0.75)' }}>{label}</p>
+      <p className="text-xl font-extrabold text-white mt-1 tabular-nums" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{txt}</p>
+    </div>
+  )
+}
+
+function TrendsTooltip({ active, payload, label }: { active?: boolean; payload?: { dataKey: string; value: number; color: string }[]; label?: string }) {
+  if (!active || !payload || !payload.length) return null
+  const hrs = payload.filter(p => p.dataKey !== 'revenue' && p.value)
+  const rev = payload.find(p => p.dataKey === 'revenue')
+  const total = hrs.reduce((s, p) => s + (p.value || 0), 0)
+  return (
+    <div className="rounded-lg px-3 py-2 text-xs" style={{ background: 'rgba(6,20,16,0.96)', border: '1px solid rgba(110,231,183,0.3)', color: '#fff' }}>
+      <p className="font-bold mb-1" style={{ color: '#6EE7B7' }}>Week of {label}</p>
+      {hrs.map(p => (
+        <div key={p.dataKey} className="flex justify-between gap-4"><span style={{ color: p.color }}>{p.dataKey}</span><span>{p.value.toFixed(1)}h</span></div>
+      ))}
+      <div className="flex justify-between gap-4 border-t border-white/15 mt-1 pt-1 font-semibold"><span>Total</span><span>{total.toFixed(1)}h</span></div>
+      {rev && <div className="flex justify-between gap-4"><span>Revenue</span><span>{formatCurrency(rev.value)}</span></div>}
+    </div>
+  )
+}
+
 // ============ COLLAPSIBLE SECTION ============
 function CollapsibleSection({ title, children, defaultExpanded = true, badge, rightContent, icon }: { 
   title: string; children: React.ReactNode; defaultExpanded?: boolean; badge?: string | number
@@ -600,6 +631,9 @@ export default function TimeTrackingPage() {
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all')
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [ttSearch, setTtSearch] = useState('')
+  const [trendsMetric, setTrendsMetric] = useState<'both' | 'hours' | 'rev'>('both')
+  const [hiddenTrendClients, setHiddenTrendClients] = useState<Set<string>>(new Set())
+  const toggleTrendClient = (name: string) => setHiddenTrendClients(prev => { const n = new Set(prev); n.has(name) ? n.delete(name) : n.add(name); return n })
   const [showDatePicker, setShowDatePicker] = useState(false)
 
   const [activeTab, setActiveTab] = useState<ViewTab>('billing')
@@ -822,6 +856,35 @@ export default function TimeTrackingPage() {
 
   const weekColumns = useMemo(() => getWeekColumns(dateRange.start, dateRange.end), [dateRange])
 
+  // T&M-only trends: hours per client per week (stacked) + T&M revenue per week (line)
+  const tmTrends = useMemo(() => {
+    const btById: Record<string, string> = {}
+    projects.forEach((p: { id: string; budget_type?: string; contract_type?: string }) => { btById[p.id] = (p.budget_type || p.contract_type || '') })
+    const isTM = (pid: string) => { const bt = (btById[pid] || '').toLowerCase(); return bt.includes('time') || bt.includes('t_m') || bt.includes('hourly') }
+    const tmEntries = costAdjustedEntries.filter(e => isTM(e.project_id))
+    const clientNames = Array.from(new Set(tmEntries.map(e => e.client_name).filter(Boolean)))
+    const rows = weekColumns.map(w => {
+      const row: Record<string, number | string> = { week: w.label }
+      clientNames.forEach(cn => { row[cn] = 0 })
+      row.revenue = 0
+      return row
+    })
+    const idxByEnd: Record<string, number> = {}; weekColumns.forEach((w, i) => { idxByEnd[w.end] = i })
+    tmEntries.forEach(e => {
+      const d = new Date(e.date)
+      const wc = weekColumns.find(w => { const ws = new Date(w.start); const we = new Date(w.end); we.setHours(23, 59, 59); return d >= ws && d <= we })
+      if (!wc) return
+      const r = rows[idxByEnd[wc.end]]
+      r[e.client_name] = ((r[e.client_name] as number) || 0) + e.hours
+      r.revenue = (r.revenue as number) + (e.is_billable ? e.billable_hours * e.bill_rate : 0)
+    })
+    const totalHours = tmEntries.reduce((s, e) => s + e.hours, 0)
+    const totalRevenue = tmEntries.reduce((s, e) => s + (e.is_billable ? e.billable_hours * e.bill_rate : 0), 0)
+    const blended = totalHours ? totalRevenue / totalHours : 0
+    const tmProjectCount = projects.filter((p: { id: string }) => isTM(p.id)).length
+    return { rows, clientNames, totalHours, totalRevenue, blended, tmProjectCount }
+  }, [costAdjustedEntries, weekColumns, projects])
+
   // ============ BY CLIENT DATA ============
   const dataByClient = useMemo(() => {
     const clientData: Record<string, { id: string; name: string; totalActualHours: number; totalBillableHours: number; totalCost: number; totalRevenue: number
@@ -886,8 +949,6 @@ export default function TimeTrackingPage() {
     })
     return Object.values(employeeData).sort((a, b) => b.totalActualHours - a.totalActualHours)
   }, [costAdjustedEntries, teamMembers])
-
-  const revenueByClientData = useMemo(() => dataByClient.map((c, i) => ({ name: c.name, value: c.totalRevenue, fill: CHART_COLORS[i % CHART_COLORS.length] })), [dataByClient])
 
   const weeklyTrendData = useMemo(() => weekColumns.map(week => {
     const weekEntries = costAdjustedEntries.filter(e => {
@@ -1370,79 +1431,52 @@ ${parts.join('')}
 
       {/* ============ TRENDS VIEW ============ */}
       {activeTab === 'trends' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <CollapsibleSection title="Revenue by Client" icon={<PieChart size={15} />}>
-            <div className="h-64">
-              {revenueByClientData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsPie>
-                    <Pie data={revenueByClientData} cx="35%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value">
-                      {revenueByClientData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
-                    </Pie>
-                    <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => formatCurrency(value)} />
-                    <Legend layout="vertical" align="right" verticalAlign="middle" formatter={(value) => {
-                      const item = revenueByClientData.find(d => d.name === value)
-                      const total = revenueByClientData.reduce((sum, d) => sum + d.value, 0)
-                      const pct = item ? ((item.value / total) * 100).toFixed(0) : 0
-                      return <span className="text-gray-600 text-sm">{value} ({pct}%)</span>
-                    }} />
-                  </RechartsPie>
-                </ResponsiveContainer>
-              ) : <div className="flex items-center justify-center h-full text-gray-400">No data</div>}
+        <div className="relative overflow-hidden rounded-2xl p-5" style={{ background: 'linear-gradient(125deg,#08221c 0%,#0b3025 42%,#0e5b43 100%)', boxShadow: '0 20px 46px -22px rgba(6,40,30,0.7)' }}>
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg,rgba(255,255,255,0.045) 0 1px,transparent 1px 13px)' }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(120% 80% at 100% 0%,rgba(110,231,183,0.16),transparent 55%)' }} />
+          <div className="relative">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-[10.5px] font-extrabold uppercase tracking-[0.16em]" style={{ color: 'rgba(174,221,205,0.8)', fontFamily: "'Archivo', system-ui, sans-serif" }}>Trends</p>
+                <h3 className="text-lg font-extrabold text-white mt-0.5" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>T&amp;M client hours &amp; revenue</h3>
+                <p className="text-xs mt-1" style={{ color: 'rgba(174,221,205,0.7)' }}>Time &amp; Materials only · {tmTrends.tmProjectCount} of {projects.length} projects · weekly</p>
+              </div>
+              <div className="flex bg-white/10 border border-white/15 rounded-xl p-0.5">
+                {(['both', 'hours', 'rev'] as const).map(m => (
+                  <button key={m} onClick={() => setTrendsMetric(m)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${trendsMetric === m ? 'text-white' : 'text-white/60 hover:text-white/80'}`} style={trendsMetric === m ? { background: 'linear-gradient(135deg,#10B981,#059669)' } : {}}>{m === 'both' ? 'Both' : m === 'hours' ? 'Hours' : 'Revenue'}</button>
+                ))}
+              </div>
             </div>
-          </CollapsibleSection>
 
-          <CollapsibleSection title="Weekly Cost vs Revenue" icon={<Activity size={15} />}>
-            <div className="h-64">
-              {weeklyTrendData.length > 0 ? (
+            <div className="h-72 mt-4">
+              {tmTrends.clientNames.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={weeklyTrendData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                    <XAxis dataKey="week" tick={{ fill: '#6b7280', fontSize: 11 }} />
-                    <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} tickFormatter={(v) => formatCompactCurrency(v)} />
-                    <Tooltip {...TOOLTIP_STYLE} formatter={(value: number, name: string) => [formatCurrency(value), name === 'cost' ? 'Cost' : 'Revenue']} />
-                    <Area type="monotone" dataKey="revenue" stroke="#059669" fill="#059669" fillOpacity={0.12} name="Revenue" />
-                    <Area type="monotone" dataKey="cost" stroke="#64748b" fill="#64748b" fillOpacity={0.08} name="Cost" />
-                    <Legend wrapperStyle={{ color: '#6b7280', fontSize: '12px' }} />
-                  </AreaChart>
+                  <ComposedChart data={tmTrends.rows} margin={{ top: 10, right: 6, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" vertical={false} />
+                    <XAxis dataKey="week" tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="h" tick={{ fill: 'rgba(174,221,205,0.7)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="r" orientation="right" tickFormatter={(v: number) => `$${Math.round(v / 1000)}k`} tick={{ fill: '#ffffff', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<TrendsTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                    {trendsMetric !== 'rev' && tmTrends.clientNames.map((cn, i) => (
+                      <Bar key={cn} yAxisId="h" dataKey={cn} stackId="hrs" fill={TREND_COLORS[i % TREND_COLORS.length]} hide={hiddenTrendClients.has(cn)} radius={i === tmTrends.clientNames.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]} />
+                    ))}
+                    {trendsMetric !== 'hours' && (
+                      <Line yAxisId="r" type="monotone" dataKey="revenue" name="T&M revenue" stroke="#ffffff" strokeWidth={2.5} dot={{ r: 3.5, fill: '#08221c', stroke: '#ffffff', strokeWidth: 2 }} />
+                    )}
+                    <Legend onClick={(o: any) => { if (o && o.dataKey && o.dataKey !== 'revenue') toggleTrendClient(String(o.dataKey)) }} wrapperStyle={{ fontSize: 12, paddingTop: 8, color: '#fff' }} />
+                  </ComposedChart>
                 </ResponsiveContainer>
-              ) : <div className="flex items-center justify-center h-full text-gray-400">No data</div>}
+              ) : (
+                <div className="h-full flex items-center justify-center text-sm" style={{ color: 'rgba(174,221,205,0.6)' }}>No T&amp;M time in this period.</div>
+              )}
             </div>
-          </CollapsibleSection>
 
-          <CollapsibleSection title="Hours by Employee" icon={<Users size={15} />}>
-            <div className="h-64">
-              {dataByEmployee.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dataByEmployee.slice(0, 8)} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                    <XAxis type="number" tick={{ fill: '#6b7280', fontSize: 11 }} />
-                    <YAxis type="category" dataKey="name" width={100} tick={{ fill: '#6b7280', fontSize: 11 }} />
-                    <Tooltip {...TOOLTIP_STYLE} />
-                    <Bar dataKey="totalActualHours" fill="#059669" radius={[0, 4, 4, 0]} name="Actual" />
-                    <Bar dataKey="totalBillableHours" fill="#05966640" radius={[0, 4, 4, 0]} name="Billable" />
-                    <Legend wrapperStyle={{ color: '#6b7280', fontSize: '12px' }} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : <div className="flex items-center justify-center h-full text-gray-400">No data</div>}
+            <div className="grid grid-cols-3 gap-2.5 mt-4">
+              <TrendStat label="T&M hours" value={tmTrends.totalHours} format="hours" />
+              <TrendStat label="T&M revenue" value={tmTrends.totalRevenue} format="currency" />
+              <TrendStat label="Blended rate" value={tmTrends.blended} format="rate" />
             </div>
-          </CollapsibleSection>
-
-          <CollapsibleSection title="Hours by Project" icon={<Briefcase size={15} />}>
-            <div className="h-64">
-              {costAdjustedEntries.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={Object.values(costAdjustedEntries.reduce((acc, e) => { if (!acc[e.project_id]) acc[e.project_id] = { name: e.project_name.substring(0, 15), hours: 0 }; acc[e.project_id].hours += e.hours; return acc }, {} as Record<string, { name: string; hours: number }>)).sort((a, b) => b.hours - a.hours).slice(0, 8)} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                    <XAxis type="number" tick={{ fill: '#6b7280', fontSize: 11 }} />
-                    <YAxis type="category" dataKey="name" width={100} tick={{ fill: '#6b7280', fontSize: 11 }} />
-                    <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => [`${value.toFixed(1)} hrs`, 'Hours']} />
-                    <Bar dataKey="hours" fill="#0891b2" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : <div className="flex items-center justify-center h-full text-gray-400">No data</div>}
-            </div>
-          </CollapsibleSection>
+          </div>
         </div>
       )}
 
