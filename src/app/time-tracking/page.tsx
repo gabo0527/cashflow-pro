@@ -291,7 +291,8 @@ const VIEW_TABS: { id: ViewTab; label: string; icon: React.ReactNode }[] = [
   // Hours & Revenue retired 06/30/2026 — convoluted/crowded; Billing + Cost cover it. Uncomment to restore.
   // { id: 'hoursRevenue', label: 'Hours & Revenue', icon: <Building2 size={15} /> },
   { id: 'billing', label: 'Billing', icon: <Briefcase size={15} /> },
-  { id: 'cost', label: 'Cost', icon: <DollarSign size={15} /> },
+  // Cost retired 07/01/2026 — cost/margin moved to the separate revenue-review report. Uncomment to restore.
+  // { id: 'cost', label: 'Cost', icon: <DollarSign size={15} /> },
   { id: 'trends', label: 'Trends', icon: <Activity size={15} /> },
   { id: 'byEmployee', label: 'By Employee', icon: <Users size={15} /> },
   { id: 'detailed', label: 'Detailed', icon: <Calendar size={15} /> },
