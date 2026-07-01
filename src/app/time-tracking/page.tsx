@@ -526,6 +526,7 @@ function KPICard({ title, value, format = 'number', trend, trendLabel, icon, acc
 
 // ============ TRENDS (T&M) helpers ============
 const TREND_COLORS = ['#6EE7B7', '#34d399', '#22d3ee', '#fbbf24', '#a78bfa', '#f472b6', '#5eead4', '#fca5a5']
+const initials = (name: string) => (name || '?').split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
 
 function TrendStat({ label, value, format }: { label: string; value: number; format: 'hours' | 'currency' | 'rate' }) {
   const v = useCountUp(value)
@@ -634,6 +635,8 @@ export default function TimeTrackingPage() {
   const [ttSearch, setTtSearch] = useState('')
   const [trendsMetric, setTrendsMetric] = useState<'both' | 'hours' | 'rev'>('both')
   const [hiddenTrendClients, setHiddenTrendClients] = useState<Set<string>>(new Set())
+  const [detailExpanded, setDetailExpanded] = useState<Set<string>>(new Set())
+  const toggleDetail = (key: string) => setDetailExpanded(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
   const toggleTrendClient = (name: string) => setHiddenTrendClients(prev => { const n = new Set(prev); n.has(name) ? n.delete(name) : n.add(name); return n })
   const [showDatePicker, setShowDatePicker] = useState(false)
 
@@ -885,6 +888,42 @@ export default function TimeTrackingPage() {
     const tmProjectCount = projects.filter((p: { id: string }) => isTM(p.id)).length
     return { rows, clientNames, totalHours, totalRevenue, blended, tmProjectCount }
   }, [costAdjustedEntries, weekColumns, projects])
+
+  // Detailed ledger grouped Employee > Client > Project, entries newest-first
+  const detailedGroups = useMemo(() => {
+    type Prj = { id: string; name: string; actual: number; billable: number; revenue: number; entries: typeof costAdjustedEntries }
+    type Cli = { id: string; name: string; actual: number; billable: number; revenue: number; projects: Record<string, Prj> }
+    type Emp = { id: string; name: string; actual: number; billable: number; revenue: number; clients: Record<string, Cli> }
+    const emps: Record<string, Emp> = {}
+    costAdjustedEntries.forEach(e => {
+      const rev = e.is_billable ? e.billable_hours * e.bill_rate : 0
+      const ek = e.team_member_id || e.team_member_name || 'unknown'
+      if (!emps[ek]) emps[ek] = { id: ek, name: e.team_member_name || 'Unknown', actual: 0, billable: 0, revenue: 0, clients: {} }
+      const emp = emps[ek]; emp.actual += e.hours; emp.billable += e.billable_hours; emp.revenue += rev
+      const ck = e.client_id || e.client_name || 'none'
+      if (!emp.clients[ck]) emp.clients[ck] = { id: ck, name: e.client_name || '—', actual: 0, billable: 0, revenue: 0, projects: {} }
+      const cli = emp.clients[ck]; cli.actual += e.hours; cli.billable += e.billable_hours; cli.revenue += rev
+      const pk = e.project_id || e.project_name || 'none'
+      if (!cli.projects[pk]) cli.projects[pk] = { id: pk, name: e.project_name || '—', actual: 0, billable: 0, revenue: 0, entries: [] }
+      const prj = cli.projects[pk]; prj.actual += e.hours; prj.billable += e.billable_hours; prj.revenue += rev
+      prj.entries.push(e)
+    })
+    Object.values(emps).forEach(emp => Object.values(emp.clients).forEach(cli => Object.values(cli.projects).forEach(prj => prj.entries.sort((a, b) => (a.date < b.date ? 1 : -1)))))
+    return Object.values(emps).sort((a, b) => b.actual - a.actual)
+  }, [costAdjustedEntries])
+
+  const weekLabelFor = (date: string) => {
+    const d = new Date(date)
+    const wc = weekColumns.find(w => { const ws = new Date(w.start); const we = new Date(w.end); we.setHours(23, 59, 59); return d >= ws && d <= we })
+    return wc ? wc.label : formatShortDate(date)
+  }
+  const detailKeys = () => {
+    const keys: string[] = []
+    detailedGroups.forEach(emp => { keys.push(`e:${emp.id}`); Object.values(emp.clients).forEach(cli => { keys.push(`e:${emp.id}|c:${cli.id}`); Object.values(cli.projects).forEach(prj => keys.push(`e:${emp.id}|c:${cli.id}|p:${prj.id}`)) }) })
+    return keys
+  }
+  const expandAllDetail = () => setDetailExpanded(new Set(detailKeys()))
+  const collapseAllDetail = () => setDetailExpanded(new Set())
 
   // ============ BY CLIENT DATA ============
   const dataByClient = useMemo(() => {
@@ -1828,74 +1867,109 @@ ${parts.join('')}
               <div className="flex items-center gap-1"><Edit2 size={11} className="text-amber-600" /><span className="text-amber-600">Billable Hours = revenue (click to adjust)</span></div>
             </div>
           </div>
-          <div className={`overflow-x-auto rounded-lg border ${THEME.border}`}>
-            <table className="w-full text-sm">
-              <thead><tr style={{ background: HEADER_GRADIENT }}>
-                <th className={`px-3 py-3 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Date</th>
-                <th className={`px-3 py-3 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Employee</th>
-                <th className={`px-3 py-3 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Client</th>
-                <th className={`px-3 py-3 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Project</th>
-                <th className={`px-3 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Actual</th>
-                <th className={`px-3 py-3 text-right text-xs font-medium text-amber-600 uppercase tracking-wider`}>Billable</th>
-                <th className={`px-3 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Cost Rate</th>
-                <th className={`px-3 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Bill Rate</th>
-                <th className={`px-3 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Cost</th>
-                <th className={`px-3 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Revenue</th>
-                <th className={`px-3 py-3 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Margin</th>
-                <th className={`px-3 py-3 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Notes</th>
-                <th className={`px-3 py-3 text-center text-xs font-medium ${THEME.textDim}`}></th>
-              </tr></thead>
-              <tbody>
-                {costAdjustedEntries.length > 0 ? costAdjustedEntries.slice(0, 100).map((entry) => {
-                  const cost = entry.hours * entry.cost_rate
-                  const revenue = entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
-                  const margin = revenue - cost
-                  return (
-                    <tr key={entry.id} className={`border-t ${THEME.border} hover:bg-gray-50`}>
-                      <td className={`px-3 py-2.5 ${THEME.textMuted} whitespace-nowrap text-xs tabular-nums`}>{formatDate(entry.date)}</td>
-                      <td className={`px-3 py-2.5 text-gray-900 text-sm`}>{entry.team_member_name}</td>
-                      <td className={`px-3 py-2.5 ${THEME.textDim} text-xs`}>{entry.client_name || '—'}</td>
-                      <td className={`px-3 py-2.5 text-gray-600 text-xs`}>{entry.project_name}</td>
-                      <td className="px-3 py-2.5 text-right">
-                        <span className="text-gray-600 flex items-center justify-end gap-1 tabular-nums">
-                          <Lock size={10} className="text-gray-400" />{entry.hours.toFixed(1)}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 text-right">
-                        <EditableBillableCell
-                          actualHours={entry.hours}
-                          billableHours={entry.billable_hours}
-                          onSave={(newValue) => updateBillableHours(entry.id, newValue)}
-                        />
-                      </td>
-                      <td className={`px-3 py-2.5 text-right text-xs ${THEME.textDim} tabular-nums`}>{formatCurrency(entry.display_cost_rate)}</td>
-                      <td className={`px-3 py-2.5 text-right text-xs ${THEME.textDim} tabular-nums`}>{formatCurrency(entry.bill_rate)}</td>
-                      <td className="px-3 py-2.5 text-right text-gray-500 text-xs tabular-nums">{formatCurrency(cost)}</td>
-                      <td className="px-3 py-2.5 text-right text-gray-900 text-xs tabular-nums">{formatCurrency(revenue)}</td>
-                      <td className={`px-3 py-2.5 text-right text-xs font-medium tabular-nums ${margin >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCurrency(margin)}</td>
-                      <td className={`px-3 py-2.5 text-xs max-w-[160px]`}>
-                        {entry.notes ? (
-                          <button
-                            onClick={() => setNotesModal({ open: true, notes: entry.notes!, employee: entry.team_member_name, project: entry.project_name, date: formatDate(entry.date) })}
-                            className="text-left w-full truncate text-gray-500 hover:text-gray-900 hover:underline underline-offset-2 transition-colors cursor-pointer"
-                            title="Click to view full note"
-                          >
-                            {entry.notes}
-                          </button>
-                        ) : <span className={THEME.textDim}>—</span>}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <button onClick={() => deleteEntry(entry.id)} className="p-1.5 rounded bg-gray-100 text-gray-500 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Delete">
-                          <Trash2 size={13} />
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                }) : <tr><td colSpan={13} className={`px-4 py-12 text-center ${THEME.textDim}`}>No time entries found</td></tr>}
-              </tbody>
-            </table>
+          <div className="mb-2 flex items-center justify-end gap-3 text-xs">
+            <button onClick={expandAllDetail} className="font-medium text-gray-500 hover:text-gray-900 transition-colors">Expand all</button>
+            <button onClick={collapseAllDetail} className="font-medium text-gray-500 hover:text-gray-900 transition-colors">Collapse all</button>
           </div>
-          {costAdjustedEntries.length > 100 && <p className="text-center text-sm text-gray-400 mt-2">Showing first 100 of {costAdjustedEntries.length} entries</p>}
+          <div className={`rounded-lg border ${THEME.border} overflow-hidden`}>
+            {detailedGroups.length > 0 ? detailedGroups.map((emp, ei) => {
+              const ekey = `e:${emp.id}`
+              const empOpen = detailExpanded.has(ekey)
+              return (
+                <div key={emp.id} className="border-t border-gray-100 first:border-t-0">
+                  <button onClick={() => toggleDetail(ekey)} className="relative w-full text-left overflow-hidden transition hover:brightness-[0.99]" style={{ background: 'linear-gradient(90deg, rgba(16,185,129,0.12), rgba(16,185,129,0.03) 55%, transparent)' }}>
+                    <span className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(6,40,30,0.028) 0 1px, transparent 1px 12px)' }} />
+                    <div className="relative flex items-center gap-3 px-4 py-3">
+                      {empOpen ? <ChevronDown size={15} className="text-gray-400 shrink-0" /> : <ChevronRight size={15} className="text-gray-400 shrink-0" />}
+                      <span className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 ring-2 ring-white" style={{ backgroundColor: CHART_COLORS[ei % CHART_COLORS.length] }}>{initials(emp.name)}</span>
+                      <span className="font-bold text-sm text-gray-900">{emp.name}</span>
+                      <div className="ml-auto flex items-center gap-6 text-xs tabular-nums shrink-0">
+                        <span className="text-gray-500">{emp.actual.toFixed(1)} <span className="text-gray-400">actual</span></span>
+                        <span className="text-gray-500">{emp.billable.toFixed(1)} <span className="text-gray-400">billable</span></span>
+                        <span className="font-bold text-emerald-700">{formatCurrency(emp.revenue)}</span>
+                      </div>
+                    </div>
+                  </button>
+
+                  {empOpen && Object.values(emp.clients).sort((a, b) => b.actual - a.actual).map(cli => {
+                    const ckey = `${ekey}|c:${cli.id}`
+                    const cliOpen = detailExpanded.has(ckey)
+                    return (
+                      <div key={cli.id} className="border-t border-gray-50">
+                        <button onClick={() => toggleDetail(ckey)} className="w-full flex items-center gap-2.5 pl-10 pr-4 py-2.5 hover:bg-gray-50 transition-colors text-left bg-gray-50/50">
+                          {cliOpen ? <ChevronDown size={13} className="text-gray-400 shrink-0" /> : <ChevronRight size={13} className="text-gray-400 shrink-0" />}
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: CHART_COLORS[ei % CHART_COLORS.length] }} />
+                          <span className="text-xs font-semibold text-gray-700">{cli.name}</span>
+                          <div className="ml-auto flex items-center gap-6 text-xs tabular-nums shrink-0">
+                            <span className="text-gray-500">{cli.actual.toFixed(1)}</span>
+                            <span className="text-gray-500">{cli.billable.toFixed(1)}</span>
+                            <span className="font-semibold text-emerald-700">{formatCurrency(cli.revenue)}</span>
+                          </div>
+                        </button>
+
+                        {cliOpen && Object.values(cli.projects).sort((a, b) => b.actual - a.actual).map(prj => {
+                          const pkey = `${ckey}|p:${prj.id}`
+                          const prjOpen = detailExpanded.has(pkey)
+                          return (
+                            <div key={prj.id} className="border-t border-gray-50">
+                              <button onClick={() => toggleDetail(pkey)} className="w-full flex items-center gap-2 pl-[52px] pr-4 py-2.5 hover:bg-gray-50 transition-colors text-left">
+                                {prjOpen ? <ChevronDown size={12} className="text-gray-300 shrink-0" /> : <ChevronRight size={12} className="text-gray-300 shrink-0" />}
+                                <span className="text-[13px] font-medium text-gray-700">{prj.name}</span>
+                                <div className="ml-auto flex items-center gap-6 text-xs tabular-nums shrink-0">
+                                  <span className="text-gray-500">{prj.actual.toFixed(1)}</span>
+                                  <span className="text-gray-500">{prj.billable.toFixed(1)}</span>
+                                  <span className="font-semibold text-emerald-700">{formatCurrency(prj.revenue)}</span>
+                                </div>
+                              </button>
+
+                              {prjOpen && (
+                                <div className="pl-[52px] pr-4 pb-3 pt-1 bg-gray-50/30 overflow-x-auto">
+                                  <table className="w-full text-sm">
+                                    <thead><tr style={{ background: HEADER_GRADIENT }}>
+                                      <th className={`px-3 py-2 text-left text-[10px] font-semibold ${THEME.textDim} uppercase tracking-wider`}>Date</th>
+                                      <th className={`px-3 py-2 text-right text-[10px] font-semibold ${THEME.textDim} uppercase tracking-wider`}>Actual</th>
+                                      <th className={`px-3 py-2 text-right text-[10px] font-semibold text-amber-600 uppercase tracking-wider`}>Billable</th>
+                                      <th className={`px-3 py-2 text-right text-[10px] font-semibold ${THEME.textDim} uppercase tracking-wider`}>Bill rate</th>
+                                      <th className={`px-3 py-2 text-right text-[10px] font-semibold ${THEME.textDim} uppercase tracking-wider`}>Revenue</th>
+                                      <th className={`px-3 py-2 text-left text-[10px] font-semibold ${THEME.textDim} uppercase tracking-wider w-[42%]`}>Notes</th>
+                                      <th className="px-3 py-2 w-8"></th>
+                                    </tr></thead>
+                                    <tbody>
+                                      {(() => {
+                                        let lastWeek = ''
+                                        const out: React.ReactNode[] = []
+                                        prj.entries.forEach(entry => {
+                                          const wl = weekLabelFor(entry.date)
+                                          if (wl !== lastWeek) { lastWeek = wl; out.push(<tr key={`w-${entry.id}`}><td colSpan={7} className="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Week of {wl}</td></tr>) }
+                                          const revenue = entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
+                                          out.push(
+                                            <tr key={entry.id} className="border-t border-gray-100 hover:bg-white">
+                                              <td className={`px-3 py-2 ${THEME.textMuted} whitespace-nowrap text-xs tabular-nums`}>{formatDate(entry.date)}</td>
+                                              <td className="px-3 py-2 text-right"><span className="text-gray-600 flex items-center justify-end gap-1 tabular-nums text-xs"><Lock size={10} className="text-gray-400" />{entry.hours.toFixed(1)}</span></td>
+                                              <td className="px-3 py-2 text-right"><EditableBillableCell actualHours={entry.hours} billableHours={entry.billable_hours} onSave={(v) => updateBillableHours(entry.id, v)} /></td>
+                                              <td className={`px-3 py-2 text-right text-xs ${THEME.textDim} tabular-nums`}>{formatCurrency(entry.bill_rate)}</td>
+                                              <td className="px-3 py-2 text-right text-gray-900 text-xs tabular-nums">{formatCurrency(revenue)}</td>
+                                              <td className="px-3 py-2 text-xs text-gray-500">{entry.notes ? <button onClick={() => setNotesModal({ open: true, notes: entry.notes!, employee: entry.team_member_name, project: entry.project_name, date: formatDate(entry.date) })} className="text-left w-full text-gray-500 hover:text-gray-900 hover:underline underline-offset-2 transition-colors cursor-pointer">{entry.notes}</button> : <span className={THEME.textDim}>—</span>}</td>
+                                              <td className="px-3 py-2"><button onClick={() => deleteEntry(entry.id)} className="p-1.5 rounded bg-gray-100 text-gray-500 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Delete"><Trash2 size={13} /></button></td>
+                                            </tr>
+                                          )
+                                        })
+                                        return out
+                                      })()}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            }) : <div className="p-10 text-center text-gray-400 text-sm">No time entries found</div>}
+          </div>
         </CollapsibleSection>
       )}
 
