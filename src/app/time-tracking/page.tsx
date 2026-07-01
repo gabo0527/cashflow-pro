@@ -56,6 +56,7 @@ interface Project {
   client: string
   client_id: string
   bill_rate?: number
+  budget_type?: string
 }
 
 interface Client {
@@ -768,7 +769,7 @@ export default function TimeTrackingPage() {
         })
 
         setTeamMembers((teamRes.data || []).map((t: any) => ({ id: t.id, name: t.name || '', email: t.email || '', status: t.status || 'active', employment_type: t.employment_type || 'contractor', cost_type: t.cost_type || 'hourly', cost_amount: t.cost_amount || 0, baseline_hours: t.baseline_hours || 172 })))
-        setProjects((projRes.data || []).map((p: any) => ({ id: p.id, name: p.name || '', client: p.client || '', client_id: p.client_id || '', bill_rate: p.bill_rate || 0 })))
+        setProjects((projRes.data || []).map((p: any) => ({ id: p.id, name: p.name || '', client: p.client || '', client_id: p.client_id || '', bill_rate: p.bill_rate || 0, budget_type: p.budget_type || p.contract_type || '' })))
         setClients((clientRes.data || []).map((c: any) => ({ id: c.id, name: c.name || '' })))
         setAssignments(assignRes.data || [])
         setBillRates(billRatesRes.data || [])
