@@ -580,6 +580,21 @@ function TabHero({ chips, titleLead, titleAccent, description, right }: {
   )
 }
 
+// ============ EMPTY STATE ============
+function EmptyState({ title, subtitle, action }: { title: string; subtitle: string; action?: React.ReactNode }) {
+  return (
+    <div className="py-14 px-6 flex flex-col items-center text-center">
+      <div className="w-14 h-14 rounded-2xl flex items-center justify-center relative overflow-hidden" style={{ background: 'linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.03))', border: '1px solid rgba(16,185,129,0.2)', color: '#10B981' }}>
+        <span className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(16,185,129,0.06) 0 1px, transparent 1px 8px)' }} />
+        <Clock size={24} className="relative" />
+      </div>
+      <p className="mt-4 text-lg font-extrabold text-gray-900" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{title}</p>
+      <p className="mt-1.5 text-sm text-gray-400 max-w-sm">{subtitle}</p>
+      {action && <div className="mt-4">{action}</div>}
+    </div>
+  )
+}
+
 // ============ COLLAPSIBLE SECTION ============
 function CollapsibleSection({ title, children, defaultExpanded = true, badge, rightContent, icon }: { 
   title: string; children: React.ReactNode; defaultExpanded?: boolean; badge?: string | number
@@ -1504,7 +1519,7 @@ ${parts.join('')}
               </div>
             ))}
             {dataByClient.length === 0 && (
-              <div className="p-10 text-center text-gray-400 text-sm">No billable time in this period.</div>
+              <EmptyState title="No billable time this period" subtitle="Once contractors log time, billing rolls up here by client." />
             )}
           </div>
         </div>
@@ -1996,7 +2011,7 @@ ${parts.join('')}
                   })}
                 </div>
               )
-            }) : <div className="p-10 text-center text-gray-400 text-sm">No time entries found</div>}
+            }) : <EmptyState title="No time logged this period" subtitle="This period has no entries yet. Add an entry or change the date range." action={<button onClick={() => setShowEntryModal(true)} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: 'linear-gradient(135deg,#10B981,#059669)' }}><Plus size={15} />Add Entry</button>} />}
           </div>
         </CollapsibleSection>
         </div>
