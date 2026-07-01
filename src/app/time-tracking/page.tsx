@@ -311,6 +311,9 @@ const THEME = {
   border: 'border-gray-200',
 }
 
+// Shared gradient + pinstripe for table header rows (matches KPI cards / client bar)
+const HEADER_GRADIENT = 'linear-gradient(90deg, rgba(16,185,129,0.10), rgba(16,185,129,0.02) 55%, transparent), repeating-linear-gradient(135deg, rgba(6,40,30,0.028) 0 1px, transparent 1px 12px)'
+
 // Shared tooltip style for all charts
 const TOOLTIP_STYLE = {
   contentStyle: { backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' },
@@ -422,6 +425,13 @@ const getWeekColumns = (start: string, end: string): { start: string; end: strin
     weeks.push({ start: weekStart.toISOString().split('T')[0], end: weekEnd, label: formatShortDate(weekEnd) })
     current.setDate(current.getDate() + 7)
     if (current > endDate) break
+  }
+  // Ensure the final column covers through the period end (e.g. Jun 30 when the
+  // last week-end lands on Jun 29). Without this, trailing days fall in no bucket
+  // and disappear from the weekly strip and PDF even though totals include them.
+  if (weeks.length > 0) {
+    const last = weeks[weeks.length - 1]
+    if (new Date(last.end) < new Date(end)) last.end = end
   }
   return weeks
 }
@@ -1025,15 +1035,19 @@ export default function TimeTrackingPage() {
         if (mode === 'hours') {
           parts.push(`<th class="l">Name</th><th>Bill</th>`)
           weekColumns.forEach(w => parts.push(`<th>${esc(w.label)}</th>`))
-          parts.push(`<th>Actual</th><th>Billed</th><th>Revenue</th></tr></thead><tbody>`)
+          parts.push(`<th>Actual</th><th>Billed</th><th>Adj</th><th>Revenue</th></tr></thead><tbody>`)
           Object.values(project.members).sort((a, b) => b.totalActualHours - a.totalActualHours).forEach(m => {
             parts.push(`<tr><td class="l">${esc(m.name)}</td><td>${fmt(m.billRate)}</td>`)
             weekColumns.forEach(w => parts.push(`<td>${(m.weekActualHours[w.end] || 0).toFixed(1)}</td>`))
-            parts.push(`<td>${m.totalActualHours.toFixed(1)}</td><td>${m.totalBillableHours.toFixed(1)}</td><td>${fmt(m.totalRevenue)}</td></tr>`)
+            const adj = m.totalBillableHours - m.totalActualHours
+            const adjStr = adj === 0 ? '—' : `${adj > 0 ? '+' : ''}${adj.toFixed(1)}`
+            parts.push(`<td>${m.totalActualHours.toFixed(1)}</td><td>${m.totalBillableHours.toFixed(1)}</td><td class="${adj > 0 ? 'pos' : adj < 0 ? 'neg' : ''}">${adjStr}</td><td>${fmt(m.totalRevenue)}</td></tr>`)
           })
           parts.push(`<tr class="rpt-total"><td class="l">Project Total</td><td></td>`)
           weekColumns.forEach(w => { const wt = Object.values(project.members).reduce((s, m) => s + (m.weekActualHours[w.end] || 0), 0); parts.push(`<td>${wt.toFixed(1)}</td>`) })
-          parts.push(`<td>${project.totalActualHours.toFixed(1)}</td><td>${project.totalBillableHours.toFixed(1)}</td><td>${fmt(project.totalRevenue)}</td></tr>`)
+          const padj = project.totalBillableHours - project.totalActualHours
+          const padjStr = padj === 0 ? '—' : `${padj > 0 ? '+' : ''}${padj.toFixed(1)}`
+          parts.push(`<td>${project.totalActualHours.toFixed(1)}</td><td>${project.totalBillableHours.toFixed(1)}</td><td class="${padj > 0 ? 'pos' : padj < 0 ? 'neg' : ''}">${padjStr}</td><td>${fmt(project.totalRevenue)}</td></tr>`)
         } else {
           parts.push(`<th class="l">Name</th><th>Actual</th><th>Cost rate</th><th>Cost</th><th>Revenue</th><th>Margin</th><th>Margin %</th></tr></thead><tbody>`)
           Object.values(project.members).sort((a, b) => (b.totalRevenue - b.totalCost) - (a.totalRevenue - a.totalCost)).forEach(m => {
@@ -1472,7 +1486,7 @@ ${parts.join('')}
                       {expandedProjects.has(project.id) && (
                         <div className="px-6 pb-3 overflow-x-auto">
                           <table className="w-full text-sm">
-                            <thead><tr className={`border-b ${THEME.border}`}>
+                            <thead><tr className={`border-b ${THEME.border}`} style={{ background: HEADER_GRADIENT }}>
                               <th className={`px-2 py-2 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-32`}>Name</th>
                               <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-20`}>Bill</th>
                               {weekColumns.map(week => <th key={week.end} className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} w-16`}>{week.label}</th>)}
@@ -1578,7 +1592,7 @@ ${parts.join('')}
                       {expandedProjects.has(project.id) && (
                         <div className="px-6 pb-3 overflow-x-auto">
                           <table className="w-full text-sm">
-                            <thead><tr className={`border-b ${THEME.border}`}>
+                            <thead><tr className={`border-b ${THEME.border}`} style={{ background: HEADER_GRADIENT }}>
                               <th className={`px-2 py-2 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-32`}>Name</th>
                               <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-20`}>Actual</th>
                               <th className={`px-2 py-2 text-right text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-20`}>Cost rate</th>
@@ -1764,7 +1778,7 @@ ${parts.join('')}
           </div>
           <div className={`overflow-x-auto rounded-lg border ${THEME.border}`}>
             <table className="w-full text-sm">
-              <thead><tr className="bg-gray-50">
+              <thead><tr style={{ background: HEADER_GRADIENT }}>
                 <th className={`px-3 py-3 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Date</th>
                 <th className={`px-3 py-3 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Employee</th>
                 <th className={`px-3 py-3 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider`}>Client</th>
