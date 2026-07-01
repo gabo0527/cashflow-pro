@@ -556,6 +556,30 @@ function TrendsTooltip({ active, payload, label }: { active?: boolean; payload?:
   )
 }
 
+// ============ TAB HERO — dark section header ============
+function TabHero({ chips, titleLead, titleAccent, description, right }: {
+  chips: string[]; titleLead: string; titleAccent: string; description: string; right?: React.ReactNode
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-2xl px-7 py-6" style={{ background: 'linear-gradient(135deg,#0f1a17 0%,#0f2a20 52%,#0d3a29 100%)', boxShadow: '0 20px 46px -24px rgba(6,30,22,0.65)' }}>
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 13px)' }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(90% 120% at 100% 0%, rgba(110,231,183,0.15), transparent 55%)' }} />
+      <div className="relative flex items-end justify-between gap-5 flex-wrap">
+        <div>
+          <div className="flex gap-1.5 mb-3">
+            {chips.map(c => <span key={c} className="text-[10px] font-semibold uppercase tracking-[0.08em] rounded-md px-2 py-1" style={{ fontFamily: "'JetBrains Mono', monospace", color: 'rgba(174,221,205,0.9)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)' }}>{c}</span>)}
+          </div>
+          <h3 className="text-[30px] leading-none font-extrabold tracking-tight text-white" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>
+            {titleLead} <span className="relative whitespace-nowrap">{titleAccent}<span className="absolute left-0 right-0 -bottom-1 h-[3px] rounded-sm" style={{ background: '#6EE7B7', boxShadow: '0 0 10px rgba(110,231,183,0.6)' }} /></span>
+          </h3>
+          <p className="text-sm mt-3 max-w-xl" style={{ color: 'rgba(174,221,205,0.75)' }}>{description}</p>
+        </div>
+        {right && <div className="flex flex-col items-end gap-2 shrink-0">{right}</div>}
+      </div>
+    </div>
+  )
+}
+
 // ============ COLLAPSIBLE SECTION ============
 function CollapsibleSection({ title, children, defaultExpanded = true, badge, rightContent, icon }: { 
   title: string; children: React.ReactNode; defaultExpanded?: boolean; badge?: string | number
@@ -670,7 +694,7 @@ export default function TimeTrackingPage() {
       const link = document.createElement('link')
       link.id = id
       link.rel = 'stylesheet'
-      link.href = 'https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Instrument+Sans:wght@400;500;600;700&display=swap'
+      link.href = 'https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@600&display=swap'
       document.head.appendChild(link)
     }
   }, [])
@@ -1354,6 +1378,7 @@ ${parts.join('')}
       {/* ============ BILLING VIEW ============ */}
       {activeTab === 'billing' && (
         <div className="space-y-4">
+          <TabHero chips={['Operations', 'Billing']} titleLead="Ready to" titleAccent="bill." description="Billable hours × rate, grouped by client. Review and adjust before it goes to invoicing." right={<div className="text-right"><div className="text-[10px] font-bold uppercase tracking-[0.06em]" style={{ color: 'rgba(174,221,205,0.6)' }}>Clients</div><div className="text-2xl font-extrabold text-white tabular-nums" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{dataByClient.length}</div></div>} />
           {/* Summary + burn-up */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="rounded-2xl p-5 text-white relative overflow-hidden" style={{ background: 'linear-gradient(135deg,#0a2a22 0%,#0d3a2e 30%,#10B981 100%)' }}>
@@ -1748,6 +1773,7 @@ ${parts.join('')}
       {/* ============ BY EMPLOYEE VIEW ============ */}
       {activeTab === 'byEmployee' && (
         <div className="space-y-3">
+          <TabHero chips={['Operations', 'Team']} titleLead="Team" titleAccent="output." description="Hours, utilization, and client mix per team member." right={<div className="text-right"><div className="text-[10px] font-bold uppercase tracking-[0.06em]" style={{ color: 'rgba(174,221,205,0.6)' }}>People</div><div className="text-2xl font-extrabold text-white tabular-nums" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{dataByEmployee.length}</div></div>} />
           {dataByEmployee.map((employee, index) => (
             <CollapsibleSection
               key={employee.id}
@@ -1805,7 +1831,9 @@ ${parts.join('')}
 
       {/* ============ DETAILED VIEW ============ */}
       {activeTab === 'detailed' && (
-        <CollapsibleSection title="Time Entries" badge={costAdjustedEntries.length} icon={<Calendar size={15} />}>
+        <div className="space-y-4">
+          <TabHero chips={['Operations', 'Ledger']} titleLead="Every hour," titleAccent="logged." description="Every submission, grouped Employee › Client › Project, in weekly order." />
+          <CollapsibleSection title="Time Entries" badge={costAdjustedEntries.length} icon={<Calendar size={15} />}>
           {/* Inline Filter Bar */}
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-1.5 text-xs text-gray-400">
@@ -1971,6 +1999,7 @@ ${parts.join('')}
             }) : <div className="p-10 text-center text-gray-400 text-sm">No time entries found</div>}
           </div>
         </CollapsibleSection>
+        </div>
       )}
 
       {/* ============ ENTRY MODAL ============ */}
