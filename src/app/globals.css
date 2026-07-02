@@ -3,26 +3,46 @@
 @tailwind utilities;
 
 /* ============================================================
-   VANTAGE DESIGN SYSTEM — Slate + Emerald Light Theme
-   Mercury / Ramp / Carta tier
+   VANTAGE DESIGN SYSTEM — Blueprint (Slate + Blue + Copper)
+   Institutional finance / tech-construction
    Single source of truth for the entire app
    ============================================================ */
 
 :root {
-  /* Core palette — light */
-  --v-bg: #f4f5f7;
+  /* Core surfaces — light */
+  --v-bg: #eef1f4;
   --v-surface: #ffffff;
   --v-surface-raised: #ffffff;
-  --v-surface-recessed: #f0f1f3;
-  --v-border: rgba(0, 0, 0, 0.08);
-  --v-border-subtle: rgba(0, 0, 0, 0.05);
+  --v-surface-recessed: #f1f5f9;
+  --v-border: #e2e8f0;
+  --v-border-subtle: rgba(15, 23, 42, 0.05);
 
-  /* Accent — emerald */
-  --v-accent: #10b981;
-  --v-accent-light: #34d399;
-  --v-accent-dim: #059669;
-  --v-accent-glow: rgba(16, 185, 129, 0.12);
-  --v-accent-glow-sm: rgba(16, 185, 129, 0.06);
+  /* Primary — Blue */
+  --v-blue: #2563eb;
+  --v-blue-l: #3b82f6;
+  --v-blue-400: #60a5fa;
+  --v-blue-300: #93c5fd;
+  --v-navy: #1e3a8a;
+
+  /* Secondary — Copper */
+  --v-copper: #c2660c;
+  --v-copper-l: #ea8a2f;
+
+  /* Deltas — reserved */
+  --v-pos: #10b981;
+  --v-neg: #e11d48;
+
+  /* Dark surfaces (banner / showcase / sidebar) */
+  --v-dark-1: #1b2431;
+  --v-dark-2: #141b24;
+  --v-dark-3: #10151c;
+
+  /* Legacy accent tokens → repointed to blue */
+  --v-accent: #2563eb;
+  --v-accent-light: #3b82f6;
+  --v-accent-dim: #1e3a8a;
+  --v-accent-glow: rgba(37, 99, 235, 0.12);
+  --v-accent-glow-sm: rgba(37, 99, 235, 0.06);
 }
 
 body {
@@ -33,14 +53,19 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Worked canvas — faint graph grid + soft emerald wash (top-left), behind content */
+/* Worked canvas — faint slate grid + soft blue wash (top-left), behind content */
 .v-app {
   background-image:
-    radial-gradient(1100px 480px at 0% 0%, rgba(16, 185, 129, 0.055), transparent 60%),
-    linear-gradient(rgba(22, 28, 31, 0.024) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(22, 28, 31, 0.024) 1px, transparent 1px);
+    radial-gradient(1000px 460px at 12% 0%, rgba(37, 99, 235, 0.05), transparent 60%),
+    linear-gradient(rgba(15, 23, 42, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.022) 1px, transparent 1px);
   background-size: 100% 100%, 26px 26px, 26px 26px;
   background-attachment: fixed;
+}
+
+/* Card texture — faint pinstripe (use behind card content) */
+.v-card-texture {
+  background-image: repeating-linear-gradient(135deg, rgba(15, 23, 42, 0.022) 0 1px, transparent 1px 12px);
 }
 
 /* ============================================================
@@ -99,10 +124,10 @@ body {
 .vBtn:active { transform: scale(0.97); }
 
 .vPri {
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 4px 16px -2px rgba(16,185,129,0.2);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 4px 16px -2px rgba(37,99,235,0.2);
 }
 .vPri:hover {
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1), 0 8px 24px -2px rgba(16,185,129,0.25);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1), 0 8px 24px -2px rgba(37,99,235,0.25);
   transform: translateY(-1px);
 }
 .vPri:active { transform: translateY(0) scale(0.98); }
@@ -116,7 +141,7 @@ body {
 .vExp { overflow: hidden; animation: vUp 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
 .vSrch { transition: all 0.2s ease; }
-.vSrch:focus-within { box-shadow: 0 0 0 3px var(--v-accent-glow-sm); border-color: rgba(16,185,129,0.3); }
+.vSrch:focus-within { box-shadow: 0 0 0 3px var(--v-accent-glow-sm); border-color: rgba(37,99,235,0.3); }
 
 .vKpi { position: relative; overflow: hidden; }
 .vKpi::after {
@@ -168,7 +193,7 @@ body {
 .v-app select,
 .v-app textarea {
   @apply bg-white border border-gray-200 text-gray-900 rounded-lg;
-  @apply focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400;
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400;
 }
 
 .v-app input::placeholder,
@@ -177,7 +202,7 @@ body {
 .v-app select option { @apply bg-white text-gray-900; }
 
 .v-app input[type="checkbox"] { @apply bg-white border border-gray-300 rounded; }
-.v-app input[type="checkbox"]:checked { @apply bg-emerald-500 border-emerald-500; }
+.v-app input[type="checkbox"]:checked { @apply bg-blue-600 border-blue-600; }
 
 /* ============================================================
    UTILITY CLASSES
