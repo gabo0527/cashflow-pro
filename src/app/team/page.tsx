@@ -25,8 +25,8 @@ const THEME = {
   textDim: "text-gray-400",
 }
 
-const inputClass = "w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 vInp"
-const selectInputClass = "w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 vInp cursor-pointer"
+const inputClass = "w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 vInp"
+const selectInputClass = "w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 vInp cursor-pointer"
 
 // ============ TOAST ============
 interface Toast { id: number; type: "success" | "error" | "info"; message: string }
@@ -99,7 +99,7 @@ const PAYMENT_METHODS = [
   { id: "ach", label: "ACH Transfer" }, { id: "wire", label: "Wire Transfer" },
   { id: "check", label: "Check" }, { id: "zelle", label: "Zelle" },
 ]
-const CHART_COLORS = { cost: "#64748b", revenue: "#059669", margin: "#2563eb" }
+const CHART_COLORS = { cost: "#64748b", revenue: "#c2660c", margin: "#2563eb" }
 
 // ============ UTILITIES ============
 const formatCurrency = (v: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
@@ -171,8 +171,8 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
           <div className="flex items-start justify-between">
             <div className="vUp">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center flex-shrink-0">
-                  <span className="text-sm font-bold text-emerald-700">{member.name.split(" ").map(n => n[0]).join("").slice(0, 2)}</span>
+                <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-bold text-blue-700">{member.name.split(" ").map(n => n[0]).join("").slice(0, 2)}</span>
                 </div>
                 <div>
                   <div className="flex items-center gap-2.5">
@@ -240,7 +240,7 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
                             ? (r.cost_type === "hourly" ? `$${r.cost_amount}/hr` : `${formatCurrency(r.cost_amount)}/mo (${r.baseline_hours}h)`)
                             : "From member total"}
                         </span>
-                        <span className="text-emerald-600">{isLumpRev ? `Rev: ${formatCurrency(revAmt)}/mo` : `Bill: $${r.rate}/hr`}</span>
+                        <span className="text-[#c2660c]">{isLumpRev ? `Rev: ${formatCurrency(revAmt)}/mo` : `Bill: $${r.rate}/hr`}</span>
                       </div>
                     </div>
                   )
@@ -470,7 +470,7 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
                           next.has(p.id) ? next.delete(p.id) : next.add(p.id)
                           return next
                         })}
-                        className="w-3.5 h-3.5 rounded border-gray-300 bg-gray-50 text-emerald-600 focus:ring-emerald-500/20" />
+                        className="w-3.5 h-3.5 rounded border-gray-300 bg-gray-50 text-blue-600 focus:ring-blue-500/20" />
                       <span className={`text-xs ${selectedProjects.has(p.id) ? "text-gray-900" : "text-gray-400"}`}>{p.name}</span>
                     </label>
                   ))}
@@ -530,12 +530,12 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
             )}
           </div>
 
-          <div className="p-4 rounded-lg border border-emerald-200 bg-emerald-50 rounded-xl">
+          <div className="p-4 rounded-lg border border-blue-200 bg-blue-50 rounded-xl">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold text-emerald-600">REVENUE SIDE &mdash; What You Charge</p>
+              <p className="text-xs font-semibold text-[#c2660c]">REVENUE SIDE &mdash; What You Charge</p>
               <button type="button" onClick={() => setForm(p => ({ ...p, revenue_type: p.revenue_type === "hourly" ? "lump_sum" : "hourly" }))}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                  form.revenue_type === "lump_sum" ? "border-emerald-400 bg-emerald-50 text-emerald-600" : "border-gray-200 text-gray-400 hover:text-gray-900"
+                  form.revenue_type === "lump_sum" ? "border-blue-400 bg-blue-50 text-blue-600" : "border-gray-200 text-gray-400 hover:text-gray-900"
                 }`}>
                 {form.revenue_type === "lump_sum" ? "Lump Sum (fixed monthly)" : "Hourly (T&M)"}
               </button>
@@ -600,7 +600,7 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
         <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.border} bg-gray-50`}>
           <button onClick={onClose} className={`vBtn px-4 py-2.5 text-sm font-medium text-gray-400 hover:text-gray-900 rounded-lg hover:bg-gray-50`}>Cancel</button>
           <button onClick={handleSave} disabled={!form.team_member_id||!form.client_id||(form.revenue_type === "hourly" ? !form.rate : !form.revenue_amount)||isSaving}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium vBtn vPri bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-40 disabled:shadow-none">
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium vBtn vPri bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:shadow-none">
             {isSaving && <RefreshCw size={14} className="animate-spin" />}{editingRate ? "Save Changes" : "Add Rate"}
           </button>
         </div>
@@ -847,7 +847,7 @@ function MemberModal({ isOpen, onClose, onSave, editingMember }: {
         <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.border} bg-gray-50`}>
           <button onClick={onClose} className={`vBtn px-4 py-2.5 text-sm font-medium text-gray-400 hover:text-gray-900 rounded-lg hover:bg-gray-50`}>Cancel</button>
           <button onClick={handleSave} disabled={!form.name||!form.email||isSaving}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium vBtn vPri bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-40 disabled:shadow-none">
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium vBtn vPri bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:shadow-none">
             {isSaving && <RefreshCw size={14} className="animate-spin" />}{editingMember ? "Save Changes" : "Add Member"}
           </button>
         </div>
@@ -1232,7 +1232,7 @@ export default function TeamPage() {
   if (loading) return (
     <div className="flex items-center justify-center h-[60vh]">
       <div className="text-center">
-        <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" />
+        <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-3" />
         <p className={`text-sm ${THEME.textMuted}`}>Loading team...</p>
       </div>
     </div>
@@ -1243,22 +1243,25 @@ export default function TeamPage() {
       <ToastContainer toasts={toasts} onDismiss={id => setToasts(prev => prev.filter(t => t.id !== id))} />
 
       {/* Header */}
-      <div className="flex items-center justify-between vUp">
-        <div>
-          <h1 className="text-[28px] font-bold text-gray-900 tracking-tight">Team</h1>
-          <p className={`text-[13px] mt-1 ${THEME.textDim}`}>Manage team members, rates, and profitability</p>
+      <div className="relative overflow-hidden rounded-2xl px-7 py-6 flex items-center justify-between vUp" style={{ background: 'linear-gradient(135deg,#1b2431 0%,#141b24 55%,#10151c 100%)', boxShadow: '0 20px 46px -26px rgba(15,23,42,0.6)' }}>
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 13px)' }} />
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(80% 130% at 0% 0%, rgba(59,130,246,0.14), transparent 55%)' }} />
+        <div className="relative">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.16em]" style={{ fontFamily: "'Archivo', system-ui, sans-serif", color: '#93c5fd' }}>Operations</p>
+          <h1 className="text-3xl font-extrabold uppercase tracking-tight text-white mt-1 leading-none" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>Team</h1>
+          <p className="text-sm mt-2" style={{ color: '#8b97a7' }}>Manage team members, rates, and profitability</p>
         </div>
-        <div className="flex items-center gap-2.5 vUp vD1">
-          <button onClick={exportToCSV} className={`flex items-center gap-2 px-4 py-2 ${THEME.card} border hover:bg-gray-50 rounded-lg text-gray-500 text-sm font-medium`}>
+        <div className="relative flex items-center gap-2.5 vUp vD1">
+          <button onClick={exportToCSV} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.16)', color: '#e2e8f0' }}>
             <Download size={14} /> Export
           </button>
           {activeTab === "directory" && (
-            <button onClick={() => { setEditingMember(null); setShowMemberModal(true) }} className="flex items-center gap-2 px-4 py-2 vBtn vPri bg-emerald-500 text-white rounded-lg text-sm font-semibold hover:bg-emerald-600">
+            <button onClick={() => { setEditingMember(null); setShowMemberModal(true) }} className="flex items-center gap-2 px-4 py-2 vBtn vPri bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
               <Plus size={14} /> Add Member
             </button>
           )}
           {activeTab === "rates" && (
-            <button onClick={() => { setEditingRate(null); setShowRateModal(true) }} className="flex items-center gap-2 px-4 py-2 vBtn vPri bg-emerald-500 text-white rounded-lg text-sm font-semibold hover:bg-emerald-600">
+            <button onClick={() => { setEditingRate(null); setShowRateModal(true) }} className="flex items-center gap-2 px-4 py-2 vBtn vPri bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
               <Plus size={14} /> Add Rate Card
             </button>
           )}
@@ -1279,7 +1282,7 @@ export default function TeamPage() {
         ]).map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`vBtn flex items-center gap-2 px-5 py-3.5 text-sm font-medium border-b-2 -mb-px transition-all duration-300 ${
-              activeTab === tab.id ? "border-emerald-500 text-emerald-600" : "border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300"
+              activeTab === tab.id ? "border-blue-600 text-blue-600" : "border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300"
             }`}>
             <tab.icon size={15} /> {tab.label}
           </button>
@@ -1311,14 +1314,14 @@ export default function TeamPage() {
           </div>
         </div>
         <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
-          <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-emerald-500" />
+          <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-blue-600" />
           <div className="pl-2">
             <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>Active Rate Cards</span>
-            <p className="text-2xl font-bold text-emerald-600 vN mt-1.5">{summary.activeRates}</p>
+            <p className="text-2xl font-bold text-blue-600 vN mt-1.5">{summary.activeRates}</p>
           </div>
         </div>
         <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
-          <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-emerald-500" />
+          <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-blue-600" />
           <div className="pl-2">
             <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>GM% ({formatPeriodLabel(selectedPeriod, periodType).split(" ")[0]})</span>
             <p className={`text-2xl font-bold vN mt-1.5 ${profitTotals.marginPct >= 20 ? "text-emerald-600" : profitTotals.marginPct >= 0 ? "text-amber-600" : "text-rose-600"}`}>
@@ -1482,7 +1485,7 @@ export default function TeamPage() {
                       >
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <ChevronRight size={14} className={`${THEME.textDim} transition-transform ${isExpanded ? "rotate-90" : ""}`} />
-                          <div className="w-8 h-8 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center flex-shrink-0">
                             <span className={`text-xs font-medium ${THEME.textSecondary}`}>{group.memberName.split(" ").map(n => n[0]).join("").slice(0, 2)}</span>
                           </div>
                           <div className="min-w-0">
@@ -1552,11 +1555,11 @@ export default function TeamPage() {
                                     <td className="px-4 py-2.5 text-right">
                                       {isLumpRev ? (
                                         <>
-                                          <span className="text-emerald-600 font-medium text-xs">{formatCurrency(revAmt)}/mo</span>
+                                          <span className="text-[#c2660c] font-medium text-xs">{formatCurrency(revAmt)}/mo</span>
                                           <p className={`text-[10px] ${THEME.textDim}`}>Lump Sum</p>
                                         </>
                                       ) : (
-                                        <span className="text-emerald-600 font-medium text-xs">${r.rate}/hr</span>
+                                        <span className="text-[#c2660c] font-medium text-xs">${r.rate}/hr</span>
                                       )}
                                     </td>
                                     <td className="px-4 py-2.5 text-right">
@@ -1575,7 +1578,7 @@ export default function TeamPage() {
                                         {r.is_active ? (
                                           <button onClick={(e) => { e.stopPropagation(); handleDeleteRate(r.id) }} title="Archive" className="p-1 rounded vBtn hover:bg-amber-50 text-gray-400 hover:text-amber-600"><Lock size={13} /></button>
                                         ) : (
-                                          <button onClick={(e) => { e.stopPropagation(); handleReactivateRate(r.id) }} title="Reactivate" className="p-1 rounded vBtn hover:bg-emerald-50 text-gray-400 hover:text-emerald-600"><Unlock size={13} /></button>
+                                          <button onClick={(e) => { e.stopPropagation(); handleReactivateRate(r.id) }} title="Reactivate" className="p-1 rounded vBtn hover:bg-blue-50 text-gray-400 hover:text-blue-600"><Unlock size={13} /></button>
                                         )}
                                       </div>
                                     </td>
@@ -1596,7 +1599,7 @@ export default function TeamPage() {
               <p>No rate cards configured yet</p>
               <p className={`text-xs ${THEME.textDim} mt-1`}>Add rate cards to define cost + bill rates per client</p>
               <button onClick={() => { setEditingRate(null); setShowRateModal(true) }}
-                className="mt-4 px-4 py-2 vBtn vPri bg-emerald-500 text-white rounded-lg text-sm font-semibold hover:bg-emerald-500 border-0">
+                className="mt-4 px-4 py-2 vBtn vPri bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 border-0">
                 Add First Rate Card
               </button>
             </div>
@@ -1632,7 +1635,7 @@ export default function TeamPage() {
 
             <div className="flex items-center gap-0.5 p-0.5 bg-gray-50 rounded-xl border border-gray-200">
               {([
-                { id: "summary" as const, label: "Summary", color: "text-emerald-600" },
+                { id: "summary" as const, label: "Summary", color: "text-blue-600" },
                 { id: "revenue" as const, label: "Revenue", color: "text-blue-600" },
                 { id: "cost" as const, label: "Cost", color: "text-orange-600" },
               ]).map(v => (
@@ -1655,10 +1658,10 @@ export default function TeamPage() {
                 </div>
               </div>
               <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
-                <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-emerald-500" />
+                <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-blue-600" />
                 <div className="pl-2">
                   <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>Revenue</span>
-                  <p className="text-2xl font-bold text-emerald-600 vN mt-1.5">{formatCurrency(profitTotals.revenue)}</p>
+                  <p className="text-2xl font-bold text-[#c2660c] vN mt-1.5">{formatCurrency(profitTotals.revenue)}</p>
                 </div>
               </div>
               <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
@@ -1708,7 +1711,7 @@ export default function TeamPage() {
           {profitView === "summary" && profitabilityData.length > 0 && (
             <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-sm`}>
               <div className={`px-6 py-4 border-b ${THEME.border} flex items-center gap-2`}>
-                <div className="vDot bg-emerald-500" />
+                <div className="vDot bg-blue-600" />
                 <h3 className={`text-[13px] font-bold ${THEME.textPrimary}`}>Direct Cost Analysis &mdash; {formatPeriodLabel(selectedPeriod, periodType)}</h3>
               </div>
               <table className="w-full text-sm">
