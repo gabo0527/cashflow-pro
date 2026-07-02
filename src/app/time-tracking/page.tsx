@@ -300,7 +300,7 @@ const VIEW_TABS: { id: ViewTab; label: string; icon: React.ReactNode }[] = [
 ]
 
 // Emerald-based chart palette for light theme
-const CHART_COLORS = ['#059669', '#0891b2', '#2563eb', '#7c3aed', '#10b981', '#d97706', '#dc2626', '#64748b']
+const CHART_COLORS = ['#2563eb', '#0891b2', '#c2660c', '#7c3aed', '#3b82f6', '#d97706', '#dc2626', '#64748b']
 
 // ============ THEME ============
 const THEME = {
@@ -314,7 +314,7 @@ const THEME = {
 }
 
 // Shared gradient + pinstripe for table header rows (matches KPI cards / client bar)
-const HEADER_GRADIENT = 'linear-gradient(90deg, rgba(16,185,129,0.10), rgba(16,185,129,0.02) 55%, transparent), repeating-linear-gradient(135deg, rgba(6,40,30,0.028) 0 1px, transparent 1px 12px)'
+const HEADER_GRADIENT = 'linear-gradient(90deg, rgba(37,99,235,0.09), rgba(37,99,235,0.02) 55%, transparent), repeating-linear-gradient(135deg, rgba(15,23,42,0.02) 0 1px, transparent 1px 12px)'
 
 // Shared tooltip style for all charts
 const TOOLTIP_STYLE = {
@@ -482,7 +482,7 @@ function useCountUp(target: number, duration = 750) {
 }
 
 // ============ KPI CARD — premium glass-gradient (Vantage) ============
-function KPICard({ title, value, format = 'number', trend, trendLabel, icon, accentColor = '#10B981' }: {
+function KPICard({ title, value, format = 'number', trend, trendLabel, icon, accentColor = '#2563eb' }: {
   title: string; value: number; format?: 'number' | 'currency' | 'percent' | 'hours'
   trend?: number; trendLabel?: string; icon?: React.ReactNode; accentColor?: string
 }) {
@@ -498,25 +498,27 @@ function KPICard({ title, value, format = 'number', trend, trendLabel, icon, acc
 
   return (
     <div
-      className="group relative rounded-2xl overflow-hidden transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_26px_54px_-22px_rgba(6,40,30,0.8)]"
-      style={{ background: 'linear-gradient(120deg,#08221c 0%,#0b3025 40%,#0e5b43 100%)', boxShadow: '0 18px 40px -22px rgba(6,40,30,0.7)' }}
+      className="group relative rounded-2xl overflow-hidden bg-white border border-[#e2e8f0] transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-22px_rgba(15,23,42,0.4)]"
+      style={{ boxShadow: '0 1px 2px rgba(15,23,42,0.05)' }}
     >
-      {/* pinstripe weave */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 13px)' }} />
-      {/* hover glow */}
-      <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background: 'radial-gradient(120% 90% at 100% 0%, rgba(110,231,183,0.22), transparent 55%)' }} />
+      {/* accent bar */}
+      <div className="absolute top-0 left-0 right-0 h-[2px] z-10" style={{ background: `linear-gradient(90deg, ${accentColor}, transparent)` }} />
+      {/* pinstripe texture */}
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)' }} />
+      {/* accent corner glow */}
+      <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(120% 100% at 100% 0%, ${accentColor}14, transparent 58%)` }} />
 
       <div className="relative p-4">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-[10.5px] font-bold uppercase tracking-[0.08em]" style={{ color: 'rgba(174,221,205,0.8)' }}>{title}</span>
-          <span className="transition-transform duration-300 group-hover:scale-110" style={{ color: '#6EE7B7' }}>{icon}</span>
+          <span className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-slate-400">{title}</span>
+          <span className="transition-transform duration-300 group-hover:scale-110" style={{ color: accentColor }}>{icon}</span>
         </div>
-        <p className="text-[26px] leading-none font-extrabold tabular-nums tracking-tight text-white" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{fmt(animated)}</p>
+        <p className="text-[26px] leading-none font-extrabold tabular-nums tracking-tight text-slate-900" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{fmt(animated)}</p>
         {trend !== undefined && (
           <div className="flex items-center gap-1.5 mt-2.5">
-            {trend >= 0 ? <TrendingUp size={12} style={{ color: '#6EE7B7' }} /> : <TrendingDown size={12} style={{ color: '#fb7185' }} />}
-            <span className="text-[11px] font-semibold tabular-nums" style={{ color: trend >= 0 ? '#6EE7B7' : '#fb7185' }}>{trend >= 0 ? '+' : ''}{trend.toFixed(1)}%</span>
-            {trendLabel && <span className="text-[11px]" style={{ color: 'rgba(174,221,205,0.7)' }}>{trendLabel}</span>}
+            {trend >= 0 ? <TrendingUp size={12} style={{ color: '#10b981' }} /> : <TrendingDown size={12} style={{ color: '#e11d48' }} />}
+            <span className="text-[11px] font-semibold tabular-nums" style={{ color: trend >= 0 ? '#10b981' : '#e11d48' }}>{trend >= 0 ? '+' : ''}{trend.toFixed(1)}%</span>
+            {trendLabel && <span className="text-[11px] text-slate-400">{trendLabel}</span>}
           </div>
         )}
       </div>
@@ -525,7 +527,7 @@ function KPICard({ title, value, format = 'number', trend, trendLabel, icon, acc
 }
 
 // ============ TRENDS (T&M) helpers ============
-const TREND_COLORS = ['#6EE7B7', '#34d399', '#22d3ee', '#fbbf24', '#a78bfa', '#f472b6', '#5eead4', '#fca5a5']
+const TREND_COLORS = ['#3b82f6', '#ea8a2f', '#22d3ee', '#a78bfa', '#f472b6', '#34d399', '#fbbf24', '#60a5fa']
 const initials = (name: string) => (name || '?').split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
 
 function TrendStat({ label, value, format }: { label: string; value: number; format: 'hours' | 'currency' | 'rate' }) {
@@ -533,7 +535,7 @@ function TrendStat({ label, value, format }: { label: string; value: number; for
   const txt = format === 'currency' ? formatCurrency(v) : format === 'rate' ? `${formatCurrency(v)}/hr` : v.toFixed(1)
   return (
     <div className="rounded-xl px-3.5 py-3 border border-white/10" style={{ background: 'rgba(255,255,255,0.06)' }}>
-      <p className="text-[10px] font-bold uppercase tracking-[0.07em]" style={{ color: 'rgba(174,221,205,0.75)' }}>{label}</p>
+      <p className="text-[10px] font-bold uppercase tracking-[0.07em]" style={{ color: 'rgba(148,163,184,0.8)' }}>{label}</p>
       <p className="text-xl font-extrabold text-white mt-1 tabular-nums" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{txt}</p>
     </div>
   )
@@ -545,8 +547,8 @@ function TrendsTooltip({ active, payload, label }: { active?: boolean; payload?:
   const rev = payload.find(p => p.dataKey === 'revenue')
   const total = hrs.reduce((s, p) => s + (p.value || 0), 0)
   return (
-    <div className="rounded-lg px-3 py-2 text-xs" style={{ background: 'rgba(6,20,16,0.96)', border: '1px solid rgba(110,231,183,0.3)', color: '#fff' }}>
-      <p className="font-bold mb-1" style={{ color: '#6EE7B7' }}>Week of {label}</p>
+    <div className="rounded-lg px-3 py-2 text-xs" style={{ background: 'rgba(15,23,42,0.96)', border: '1px solid rgba(59,130,246,0.3)', color: '#fff' }}>
+      <p className="font-bold mb-1" style={{ color: '#60a5fa' }}>Week of {label}</p>
       {hrs.map(p => (
         <div key={p.dataKey} className="flex justify-between gap-4"><span style={{ color: p.color }}>{p.dataKey}</span><span>{p.value.toFixed(1)}h</span></div>
       ))}
@@ -561,18 +563,18 @@ function TabHero({ chips, titleLead, titleAccent, description, right }: {
   chips: string[]; titleLead: string; titleAccent: string; description: string; right?: React.ReactNode
 }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl px-7 py-6" style={{ background: 'linear-gradient(135deg,#0f1a17 0%,#0f2a20 52%,#0d3a29 100%)', boxShadow: '0 20px 46px -24px rgba(6,30,22,0.65)' }}>
-      <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 13px)' }} />
-      <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(90% 120% at 100% 0%, rgba(110,231,183,0.15), transparent 55%)' }} />
+    <div className="relative overflow-hidden rounded-2xl px-6 py-5 border border-[#e2e8f0]" style={{ background: 'linear-gradient(120deg,#ffffff,#eef2f8 70%,#e7edf6)', boxShadow: '0 1px 2px rgba(15,23,42,0.05)' }}>
+      <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: 'linear-gradient(180deg,#2563eb,#c2660c)' }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(70% 120% at 100% 0%, rgba(37,99,235,0.06), transparent 60%)' }} />
       <div className="relative flex items-end justify-between gap-5 flex-wrap">
         <div>
-          <div className="flex gap-1.5 mb-3">
-            {chips.map(c => <span key={c} className="text-[10px] font-semibold uppercase tracking-[0.08em] rounded-md px-2 py-1" style={{ fontFamily: "'JetBrains Mono', monospace", color: 'rgba(174,221,205,0.9)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)' }}>{c}</span>)}
+          <div className="flex gap-1.5 mb-2.5">
+            {chips.map(c => <span key={c} className="text-[10px] font-semibold uppercase tracking-[0.06em] rounded-md px-2 py-1" style={{ fontFamily: "'JetBrains Mono', monospace", color: '#2563eb', background: 'rgba(37,99,235,0.09)', border: '1px solid rgba(37,99,235,0.22)' }}>{c}</span>)}
           </div>
-          <h3 className="text-[30px] leading-none font-extrabold tracking-tight text-white" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>
-            {titleLead} <span className="relative whitespace-nowrap">{titleAccent}<span className="absolute left-0 right-0 -bottom-1 h-[3px] rounded-sm" style={{ background: '#6EE7B7', boxShadow: '0 0 10px rgba(110,231,183,0.6)' }} /></span>
+          <h3 className="text-[24px] leading-none font-extrabold tracking-tight text-slate-900" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>
+            {titleLead} <span className="relative whitespace-nowrap">{titleAccent}<span className="absolute left-0 right-0 -bottom-1 h-[3px] rounded-sm" style={{ background: '#c2660c' }} /></span>
           </h3>
-          <p className="text-sm mt-3 max-w-xl" style={{ color: 'rgba(174,221,205,0.75)' }}>{description}</p>
+          <p className="text-sm mt-2.5 max-w-xl text-slate-500">{description}</p>
         </div>
         {right && <div className="flex flex-col items-end gap-2 shrink-0">{right}</div>}
       </div>
@@ -584,8 +586,8 @@ function TabHero({ chips, titleLead, titleAccent, description, right }: {
 function EmptyState({ title, subtitle, action }: { title: string; subtitle: string; action?: React.ReactNode }) {
   return (
     <div className="py-14 px-6 flex flex-col items-center text-center">
-      <div className="w-14 h-14 rounded-2xl flex items-center justify-center relative overflow-hidden" style={{ background: 'linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.03))', border: '1px solid rgba(16,185,129,0.2)', color: '#10B981' }}>
-        <span className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(16,185,129,0.06) 0 1px, transparent 1px 8px)' }} />
+      <div className="w-14 h-14 rounded-2xl flex items-center justify-center relative overflow-hidden" style={{ background: 'linear-gradient(135deg,rgba(37,99,235,0.12),rgba(37,99,235,0.03))', border: '1px solid rgba(37,99,235,0.2)', color: '#2563eb' }}>
+        <span className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(37,99,235,0.06) 0 1px, transparent 1px 8px)' }} />
         <Clock size={24} className="relative" />
       </div>
       <p className="mt-4 text-lg font-extrabold text-gray-900" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{title}</p>
@@ -1270,23 +1272,25 @@ ${parts.join('')}
     return 'All Clients'
   }
 
-  if (loading) return <div className="flex items-center justify-center h-64"><RefreshCw className="w-6 h-6 text-emerald-500 animate-spin" /></div>
+  if (loading) return <div className="flex items-center justify-center h-64"><RefreshCw className="w-6 h-6 text-blue-500 animate-spin" /></div>
 
   return (
     <div className="space-y-5">
       <ToastContainer toasts={toasts} onDismiss={id => setToasts(prev => prev.filter(t => t.id !== id))} />
 
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-emerald-600" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>Operations</p>
-          <h1 className="text-3xl font-extrabold uppercase tracking-tight text-gray-900 mt-1 leading-none" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>Time Tracking</h1>
-          <p className={`text-sm mt-2 ${THEME.textDim}`}>{getFilterTitle()}</p>
+      {/* Header — dark page banner */}
+      <div className="relative overflow-hidden rounded-2xl px-7 py-6 flex items-start justify-between gap-4" style={{ background: 'linear-gradient(135deg,#1b2431 0%,#141b24 55%,#10151c 100%)', boxShadow: '0 20px 46px -26px rgba(15,23,42,0.6)' }}>
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 13px)' }} />
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(80% 130% at 0% 0%, rgba(59,130,246,0.14), transparent 55%)' }} />
+        <div className="relative">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.16em]" style={{ fontFamily: "'Archivo', system-ui, sans-serif", color: '#93c5fd' }}>Operations</p>
+          <h1 className="text-3xl font-extrabold uppercase tracking-tight text-white mt-1 leading-none" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>Time Tracking</h1>
+          <p className="text-sm mt-2" style={{ color: '#8b97a7' }}>{getFilterTitle()}</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button onClick={openPdfReport} className="flex items-center gap-2 px-3.5 py-2 bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm rounded-xl text-sm font-medium text-gray-600 transition-all"><Download size={15} />Export PDF</button>
-          <button onClick={exportToCSV} className="flex items-center gap-2 px-3.5 py-2 bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm rounded-xl text-sm font-medium text-gray-600 transition-all"><FileText size={15} />Export CSV</button>
-          <button onClick={() => setShowEntryModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:shadow-[0_10px_22px_-8px_rgba(16,185,129,0.75)]" style={{ background: 'linear-gradient(135deg,#10B981,#059669)' }}><Plus size={16} />Add Entry</button>
+        <div className="relative flex items-center gap-2 shrink-0">
+          <button onClick={openPdfReport} className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.16)', color: '#e2e8f0' }}><Download size={15} />Export PDF</button>
+          <button onClick={exportToCSV} className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.16)', color: '#e2e8f0' }}><FileText size={15} />Export CSV</button>
+          <button onClick={() => setShowEntryModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:shadow-[0_10px_22px_-8px_rgba(37,99,235,0.75)]" style={{ background: 'linear-gradient(135deg,#2563eb,#1e3a8a)' }}><Plus size={16} />Add Entry</button>
         </div>
       </div>
 
@@ -1297,26 +1301,26 @@ ${parts.join('')}
           <div className="relative flex-1 min-w-[220px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             <input type="text" value={ttSearch} onChange={(e) => setTtSearch(e.target.value)} placeholder="Search client, project, person…"
-              className="w-full pl-9 pr-3 py-2 bg-gray-50/70 border border-transparent hover:bg-gray-50 focus:bg-white focus:border-emerald-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 transition-all" />
+              className="w-full pl-9 pr-3 py-2 bg-gray-50/70 border border-transparent hover:bg-gray-50 focus:bg-white focus:border-blue-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all" />
           </div>
           {/* Date */}
           <div className="relative">
-            <button onClick={() => setShowDatePicker(!showDatePicker)} className="flex items-center gap-2 px-3.5 py-2 bg-white border border-gray-200 hover:border-emerald-300 rounded-xl text-sm font-medium text-gray-900 transition-colors">
-              <Calendar size={14} className="text-emerald-600" />{DATE_PRESETS.find(p => p.id === datePreset)?.label}<ChevronDown size={14} className="text-gray-400" />
+            <button onClick={() => setShowDatePicker(!showDatePicker)} className="flex items-center gap-2 px-3.5 py-2 bg-white border border-gray-200 hover:border-blue-300 rounded-xl text-sm font-medium text-gray-900 transition-colors">
+              <Calendar size={14} className="text-blue-600" />{DATE_PRESETS.find(p => p.id === datePreset)?.label}<ChevronDown size={14} className="text-gray-400" />
             </button>
             {showDatePicker && (
               <div className={`absolute top-full right-0 mt-2 w-56 p-2 bg-white border ${THEME.border} rounded-xl shadow-lg z-[100]`}>
                 <div className="space-y-0.5">
                   {DATE_PRESETS.map(preset => (
                     <button key={preset.id} onClick={() => { setDatePreset(preset.id); if (preset.id !== 'custom') setShowDatePicker(false) }}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${datePreset === preset.id ? 'bg-emerald-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{preset.label}</button>
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${datePreset === preset.id ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{preset.label}</button>
                   ))}
                 </div>
                 {datePreset === 'custom' && (
                   <div className={`mt-2 pt-2 border-t ${THEME.border} space-y-2`}>
                     <div><label className={`text-xs ${THEME.textDim}`}>Start</label><input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className={`w-full mt-1 px-2 py-1.5 bg-white border ${THEME.border} rounded-lg text-sm text-gray-900`} /></div>
                     <div><label className={`text-xs ${THEME.textDim}`}>End</label><input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className={`w-full mt-1 px-2 py-1.5 bg-white border ${THEME.border} rounded-lg text-sm text-gray-900`} /></div>
-                    <button onClick={() => setShowDatePicker(false)} className="w-full mt-2 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm font-medium text-white">Apply</button>
+                    <button onClick={() => setShowDatePicker(false)} className="w-full mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white">Apply</button>
                   </div>
                 )}
               </div>
@@ -1324,21 +1328,21 @@ ${parts.join('')}
           </div>
           {/* Pill selects */}
           <div className="relative">
-            <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className={`appearance-none pl-3.5 pr-8 py-2 bg-white border rounded-xl text-sm hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 transition-colors cursor-pointer ${selectedClient !== 'all' ? 'border-emerald-400 text-gray-900' : 'border-gray-200 text-gray-700'}`}>
+            <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className={`appearance-none pl-3.5 pr-8 py-2 bg-white border rounded-xl text-sm hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-colors cursor-pointer ${selectedClient !== 'all' ? 'border-blue-400 text-gray-900' : 'border-gray-200 text-gray-700'}`}>
               <option value="all">All Clients</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
           <div className="relative">
-            <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)} className={`appearance-none pl-3.5 pr-8 py-2 bg-white border rounded-xl text-sm hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 transition-colors cursor-pointer ${selectedEmployee !== 'all' ? 'border-emerald-400 text-gray-900' : 'border-gray-200 text-gray-700'}`}>
+            <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)} className={`appearance-none pl-3.5 pr-8 py-2 bg-white border rounded-xl text-sm hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-colors cursor-pointer ${selectedEmployee !== 'all' ? 'border-blue-400 text-gray-900' : 'border-gray-200 text-gray-700'}`}>
               <option value="all">All Employees</option>
               {teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
             <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
           <div className="relative">
-            <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className={`appearance-none pl-3.5 pr-8 py-2 bg-white border rounded-xl text-sm hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 transition-colors cursor-pointer ${selectedProject !== 'all' ? 'border-emerald-400 text-gray-900' : 'border-gray-200 text-gray-700'}`}>
+            <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className={`appearance-none pl-3.5 pr-8 py-2 bg-white border rounded-xl text-sm hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-colors cursor-pointer ${selectedProject !== 'all' ? 'border-blue-400 text-gray-900' : 'border-gray-200 text-gray-700'}`}>
               <option value="all">All Projects</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
@@ -1353,9 +1357,9 @@ ${parts.join('')}
 
       {/* KPI Cards — 3 operational metrics */}
       <div className="grid grid-cols-3 gap-3 relative z-10">
-        <KPICard title="Actual Hours" value={kpis.totalActualHours} format="hours" trend={kpis.hoursTrend} trendLabel="vs prior" icon={<Clock size={15} />} accentColor="#10B981" />
-        <KPICard title="Billable Hours" value={kpis.totalBillableHours} format="hours" icon={<BadgeCheck size={15} />} accentColor="#0E9F6E" />
-        <KPICard title="Utilization" value={kpis.utilization} format="percent" icon={<Gauge size={15} />} accentColor="#059669" />
+        <KPICard title="Actual Hours" value={kpis.totalActualHours} format="hours" trend={kpis.hoursTrend} trendLabel="vs prior" icon={<Clock size={15} />} accentColor="#2563eb" />
+        <KPICard title="Billable Hours" value={kpis.totalBillableHours} format="hours" icon={<BadgeCheck size={15} />} accentColor="#c2660c" />
+        <KPICard title="Utilization" value={kpis.utilization} format="percent" icon={<Gauge size={15} />} accentColor="#2563eb" />
       </div>
 
       {/* View Tabs */}
@@ -1363,7 +1367,7 @@ ${parts.join('')}
         {VIEW_TABS.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
             activeTab === tab.id 
-              ? 'border-emerald-500 text-emerald-600' 
+              ? 'border-blue-600 text-blue-600' 
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
           }`}>
             {tab.icon}{tab.label}
@@ -1393,10 +1397,10 @@ ${parts.join('')}
       {/* ============ BILLING VIEW ============ */}
       {activeTab === 'billing' && (
         <div className="space-y-4">
-          <TabHero chips={['Operations', 'Billing']} titleLead="Ready to" titleAccent="bill." description="Billable hours × rate, grouped by client. Review and adjust before it goes to invoicing." right={<div className="text-right"><div className="text-[10px] font-bold uppercase tracking-[0.06em]" style={{ color: 'rgba(174,221,205,0.6)' }}>Clients</div><div className="text-2xl font-extrabold text-white tabular-nums" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{dataByClient.length}</div></div>} />
+          <TabHero chips={['Operations', 'Billing']} titleLead="Ready to" titleAccent="bill." description="Billable hours × rate, grouped by client. Review and adjust before it goes to invoicing." right={<div className="text-right"><div className="text-[10px] font-bold uppercase tracking-[0.06em] text-slate-400">Clients</div><div className="text-2xl font-extrabold text-slate-900 tabular-nums" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{dataByClient.length}</div></div>} />
           {/* Summary + burn-up */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="rounded-2xl p-5 text-white relative overflow-hidden" style={{ background: 'linear-gradient(135deg,#0a2a22 0%,#0d3a2e 30%,#10B981 100%)' }}>
+            <div className="rounded-2xl p-5 text-white relative overflow-hidden" style={{ background: 'linear-gradient(135deg,#1b2431 0%,#141b24 55%,#10151c 100%)' }}>
               <p className="text-[11px] font-bold uppercase tracking-wider text-white/70">To bill this period</p>
               <div className="flex items-baseline gap-2.5 mt-2 flex-wrap">
                 <p className="text-4xl font-bold tracking-tight">{formatCurrency(billingTotals.toBill)}</p>
@@ -1420,12 +1424,12 @@ ${parts.join('')}
               </div>
               <ResponsiveContainer width="100%" height={150}>
                 <AreaChart data={billingBurnUp} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <defs><linearGradient id="billFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#10b981" stopOpacity={0.25} /><stop offset="100%" stopColor="#10b981" stopOpacity={0} /></linearGradient></defs>
+                  <defs><linearGradient id="billFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2563eb" stopOpacity={0.25} /><stop offset="100%" stopColor="#2563eb" stopOpacity={0} /></linearGradient></defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                   <XAxis dataKey="week" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => formatCompactCurrency(v)} width={56} />
                   <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => [formatCurrency(value), 'Cumulative billed']} />
-                  <Area type="monotone" dataKey="cumulative" stroke="#10b981" strokeWidth={2.5} fill="url(#billFill)" />
+                  <Area type="monotone" dataKey="cumulative" stroke="#2563eb" strokeWidth={2.5} fill="url(#billFill)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -1435,12 +1439,12 @@ ${parts.join('')}
           <div className="flex items-center justify-between gap-2 px-1 flex-wrap">
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mr-1">Sort</span>
-              <button onClick={() => setBillingSort('amount')} className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${billingSort === 'amount' ? 'border-emerald-500 text-emerald-700 bg-emerald-50' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>Amount</button>
-              <button onClick={() => setBillingSort('az')} className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${billingSort === 'az' ? 'border-emerald-500 text-emerald-700 bg-emerald-50' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>A–Z</button>
+              <button onClick={() => setBillingSort('amount')} className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${billingSort === 'amount' ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>Amount</button>
+              <button onClick={() => setBillingSort('az')} className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${billingSort === 'az' ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>A–Z</button>
             </div>
             <div className="flex items-center gap-3">
               <button onClick={() => setBillingWeekly(v => !v)} className="flex items-center gap-2 text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors">
-                <span className={`relative w-8 h-[18px] rounded-full transition-colors ${billingWeekly ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+                <span className={`relative w-8 h-[18px] rounded-full transition-colors ${billingWeekly ? 'bg-blue-600' : 'bg-gray-300'}`}>
                   <span className={`absolute top-[2px] w-3.5 h-3.5 rounded-full bg-white transition-all ${billingWeekly ? 'left-[16px]' : 'left-[2px]'}`} />
                 </span>
                 Weekly detail
@@ -1456,8 +1460,8 @@ ${parts.join('')}
             {[...dataByClient].sort(billingCmp).map((client, ci) => (
               <div key={client.id} className="border-t border-gray-100 first:border-t-0">
                 {/* CLIENT */}
-                <button onClick={() => toggleClient(client.id)} className="relative w-full text-left overflow-hidden transition hover:brightness-[0.98]" style={{ background: 'linear-gradient(90deg, rgba(16,185,129,0.12), rgba(16,185,129,0.03) 55%, transparent)' }}>
-                  <span className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(6,40,30,0.028) 0 1px, transparent 1px 12px)' }} />
+                <button onClick={() => toggleClient(client.id)} className="relative w-full text-left overflow-hidden transition hover:brightness-[0.98]" style={{ background: 'linear-gradient(90deg, rgba(37,99,235,0.09), rgba(37,99,235,0.02) 55%, transparent)' }}>
+                  <span className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.02) 0 1px, transparent 1px 12px)' }} />
                   <div className="relative flex items-center gap-3 px-5 py-3.5">
                     {expandedClients.has(client.id) ? <ChevronDown size={15} className="text-gray-400 shrink-0" /> : <ChevronRight size={15} className="text-gray-400 shrink-0" />}
                     <span className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-white" style={{ backgroundColor: CHART_COLORS[ci % CHART_COLORS.length] }} />
@@ -1465,7 +1469,7 @@ ${parts.join('')}
                     <div className="ml-auto flex items-center gap-5 text-sm shrink-0">
                       <span className="w-16 text-right" />
                       <span className="w-20 text-right text-gray-500 tabular-nums text-xs">{client.totalBillableHours.toFixed(1)} hrs</span>
-                      <span className={`w-24 text-right font-bold tabular-nums ${client.totalRevenue ? 'text-emerald-700' : 'text-gray-400'}`}>{formatCurrency(client.totalRevenue)}</span>
+                      <span className={`w-24 text-right font-bold tabular-nums ${client.totalRevenue ? 'text-[#c2660c]' : 'text-gray-400'}`}>{formatCurrency(client.totalRevenue)}</span>
                     </div>
                   </div>
                 </button>
@@ -1479,7 +1483,7 @@ ${parts.join('')}
                       <div className="ml-auto flex items-center gap-5 text-sm shrink-0">
                         <span className="w-16 text-right" />
                         <span className="w-20 text-right text-gray-500 tabular-nums text-xs">{project.totalBillableHours.toFixed(1)} hrs</span>
-                        <span className={`w-24 text-right font-semibold tabular-nums text-[13px] ${project.totalRevenue ? 'text-emerald-700' : 'text-gray-400'}`}>{formatCurrency(project.totalRevenue)}</span>
+                        <span className={`w-24 text-right font-semibold tabular-nums text-[13px] ${project.totalRevenue ? 'text-[#c2660c]' : 'text-gray-400'}`}>{formatCurrency(project.totalRevenue)}</span>
                       </div>
                     </button>
 
@@ -1495,15 +1499,15 @@ ${parts.join('')}
                             <div className="ml-auto flex items-center gap-5 text-sm shrink-0">
                               <span className="w-16 text-right text-[11px] text-gray-400 tabular-nums">{m.billRate ? `$${m.billRate}/hr` : '—'}</span>
                               <span className="w-20 text-right text-gray-600 tabular-nums text-xs">{m.totalBillableHours.toFixed(1)} hrs</span>
-                              <span className={`w-24 text-right font-bold tabular-nums text-[13px] ${m.totalRevenue ? 'text-emerald-700' : 'text-gray-400'}`}>{formatCurrency(m.totalRevenue)}</span>
+                              <span className={`w-24 text-right font-bold tabular-nums text-[13px] ${m.totalRevenue ? 'text-[#c2660c]' : 'text-gray-400'}`}>{formatCurrency(m.totalRevenue)}</span>
                             </div>
                           </button>
                           {showWeekly && (
-                            <div className="pl-[60px] pr-5 pb-3 pt-1 flex flex-wrap gap-1.5 bg-emerald-50/20">
+                            <div className="pl-[60px] pr-5 pb-3 pt-1 flex flex-wrap gap-1.5 bg-blue-50/20">
                               {weekColumns.map(w => {
                                 const h = m.weekBillableHours[w.end] || 0
                                 return (
-                                  <div key={w.end} className={`flex flex-col items-center min-w-[52px] px-2.5 py-1.5 rounded-lg border ${h ? 'bg-white border-emerald-200' : 'bg-gray-50/50 border-gray-100'}`}>
+                                  <div key={w.end} className={`flex flex-col items-center min-w-[52px] px-2.5 py-1.5 rounded-lg border ${h ? 'bg-white border-blue-200' : 'bg-gray-50/50 border-gray-100'}`}>
                                     <span className="text-[9px] font-semibold text-gray-400">{w.label}</span>
                                     <span className={`text-xs font-bold tabular-nums mt-0.5 ${h ? 'text-gray-900' : 'text-gray-300'}`}>{h.toFixed(1)}</span>
                                   </div>
@@ -1527,19 +1531,19 @@ ${parts.join('')}
 
       {/* ============ TRENDS VIEW ============ */}
       {activeTab === 'trends' && (
-        <div className="relative overflow-hidden rounded-2xl p-5" style={{ background: 'linear-gradient(125deg,#08221c 0%,#0b3025 42%,#0e5b43 100%)', boxShadow: '0 20px 46px -22px rgba(6,40,30,0.7)' }}>
+        <div className="relative overflow-hidden rounded-2xl p-5" style={{ background: 'linear-gradient(125deg,#1b2431 0%,#141b24 55%,#10151c 100%)', boxShadow: '0 20px 46px -22px rgba(15,23,42,0.6)' }}>
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg,rgba(255,255,255,0.045) 0 1px,transparent 1px 13px)' }} />
-          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(120% 80% at 100% 0%,rgba(110,231,183,0.16),transparent 55%)' }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(120% 80% at 100% 0%,rgba(59,130,246,0.14),transparent 55%)' }} />
           <div className="relative">
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>
-                <p className="text-[10.5px] font-extrabold uppercase tracking-[0.16em]" style={{ color: 'rgba(174,221,205,0.8)', fontFamily: "'Archivo', system-ui, sans-serif" }}>Trends</p>
+                <p className="text-[10.5px] font-extrabold uppercase tracking-[0.16em]" style={{ color: 'rgba(148,163,184,0.85)', fontFamily: "'Archivo', system-ui, sans-serif" }}>Trends</p>
                 <h3 className="text-lg font-extrabold text-white mt-0.5" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>T&amp;M client hours &amp; revenue</h3>
-                <p className="text-xs mt-1" style={{ color: 'rgba(174,221,205,0.7)' }}>Time &amp; Materials only · {tmTrends.tmProjectCount} of {projects.length} projects · weekly</p>
+                <p className="text-xs mt-1" style={{ color: 'rgba(148,163,184,0.75)' }}>Time &amp; Materials only · {tmTrends.tmProjectCount} of {projects.length} projects · weekly</p>
               </div>
               <div className="flex bg-white/10 border border-white/15 rounded-xl p-0.5">
                 {(['both', 'hours', 'rev'] as const).map(m => (
-                  <button key={m} onClick={() => setTrendsMetric(m)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${trendsMetric === m ? 'text-white' : 'text-white/60 hover:text-white/80'}`} style={trendsMetric === m ? { background: 'linear-gradient(135deg,#10B981,#059669)' } : {}}>{m === 'both' ? 'Both' : m === 'hours' ? 'Hours' : 'Revenue'}</button>
+                  <button key={m} onClick={() => setTrendsMetric(m)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${trendsMetric === m ? 'text-white' : 'text-white/60 hover:text-white/80'}`} style={trendsMetric === m ? { background: 'linear-gradient(135deg,#2563eb,#1e3a8a)' } : {}}>{m === 'both' ? 'Both' : m === 'hours' ? 'Hours' : 'Revenue'}</button>
                 ))}
               </div>
             </div>
@@ -1550,7 +1554,7 @@ ${parts.join('')}
                   <ComposedChart data={tmTrends.rows} margin={{ top: 10, right: 6, left: -10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" vertical={false} />
                     <XAxis dataKey="week" tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis yAxisId="h" tick={{ fill: 'rgba(174,221,205,0.7)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="h" tick={{ fill: 'rgba(148,163,184,0.75)', fontSize: 10 }} axisLine={false} tickLine={false} />
                     <YAxis yAxisId="r" orientation="right" tickFormatter={(v: number) => `$${Math.round(v / 1000)}k`} tick={{ fill: '#ffffff', fontSize: 10 }} axisLine={false} tickLine={false} />
                     <Tooltip content={<TrendsTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
                     {trendsMetric !== 'rev' && tmTrends.clientNames.map((cn, i) => (
@@ -1563,7 +1567,7 @@ ${parts.join('')}
                   </ComposedChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-full flex items-center justify-center text-sm" style={{ color: 'rgba(174,221,205,0.6)' }}>No T&amp;M time in this period.</div>
+                <div className="h-full flex items-center justify-center text-sm" style={{ color: 'rgba(148,163,184,0.65)' }}>No T&amp;M time in this period.</div>
               )}
             </div>
 
@@ -1788,7 +1792,7 @@ ${parts.join('')}
       {/* ============ BY EMPLOYEE VIEW ============ */}
       {activeTab === 'byEmployee' && (
         <div className="space-y-3">
-          <TabHero chips={['Operations', 'Team']} titleLead="Team" titleAccent="output." description="Hours, utilization, and client mix per team member." right={<div className="text-right"><div className="text-[10px] font-bold uppercase tracking-[0.06em]" style={{ color: 'rgba(174,221,205,0.6)' }}>People</div><div className="text-2xl font-extrabold text-white tabular-nums" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{dataByEmployee.length}</div></div>} />
+          <TabHero chips={['Operations', 'Team']} titleLead="Team" titleAccent="output." description="Hours, utilization, and client mix per team member." right={<div className="text-right"><div className="text-[10px] font-bold uppercase tracking-[0.06em] text-slate-400">People</div><div className="text-2xl font-extrabold text-slate-900 tabular-nums" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{dataByEmployee.length}</div></div>} />
           {dataByEmployee.map((employee, index) => (
             <CollapsibleSection
               key={employee.id}
@@ -1856,17 +1860,17 @@ ${parts.join('')}
               <span className="font-medium text-gray-500">Filter:</span>
             </div>
             <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)}
-              className={`px-3 py-1.5 bg-white border ${selectedEmployee !== 'all' ? 'border-emerald-400 ring-1 ring-emerald-500/20' : THEME.border} rounded-lg text-xs text-gray-900 transition-colors hover:bg-gray-100`}>
+              className={`px-3 py-1.5 bg-white border ${selectedEmployee !== 'all' ? 'border-blue-400 ring-1 ring-blue-500/20' : THEME.border} rounded-lg text-xs text-gray-900 transition-colors hover:bg-gray-100`}>
               <option value="all">All Employees</option>
               {teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
             <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)}
-              className={`px-3 py-1.5 bg-white border ${selectedClient !== 'all' ? 'border-emerald-400 ring-1 ring-emerald-500/20' : THEME.border} rounded-lg text-xs text-gray-900 transition-colors hover:bg-gray-100`}>
+              className={`px-3 py-1.5 bg-white border ${selectedClient !== 'all' ? 'border-blue-400 ring-1 ring-blue-500/20' : THEME.border} rounded-lg text-xs text-gray-900 transition-colors hover:bg-gray-100`}>
               <option value="all">All Clients</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)}
-              className={`px-3 py-1.5 bg-white border ${selectedProject !== 'all' ? 'border-emerald-400 ring-1 ring-emerald-500/20' : THEME.border} rounded-lg text-xs text-gray-900 transition-colors hover:bg-gray-100`}>
+              className={`px-3 py-1.5 bg-white border ${selectedProject !== 'all' ? 'border-blue-400 ring-1 ring-blue-500/20' : THEME.border} rounded-lg text-xs text-gray-900 transition-colors hover:bg-gray-100`}>
               <option value="all">All Projects</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
@@ -1878,19 +1882,19 @@ ${parts.join('')}
                 <div className="h-4 w-px bg-gray-100" />
                 <div className="flex items-center gap-1.5">
                   {selectedEmployee !== 'all' && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-xs border border-emerald-200">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs border border-blue-200">
                       <User size={10} />{teamMembers.find(t => t.id === selectedEmployee)?.name}
                       <button onClick={() => setSelectedEmployee('all')} className="ml-0.5 hover:text-gray-900"><X size={10} /></button>
                     </span>
                   )}
                   {selectedClient !== 'all' && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-xs border border-emerald-200">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs border border-blue-200">
                       <Building2 size={10} />{clients.find(c => c.id === selectedClient)?.name}
                       <button onClick={() => setSelectedClient('all')} className="ml-0.5 hover:text-gray-900"><X size={10} /></button>
                     </span>
                   )}
                   {selectedProject !== 'all' && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-xs border border-emerald-200">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs border border-blue-200">
                       <Briefcase size={10} />{projects.find(p => p.id === selectedProject)?.name}
                       <button onClick={() => setSelectedProject('all')} className="ml-0.5 hover:text-gray-900"><X size={10} /></button>
                     </span>
@@ -1920,8 +1924,8 @@ ${parts.join('')}
               const empOpen = detailExpanded.has(ekey)
               return (
                 <div key={emp.id} className="border-t border-gray-100 first:border-t-0">
-                  <button onClick={() => toggleDetail(ekey)} className="relative w-full text-left overflow-hidden transition hover:brightness-[0.99]" style={{ background: 'linear-gradient(90deg, rgba(16,185,129,0.12), rgba(16,185,129,0.03) 55%, transparent)' }}>
-                    <span className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(6,40,30,0.028) 0 1px, transparent 1px 12px)' }} />
+                  <button onClick={() => toggleDetail(ekey)} className="relative w-full text-left overflow-hidden transition hover:brightness-[0.99]" style={{ background: 'linear-gradient(90deg, rgba(37,99,235,0.09), rgba(37,99,235,0.02) 55%, transparent)' }}>
+                    <span className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.02) 0 1px, transparent 1px 12px)' }} />
                     <div className="relative flex items-center gap-3 px-4 py-3">
                       {empOpen ? <ChevronDown size={15} className="text-gray-400 shrink-0" /> : <ChevronRight size={15} className="text-gray-400 shrink-0" />}
                       <span className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 ring-2 ring-white" style={{ backgroundColor: CHART_COLORS[ei % CHART_COLORS.length] }}>{initials(emp.name)}</span>
@@ -1929,7 +1933,7 @@ ${parts.join('')}
                       <div className="ml-auto flex items-center gap-6 text-xs tabular-nums shrink-0">
                         <span className="text-gray-500">{emp.actual.toFixed(1)} <span className="text-gray-400">actual</span></span>
                         <span className="text-gray-500">{emp.billable.toFixed(1)} <span className="text-gray-400">billable</span></span>
-                        <span className="font-bold text-emerald-700">{formatCurrency(emp.revenue)}</span>
+                        <span className="font-bold text-[#c2660c]">{formatCurrency(emp.revenue)}</span>
                       </div>
                     </div>
                   </button>
@@ -1946,7 +1950,7 @@ ${parts.join('')}
                           <div className="ml-auto flex items-center gap-6 text-xs tabular-nums shrink-0">
                             <span className="text-gray-500">{cli.actual.toFixed(1)}</span>
                             <span className="text-gray-500">{cli.billable.toFixed(1)}</span>
-                            <span className="font-semibold text-emerald-700">{formatCurrency(cli.revenue)}</span>
+                            <span className="font-semibold text-[#c2660c]">{formatCurrency(cli.revenue)}</span>
                           </div>
                         </button>
 
@@ -1961,7 +1965,7 @@ ${parts.join('')}
                                 <div className="ml-auto flex items-center gap-6 text-xs tabular-nums shrink-0">
                                   <span className="text-gray-500">{prj.actual.toFixed(1)}</span>
                                   <span className="text-gray-500">{prj.billable.toFixed(1)}</span>
-                                  <span className="font-semibold text-emerald-700">{formatCurrency(prj.revenue)}</span>
+                                  <span className="font-semibold text-[#c2660c]">{formatCurrency(prj.revenue)}</span>
                                 </div>
                               </button>
 
@@ -2011,7 +2015,7 @@ ${parts.join('')}
                   })}
                 </div>
               )
-            }) : <EmptyState title="No time logged this period" subtitle="This period has no entries yet. Add an entry or change the date range." action={<button onClick={() => setShowEntryModal(true)} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: 'linear-gradient(135deg,#10B981,#059669)' }}><Plus size={15} />Add Entry</button>} />}
+            }) : <EmptyState title="No time logged this period" subtitle="This period has no entries yet. Add an entry or change the date range." action={<button onClick={() => setShowEntryModal(true)} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: 'linear-gradient(135deg,#2563eb,#1e3a8a)' }}><Plus size={15} />Add Entry</button>} />}
           </div>
         </CollapsibleSection>
         </div>
@@ -2023,13 +2027,13 @@ ${parts.join('')}
           <div className={`${THEME.card} border rounded-xl p-6 w-full max-w-lg shadow-2xl`}>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Time Entry</h3>
             <div className="space-y-4">
-              <div><label className={`block text-xs font-medium ${THEME.textDim} uppercase tracking-wider mb-1.5`}>Date *</label><input type="date" value={formData.date} onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))} className={`w-full px-3 py-2.5 bg-white border ${THEME.border} rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20`} /></div>
-              <div><label className={`block text-xs font-medium ${THEME.textDim} uppercase tracking-wider mb-1.5`}>Employee *</label><select value={formData.team_member_id} onChange={(e) => setFormData(prev => ({ ...prev, team_member_id: e.target.value }))} className={`w-full px-3 py-2.5 bg-white border ${THEME.border} rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20`}><option value="">Select...</option>{teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-              <div><label className={`block text-xs font-medium ${THEME.textDim} uppercase tracking-wider mb-1.5`}>Project *</label><select value={formData.project_id} onChange={(e) => setFormData(prev => ({ ...prev, project_id: e.target.value }))} className={`w-full px-3 py-2.5 bg-white border ${THEME.border} rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20`}><option value="">Select...</option>{projects.map(p => <option key={p.id} value={p.id}>{p.client ? `${p.client} - ` : ''}{p.name}</option>)}</select></div>
+              <div><label className={`block text-xs font-medium ${THEME.textDim} uppercase tracking-wider mb-1.5`}>Date *</label><input type="date" value={formData.date} onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))} className={`w-full px-3 py-2.5 bg-white border ${THEME.border} rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20`} /></div>
+              <div><label className={`block text-xs font-medium ${THEME.textDim} uppercase tracking-wider mb-1.5`}>Employee *</label><select value={formData.team_member_id} onChange={(e) => setFormData(prev => ({ ...prev, team_member_id: e.target.value }))} className={`w-full px-3 py-2.5 bg-white border ${THEME.border} rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20`}><option value="">Select...</option>{teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+              <div><label className={`block text-xs font-medium ${THEME.textDim} uppercase tracking-wider mb-1.5`}>Project *</label><select value={formData.project_id} onChange={(e) => setFormData(prev => ({ ...prev, project_id: e.target.value }))} className={`w-full px-3 py-2.5 bg-white border ${THEME.border} rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20`}><option value="">Select...</option>{projects.map(p => <option key={p.id} value={p.id}>{p.client ? `${p.client} - ` : ''}{p.name}</option>)}</select></div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={`block text-xs font-medium ${THEME.textDim} uppercase tracking-wider mb-1.5`}>Actual Hours *</label>
-                  <input type="number" value={formData.hours} onChange={(e) => setFormData(prev => ({ ...prev, hours: e.target.value }))} className={`w-full px-3 py-2.5 bg-white border ${THEME.border} rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20`} placeholder="8" step="0.5" />
+                  <input type="number" value={formData.hours} onChange={(e) => setFormData(prev => ({ ...prev, hours: e.target.value }))} className={`w-full px-3 py-2.5 bg-white border ${THEME.border} rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20`} placeholder="8" step="0.5" />
                   <p className="text-[11px] text-gray-400 mt-1">What contractor worked</p>
                 </div>
                 <div>
@@ -2039,14 +2043,14 @@ ${parts.join('')}
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <input type="checkbox" checked={formData.is_billable} onChange={(e) => setFormData(prev => ({ ...prev, is_billable: e.target.checked }))} className="rounded bg-white border-gray-300 text-emerald-600 focus:ring-emerald-500/20" />
+                <input type="checkbox" checked={formData.is_billable} onChange={(e) => setFormData(prev => ({ ...prev, is_billable: e.target.checked }))} className="rounded bg-white border-gray-300 text-blue-600 focus:ring-blue-500/20" />
                 <label className={`text-sm ${THEME.textMuted}`}>Billable</label>
               </div>
-              <div><label className={`block text-xs font-medium ${THEME.textDim} uppercase tracking-wider mb-1.5`}>Notes</label><textarea value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} className={`w-full px-3 py-2.5 bg-white border ${THEME.border} rounded-lg text-gray-900 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20`} rows={2} placeholder="Description..." /></div>
+              <div><label className={`block text-xs font-medium ${THEME.textDim} uppercase tracking-wider mb-1.5`}>Notes</label><textarea value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} className={`w-full px-3 py-2.5 bg-white border ${THEME.border} rounded-lg text-gray-900 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20`} rows={2} placeholder="Description..." /></div>
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={() => setShowEntryModal(false)} className={`flex-1 px-4 py-2.5 bg-white hover:bg-gray-100 border ${THEME.border} rounded-lg text-sm font-medium text-gray-600 transition-colors`}>Cancel</button>
-              <button onClick={saveNewEntry} className="flex-1 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm font-medium text-white transition-colors">Add Entry</button>
+              <button onClick={saveNewEntry} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white transition-colors">Add Entry</button>
             </div>
           </div>
         </div>
