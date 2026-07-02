@@ -964,6 +964,20 @@ export default function TeamPage() {
     }
   }, [teamMembers, billRates])
 
+  // ---- UTILIZATION (billable hours / capacity @ 172 hrs/mo) ----
+  const teamCapacity = useMemo(() => 172 * getMonthsInPeriod(selectedPeriod, periodType).length, [selectedPeriod, periodType])
+  const memberBillable = useMemo(() => {
+    const months = getMonthsInPeriod(selectedPeriod, periodType)
+    const map: Record<string, number> = {}
+    timeEntries.forEach(t => {
+      const mo = t.date?.substring(0, 7)
+      if (!mo || !months.includes(mo) || t.is_billable === false) return
+      const bh = t.billable_hours != null ? t.billable_hours : (t.hours || 0)
+      map[t.contractor_id] = (map[t.contractor_id] || 0) + bh
+    })
+    return map
+  }, [timeEntries, selectedPeriod, periodType])
+
   // ---- PROFITABILITY ENGINE (reads from timesheet + rate card) ----
   const profitabilityData = useMemo(() => {
     const months = getMonthsInPeriod(selectedPeriod, periodType)
@@ -1358,61 +1372,67 @@ export default function TeamPage() {
             </div>
           </div>
 
-          <div className={`${THEME.card} border ${THEME.border} rounded-2xl overflow-hidden shadow-sm`}>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className={`bg-gray-50 border-b ${THEME.border}`}>
-                  <th className={`px-4 py-2.5 text-left vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Name</th>
-                  <th className={`px-4 py-2.5 text-left vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Type</th>
-                  <th className={`px-4 py-2.5 text-left vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Role</th>
-                  <th className={`px-4 py-2.5 text-right vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Cost</th>
-                  <th className={`px-4 py-2.5 text-center vLbl text-[10px] ${THEME.textDim} font-bold uppercase`}>Status</th>
-                  <th className={`px-4 py-2.5 text-center vLbl text-[10px] ${THEME.textDim} font-bold uppercase w-20`}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredMembers.map(m => {
-                  const stStyle = getStatusStyle(m.status)
-                  const empStyle = getEmploymentStyle(m.employment_type)
-                  const rateCount = billRates.filter(r => r.team_member_id === m.id && r.is_active).length
+          {(() => {
+            const tint = (m: TeamMember) => m.status !== 'active'
+              ? { bg: 'rgba(100,116,139,0.1)', color: '#64748b', border: 'rgba(100,116,139,0.25)' }
+              : m.employment_type === 'employee'
+                ? { bg: 'rgba(37,99,235,0.09)', color: '#2563eb', border: 'rgba(37,99,235,0.18)' }
+                : { bg: 'rgba(194,102,12,0.1)', color: '#c2660c', border: 'rgba(194,102,12,0.22)' }
+            const utilOf = (m: TeamMember) => teamCapacity > 0 ? Math.round(((memberBillable[m.id] || 0) / teamCapacity) * 100) : 0
+            const uColor = (u: number) => u === 0 ? '#cbd5e1' : u < 50 ? '#d97706' : '#2563eb'
+            const uText = (u: number) => u === 0 ? '#94a3b8' : u < 50 ? '#b45309' : '#1e293b'
+            const cols = 'grid grid-cols-[2.3fr_1.5fr_1.3fr_1fr_0.9fr_40px] gap-3'
+            const groups: [string, boolean, string][] = [['W-2 Employees', true, '#2563eb'], ['1099 Contractors', false, '#c2660c']]
+            return (
+              <div className="space-y-3">
+                {groups.map(([label, isEmp, badge]) => {
+                  const list = filteredMembers.filter(m => isEmp ? m.employment_type === 'employee' : m.employment_type !== 'employee')
+                  if (!list.length) return null
+                  const utils = list.map(utilOf).filter(u => u > 0)
+                  const avgU = utils.length ? Math.round(utils.reduce((a, b) => a + b, 0) / utils.length) : 0
+                  const activeN = list.filter(m => m.status === 'active').length
                   return (
-                    <tr key={m.id} className="border-b border-gray-200 vRow cursor-pointer"
-                      onClick={() => setSelectedMemberDetail(m)}>
-                      <td className="px-4 py-3">
-                        <p className={`font-medium ${THEME.textPrimary}`}>{m.name}</p>
-                        <p className={`text-xs ${THEME.textDim}`}>{m.email}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`vBdg px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase border ${empStyle.border || ""} ${empStyle.bg} ${empStyle.text}`}>
-                          {m.employment_type === "employee" ? "W-2" : "1099"}
-                        </span>
-                      </td>
-                      <td className={`px-4 py-3 ${THEME.textSecondary}`}>{m.role || "\u2014"}</td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-orange-600 font-medium vN">
-                          {m.cost_amount ? (m.cost_type === "hourly" ? `$${m.cost_amount}/hr` : `${formatCurrency(m.cost_amount)}/mo`) : "\u2014"}
-                        </span>
-                        {rateCount > 0 && <p className={`text-xs ${THEME.textDim}`}>{rateCount} rate card{rateCount > 1 ? "s" : ""}</p>}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`vBdg px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase border ${stStyle.border || ""} ${stStyle.bg} ${stStyle.text}`}>{m.status}</span>
-                      </td>
-                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-center">
-                          <button onClick={() => { setEditingMember(m); setShowMemberModal(true) }} className="p-1.5 rounded hover:bg-gray-50 text-gray-400 hover:text-gray-600">
-                            <Edit2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                    <div key={label} className="bg-white border border-[#e2e8f0] rounded-2xl overflow-hidden shadow-sm">
+                      <div className="flex items-center gap-3 px-4 py-3 border-b border-[#e2e8f0]" style={{ background: 'linear-gradient(90deg,#f8fafc,#fff)' }}>
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-900" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{label}</span>
+                        <span className="text-[11px] font-bold text-white rounded-full px-2 py-0.5" style={{ background: badge }}>{list.length}</span>
+                        <span className="ml-auto text-[11.5px] text-slate-500">{activeN} active{avgU > 0 ? ` · avg ${avgU}% util` : ''}</span>
+                      </div>
+                      <div className={`${cols} px-4 py-2 border-b border-[#f1f4f6] text-[9.5px] font-bold uppercase tracking-[0.06em] text-slate-400`}>
+                        <span>Name</span><span>Role</span><span>Utilization</span><span className="text-right">Cost</span><span className="text-center">Status</span><span></span>
+                      </div>
+                      {list.map(m => {
+                        const rateCount = billRates.filter(r => r.team_member_id === m.id && r.is_active).length
+                        const t = tint(m); const u = utilOf(m); const st = getStatusStyle(m.status)
+                        return (
+                          <div key={m.id} onClick={() => setSelectedMemberDetail(m)} className={`${cols} px-4 py-3 items-center border-b border-[#f4f6f8] last:border-b-0 cursor-pointer hover:bg-[#f6f9ff] transition-colors`}>
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold flex-shrink-0" style={{ background: t.bg, color: t.color, border: `1px solid ${t.border}` }}>{(m.name || '?').split(' ').map(n => n[0]).join('').slice(0, 2)}</div>
+                              <div className="min-w-0"><p className="font-semibold text-[13.5px] text-slate-900 truncate">{m.name}</p><p className="text-[11px] text-slate-400 truncate">{m.email}</p></div>
+                            </div>
+                            <span className={`text-[12.5px] ${m.role ? 'text-slate-600' : 'text-slate-400'}`}>{m.role || '\u2014'}</span>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 max-w-[90px] h-1.5 rounded-full bg-[#eef1f5] overflow-hidden"><div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(u, 100)}%`, background: uColor(u) }} /></div>
+                              <span className="text-[12px] font-bold tabular-nums w-9" style={{ color: uText(u) }}>{u > 0 ? `${u}%` : '\u2014'}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-extrabold text-[13.5px] tabular-nums" style={{ color: m.cost_amount ? '#c2660c' : '#94a3b8', fontFamily: "'Archivo', system-ui, sans-serif" }}>{m.cost_amount ? (m.cost_type === 'hourly' ? `$${m.cost_amount}/hr` : `${formatCurrency(m.cost_amount)}/mo`) : '\u2014'}</span>
+                              {rateCount > 0 && <p className="text-[10.5px] text-slate-400">{rateCount} rate card{rateCount > 1 ? 's' : ''}</p>}
+                            </div>
+                            <div className="flex justify-center"><span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase border ${st.border || ''} ${st.bg} ${st.text}`}>{m.status}</span></div>
+                            <div className="flex justify-end" onClick={e => e.stopPropagation()}><button onClick={() => { setEditingMember(m); setShowMemberModal(true) }} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"><Edit2 size={14} /></button></div>
+                          </div>
+                        )
+                      })}
+                    </div>
                   )
                 })}
                 {filteredMembers.length === 0 && (
-                  <tr><td colSpan={6} className={`px-4 py-12 text-center ${THEME.textMuted}`}>No team members found</td></tr>
+                  <div className="bg-white border border-[#e2e8f0] rounded-2xl px-4 py-12 text-center text-slate-400 shadow-sm">No team members found</div>
                 )}
-              </tbody>
-            </table>
-          </div>
+              </div>
+            )
+          })()}
         </div>
       )}
 
