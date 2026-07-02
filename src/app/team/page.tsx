@@ -1289,44 +1289,52 @@ export default function TeamPage() {
         ))}
       </div>
 
-      {/* Summary Cards — left-accent-bar */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 vUp vD3">
-        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
-          <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-gray-300" />
-          <div className="pl-2">
-            <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>Total Members</span>
-            <p className="text-2xl font-bold text-gray-900 vN mt-1.5">{summary.total}</p>
-            <p className={`text-xs ${THEME.textDim} mt-0.5`}>{summary.active} active</p>
+      {/* Summary Cards — Blueprint textured (top accent) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 vUp vD3">
+        <div className="relative bg-white border border-[#e2e8f0] rounded-2xl p-5 overflow-hidden shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_-22px_rgba(15,23,42,0.4)]">
+          <div className="absolute top-0 left-0 right-0 h-[2px] z-10" style={{ background: 'linear-gradient(90deg,#2563eb,transparent)' }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)' }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(120% 100% at 100% 0%, #2563eb14, transparent 58%)' }} />
+          <div className="relative">
+            <span className="text-[10px] font-bold uppercase tracking-[0.07em] text-slate-400">Team Members</span>
+            <p className="text-[26px] font-extrabold text-slate-900 vN mt-1.5 leading-none" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{summary.total}</p>
+            <p className="text-xs text-slate-400 mt-1.5">{summary.active} active</p>
           </div>
         </div>
-        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
-          <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-blue-500" />
-          <div className="pl-2">
-            <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>W-2 Employees</span>
-            <p className="text-2xl font-bold text-blue-600 vN mt-1.5">{summary.employees}</p>
+        <div className="relative bg-white border border-[#e2e8f0] rounded-2xl p-5 overflow-hidden shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_-22px_rgba(15,23,42,0.4)]">
+          <div className="absolute top-0 left-0 right-0 h-[2px] z-10" style={{ background: 'linear-gradient(90deg,#c2660c,transparent)' }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)' }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(120% 100% at 100% 0%, #c2660c14, transparent 58%)' }} />
+          <div className="relative">
+            <span className="text-[10px] font-bold uppercase tracking-[0.07em] text-slate-400">W-2 / 1099</span>
+            <div className="flex items-baseline gap-2 mt-1.5">
+              <span className="text-[26px] font-extrabold text-slate-900 leading-none" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{summary.employees}</span>
+              <span className="text-slate-300 text-xl">/</span>
+              <span className="text-[26px] font-extrabold text-slate-900 leading-none" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{summary.contractors}</span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1.5">employees / contractors</p>
           </div>
         </div>
-        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
-          <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-amber-500" />
-          <div className="pl-2">
-            <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>1099 Contractors</span>
-            <p className="text-2xl font-bold text-amber-600 vN mt-1.5">{summary.contractors}</p>
+        <div className="relative bg-white border border-[#e2e8f0] rounded-2xl p-5 overflow-hidden shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_-22px_rgba(15,23,42,0.4)]">
+          <div className="absolute top-0 left-0 right-0 h-[2px] z-10" style={{ background: 'linear-gradient(90deg,#2563eb,transparent)' }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)' }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(120% 100% at 100% 0%, #2563eb14, transparent 58%)' }} />
+          <div className="relative">
+            <span className="text-[10px] font-bold uppercase tracking-[0.07em] text-slate-400">Active Rate Cards</span>
+            <p className="text-[26px] font-extrabold text-slate-900 vN mt-1.5 leading-none" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{summary.activeRates}</p>
+            <p className="text-xs text-slate-400 mt-1.5">across clients</p>
           </div>
         </div>
-        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
-          <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-blue-600" />
-          <div className="pl-2">
-            <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>Active Rate Cards</span>
-            <p className="text-2xl font-bold text-blue-600 vN mt-1.5">{summary.activeRates}</p>
-          </div>
-        </div>
-        <div className={`vCard vKpi relative p-6 rounded-2xl ${THEME.card} border overflow-hidden shadow-sm`}>
-          <div className="absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full bg-blue-600" />
-          <div className="pl-2">
-            <span className={`vLbl text-[10px] font-bold ${THEME.textDim} uppercase`}>GM% ({formatPeriodLabel(selectedPeriod, periodType).split(" ")[0]})</span>
-            <p className={`text-2xl font-bold vN mt-1.5 ${profitTotals.marginPct >= 20 ? "text-emerald-600" : profitTotals.marginPct >= 0 ? "text-amber-600" : "text-rose-600"}`}>
+        <div className="relative bg-white border border-[#e2e8f0] rounded-2xl p-5 overflow-hidden shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_-22px_rgba(15,23,42,0.4)]">
+          <div className="absolute top-0 left-0 right-0 h-[2px] z-10" style={{ background: 'linear-gradient(90deg,#10b981,transparent)' }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)' }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(120% 100% at 100% 0%, #10b98114, transparent 58%)' }} />
+          <div className="relative">
+            <span className="text-[10px] font-bold uppercase tracking-[0.07em] text-slate-400">GM% ({formatPeriodLabel(selectedPeriod, periodType).split(" ")[0]})</span>
+            <p className={`text-[26px] font-extrabold vN mt-1.5 leading-none ${profitTotals.marginPct >= 20 ? "text-emerald-600" : profitTotals.marginPct >= 0 ? "text-amber-600" : "text-rose-600"}`} style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>
               {profitTotals.revenue > 0 ? `${profitTotals.marginPct.toFixed(1)}%` : "\u2014"}
             </p>
+            <p className="text-xs text-slate-400 mt-1.5">blended margin</p>
           </div>
         </div>
       </div>
