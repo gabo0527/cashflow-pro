@@ -89,7 +89,7 @@ function StatusDropdown({ status, onChange, disabled }: { status: string; onChan
       value={status === 'submitted' ? 'pending' : status}
       onChange={e => onChange(e.target.value)}
       disabled={disabled}
-      className={`px-2.5 py-1 rounded-full text-xs font-semibold border cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-colors disabled:opacity-50 ${cfg.bg} ${cfg.text} ${cfg.border}`}
+      className={`px-2.5 py-1 rounded-full text-xs font-semibold border cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50 ${cfg.bg} ${cfg.text} ${cfg.border}`}
       style={{ backgroundColor: cfg.selectBg }}
     >
       {ALL_STATUSES.map(s => (
@@ -115,7 +115,7 @@ function BillableBadge({ isBillable, isOH }: { isBillable: boolean; isOH: boolea
     </span>
   )
   if (isBillable) return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase tracking-wide">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#fbe8d3] text-[#c2660c] border border-[#f0c39a] uppercase tracking-wide">
       <Tag size={9} /> Billable
     </span>
   )
@@ -126,27 +126,29 @@ function BillableBadge({ isBillable, isOH }: { isBillable: boolean; isOH: boolea
   )
 }
 
-function MetricCard({ label, value, sub, icon: Icon, accentColor = '#059669', highlight = false }: {
+function MetricCard({ label, value, sub, icon: Icon, accentColor = '#2563eb', highlight = false }: {
   label: string; value: string; sub?: string; icon: any; accentColor?: string; highlight?: boolean
 }) {
   return (
-    <div className={`vCard relative p-4 rounded-xl border overflow-hidden shadow-sm ${highlight ? 'bg-amber-50/50 border-amber-200' : 'bg-white border-gray-200'}`}>
-      <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full" style={{ backgroundColor: accentColor }} />
-      <div className="pl-2">
+    <div className={`relative p-4 rounded-2xl border overflow-hidden shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_-22px_rgba(15,23,42,0.4)] ${highlight ? 'bg-amber-50/40 border-amber-200' : 'bg-white border-[#e2e8f0]'}`}>
+      <div className="absolute top-0 left-0 right-0 h-[2px] z-10" style={{ background: `linear-gradient(90deg,${accentColor},transparent)` }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)' }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(120% 100% at 100% 0%, ${accentColor}14, transparent 58%)` }} />
+      <div className="relative">
         <div className="flex items-center justify-between mb-1.5">
-          <span className={`vLbl text-[10px] font-bold uppercase ${highlight ? 'text-amber-600' : THEME.textDim}`}>{label}</span>
-          <Icon size={15} className={highlight ? 'text-amber-500' : THEME.textDim} />
+          <span className={`text-[10px] font-bold uppercase tracking-[0.07em] ${highlight ? 'text-amber-600' : 'text-slate-400'}`}>{label}</span>
+          <Icon size={15} style={{ color: accentColor }} />
         </div>
-        <p className={`text-2xl font-semibold vN ${highlight ? 'text-amber-700' : 'text-gray-900'}`}>{value}</p>
-        {sub && <p className={`text-xs mt-0.5 ${highlight ? 'text-amber-600' : THEME.textDim}`}>{sub}</p>}
+        <p className="text-[24px] font-extrabold vN text-slate-900 leading-none" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{value}</p>
+        {sub && <p className={`text-xs mt-1.5 ${highlight ? 'text-amber-600' : 'text-slate-400'}`}>{sub}</p>}
       </div>
     </div>
   )
 }
 
 const selClass = (active: boolean) =>
-  `px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-colors cursor-pointer ${
-    active ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-white border-gray-200 text-gray-700'
+  `px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-colors cursor-pointer ${
+    active ? 'bg-blue-50 border-blue-300 text-blue-800' : 'bg-white border-gray-200 text-gray-700'
   }`
 
 function getRowBorder(status: string): string {
@@ -241,7 +243,7 @@ function GroupAccordion({ node, depth, collapsed, onToggle, renderItems }: {
             </span>
           ) : (
             <div className="flex items-center gap-2">
-              <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${node.isOverhead ? 'bg-gray-100 text-gray-500' : 'bg-emerald-50 text-emerald-700'}`}>
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${node.isOverhead ? 'bg-gray-100 text-gray-500' : 'bg-blue-50 text-blue-700'}`}>
                 {node.label.charAt(0).toUpperCase()}
               </div>
               <span className="text-gray-900 text-sm font-semibold">{node.label}</span>
@@ -304,7 +306,7 @@ function GroupBySelector({ dimensions, onChange }: { dimensions: GroupDimension[
         activeDims.map((dim, i) => (
           <span key={dim} className="inline-flex items-center gap-1">
             {i > 0 && <span className="text-gray-300 text-xs">›</span>}
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
               {options.find(o => o.id === dim)?.label}
               <button onClick={() => removeDim(i)} className="hover:text-red-500 ml-0.5"><X size={10} /></button>
             </span>
@@ -846,7 +848,7 @@ export default function ContractorManagement() {
                   <Edit2 size={13} />
                 </button>
                 {inv.receipt_url && (
-                  <button onClick={() => openPreview(inv.receipt_url!)} className="p-1 rounded text-emerald-600 hover:text-emerald-500 hover:bg-emerald-50 vBtn" title="View receipt">
+                  <button onClick={() => openPreview(inv.receipt_url!)} className="p-1 rounded text-blue-600 hover:text-blue-500 hover:bg-blue-50 vBtn" title="View receipt">
                     <Eye size={14} />
                   </button>
                 )}
@@ -919,7 +921,7 @@ export default function ContractorManagement() {
             <p className="text-gray-900 text-sm truncate">{exp.description}</p>
             <span className="text-gray-600 text-sm truncate">{memberMap[exp.team_member_id] || '—'}</span>
             <div className="flex items-center gap-1.5 min-w-0">
-              <div className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-bold shrink-0 ${oh ? 'bg-gray-100 text-gray-500' : 'bg-emerald-50 text-emerald-700'}`}>
+              <div className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-bold shrink-0 ${oh ? 'bg-gray-100 text-gray-500' : 'bg-blue-50 text-blue-700'}`}>
                 {cn !== '—' ? cn.charAt(0).toUpperCase() : '?'}
               </div>
               <span className={`text-xs truncate ${oh ? 'text-gray-500' : 'text-gray-700 font-medium'}`}>{cn}</span>
@@ -939,7 +941,7 @@ export default function ContractorManagement() {
                 <Edit2 size={13} />
               </button>
               {exp.receipt_url && (
-                <button onClick={() => openPreview(exp.receipt_url!)} className="p-1 rounded text-emerald-600 hover:text-emerald-500 hover:bg-emerald-50 vBtn" title="View receipt">
+                <button onClick={() => openPreview(exp.receipt_url!)} className="p-1 rounded text-blue-600 hover:text-blue-500 hover:bg-blue-50 vBtn" title="View receipt">
                   <Eye size={14} />
                 </button>
               )}
@@ -963,20 +965,23 @@ export default function ContractorManagement() {
   )
 
   // ============ RENDER ============
-  if (loading) return <div className="flex items-center justify-center h-64"><Loader2 size={22} className="text-emerald-500 animate-spin" /></div>
+  if (loading) return <div className="flex items-center justify-center h-64"><Loader2 size={22} className="text-blue-500 animate-spin" /></div>
 
   const isNoGroup = (dims: GroupDimension[]) => dims.length === 0 || dims[0] === 'none'
 
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900 tracking-tight">Contractor Management</h1>
-          <p className={`text-[13px] mt-1 ${THEME.textDim}`}>AP invoices and expenses from your team</p>
+      {/* Header — dark page banner */}
+      <div className="relative overflow-hidden rounded-2xl px-7 py-6 flex items-center justify-between gap-4" style={{ background: 'linear-gradient(135deg,#1b2431 0%,#141b24 55%,#10151c 100%)', boxShadow: '0 20px 46px -26px rgba(15,23,42,0.6)' }}>
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 13px)' }} />
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(80% 130% at 0% 0%, rgba(59,130,246,0.14), transparent 55%)' }} />
+        <div className="relative">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.16em]" style={{ fontFamily: "'Archivo', system-ui, sans-serif", color: '#93c5fd' }}>Operations</p>
+          <h1 className="text-3xl font-extrabold uppercase tracking-tight text-white mt-1 leading-none" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>Contractor Management</h1>
+          <p className="text-sm mt-2" style={{ color: '#8b97a7' }}>AP invoices and expenses from your team</p>
         </div>
         <a href="/contractor-portal" target="_blank" rel="noopener noreferrer"
-          className={`flex items-center gap-2 px-4 py-2 ${THEME.card} border hover:bg-gray-50 rounded-lg text-gray-600 text-sm transition-colors`}>
+          className="relative flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.16)', color: '#e2e8f0' }}>
           <ExternalLink size={14} /> Contractor Portal
         </a>
       </div>
@@ -990,7 +995,7 @@ export default function ContractorManagement() {
         ].map(tab => (
           <button key={tab.id} onClick={() => { setActiveTab(tab.id); clearFilters() }}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium vBtn border-b-2 -mb-px transition-all duration-300 ${
-              activeTab === tab.id ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300'
+              activeTab === tab.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300'
             }`}>
             <tab.icon size={15} />
             {tab.label}
@@ -1016,7 +1021,7 @@ export default function ContractorManagement() {
                 <span className="text-sm text-amber-800 font-medium">{invMetrics.pendingCount} invoice{invMetrics.pendingCount !== 1 ? 's' : ''} pending — {fmt$(invMetrics.pendingAmt)}</span>
               </div>
               <button onClick={bulkApproveInv} disabled={processing === 'bulk'}
-                className="px-3 py-1.5 bg-emerald-500 text-white text-xs font-semibold rounded-lg hover:bg-emerald-600 disabled:opacity-50 vBtn flex items-center gap-1.5">
+                className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 vBtn flex items-center gap-1.5">
                 {processing === 'bulk' ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />} Approve All
               </button>
             </div>
@@ -1029,7 +1034,7 @@ export default function ContractorManagement() {
                 <div className="relative flex-1 max-w-xs">
                   <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input type="text" placeholder="Search invoices..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                 </div>
                 <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={selClass(filterStatus !== 'all')}>
                   <option value="all">All Statuses</option>
@@ -1098,7 +1103,7 @@ export default function ContractorManagement() {
             <MetricCard label="Pending" value={fmt$(expMetrics.pendingAmt)} icon={Clock} accentColor="#d97706" sub={`${expMetrics.pendingCount} awaiting`} highlight={expMetrics.pendingCount > 0} />
             <MetricCard label="Approved" value={fmt$(expMetrics.approvedAmt)} icon={CheckCircle} accentColor="#3b82f6" sub={`${expMetrics.approvedCount} approved`} />
             <MetricCard label="Paid" value={fmt$(expMetrics.paidAmt)} icon={DollarSign} accentColor="#059669" sub={`${expMetrics.paidCount} paid`} />
-            <MetricCard label="Billable" value={fmt$(expMetrics.billableAmt)} icon={Tag} accentColor="#059669" sub={`${expMetrics.billableCount} tagged`} />
+            <MetricCard label="Billable" value={fmt$(expMetrics.billableAmt)} icon={Tag} accentColor="#c2660c" sub={`${expMetrics.billableCount} tagged`} />
           </div>
 
           {expMetrics.pendingCount > 0 && (
@@ -1108,7 +1113,7 @@ export default function ContractorManagement() {
                 <span className="text-sm text-amber-800 font-medium">{expMetrics.pendingCount} expense{expMetrics.pendingCount !== 1 ? 's' : ''} pending — {fmt$(expMetrics.pendingAmt)}</span>
               </div>
               <button onClick={bulkApproveExp} disabled={processing === 'bulk'}
-                className="px-3 py-1.5 bg-emerald-500 text-white text-xs font-semibold rounded-lg hover:bg-emerald-600 disabled:opacity-50 vBtn flex items-center gap-1.5">
+                className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 vBtn flex items-center gap-1.5">
                 {processing === 'bulk' ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />} Approve All
               </button>
             </div>
@@ -1120,7 +1125,7 @@ export default function ContractorManagement() {
                 <div className="relative flex-1 max-w-xs">
                   <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input type="text" placeholder="Search expenses..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                 </div>
                 <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={selClass(filterStatus !== 'all')}>
                   <option value="all">All Statuses</option>
@@ -1295,7 +1300,7 @@ export default function ContractorManagement() {
               <div className="flex items-center gap-3">
                 <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">Billable</label>
                 <button onClick={() => setEditForm(f => ({ ...f, is_billable: !f.is_billable }))}
-                  className={`relative w-9 h-5 rounded-full transition-colors ${editForm.is_billable ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+                  className={`relative w-9 h-5 rounded-full transition-colors ${editForm.is_billable ? 'bg-blue-600' : 'bg-gray-300'}`}>
                   <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${editForm.is_billable ? 'translate-x-4' : 'translate-x-0.5'}`} />
                 </button>
               </div>
@@ -1336,7 +1341,7 @@ export default function ContractorManagement() {
               return (
                 <div key={m.id} className={`flex items-center justify-between px-5 py-4 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 transition-colors ${m.status === 'inactive' ? 'opacity-60' : ''}`}>
                   <div className="flex items-center gap-4">
-                    <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center text-sm font-bold text-emerald-700">
+                    <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center text-sm font-bold text-blue-700">
                       {m.name.charAt(0).toUpperCase()}
                     </div>
                     <div>
@@ -1470,7 +1475,7 @@ export default function ContractorManagement() {
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white sticky top-0 z-10">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center text-sm font-bold text-emerald-700">
+                <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center text-sm font-bold text-blue-700">
                   {profileMember.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
@@ -1499,38 +1504,38 @@ export default function ContractorManagement() {
                     <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Phone</label>
                     <input value={profileForm.phone || ''} onChange={e => setProfileForm(p => ({ ...p, phone: e.target.value }))}
                       placeholder="+1 (787) 000-0000"
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Country</label>
                     <input value={profileForm.country || ''} onChange={e => setProfileForm(p => ({ ...p, country: e.target.value }))}
                       placeholder="United States"
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                   </div>
                   <div className="col-span-2">
                     <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Street Address</label>
                     <input value={profileForm.address || ''} onChange={e => setProfileForm(p => ({ ...p, address: e.target.value }))}
                       placeholder="123 Main St"
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">City</label>
                     <input value={profileForm.city || ''} onChange={e => setProfileForm(p => ({ ...p, city: e.target.value }))}
                       placeholder="San Juan"
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">State</label>
                       <input value={profileForm.state || ''} onChange={e => setProfileForm(p => ({ ...p, state: e.target.value }))}
                         placeholder="PR"
-                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">ZIP</label>
                       <input value={profileForm.zip || ''} onChange={e => setProfileForm(p => ({ ...p, zip: e.target.value }))}
                         placeholder="00901"
-                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                     </div>
                   </div>
                 </div>
@@ -1547,24 +1552,24 @@ export default function ContractorManagement() {
                     <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Bank Name</label>
                     <input value={profileForm.bank_name || ''} onChange={e => setProfileForm(p => ({ ...p, bank_name: e.target.value }))}
                       placeholder="Chase Bank"
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Routing Number</label>
                     <input value={profileForm.routing_number || ''} onChange={e => setProfileForm(p => ({ ...p, routing_number: e.target.value }))}
                       placeholder="021000021"
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Account Number</label>
                     <input value={profileForm.account_number || ''} onChange={e => setProfileForm(p => ({ ...p, account_number: e.target.value }))}
                       placeholder="000123456789"
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Account Type</label>
                     <select value={profileForm.account_type || ''} onChange={e => setProfileForm(p => ({ ...p, account_type: e.target.value }))}
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400">
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400">
                       <option value="">Select type</option>
                       <option value="checking">Checking</option>
                       <option value="savings">Savings</option>
@@ -1584,25 +1589,25 @@ export default function ContractorManagement() {
                     <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">SWIFT / BIC Code</label>
                     <input value={profileForm.swift_code || ''} onChange={e => setProfileForm(p => ({ ...p, swift_code: e.target.value }))}
                       placeholder="CHASUS33"
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">IBAN</label>
                     <input value={profileForm.iban || ''} onChange={e => setProfileForm(p => ({ ...p, iban: e.target.value }))}
                       placeholder="GB29 NWBK 6016 1331 9268 19"
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                   </div>
                   <div className="col-span-2">
                     <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Bank Address</label>
                     <input value={profileForm.bank_address || ''} onChange={e => setProfileForm(p => ({ ...p, bank_address: e.target.value }))}
                       placeholder="270 Park Ave, New York, NY 10017"
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                   </div>
                   <div className="col-span-2">
                     <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Intermediary Bank (if applicable)</label>
                     <input value={profileForm.intermediary_bank || ''} onChange={e => setProfileForm(p => ({ ...p, intermediary_bank: e.target.value }))}
                       placeholder="Bank of America, SWIFT: BOFAUS3N"
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400" />
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                   </div>
                 </div>
               </section>
@@ -1625,8 +1630,8 @@ export default function ContractorManagement() {
                     return (
                       <div key={field} className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-lg">
                         <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded flex items-center justify-center ${url ? 'bg-emerald-50' : 'bg-gray-100'}`}>
-                            <FileText size={14} className={url ? 'text-emerald-600' : 'text-gray-400'} />
+                          <div className={`w-8 h-8 rounded flex items-center justify-center ${url ? 'bg-blue-50' : 'bg-gray-100'}`}>
+                            <FileText size={14} className={url ? 'text-blue-600' : 'text-gray-400'} />
                           </div>
                           <div>
                             <p className="text-sm font-medium text-gray-900">{label}</p>
@@ -1635,7 +1640,7 @@ export default function ContractorManagement() {
                                 <span className="text-[10px] text-gray-400 uppercase tracking-wide">Expires</span>
                                 <input type="date" value={profileForm[expiresField] || ''}
                                   onChange={e => setProfileForm(p => ({ ...p, [expiresField]: e.target.value }))}
-                                  className="text-[11px] text-gray-600 bg-transparent border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-emerald-400" />
+                                  className="text-[11px] text-gray-600 bg-transparent border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-blue-400" />
                               </div>
                             )}
                           </div>
@@ -1643,7 +1648,7 @@ export default function ContractorManagement() {
                         <div className="flex items-center gap-2">
                           {url && (
                             <button onClick={() => openProfileDoc(url)}
-                              className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 flex items-center gap-1.5">
+                              className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 flex items-center gap-1.5">
                               <Eye size={12} /> View
                             </button>
                           )}
@@ -1774,7 +1779,7 @@ export default function ContractorManagement() {
                 {previewFiles.map((f, i) => (
                   <button key={i} onClick={() => setPreviewIndex(i)}
                     className={`flex-shrink-0 w-10 h-10 rounded-lg border-2 flex items-center justify-center text-xs font-medium transition-colors ${
-                      i === previewIndex ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                      i === previewIndex ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
                     }`}>
                     {(f.match(/\.(jpg|jpeg|png|gif|webp|heic)/i) || f.includes('image')) ? <Eye size={14} /> : <FileText size={14} />}
                   </button>
