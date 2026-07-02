@@ -34,14 +34,14 @@ function emailWrapper(content: string): string {
         <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; background-color:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
           <!-- Header -->
           <tr>
-            <td style="background-color:#111827; padding:24px 32px;">
+            <td style="background:linear-gradient(135deg,#1b2431,#10151c); background-color:#141b24; padding:24px 32px;">
               <table cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="padding-right:12px;">
-                    <div style="width:32px; height:32px; background-color:#10b981; border-radius:8px; display:inline-block;"></div>
+                    <div style="width:34px; height:34px; background:linear-gradient(135deg,#3b82f6,#1e3a8a); background-color:#2563eb; border-radius:9px; text-align:center; line-height:34px; color:#ffffff; font-size:18px; font-weight:800; font-family:Arial,sans-serif;">V</div>
                   </td>
                   <td>
-                    <span style="color:#ffffff; font-size:18px; font-weight:700; letter-spacing:-0.3px;">VantageFP</span>
+                    <span style="color:#ffffff; font-size:18px; font-weight:700; letter-spacing:-0.3px;">Vantage<span style="color:#ea8a2f;">FP</span></span>
                   </td>
                 </tr>
               </table>
@@ -58,7 +58,7 @@ function emailWrapper(content: string): string {
             <td style="padding:20px 32px; border-top:1px solid #e5e7eb; background-color:#f9fafb;">
               <p style="margin:0; font-size:12px; color:#9ca3af; line-height:1.5;">
                 This is an automated notification from VantageFP. 
-                <a href="${APP_URL}" style="color:#10b981; text-decoration:none;">Open your portal</a>
+                <a href="${APP_URL}" style="color:#2563eb; text-decoration:none;">Open your portal</a>
               </p>
             </td>
           </tr>
@@ -74,7 +74,7 @@ function ctaButton(text: string, url: string): string {
   return `
     <table cellpadding="0" cellspacing="0" style="margin:24px 0 8px;">
       <tr>
-        <td style="background-color:#10b981; border-radius:8px; padding:12px 24px;">
+        <td style="background:linear-gradient(135deg,#2563eb,#1e3a8a); background-color:#2563eb; border-radius:8px; padding:12px 24px;">
           <a href="${url}" style="color:#ffffff; font-size:14px; font-weight:600; text-decoration:none; display:inline-block;">${text}</a>
         </td>
       </tr>
@@ -86,9 +86,9 @@ function statusBadge(status: string): string {
     "submitted": { bg: "#dbeafe", text: "#1d4ed8" },
     "pending": { bg: "#fef3c7", text: "#92400e" },
     "pending review": { bg: "#fef3c7", text: "#92400e" },
-    "approved": { bg: "#d1fae5", text: "#065f46" },
-    "scheduled": { bg: "#e0e7ff", text: "#3730a3" },
-    "scheduled for payment": { bg: "#e0e7ff", text: "#3730a3" },
+    "approved": { bg: "#dbeafe", text: "#1d4ed8" },
+    "scheduled": { bg: "#fbe8d3", text: "#c2660c" },
+    "scheduled for payment": { bg: "#fbe8d3", text: "#c2660c" },
     "paid": { bg: "#d1fae5", text: "#065f46" },
     "rejected": { bg: "#fee2e2", text: "#991b1b" },
     "changes requested": { bg: "#ffedd5", text: "#9a3412" },
@@ -391,7 +391,7 @@ export async function sendAdminInvoiceSubmittedEmail(data: AdminInvoiceSubmitted
         </tr>
       </table>
     </div>
-    ${data.notes ? `<div style="margin-top:16px; padding:14px 16px; background-color:#f0fdf4; border-radius:8px; border-left:3px solid #10b981;"><p style="margin:0 0 4px; font-size:12px; font-weight:600; color:#065f46; text-transform:uppercase;">Contractor Note</p><p style="margin:0; font-size:13px; color:#374151; line-height:1.5;">${data.notes}</p></div>` : ""}
+    ${data.notes ? `<div style="margin-top:16px; padding:14px 16px; background-color:#eef4ff; border-radius:8px; border-left:3px solid #2563eb;"><p style="margin:0 0 4px; font-size:12px; font-weight:600; color:#2563eb; text-transform:uppercase;">Contractor Note</p><p style="margin:0; font-size:13px; color:#374151; line-height:1.5;">${data.notes}</p></div>` : ""}
     ${ctaButton("Review in Contractor Management", `${APP_URL}/contractor-management`)}
   `
 
@@ -461,7 +461,7 @@ export async function sendAdminExpenseSubmittedEmail(data: AdminExpenseSubmitted
         </tr>
       </table>
     </div>
-    ${data.notes ? `<div style="margin-top:16px; padding:14px 16px; background-color:#f0fdf4; border-radius:8px; border-left:3px solid #10b981;"><p style="margin:0 0 4px; font-size:12px; font-weight:600; color:#065f46; text-transform:uppercase;">Contractor Note</p><p style="margin:0; font-size:13px; color:#374151; line-height:1.5;">${data.notes}</p></div>` : ""}
+    ${data.notes ? `<div style="margin-top:16px; padding:14px 16px; background-color:#eef4ff; border-radius:8px; border-left:3px solid #2563eb;"><p style="margin:0 0 4px; font-size:12px; font-weight:600; color:#2563eb; text-transform:uppercase;">Contractor Note</p><p style="margin:0; font-size:13px; color:#374151; line-height:1.5;">${data.notes}</p></div>` : ""}
     ${ctaButton("Review in Contractor Management", `${APP_URL}/contractor-management`)}
   `
 
@@ -525,7 +525,7 @@ export async function sendAdminTimesheetDigestEmail(data: AdminTimesheetDigestDa
 
     <div style="display:grid; margin-bottom:20px;">
       <div style="background-color:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:14px 18px; display:inline-block; margin-bottom:12px;">
-        <p style="margin:0; font-size:11px; color:#065f46; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Total Hours Logged</p>
+        <p style="margin:0; font-size:11px; color:#2563eb; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Total Hours Logged</p>
         <p style="margin:4px 0 0; font-size:24px; font-weight:700; color:#111827;">${totalHours.toFixed(1)}h</p>
         <p style="margin:2px 0 0; font-size:12px; color:#6b7280;">${submitted.length} of ${data.contractors.length} contractors submitted</p>
       </div>
@@ -596,7 +596,7 @@ export async function sendEOMReminderEmail(data: EOMReminderEmailData) {
   const invoiceAmountRow = isHourly && data.estimatedInvoiceAmount
     ? `<tr>
          <td style="padding:10px 0 4px; font-size:12px; color:#6b7280; border-top:1px solid #e5e7eb;">Estimated Invoice</td>
-         <td style="padding:10px 0 4px; font-size:15px; font-weight:700; text-align:right; color:#10b981; border-top:1px solid #e5e7eb;">${formatCurrency(data.estimatedInvoiceAmount)}</td>
+         <td style="padding:10px 0 4px; font-size:15px; font-weight:700; text-align:right; color:#c2660c; border-top:1px solid #e5e7eb;">${formatCurrency(data.estimatedInvoiceAmount)}</td>
        </tr>`
     : ""
 
@@ -604,7 +604,7 @@ export async function sendEOMReminderEmail(data: EOMReminderEmailData) {
   const fixedAmountRow = isFixed
     ? `<tr>
          <td style="padding:10px 0 4px; font-size:12px; color:#6b7280; border-top:1px solid #e5e7eb;">Monthly Invoice Amount</td>
-         <td style="padding:10px 0 4px; font-size:15px; font-weight:700; text-align:right; color:#10b981; border-top:1px solid #e5e7eb;">${formatCurrency(data.fixedMonthlyAmount!)}</td>
+         <td style="padding:10px 0 4px; font-size:15px; font-weight:700; text-align:right; color:#c2660c; border-top:1px solid #e5e7eb;">${formatCurrency(data.fixedMonthlyAmount!)}</td>
        </tr>`
     : ""
 
