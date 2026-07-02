@@ -48,7 +48,7 @@ export default function Header({
       <div className="flex items-center gap-4 flex-1 max-w-md">
         <div className={cn(
           'relative flex-1 rounded-xl border transition-all',
-          searchFocused ? 'bg-white border-emerald-300 ring-2 ring-emerald-500/15' : 'bg-gray-50 border-gray-200'
+          searchFocused ? 'bg-white border-blue-300 ring-2 ring-blue-500/15' : 'bg-gray-50 border-gray-200'
         )}>
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
@@ -74,8 +74,8 @@ export default function Header({
           onClick={onOpenChat}
           className={cn(
             'vBtn p-2.5 rounded-xl',
-            'text-gray-400 hover:text-emerald-600',
-            'hover:bg-emerald-50'
+            'text-gray-400 hover:text-blue-600',
+            'hover:bg-blue-50'
           )}
           title="Open Sage AI"
         >
@@ -108,7 +108,7 @@ export default function Header({
             )}
           >
             {/* Avatar */}
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg,#10B981,#065F46)' }}>
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg,#3b82f6,#1e3a8a)' }}>
               {initials}
             </div>
             <span className="text-sm font-medium text-gray-700 hidden sm:block">
