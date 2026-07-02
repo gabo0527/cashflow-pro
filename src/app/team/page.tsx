@@ -157,12 +157,24 @@ function getDefaultPeriod(pt: PeriodType): string {
 }
 
 // ============ MEMBER DETAIL FLYOUT ============
-function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
-  member: TeamMember; billRates: BillRate[]; clients: Client[]; onClose: () => void; onEdit: () => void
+interface FlyoutStats { util: number; billable: number; hours: number; revenue: number; cost: number; margin: number; marginPct: number; periodLabel: string }
+function MetricMini({ label, value, accent, valColor, sub }: { label: string; value: string; accent: string; valColor?: string; sub?: string }) {
+  return (
+    <div className="relative bg-white border border-[#e2e8f0] rounded-xl p-3 overflow-hidden">
+      <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: `linear-gradient(90deg,${accent},transparent)` }} />
+      <p className="text-[9.5px] font-bold uppercase tracking-[0.06em] text-slate-400">{label}</p>
+      <p className="text-lg font-extrabold mt-1 tabular-nums" style={{ color: valColor || '#0f172a', fontFamily: "'Archivo', system-ui, sans-serif" }}>{value}</p>
+      {sub && <p className="text-[10.5px] text-slate-400 mt-0.5">{sub}</p>}
+    </div>
+  )
+}
+function MemberDetailFlyout({ member, billRates, clients, stats, onClose, onEdit }: {
+  member: TeamMember; billRates: BillRate[]; clients: Client[]; stats?: FlyoutStats; onClose: () => void; onEdit: () => void
 }) {
   const [showBanking, setShowBanking] = useState(false)
   const memberRates = billRates.filter(r => r.team_member_id === member.id && r.is_active)
   const empStyle = getEmploymentStyle(member.employment_type)
+  const avTint = member.status !== 'active' ? { bg: 'rgba(100,116,139,0.1)', color: '#64748b', border: 'rgba(100,116,139,0.25)' } : member.employment_type === 'employee' ? { bg: 'rgba(37,99,235,0.09)', color: '#2563eb', border: 'rgba(37,99,235,0.18)' } : { bg: 'rgba(194,102,12,0.1)', color: '#c2660c', border: 'rgba(194,102,12,0.22)' }
 
   return (
     <div className="fixed inset-0 bg-black/30 vFade flex justify-end z-50" onClick={onClose}>
@@ -171,8 +183,8 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
           <div className="flex items-start justify-between">
             <div className="vUp">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center flex-shrink-0">
-                  <span className="text-sm font-bold text-blue-700">{member.name.split(" ").map(n => n[0]).join("").slice(0, 2)}</span>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: avTint.bg, color: avTint.color, border: `1px solid ${avTint.border}` }}>
+                  <span className="text-sm font-bold">{member.name.split(" ").map(n => n[0]).join("").slice(0, 2)}</span>
                 </div>
                 <div>
                   <div className="flex items-center gap-2.5">
@@ -192,6 +204,17 @@ function MemberDetailFlyout({ member, billRates, clients, onClose, onEdit }: {
           </div>
         </div>
         <div className="p-6 space-y-6">
+          {stats && (
+            <div>
+              <div className="grid grid-cols-2 gap-3">
+                <MetricMini label="Utilization" value={`${stats.util}%`} accent="#2563eb" valColor="#2563eb" />
+                <MetricMini label={`Revenue · ${stats.periodLabel.split(' ')[0]}`} value={formatCurrency(stats.revenue)} accent="#c2660c" valColor="#c2660c" />
+                <MetricMini label={`Cost · ${stats.periodLabel.split(' ')[0]}`} value={formatCurrency(stats.cost)} accent="#64748b" />
+                <MetricMini label={`Margin · ${stats.periodLabel.split(' ')[0]}`} value={formatCurrency(stats.margin)} accent={stats.margin >= 0 ? '#10b981' : '#e11d48'} valColor={stats.margin >= 0 ? '#10b981' : '#e11d48'} sub={`${stats.marginPct.toFixed(1)}% GM`} />
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">{stats.billable.toFixed(1)} billable of {stats.hours.toFixed(1)} actual hrs · {stats.periodLabel}</p>
+            </div>
+          )}
           <div className="space-y-3">
             <h3 className={`vLbl text-[11px] font-bold uppercase text-gray-400`}>Contact</h3>
             <div className="space-y-2">
@@ -1910,11 +1933,25 @@ export default function TeamPage() {
         onSave={handleSaveRate} editingRate={editingRate} teamMembers={teamMembers} clients={clients} projects={projects} companyId={companyId} />
       <CostOverrideModal isOpen={showOverrideModal} onClose={() => setShowOverrideModal(false)}
         onSave={handleSaveOverride} billRates={billRates} teamMembers={teamMembers} clients={clients} selectedMonth={selectedPeriod.includes("-Q") ? getMonthsInPeriod(selectedPeriod, periodType)[0] : selectedPeriod.length === 4 ? getCurrentMonth() : selectedPeriod} />
-      {selectedMemberDetail && (
-        <MemberDetailFlyout member={selectedMemberDetail} billRates={billRates} clients={clients}
-          onClose={() => setSelectedMemberDetail(null)}
-          onEdit={() => { setEditingMember(selectedMemberDetail); setShowMemberModal(true); setSelectedMemberDetail(null) }} />
-      )}
+      {selectedMemberDetail && (() => {
+        const pd = profitabilityData.find(p => p && p.id === selectedMemberDetail.id)
+        const billable = memberBillable[selectedMemberDetail.id] || 0
+        const stats = {
+          util: teamCapacity > 0 ? Math.round((billable / teamCapacity) * 100) : 0,
+          billable,
+          hours: pd?.hours || 0,
+          revenue: pd?.revenue || 0,
+          cost: pd?.cost || 0,
+          margin: pd?.margin || 0,
+          marginPct: pd?.marginPct || 0,
+          periodLabel: formatPeriodLabel(selectedPeriod, periodType),
+        }
+        return (
+          <MemberDetailFlyout member={selectedMemberDetail} billRates={billRates} clients={clients} stats={stats}
+            onClose={() => setSelectedMemberDetail(null)}
+            onEdit={() => { setEditingMember(selectedMemberDetail); setShowMemberModal(true); setSelectedMemberDetail(null) }} />
+        )
+      })()}
     </div>
   )
 }
