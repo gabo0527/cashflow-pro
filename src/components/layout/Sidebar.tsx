@@ -79,24 +79,25 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
         'fixed left-0 top-0 h-full z-40 flex flex-col overflow-hidden transition-all duration-300',
         collapsed ? 'w-16' : 'w-60'
       )}
-      style={{ background: 'linear-gradient(165deg,#181e23 0%,#151b1f 55%,#11161b 100%)' }}
+      style={{ background: 'linear-gradient(165deg,#1b232e 0%,#141b24 55%,#0f151c 100%)' }}
     >
       {/* Texture overlays */}
       <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 13px)' }} />
       <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)', backgroundSize: '17px 17px', opacity: 0.6 }} />
-      <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(100% 40% at 100% 0%, rgba(110,231,183,0.10), transparent 60%)' }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(100% 40% at 100% 0%, rgba(59,130,246,0.12), transparent 60%)' }} />
 
       {/* Brand */}
       <div className={cn('relative flex items-center h-16 border-b border-white/[0.07]', collapsed ? 'justify-center px-2' : 'px-4')}>
         <div className="flex items-center gap-3">
-          <svg width={collapsed ? 26 : 28} height={collapsed ? 26 : 28} viewBox="0 0 40 40" fill="none" className="flex-shrink-0">
-            <path d="M8 8L20 32L32 8" stroke="#6EE7B7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 4px rgba(110,231,183,0.5))' }} />
+          <svg width={collapsed ? 26 : 28} height={collapsed ? 26 : 28} viewBox="0 0 48 48" fill="none" className="flex-shrink-0">
+            <path d="M13 12 L24 35" stroke="#3b82f6" strokeWidth="5.5" strokeLinecap="round" style={{ filter: 'drop-shadow(0 0 4px rgba(59,130,246,0.5))' }} />
+            <path d="M24 35 L35 12" stroke="#ea8a2f" strokeWidth="5.5" strokeLinecap="round" />
           </svg>
           {!collapsed && (
             <div>
-              <h1 className="text-base font-extrabold tracking-tight text-white" style={{ fontFamily: DISPLAY }}>VantageFP</h1>
+              <h1 className="text-base font-extrabold tracking-tight text-white" style={{ fontFamily: DISPLAY }}>Vantage<span style={{ color: '#ea8a2f' }}>FP</span></h1>
               {companyName && (
-                <p className="text-[9px] -mt-0.5 truncate max-w-32" style={{ fontFamily: MONO, color: 'rgba(110,231,183,0.5)' }}>{companyName}</p>
+                <p className="text-[9px] -mt-0.5 truncate max-w-32" style={{ fontFamily: MONO, color: 'rgba(96,165,250,0.55)' }}>{companyName}</p>
               )}
             </div>
           )}
@@ -118,7 +119,7 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
               <React.Fragment key={item.href}>
                 {showSection && !collapsed && (
                   <li className="pt-4 pb-1.5 px-3">
-                    <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em]" style={{ fontFamily: MONO, color: 'rgba(110,231,183,0.42)' }}>
+                    <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em]" style={{ fontFamily: MONO, color: 'rgba(96,165,250,0.42)' }}>
                       // {item.section}
                     </span>
                   </li>
@@ -138,12 +139,12 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
                       collapsed && 'justify-center',
                       isActive ? 'text-white font-semibold' : 'text-white/60 hover:text-white hover:bg-white/[0.05]'
                     )}
-                    style={isActive ? { background: 'linear-gradient(90deg, rgba(16,185,129,0.24), rgba(16,185,129,0.05))', boxShadow: '0 0 18px -3px rgba(110,231,183,0.3) inset' } : undefined}
+                    style={isActive ? { background: 'linear-gradient(90deg, rgba(37,99,235,0.26), rgba(37,99,235,0.05))', boxShadow: '0 0 20px -4px rgba(59,130,246,0.35) inset' } : undefined}
                   >
                     {isActive && (
-                      <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full" style={{ background: '#6EE7B7', boxShadow: '0 0 8px rgba(110,231,183,0.7)' }} />
+                      <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full" style={{ background: '#3b82f6', boxShadow: '0 0 9px rgba(59,130,246,0.75)' }} />
                     )}
-                    <span className="flex-shrink-0" style={{ color: isActive ? '#6EE7B7' : 'rgba(255,255,255,0.5)' }}>
+                    <span className="flex-shrink-0" style={{ color: isActive ? '#60a5fa' : 'rgba(255,255,255,0.5)' }}>
                       {item.icon}
                     </span>
                     {!collapsed && (
@@ -161,8 +162,8 @@ export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, u
       <div className="relative border-t border-white/[0.07] p-2">
         {!collapsed && (
           <div className="flex items-center gap-2 px-3 pb-2 pt-1">
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#6EE7B7', boxShadow: '0 0 6px rgba(110,231,183,0.8)' }} />
-            <span className="text-[9.5px]" style={{ fontFamily: MONO, color: 'rgba(110,231,183,0.55)' }}>online</span>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#ea8a2f', boxShadow: '0 0 6px rgba(234,138,47,0.8)' }} />
+            <span className="text-[9.5px]" style={{ fontFamily: MONO, color: 'rgba(234,138,47,0.65)' }}>online</span>
           </div>
         )}
 
