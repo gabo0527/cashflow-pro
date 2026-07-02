@@ -273,13 +273,14 @@ export async function notifyAdminInvoiceSubmitted(invoiceId: string) {
     const { data: invoice, error } = await supabase
       .from("contractor_invoices")
       .select(`
-        id, invoice_number, total_amount, period_start, period_end, notes,
+        id, invoice_number, total_amount, period_start, period_end, notes, admin_notified_at,
         team_members!team_member_id ( name, email )
       `)
       .eq("id", invoiceId)
       .single()
 
     if (error || !invoice) { console.error("Admin invoice notify: fetch failed", error); return { success: false } }
+    if ((invoice as any).admin_notified_at) return { success: true, skipped: true }
     const contractor = invoice.team_members as any
 
     const result = await sendAdminInvoiceSubmittedEmail({
@@ -293,6 +294,7 @@ export async function notifyAdminInvoiceSubmitted(invoiceId: string) {
     })
 
     if (result.success) {
+      await supabase.from("contractor_invoices").update({ admin_notified_at: new Date().toISOString() }).eq("id", invoiceId)
       await supabase.from("notification_log").insert({
         type: "admin_invoice_submitted",
         recipient_email: process.env.EMAIL_REPLY_TO || "gabriel@manocg.com",
@@ -318,13 +320,14 @@ export async function notifyAdminExpenseSubmitted(expenseId: string) {
     const { data: expense, error } = await supabase
       .from("contractor_expenses")
       .select(`
-        id, description, amount, date, category, notes,
+        id, description, amount, date, category, notes, admin_notified_at,
         team_members!team_member_id ( name, email )
       `)
       .eq("id", expenseId)
       .single()
 
     if (error || !expense) { console.error("Admin expense notify: fetch failed", error); return { success: false } }
+    if ((expense as any).admin_notified_at) return { success: true, skipped: true }
     const contractor = expense.team_members as any
 
     const result = await sendAdminExpenseSubmittedEmail({
@@ -338,6 +341,7 @@ export async function notifyAdminExpenseSubmitted(expenseId: string) {
     })
 
     if (result.success) {
+      await supabase.from("contractor_expenses").update({ admin_notified_at: new Date().toISOString() }).eq("id", expenseId)
       await supabase.from("notification_log").insert({
         type: "admin_expense_submitted",
         recipient_email: process.env.EMAIL_REPLY_TO || "gabriel@manocg.com",
