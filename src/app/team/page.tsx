@@ -1009,6 +1009,7 @@ export default function TeamPage() {
       return months.includes(m)
     })
     const projectClientMap = new Map(projects.map(p => [p.id, p.client_id || ""]))
+    const projectBillingMap = new Map(projects.map(p => [p.id, { model: (p as any).billing_model || "per_resource", rate: (p as any).bill_rate || 0 }]))
 
     // Helper: check if a rate card is active for the given period
     const isRateActiveInPeriod = (r: BillRate) => {
@@ -1046,12 +1047,19 @@ export default function TeamPage() {
       // Group hours by client (actual for cost, billable for revenue)
       const hoursByClient: Record<string, number> = {}
       const billableHoursByClient: Record<string, number> = {}
+      // per_scope projects bill at the project rate (any resource) — kept separate from rate-card revenue
+      const scopeRevenueByClient: Record<string, number> = {}
       memberTime.forEach(t => {
         const clientId = projectClientMap.get(t.project_id) || "unknown"
         hoursByClient[clientId] = (hoursByClient[clientId] || 0) + (t.hours || 0)
         // Use billable_hours for revenue; fall back to actual hours if not set
         const bh = t.billable_hours != null ? t.billable_hours : (t.hours || 0)
-        billableHoursByClient[clientId] = (billableHoursByClient[clientId] || 0) + bh
+        const pb = projectBillingMap.get(t.project_id)
+        if (pb && pb.model === "per_scope") {
+          scopeRevenueByClient[clientId] = (scopeRevenueByClient[clientId] || 0) + bh * (pb.rate || 0)
+        } else {
+          billableHoursByClient[clientId] = (billableHoursByClient[clientId] || 0) + bh
+        }
       })
 
       // REVENUE by client
@@ -1062,6 +1070,12 @@ export default function TeamPage() {
       Object.entries(billableHoursByClient).forEach(([clientId, billableHrs]) => {
         const rc = memberRates.find(r => r.client_id === clientId && r.revenue_type !== "lump_sum")
         const rev = billableHrs * (rc?.rate || 0)
+        revenueByClient[clientId] = (revenueByClient[clientId] || 0) + rev
+        totalRevenue += rev
+      })
+
+      // Fold in per_scope project revenue (billed at project rate, not rate card)
+      Object.entries(scopeRevenueByClient).forEach(([clientId, rev]) => {
         revenueByClient[clientId] = (revenueByClient[clientId] || 0) + rev
         totalRevenue += rev
       })
