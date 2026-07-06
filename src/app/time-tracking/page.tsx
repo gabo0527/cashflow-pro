@@ -1414,8 +1414,7 @@ ${parts.join('')}
       {/* ============ BILLING VIEW ============ */}
       {activeTab === 'billing' && (
         <div className="space-y-4">
-          <TabHero chips={['Operations', 'Billing']} titleLead="Ready to" titleAccent="bill." description="Billable hours × rate, grouped by client. Review and adjust before it goes to invoicing." right={<div className="text-right"><div className="text-[10px] font-bold uppercase tracking-[0.06em] text-slate-400">Clients</div><div className="text-2xl font-extrabold text-slate-900 tabular-nums" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{dataByClient.length}</div></div>} />
-          {/* Summary + burn-up */}
+          {/* Summary: dark to-bill card + compact utilization / burn-up sparkline */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="rounded-2xl p-5 text-white relative overflow-hidden" style={{ background: 'linear-gradient(135deg,#1b2431 0%,#141b24 55%,#10151c 100%)' }}>
               <p className="text-[11px] font-bold uppercase tracking-wider text-white/70">To bill this period</p>
@@ -1434,21 +1433,24 @@ ${parts.join('')}
                 )}
               </p>
             </div>
-            <div className={`lg:col-span-2 rounded-2xl border ${THEME.border} bg-white p-4`}>
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Billing burn-up</p>
-                <p className="text-[11px] text-gray-400">cumulative $ by week</p>
+            <div className={`lg:col-span-2 rounded-2xl border ${THEME.border} bg-white p-4 flex items-center gap-6`}>
+              <div className="shrink-0">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Utilization</p>
+                <p className="text-3xl font-extrabold text-slate-900 tabular-nums mt-1 leading-none" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>{kpis.utilization.toFixed(1)}%</p>
+                <p className="text-[11px] text-gray-400 mt-1">actual vs capacity</p>
               </div>
-              <ResponsiveContainer width="100%" height={150}>
-                <AreaChart data={billingBurnUp} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <defs><linearGradient id="billFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2563eb" stopOpacity={0.25} /><stop offset="100%" stopColor="#2563eb" stopOpacity={0} /></linearGradient></defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                  <XAxis dataKey="week" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => formatCompactCurrency(v)} width={56} />
-                  <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => [formatCurrency(value), 'Cumulative billed']} />
-                  <Area type="monotone" dataKey="cumulative" stroke="#2563eb" strokeWidth={2.5} fill="url(#billFill)" />
-                </AreaChart>
-              </ResponsiveContainer>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Burn-up</p>
+                  <button onClick={() => setActiveTab('trends')} className="text-[11px] font-medium text-blue-600 hover:underline">Full chart in Trends →</button>
+                </div>
+                <ResponsiveContainer width="100%" height={56}>
+                  <AreaChart data={billingBurnUp} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                    <defs><linearGradient id="billFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2563eb" stopOpacity={0.22} /><stop offset="100%" stopColor="#2563eb" stopOpacity={0} /></linearGradient></defs>
+                    <Area type="monotone" dataKey="cumulative" stroke="#2563eb" strokeWidth={2} fill="url(#billFill)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
 
