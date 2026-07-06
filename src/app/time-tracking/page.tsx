@@ -764,8 +764,13 @@ export default function TimeTrackingPage() {
           // Fallback: project assignment
           const assignment = assignmentLookup[`${teamMemberId}_${e.project_id}`]
 
-          // BILL RATE (revenue): rate card > assignment > entry stored > 0
-          const billRate = rateCard?.rate || e.bill_rate || assignment?.bill_rate || 0
+          // BILL RATE (revenue):
+          //   per_scope → project scope rate overrides everyone (one rate, any resource)
+          //   else      → rate card > entry stored > assignment > 0 (per-resource)
+          const isPerScope = project?.billing_model === 'per_scope'
+          const billRate = isPerScope
+            ? (project?.bill_rate || 0)
+            : (rateCard?.rate || e.bill_rate || assignment?.bill_rate || 0)
 
           // COST RATE (two-tier model):
           // Tier 1: Rate card has custom cost (cost_amount > 0) → use it
@@ -813,7 +818,7 @@ export default function TimeTrackingPage() {
         })
 
         setTeamMembers((teamRes.data || []).map((t: any) => ({ id: t.id, name: t.name || '', email: t.email || '', status: t.status || 'active', employment_type: t.employment_type || 'contractor', cost_type: t.cost_type || 'hourly', cost_amount: t.cost_amount || 0, baseline_hours: t.baseline_hours || 172 })))
-        setProjects((projRes.data || []).map((p: any) => ({ id: p.id, name: p.name || '', client: p.client || '', client_id: p.client_id || '', bill_rate: p.bill_rate || 0, budget_type: p.budget_type || p.contract_type || '' })))
+        setProjects((projRes.data || []).map((p: any) => ({ id: p.id, name: p.name || '', client: p.client || '', client_id: p.client_id || '', bill_rate: p.bill_rate || 0, budget_type: p.budget_type || p.contract_type || '', billing_model: p.billing_model || 'per_resource', fixed_amount: p.fixed_amount || 0 })))
         setClients((clientRes.data || []).map((c: any) => ({ id: c.id, name: c.name || '' })))
         setAssignments(assignRes.data || [])
         setBillRates(billRatesRes.data || [])
