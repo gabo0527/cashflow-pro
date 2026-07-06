@@ -1170,10 +1170,27 @@ export default function TimeTrackingPage() {
   const [pdfScopes, setPdfScopes] = useState<Set<string>>(new Set())
   const [pdfGrouping, setPdfGrouping] = useState<'resource' | 'rate' | 'scope'>('resource')
   const [pdfCols, setPdfCols] = useState({ hours: true, rate: true, amount: true })
+  const loadLineNotes = async () => {
+    if (!companyId) return
+    const { data } = await supabase.from('billing_line_notes').select('line_key, client_description').eq('company_id', companyId).eq('period', dateRange.start)
+    const map: Record<string, string> = {}
+    ;(data || []).forEach((r: any) => { map[r.line_key] = r.client_description || '' })
+    setLineNotes(map)
+  }
+  const saveLineNotes = async () => {
+    if (!companyId) return
+    const clientId = selectedClient !== 'all' ? selectedClient : null
+    const entries = Object.entries(lineNotes)
+    const toUpsert = entries.filter(([, v]) => v && v.trim()).map(([line_key, v]) => ({ company_id: companyId, client_id: clientId, period: dateRange.start, line_key, client_description: v.trim(), updated_at: new Date().toISOString() }))
+    const toDelete = entries.filter(([, v]) => !v || !v.trim()).map(([k]) => k)
+    if (toUpsert.length) await supabase.from('billing_line_notes').upsert(toUpsert, { onConflict: 'company_id,period,line_key' })
+    if (toDelete.length) await supabase.from('billing_line_notes').delete().eq('company_id', companyId).eq('period', dateRange.start).in('line_key', toDelete)
+  }
   const openPdfConfig = () => {
     const ids = new Set<string>()
     dataByClient.forEach(c => Object.values(c.projects).forEach((p: any) => ids.add(p.id)))
     setPdfScopes(ids); setShowPdfConfig(true)
+    loadLineNotes()
   }
   const togglePdfScope = (id: string) => setPdfScopes(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const [pdfDescriptions, setPdfDescriptions] = useState(false)
@@ -1354,6 +1371,7 @@ ${parts.join('')}
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Billing Statement</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Archivo:wght@700;800&display=swap" rel="stylesheet">
 <style>*{box-sizing:border-box;margin:0;padding:0}body{padding:34px 30px}${STATEMENT_CSS}</style></head><body>${buildStatementBody()}</body></html>`
+    saveLineNotes()
     const w = window.open('', '_blank')
     if (!w) { addToast('error', 'Allow pop-ups to generate the statement'); return }
     w.document.write(html); w.document.close()
