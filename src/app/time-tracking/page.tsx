@@ -1154,6 +1154,18 @@ export default function TimeTrackingPage() {
   const toggleClient = (clientId: string) => setExpandedClients(prev => { const next = new Set(prev); if (next.has(clientId)) next.delete(clientId); else next.add(clientId); return next })
   const toggleProject = (projectId: string) => setExpandedProjects(prev => { const next = new Set(prev); if (next.has(projectId)) next.delete(projectId); else next.add(projectId); return next })
   const toggleResource = (key: string) => setExpandedResources(prev => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next })
+  const expandAllBilling = () => {
+    const c = new Set<string>(), p = new Set<string>(), r = new Set<string>()
+    dataByClient.forEach((cl: any) => {
+      c.add(cl.id)
+      Object.values(cl.projects || {}).forEach((pr: any) => {
+        p.add(pr.id)
+        Object.values(pr.members || {}).forEach((m: any) => r.add(`${pr.id}:${m.id}`))
+      })
+    })
+    setExpandedClients(c); setExpandedProjects(p); setExpandedResources(r)
+  }
+  const collapseAllBilling = () => { setExpandedClients(new Set()); setExpandedProjects(new Set()); setExpandedResources(new Set()) }
   const billingCmp = (a: { name: string; totalRevenue: number }, b: { name: string; totalRevenue: number }) => billingSort === 'az' ? a.name.localeCompare(b.name) : b.totalRevenue - a.totalRevenue
 
   const exportToCSV = () => {
@@ -1455,9 +1467,9 @@ ${parts.join('')}
                 Weekly detail
               </button>
               <span className="text-gray-300">|</span>
-              <button onClick={() => setExpandedClients(new Set(dataByClient.map(c => c.id)))} className="text-xs font-medium text-gray-500 hover:text-gray-900 px-1 transition-colors">Expand all</button>
+              <button onClick={expandAllBilling} className="text-xs font-medium text-gray-500 hover:text-gray-900 px-1 transition-colors">Expand all</button>
               <span className="text-gray-300">·</span>
-              <button onClick={() => { setExpandedClients(new Set()); setExpandedProjects(new Set()); setExpandedResources(new Set()) }} className="text-xs font-medium text-gray-500 hover:text-gray-900 px-1 transition-colors">Collapse all</button>
+              <button onClick={collapseAllBilling} className="text-xs font-medium text-gray-500 hover:text-gray-900 px-1 transition-colors">Collapse all</button>
             </div>
           </div>
 
