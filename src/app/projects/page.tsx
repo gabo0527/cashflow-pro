@@ -34,7 +34,7 @@ export default function ProjectsPage() {
   const [coParentId, setCoParentId] = useState<string | null>(null)
   const [coParentName, setCoParentName] = useState('')
 
-  const emptyForm = { name: '', client_id: '', budget: '', spent: '', budgeted_hours: '', percent_complete: '', status: 'active', start_date: '', end_date: '', budget_type: 'fixed', description: '' }
+  const emptyForm = { name: '', client_id: '', budget: '', spent: '', budgeted_hours: '', percent_complete: '', status: 'active', start_date: '', end_date: '', budget_type: 'fixed', description: '', billing_model: 'per_resource', bill_rate: '', fixed_amount: '' }
   const [formData, setFormData] = useState(emptyForm)
 
   // Derive company_id from existing projects
@@ -76,6 +76,7 @@ export default function ProjectsPage() {
       budgeted_hours: project.budgeted_hours?.toString() || '', percent_complete: project.percent_complete?.toString() || '',
       status: project.status || 'active', start_date: project.start_date || '', end_date: project.end_date || '',
       budget_type: project.budget_type || 'fixed', description: project.description || '',
+      billing_model: project.billing_model || 'per_resource', bill_rate: project.bill_rate?.toString() || '', fixed_amount: project.fixed_amount?.toString() || '',
     })
     setEditingProject(project)
     setShowProjectModal(true)
@@ -99,6 +100,7 @@ export default function ProjectsPage() {
         percent_complete: parseFloat(formData.percent_complete) || 0,
         status: formData.status, start_date: formData.start_date || null, end_date: formData.end_date || null,
         budget_type: formData.budget_type, description: formData.description,
+        billing_model: formData.billing_model, bill_rate: parseFloat(formData.bill_rate) || null, fixed_amount: parseFloat(formData.fixed_amount) || null,
       }
       if (isAddingCO && coParentId) { payload.parent_id = coParentId; payload.is_change_order = true }
       if (editingProject) {
@@ -284,6 +286,28 @@ export default function ProjectsPage() {
                     <option value="retainer">Retainer</option>
                   </select>
                 </div>
+              </div>
+              <div className="mt-4">
+                <label className="block text-xs font-medium text-slate-500 mb-1">Billing Model</label>
+                <select value={formData.billing_model} onChange={e => setFormData(prev => ({ ...prev, billing_model: e.target.value }))} className="bg-white border border-slate-200 rounded-lg text-sm text-slate-900 px-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none w-full py-2">
+                  <option value="per_resource">Per Resource — each person&apos;s rate card</option>
+                  <option value="per_scope">Per Scope — one rate for this project</option>
+                  <option value="fixed">Fixed Fee — flat amount</option>
+                </select>
+                {formData.billing_model === 'per_scope' && (
+                  <div className="mt-3">
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Scope Rate ($/hr)</label>
+                    <input type="number" value={formData.bill_rate} onChange={e => setFormData(prev => ({ ...prev, bill_rate: e.target.value }))} placeholder="e.g. 185" className="bg-white border border-slate-200 rounded-lg text-sm text-slate-900 px-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none w-full py-2" />
+                    <p className="text-[11px] text-slate-400 mt-1">All billable hours on this project bill at this rate, regardless of who logs them.</p>
+                  </div>
+                )}
+                {formData.billing_model === 'fixed' && (
+                  <div className="mt-3">
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Fixed Fee ($)</label>
+                    <input type="number" value={formData.fixed_amount} onChange={e => setFormData(prev => ({ ...prev, fixed_amount: e.target.value }))} placeholder="e.g. 50000" className="bg-white border border-slate-200 rounded-lg text-sm text-slate-900 px-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none w-full py-2" />
+                    <p className="text-[11px] text-slate-400 mt-1">Flat project fee. Hours are tracked for cost/utilization but don&apos;t drive revenue.</p>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200">
