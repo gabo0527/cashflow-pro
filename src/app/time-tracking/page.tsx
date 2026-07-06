@@ -1176,6 +1176,27 @@ export default function TimeTrackingPage() {
     setPdfScopes(ids); setShowPdfConfig(true)
   }
   const togglePdfScope = (id: string) => setPdfScopes(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const [pdfDescriptions, setPdfDescriptions] = useState(false)
+  const [lineNotes, setLineNotes] = useState<Record<string, string>>({})
+  const buildPdfLines = () => {
+    const scopes: { scopeId: string; scopeName: string; subHours: number; subAmount: number; lines: { key: string; label: string; hours: number; rate: number | null; amount: number }[] }[] = []
+    dataByClient.forEach(client => Object.values(client.projects).forEach((project: any) => {
+      if (!pdfScopes.has(project.id)) return
+      const members = Object.values(project.members) as any[]
+      let lines: { key: string; label: string; hours: number; rate: number | null; amount: number }[] = []
+      if (pdfGrouping === 'scope') {
+        lines = [{ key: `${project.id}:scope`, label: 'Scope total', hours: project.totalBillableHours, rate: null, amount: project.totalRevenue }]
+      } else if (pdfGrouping === 'rate') {
+        const byRate: Record<string, { hours: number; amount: number; count: number; rate: number }> = {}
+        members.forEach(m => { const k = String(m.billRate); if (!byRate[k]) byRate[k] = { hours: 0, amount: 0, count: 0, rate: m.billRate }; byRate[k].hours += m.totalBillableHours; byRate[k].amount += m.totalRevenue; byRate[k].count += 1 })
+        lines = Object.values(byRate).sort((a, b) => b.amount - a.amount).map(r => ({ key: `${project.id}:rate:${r.rate}`, label: r.count > 1 ? `${r.count} resources` : 'Resource', hours: r.hours, rate: r.rate, amount: r.amount }))
+      } else {
+        lines = members.sort((a, b) => b.totalRevenue - a.totalRevenue).map(m => ({ key: `${project.id}:res:${m.id}`, label: m.name, hours: m.totalBillableHours, rate: m.billRate, amount: m.totalRevenue }))
+      }
+      scopes.push({ scopeId: project.id, scopeName: project.name, subHours: project.totalBillableHours, subAmount: project.totalRevenue, lines })
+    }))
+    return scopes
+  }
   const billingCmp = (a: { name: string; totalRevenue: number }, b: { name: string; totalRevenue: number }) => billingSort === 'az' ? a.name.localeCompare(b.name) : b.totalRevenue - a.totalRevenue
 
   const exportToCSV = () => {
@@ -1304,27 +1325,14 @@ ${parts.join('')}
     let grandHrs = 0, grandAmt = 0
     const colH = (t: string) => `<th>${t}</th>`
     const headCols = `<th class="l">Line</th>${pdfCols.hours ? colH('Hours') : ''}${pdfCols.rate ? colH('Rate') : ''}${pdfCols.amount ? colH('Amount') : ''}`
-    dataByClient.forEach(client => {
-      Object.values(client.projects).forEach(project => {
-        if (!pdfScopes.has(project.id)) return
-        const members = Object.values(project.members) as any[]
-        let lines: { label: string; hours: number; rate: number | null; amount: number }[] = []
-        if (pdfGrouping === 'scope') {
-          lines = [{ label: 'Scope total', hours: project.totalBillableHours, rate: null, amount: project.totalRevenue }]
-        } else if (pdfGrouping === 'rate') {
-          const byRate: Record<string, { hours: number; amount: number; count: number; rate: number }> = {}
-          members.forEach(m => { const k = String(m.billRate); if (!byRate[k]) byRate[k] = { hours: 0, amount: 0, count: 0, rate: m.billRate }; byRate[k].hours += m.totalBillableHours; byRate[k].amount += m.totalRevenue; byRate[k].count += 1 })
-          lines = Object.values(byRate).sort((a, b) => b.amount - a.amount).map(r => ({ label: r.count > 1 ? `${r.count} resources` : 'Resource', hours: r.hours, rate: r.rate, amount: r.amount }))
-        } else {
-          lines = members.sort((a, b) => b.totalRevenue - a.totalRevenue).map(m => ({ label: m.name, hours: m.totalBillableHours, rate: m.billRate, amount: m.totalRevenue }))
-        }
-        parts.push(`<div class="scope"><div class="scope-name">${esc(project.name)}</div><table><thead><tr>${headCols}</tr></thead><tbody>`)
-        lines.forEach(ln => {
-          parts.push(`<tr><td class="l">${esc(ln.label)}</td>${pdfCols.hours ? `<td>${ln.hours.toFixed(1)}</td>` : ''}${pdfCols.rate ? `<td>${ln.rate != null ? fmt(ln.rate) + '/hr' : ''}</td>` : ''}${pdfCols.amount ? `<td class="amt">${fmt(ln.amount)}</td>` : ''}</tr>`)
-        })
-        parts.push(`<tr class="subtot"><td class="l">Subtotal</td>${pdfCols.hours ? `<td>${project.totalBillableHours.toFixed(1)}</td>` : ''}${pdfCols.rate ? '<td></td>' : ''}${pdfCols.amount ? `<td class="amt">${fmt(project.totalRevenue)}</td>` : ''}</tr></tbody></table></div>`)
-        grandHrs += project.totalBillableHours; grandAmt += project.totalRevenue
+    buildPdfLines().forEach(sc => {
+      parts.push(`<div class="scope"><div class="scope-name">${esc(sc.scopeName)}</div><table><thead><tr>${headCols}</tr></thead><tbody>`)
+      sc.lines.forEach(ln => {
+        const desc = pdfDescriptions && lineNotes[ln.key] ? `<div class="ldesc">${esc(lineNotes[ln.key])}</div>` : ''
+        parts.push(`<tr><td class="l">${esc(ln.label)}${desc}</td>${pdfCols.hours ? `<td>${ln.hours.toFixed(1)}</td>` : ''}${pdfCols.rate ? `<td>${ln.rate != null ? fmt(ln.rate) + '/hr' : ''}</td>` : ''}${pdfCols.amount ? `<td class="amt">${fmt(ln.amount)}</td>` : ''}</tr>`)
       })
+      parts.push(`<tr class="subtot"><td class="l">Subtotal</td>${pdfCols.hours ? `<td>${sc.subHours.toFixed(1)}</td>` : ''}${pdfCols.rate ? '<td></td>' : ''}${pdfCols.amount ? `<td class="amt">${fmt(sc.subAmount)}</td>` : ''}</tr></tbody></table></div>`)
+      grandHrs += sc.subHours; grandAmt += sc.subAmount
     })
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Billing Statement — ${esc(clientLabel)}</title>
@@ -1345,6 +1353,7 @@ th{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;fon
 th.l,td.l{text-align:left}
 td{font-size:11.5px;text-align:right;padding:7px 8px;border-bottom:1px solid #f1f4f6}
 .amt{color:#c2660c;font-weight:600}
+.ldesc{font-size:10px;color:#64748b;font-style:italic;margin-top:2px;font-weight:400}
 .subtot td{background:#f8fafc;font-weight:700;border-top:1px solid #e2e8f0}
 .grand{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:14px 8px;border-top:2px solid #10151c}
 .grand .l{font-family:'Archivo',sans-serif;font-weight:800;font-size:14px}
@@ -2231,6 +2240,25 @@ ${parts.join('')}
                     </label>
                   ))}
                 </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Descriptions</p>
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input type="checkbox" checked={pdfDescriptions} onChange={e => setPdfDescriptions(e.target.checked)} className="accent-blue-600" />
+                    <span className="text-slate-600">Include</span>
+                  </label>
+                </div>
+                {pdfDescriptions && (
+                  <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-56 overflow-y-auto">
+                    {buildPdfLines().flatMap(sc => sc.lines.map(ln => (
+                      <div key={ln.key} className="px-3 py-2">
+                        <p className="text-[11px] font-medium text-slate-500 mb-1">{sc.scopeName} · {ln.label}</p>
+                        <textarea value={lineNotes[ln.key] || ''} onChange={e => setLineNotes(prev => ({ ...prev, [ln.key]: e.target.value }))} rows={2} placeholder="Client-facing description..." className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none" />
+                      </div>
+                    )))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-gray-100">
