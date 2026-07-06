@@ -1166,6 +1166,16 @@ export default function TimeTrackingPage() {
     setExpandedClients(c); setExpandedProjects(p); setExpandedResources(r)
   }
   const collapseAllBilling = () => { setExpandedClients(new Set()); setExpandedProjects(new Set()); setExpandedResources(new Set()) }
+  const [showPdfConfig, setShowPdfConfig] = useState(false)
+  const [pdfScopes, setPdfScopes] = useState<Set<string>>(new Set())
+  const [pdfGrouping, setPdfGrouping] = useState<'resource' | 'rate' | 'scope'>('resource')
+  const [pdfCols, setPdfCols] = useState({ hours: true, rate: true, amount: true })
+  const openPdfConfig = () => {
+    const ids = new Set<string>()
+    dataByClient.forEach(c => Object.values(c.projects).forEach((p: any) => ids.add(p.id)))
+    setPdfScopes(ids); setShowPdfConfig(true)
+  }
+  const togglePdfScope = (id: string) => setPdfScopes(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const billingCmp = (a: { name: string; totalRevenue: number }, b: { name: string; totalRevenue: number }) => billingSort === 'az' ? a.name.localeCompare(b.name) : b.totalRevenue - a.totalRevenue
 
   const exportToCSV = () => {
@@ -1292,13 +1302,27 @@ ${parts.join('')}
 
     const parts: string[] = []
     let grandHrs = 0, grandAmt = 0
+    const colH = (t: string) => `<th>${t}</th>`
+    const headCols = `<th class="l">Line</th>${pdfCols.hours ? colH('Hours') : ''}${pdfCols.rate ? colH('Rate') : ''}${pdfCols.amount ? colH('Amount') : ''}`
     dataByClient.forEach(client => {
       Object.values(client.projects).forEach(project => {
-        parts.push(`<div class="scope"><div class="scope-name">${esc(project.name)}</div><table><thead><tr><th class="l">Line</th><th>Hours</th><th>Rate</th><th>Amount</th></tr></thead><tbody>`)
-        Object.values(project.members).sort((a, b) => b.totalRevenue - a.totalRevenue).forEach(m => {
-          parts.push(`<tr><td class="l">${esc(m.name)}</td><td>${m.totalBillableHours.toFixed(1)}</td><td>${fmt(m.billRate)}/hr</td><td class="amt">${fmt(m.totalRevenue)}</td></tr>`)
+        if (!pdfScopes.has(project.id)) return
+        const members = Object.values(project.members) as any[]
+        let lines: { label: string; hours: number; rate: number | null; amount: number }[] = []
+        if (pdfGrouping === 'scope') {
+          lines = [{ label: 'Scope total', hours: project.totalBillableHours, rate: null, amount: project.totalRevenue }]
+        } else if (pdfGrouping === 'rate') {
+          const byRate: Record<string, { hours: number; amount: number; count: number; rate: number }> = {}
+          members.forEach(m => { const k = String(m.billRate); if (!byRate[k]) byRate[k] = { hours: 0, amount: 0, count: 0, rate: m.billRate }; byRate[k].hours += m.totalBillableHours; byRate[k].amount += m.totalRevenue; byRate[k].count += 1 })
+          lines = Object.values(byRate).sort((a, b) => b.amount - a.amount).map(r => ({ label: r.count > 1 ? `${r.count} resources` : 'Resource', hours: r.hours, rate: r.rate, amount: r.amount }))
+        } else {
+          lines = members.sort((a, b) => b.totalRevenue - a.totalRevenue).map(m => ({ label: m.name, hours: m.totalBillableHours, rate: m.billRate, amount: m.totalRevenue }))
+        }
+        parts.push(`<div class="scope"><div class="scope-name">${esc(project.name)}</div><table><thead><tr>${headCols}</tr></thead><tbody>`)
+        lines.forEach(ln => {
+          parts.push(`<tr><td class="l">${esc(ln.label)}</td>${pdfCols.hours ? `<td>${ln.hours.toFixed(1)}</td>` : ''}${pdfCols.rate ? `<td>${ln.rate != null ? fmt(ln.rate) + '/hr' : ''}</td>` : ''}${pdfCols.amount ? `<td class="amt">${fmt(ln.amount)}</td>` : ''}</tr>`)
         })
-        parts.push(`<tr class="subtot"><td class="l">Subtotal</td><td>${project.totalBillableHours.toFixed(1)}</td><td></td><td class="amt">${fmt(project.totalRevenue)}</td></tr></tbody></table></div>`)
+        parts.push(`<tr class="subtot"><td class="l">Subtotal</td>${pdfCols.hours ? `<td>${project.totalBillableHours.toFixed(1)}</td>` : ''}${pdfCols.rate ? '<td></td>' : ''}${pdfCols.amount ? `<td class="amt">${fmt(project.totalRevenue)}</td>` : ''}</tr></tbody></table></div>`)
         grandHrs += project.totalBillableHours; grandAmt += project.totalRevenue
       })
     })
@@ -1342,6 +1366,7 @@ ${parts.join('')}
     w.document.write(html); w.document.close()
     w.onload = () => { w.focus(); w.print() }
     addToast('success', 'Statement ready — choose "Save as PDF"')
+    setShowPdfConfig(false)
   }
 
   const getFilterTitle = () => {
@@ -1523,7 +1548,7 @@ ${parts.join('')}
               <button onClick={() => setBillingSort('az')} className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${billingSort === 'az' ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>A–Z</button>
             </div>
             <div className="flex items-center gap-3">
-              <button onClick={generateBillingStatement} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"><Download size={13} /> Billing PDF</button>
+              <button onClick={openPdfConfig} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"><Download size={13} /> Billing PDF</button>
               <button onClick={() => setBillingWeekly(v => !v)} className="flex items-center gap-2 text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors">
                 <span className={`relative w-8 h-[18px] rounded-full transition-colors ${billingWeekly ? 'bg-blue-600' : 'bg-gray-300'}`}>
                   <span className={`absolute top-[2px] w-3.5 h-3.5 rounded-full bg-white transition-all ${billingWeekly ? 'left-[16px]' : 'left-[2px]'}`} />
@@ -2153,6 +2178,64 @@ ${parts.join('')}
             </div>
             <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
               <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{notesModal.notes}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPdfConfig && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowPdfConfig(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="font-bold text-slate-900" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>Configure Billing PDF</h3>
+              <button onClick={() => setShowPdfConfig(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600"><X size={16} /></button>
+            </div>
+            <div className="p-5 space-y-5">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Scopes</p>
+                  <div className="flex gap-2 text-[11px] font-semibold">
+                    <button onClick={() => { const ids = new Set<string>(); dataByClient.forEach(c => Object.values(c.projects).forEach((p: any) => ids.add(p.id))); setPdfScopes(ids) }} className="text-blue-600 hover:underline">All</button>
+                    <button onClick={() => setPdfScopes(new Set())} className="text-gray-400 hover:underline">Clear</button>
+                  </div>
+                </div>
+                <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-48 overflow-y-auto">
+                  {dataByClient.flatMap(c => Object.values(c.projects)).map((p: any) => (
+                    <label key={p.id} className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50">
+                      <input type="checkbox" checked={pdfScopes.has(p.id)} onChange={() => togglePdfScope(p.id)} className="accent-blue-600" />
+                      <span className="text-slate-700">{p.name}</span>
+                      <span className="ml-auto text-[11px] text-gray-400 tabular-nums">{p.totalBillableHours.toFixed(1)} hrs · {formatCurrency(p.totalRevenue)}</span>
+                    </label>
+                  ))}
+                  {dataByClient.length === 0 && <p className="px-3 py-3 text-xs text-gray-400">No scopes in the current filter.</p>}
+                </div>
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">Line grouping</p>
+                <div className="space-y-1.5">
+                  {([['resource', 'Per resource', 'each person as a line'], ['rate', 'Collapse by rate', 'one line per rate (e.g. AWS)'], ['scope', 'Per scope', 'one line per scope']] as const).map(([val, label, desc]) => (
+                    <label key={val} className={`flex items-start gap-2.5 px-3 py-2 border rounded-lg cursor-pointer text-sm ${pdfGrouping === val ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                      <input type="radio" name="pdfgroup" checked={pdfGrouping === val} onChange={() => setPdfGrouping(val)} className="mt-0.5 accent-blue-600" />
+                      <span><span className="font-medium text-slate-800">{label}</span><span className="block text-[11px] text-gray-400">{desc}</span></span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">Columns</p>
+                <div className="flex gap-4">
+                  {([['hours', 'Hours'], ['rate', 'Rate'], ['amount', 'Amount']] as const).map(([key, label]) => (
+                    <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input type="checkbox" checked={pdfCols[key]} onChange={e => setPdfCols(prev => ({ ...prev, [key]: e.target.checked }))} className="accent-blue-600" />
+                      <span className="text-slate-700">{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-gray-100">
+              <button onClick={() => setShowPdfConfig(false)} className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Cancel</button>
+              <button onClick={generateBillingStatement} disabled={pdfScopes.size === 0} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"><Download size={14} /> Generate PDF</button>
             </div>
           </div>
         </div>
