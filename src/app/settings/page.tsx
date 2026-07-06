@@ -285,13 +285,7 @@ function SecuritySection({ companyId }: { companyId: string }) {
 
 // ============ INTEGRATIONS ============
 function IntegrationsSection({ companyId }: { companyId: string }) {
-  const [syncing, setSyncing] = useState<string | null>(null); const [lastSync, setLastSync] = useState<string | null>(null)
-  useEffect(() => { if (companyId) loadSyncStatus() }, [companyId])
-  const loadSyncStatus = async () => { const { data } = await supabase.from('company_settings').select('qbo_last_sync').eq('company_id', companyId).single(); if (data?.qbo_last_sync) setLastSync(data.qbo_last_sync) }
-  const triggerSync = async (type: string) => { setSyncing(type); try { const res = await fetch('/api/quickbooks/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type }) }); if (res.ok) { const now = new Date().toISOString(); setLastSync(now); await supabase.from('company_settings').upsert({ company_id: companyId, qbo_last_sync: now }, { onConflict: 'company_id' }) } } catch (err) { console.error('Sync error:', err) } setSyncing(null) }
-
   const integrations = [
-    { type: 'quickbooks', name: 'QuickBooks Online', desc: 'Sync invoices & expenses', icon: '📊', connected: true },
     { type: 'xero', name: 'Xero', desc: 'Connect Xero accounting', icon: '📘', connected: false },
     { type: 'plaid', name: 'Plaid', desc: 'Direct bank feed', icon: '🏦', connected: false },
     { type: 'stripe', name: 'Stripe', desc: 'Accept payments', icon: '💳', connected: false },
@@ -300,13 +294,6 @@ function IntegrationsSection({ companyId }: { companyId: string }) {
 
   return (
     <div className="space-y-6">
-      <SectionCard>
-        <SectionHeader title="Connected Integrations" />
-        <div className="p-5"><div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-lg">
-          <div className="flex items-center gap-4"><div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-500/20 flex items-center justify-center text-lg">📊</div><div><div className="flex items-center gap-2"><span className="text-sm text-slate-900 font-medium">QuickBooks Online</span><StatusBadge status="connected" /></div><p className="text-xs text-slate-400">{lastSync ? `Last synced ${new Date(lastSync).toLocaleString()}` : 'Connected'}</p></div></div>
-          <div className="flex items-center gap-2"><button onClick={() => triggerSync('all')} disabled={syncing !== null} className="p-2 text-slate-500 hover:text-emerald-600 transition-colors disabled:opacity-50" title="Sync now"><RefreshCw size={15} className={syncing === 'all' ? 'animate-spin' : ''} /></button><button className="px-3 py-1.5 text-red-400 hover:bg-red-500/10 rounded-lg text-xs transition-colors">Disconnect</button></div>
-        </div></div>
-      </SectionCard>
       <SectionCard>
         <SectionHeader title="Available Integrations" />
         <div className="p-5 space-y-3">{integrations.map(a => (
