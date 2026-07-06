@@ -1185,7 +1185,7 @@ export default function TimeTrackingPage() {
       const members = Object.values(project.members) as any[]
       let lines: { key: string; label: string; hours: number; rate: number | null; amount: number }[] = []
       if (pdfGrouping === 'scope') {
-        lines = [{ key: `${project.id}:scope`, label: 'Scope total', hours: project.totalBillableHours, rate: null, amount: project.totalRevenue }]
+        lines = [{ key: `${project.id}:scope`, label: project.name, hours: project.totalBillableHours, rate: project.totalBillableHours > 0 ? project.totalRevenue / project.totalBillableHours : null, amount: project.totalRevenue }]
       } else if (pdfGrouping === 'rate') {
         const byRate: Record<string, { hours: number; amount: number; count: number; rate: number }> = {}
         members.forEach(m => { const k = String(m.billRate); if (!byRate[k]) byRate[k] = { hours: 0, amount: 0, count: 0, rate: m.billRate }; byRate[k].hours += m.totalBillableHours; byRate[k].amount += m.totalRevenue; byRate[k].count += 1 })
@@ -1325,15 +1325,26 @@ ${parts.join('')}
     let grandHrs = 0, grandAmt = 0
     const colH = (t: string) => `<th>${t}</th>`
     const headCols = `<th class="l">Line</th>${pdfCols.hours ? colH('Hours') : ''}${pdfCols.rate ? colH('Rate') : ''}${pdfCols.amount ? colH('Amount') : ''}`
-    buildPdfLines().forEach(sc => {
-      parts.push(`<div class="scope"><div class="scope-name">${esc(sc.scopeName)}</div><table><thead><tr>${headCols}</tr></thead><tbody>`)
-      sc.lines.forEach(ln => {
+    if (pdfGrouping === 'scope') {
+      parts.push(`<div class="scope"><table><thead><tr>${headCols}</tr></thead><tbody>`)
+      buildPdfLines().forEach(sc => {
+        const ln = sc.lines[0]
         const desc = pdfDescriptions && lineNotes[ln.key] ? `<div class="ldesc">${esc(lineNotes[ln.key])}</div>` : ''
-        parts.push(`<tr><td class="l">${esc(ln.label)}${desc}</td>${pdfCols.hours ? `<td>${ln.hours.toFixed(1)}</td>` : ''}${pdfCols.rate ? `<td>${ln.rate != null ? fmt(ln.rate) + '/hr' : ''}</td>` : ''}${pdfCols.amount ? `<td class="amt">${fmt(ln.amount)}</td>` : ''}</tr>`)
+        parts.push(`<tr><td class="l">${esc(sc.scopeName)}${desc}</td>${pdfCols.hours ? `<td>${sc.subHours.toFixed(1)}</td>` : ''}${pdfCols.rate ? `<td>${ln.rate != null ? fmt(ln.rate) + '/hr' : ''}</td>` : ''}${pdfCols.amount ? `<td class="amt">${fmt(sc.subAmount)}</td>` : ''}</tr>`)
+        grandHrs += sc.subHours; grandAmt += sc.subAmount
       })
-      parts.push(`<tr class="subtot"><td class="l">Subtotal</td>${pdfCols.hours ? `<td>${sc.subHours.toFixed(1)}</td>` : ''}${pdfCols.rate ? '<td></td>' : ''}${pdfCols.amount ? `<td class="amt">${fmt(sc.subAmount)}</td>` : ''}</tr></tbody></table></div>`)
-      grandHrs += sc.subHours; grandAmt += sc.subAmount
-    })
+      parts.push(`</tbody></table></div>`)
+    } else {
+      buildPdfLines().forEach(sc => {
+        parts.push(`<div class="scope"><div class="scope-name">${esc(sc.scopeName)}</div><table><thead><tr>${headCols}</tr></thead><tbody>`)
+        sc.lines.forEach(ln => {
+          const desc = pdfDescriptions && lineNotes[ln.key] ? `<div class="ldesc">${esc(lineNotes[ln.key])}</div>` : ''
+          parts.push(`<tr><td class="l">${esc(ln.label)}${desc}</td>${pdfCols.hours ? `<td>${ln.hours.toFixed(1)}</td>` : ''}${pdfCols.rate ? `<td>${ln.rate != null ? fmt(ln.rate) + '/hr' : ''}</td>` : ''}${pdfCols.amount ? `<td class="amt">${fmt(ln.amount)}</td>` : ''}</tr>`)
+        })
+        parts.push(`<tr class="subtot"><td class="l">Subtotal</td>${pdfCols.hours ? `<td>${sc.subHours.toFixed(1)}</td>` : ''}${pdfCols.rate ? '<td></td>' : ''}${pdfCols.amount ? `<td class="amt">${fmt(sc.subAmount)}</td>` : ''}</tr></tbody></table></div>`)
+        grandHrs += sc.subHours; grandAmt += sc.subAmount
+      })
+    }
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Billing Statement — ${esc(clientLabel)}</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Archivo:wght@700;800&display=swap" rel="stylesheet">
