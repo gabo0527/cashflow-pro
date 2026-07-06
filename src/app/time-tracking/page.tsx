@@ -1314,13 +1314,14 @@ ${parts.join('')}
     addToast('success', 'Report ready — choose "Save as PDF"')
   }
 
-  const generateBillingStatement = () => {
+  const MANO_LOGO = `<svg height="30" viewBox="0 0 331.63 65.13" xmlns="http://www.w3.org/2000/svg"><defs><style>.d{fill:#24333b}</style></defs><g><path class="d" d="M155.28,65.07c-5.65,0-10.8-1.45-15.46-4.36-4.66-2.9-8.36-6.81-11.1-11.7-2.75-4.9-4.12-10.33-4.12-16.3,0-4.46,.79-8.66,2.39-12.6,1.59-3.94,3.78-7.4,6.57-10.39,2.79-2.99,6.03-5.33,9.73-7.04,3.7-1.71,7.7-2.57,12-2.57,5.41,0,9.63,1.01,12.66,3.04,3.02,2.03,5.37,4.72,7.04,8.06V0h16V65.07h-15.64v-11.7c-1.67,3.5-4.04,6.33-7.1,8.48-3.07,2.15-7.38,3.22-12.95,3.22Zm2.63-14.57c3.58,0,6.67-.82,9.25-2.45,2.59-1.63,4.6-3.8,6.03-6.51,1.43-2.7,2.15-5.65,2.15-8.83s-.72-6.25-2.15-8.95c-1.43-2.7-3.44-4.9-6.03-6.57-2.59-1.67-5.67-2.51-9.25-2.51s-6.43,.82-9.01,2.45c-2.59,1.63-4.6,3.8-6.03,6.51-1.43,2.71-2.15,5.69-2.15,8.95s.72,6.03,2.15,8.78c1.43,2.75,3.44,4.95,6.03,6.63,2.59,1.67,5.59,2.51,9.01,2.51Z"/><path class="d" d="M200.53,65.07V0h15.88V10.51c3.26-7,9.59-10.51,18.98-10.51,4.46,0,8.48,1.04,12.06,3.1,3.58,2.07,6.41,5.01,8.48,8.83,2.07,3.82,3.1,8.36,3.1,13.61v39.52h-16.12V29.49c0-5.41-1.24-9.33-3.7-11.76-2.47-2.43-5.69-3.64-9.67-3.64-3.42,0-6.43,1.21-9.01,3.64-2.59,2.43-3.88,6.35-3.88,11.76v35.58h-16.12Z"/><path class="d" d="M298.55,65.13c-6.37,0-12.06-1.47-17.07-4.42-5.01-2.94-8.94-6.87-11.76-11.76-2.83-4.9-4.24-10.33-4.24-16.3s1.41-11.42,4.24-16.36c2.82-4.93,6.75-8.87,11.76-11.82C286.5,1.53,292.19,.06,298.55,.06s12.16,1.47,17.13,4.42c4.97,2.95,8.87,6.89,11.7,11.82,2.82,4.94,4.24,10.39,4.24,16.36s-1.41,11.4-4.24,16.3c-2.83,4.9-6.73,8.82-11.7,11.76-4.98,2.94-10.69,4.42-17.13,4.42Zm0-14.69c3.42,0,6.41-.81,8.95-2.45,2.55-1.63,4.52-3.8,5.91-6.51,1.39-2.71,2.09-5.65,2.09-8.84s-.7-6.25-2.09-8.95c-1.39-2.71-3.36-4.88-5.91-6.51-2.55-1.63-5.53-2.45-8.95-2.45s-6.41,.82-8.95,2.45c-2.55,1.63-4.52,3.8-5.91,6.51-1.39,2.71-2.09,5.69-2.09,8.95s.7,6.13,2.09,8.84c1.39,2.71,3.36,4.88,5.91,6.51,2.55,1.63,5.53,2.45,8.95,2.45Z"/><polygon class="d" points="20.51 65.07 65.06 20.52 85.5 0 65.06 0 65.06 .01 0 65.07 20.51 65.07"/><polygon class="d" points="59.1 65.07 103.65 20.52 103.65 65.07 118.15 65.07 118.15 0 103.65 0 103.65 .01 38.59 65.07 59.1 65.07"/></g></svg>`
+  const STATEMENT_CSS = `.stmt{font-family:'Instrument Sans',system-ui,sans-serif;color:#0f172a;font-size:12px}.stmt .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #10151c;padding-bottom:16px;margin-bottom:8px}.stmt .co{font-size:11px;color:#64748b;margin-top:6px}.stmt .meta{font-size:11.5px;color:#64748b;text-align:right;line-height:1.7}.stmt .meta b{color:#0f172a}.stmt .title{font-family:'Archivo',sans-serif;font-size:19px;font-weight:800;margin:14px 0 2px}.stmt .title-sub{font-size:11.5px;color:#64748b;margin-bottom:16px}.stmt .scope{margin-bottom:14px;break-inside:avoid}.stmt .scope-name{font-family:'Archivo',sans-serif;font-size:13px;font-weight:800;margin:12px 0 5px}.stmt table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}.stmt th{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0}.stmt th.l,.stmt td.l{text-align:left}.stmt td{font-size:11.5px;text-align:right;padding:7px 8px;border-bottom:1px solid #f1f4f6}.stmt .amt{color:#c2660c;font-weight:600}.stmt .ldesc{font-size:10px;color:#64748b;font-style:italic;margin-top:2px;font-weight:400}.stmt .subtot td{background:#f8fafc;font-weight:700;border-top:1px solid #e2e8f0}.stmt .grand{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:14px 8px;border-top:2px solid #10151c}.stmt .grand .l{font-family:'Archivo',sans-serif;font-weight:800;font-size:14px}.stmt .grand .r{font-family:'Archivo',sans-serif;font-weight:800;font-size:18px;color:#c2660c}.stmt .grand .hrs{color:#64748b;font-weight:600;font-size:12px;margin-right:18px}.stmt .foot{margin-top:22px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8;display:flex;justify-content:space-between}`
+
+  const buildStatementBody = () => {
     const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     const fmt = (n: number) => formatCurrency(n)
     const generatedOn = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
     const clientLabel = selectedClient !== 'all' ? (clients.find(c => c.id === selectedClient)?.name || 'Client') : 'All clients'
-    const MANO_LOGO = `<svg height="30" viewBox="0 0 331.63 65.13" xmlns="http://www.w3.org/2000/svg"><defs><style>.d{fill:#24333b}</style></defs><g><path class="d" d="M155.28,65.07c-5.65,0-10.8-1.45-15.46-4.36-4.66-2.9-8.36-6.81-11.1-11.7-2.75-4.9-4.12-10.33-4.12-16.3,0-4.46,.79-8.66,2.39-12.6,1.59-3.94,3.78-7.4,6.57-10.39,2.79-2.99,6.03-5.33,9.73-7.04,3.7-1.71,7.7-2.57,12-2.57,5.41,0,9.63,1.01,12.66,3.04,3.02,2.03,5.37,4.72,7.04,8.06V0h16V65.07h-15.64v-11.7c-1.67,3.5-4.04,6.33-7.1,8.48-3.07,2.15-7.38,3.22-12.95,3.22Zm2.63-14.57c3.58,0,6.67-.82,9.25-2.45,2.59-1.63,4.6-3.8,6.03-6.51,1.43-2.7,2.15-5.65,2.15-8.83s-.72-6.25-2.15-8.95c-1.43-2.7-3.44-4.9-6.03-6.57-2.59-1.67-5.67-2.51-9.25-2.51s-6.43,.82-9.01,2.45c-2.59,1.63-4.6,3.8-6.03,6.51-1.43,2.71-2.15,5.69-2.15,8.95s.72,6.03,2.15,8.78c1.43,2.75,3.44,4.95,6.03,6.63,2.59,1.67,5.59,2.51,9.01,2.51Z"/><path class="d" d="M200.53,65.07V0h15.88V10.51c3.26-7,9.59-10.51,18.98-10.51,4.46,0,8.48,1.04,12.06,3.1,3.58,2.07,6.41,5.01,8.48,8.83,2.07,3.82,3.1,8.36,3.1,13.61v39.52h-16.12V29.49c0-5.41-1.24-9.33-3.7-11.76-2.47-2.43-5.69-3.64-9.67-3.64-3.42,0-6.43,1.21-9.01,3.64-2.59,2.43-3.88,6.35-3.88,11.76v35.58h-16.12Z"/><path class="d" d="M298.55,65.13c-6.37,0-12.06-1.47-17.07-4.42-5.01-2.94-8.94-6.87-11.76-11.76-2.83-4.9-4.24-10.33-4.24-16.3s1.41-11.42,4.24-16.36c2.82-4.93,6.75-8.87,11.76-11.82C286.5,1.53,292.19,.06,298.55,.06s12.16,1.47,17.13,4.42c4.97,2.95,8.87,6.89,11.7,11.82,2.82,4.94,4.24,10.39,4.24,16.36s-1.41,11.4-4.24,16.3c-2.83,4.9-6.73,8.82-11.7,11.76-4.98,2.94-10.69,4.42-17.13,4.42Zm0-14.69c3.42,0,6.41-.81,8.95-2.45,2.55-1.63,4.52-3.8,5.91-6.51,1.39-2.71,2.09-5.65,2.09-8.84s-.7-6.25-2.09-8.95c-1.39-2.71-3.36-4.88-5.91-6.51-2.55-1.63-5.53-2.45-8.95-2.45s-6.41,.82-8.95,2.45c-2.55,1.63-4.52,3.8-5.91,6.51-1.39,2.71-2.09,5.69-2.09,8.95s.7,6.13,2.09,8.84c1.39,2.71,3.36,4.88,5.91,6.51,2.55,1.63,5.53,2.45,8.95,2.45Z"/><polygon class="d" points="20.51 65.07 65.06 20.52 85.5 0 65.06 0 65.06 .01 0 65.07 20.51 65.07"/><polygon class="d" points="59.1 65.07 103.65 20.52 103.65 65.07 118.15 65.07 118.15 0 103.65 0 103.65 .01 38.59 65.07 59.1 65.07"/></g></svg>`
-
     const parts: string[] = []
     let grandHrs = 0, grandAmt = 0
     const colH = (t: string) => `<th>${t}</th>`
@@ -1345,42 +1346,14 @@ ${parts.join('')}
         grandHrs += sc.subHours; grandAmt += sc.subAmount
       })
     }
+    if (parts.length === 0) parts.push(`<p style="color:#94a3b8;font-size:12px;padding:20px 0">Select at least one scope to preview.</p>`)
+    return `<div class="stmt"><div class="head"><div>${MANO_LOGO}<div class="co">Mano CG LLC · Billing Statement</div></div><div class="meta">Client · <b>${esc(clientLabel)}</b><br>Period · <b>${formatDate(dateRange.start)} – ${formatDate(dateRange.end)}</b><br>Generated · ${generatedOn}</div></div><div class="title">Billing Statement</div><div class="title-sub">Billable hours by scope · reviewed before invoicing</div>${parts.join('')}<div class="grand"><span class="l">Total</span><span><span class="hrs">${grandHrs.toFixed(1)} hrs</span><span class="r">${fmt(grandAmt)}</span></span></div><div class="foot"><span>Mano CG LLC · vantagefp.co</span><span>Generated ${generatedOn}</span></div></div>`
+  }
 
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Billing Statement — ${esc(clientLabel)}</title>
+  const generateBillingStatement = () => {
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Billing Statement</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Archivo:wght@700;800&display=swap" rel="stylesheet">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Instrument Sans',system-ui,sans-serif;color:#0f172a;font-size:12px;padding:34px 30px}
-.head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #10151c;padding-bottom:16px;margin-bottom:8px}
-.co{font-size:11px;color:#64748b;margin-top:6px}
-.meta{font-size:11.5px;color:#64748b;text-align:right;line-height:1.7}
-.meta b{color:#0f172a}
-.title{font-family:'Archivo',sans-serif;font-size:19px;font-weight:800;margin:14px 0 2px}
-.title-sub{font-size:11.5px;color:#64748b;margin-bottom:16px}
-.scope{margin-bottom:14px;break-inside:avoid}
-.scope-name{font-family:'Archivo',sans-serif;font-size:13px;font-weight:800;margin:12px 0 5px}
-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-th{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0}
-th.l,td.l{text-align:left}
-td{font-size:11.5px;text-align:right;padding:7px 8px;border-bottom:1px solid #f1f4f6}
-.amt{color:#c2660c;font-weight:600}
-.ldesc{font-size:10px;color:#64748b;font-style:italic;margin-top:2px;font-weight:400}
-.subtot td{background:#f8fafc;font-weight:700;border-top:1px solid #e2e8f0}
-.grand{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:14px 8px;border-top:2px solid #10151c}
-.grand .l{font-family:'Archivo',sans-serif;font-weight:800;font-size:14px}
-.grand .r{font-family:'Archivo',sans-serif;font-weight:800;font-size:18px;color:#c2660c}
-.grand .hrs{color:#64748b;font-weight:600;font-size:12px;margin-right:18px}
-.foot{margin-top:22px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8;display:flex;justify-content:space-between}
-@media print{body{padding:0}.scope{break-inside:avoid}}
-</style></head><body>
-<div class="head"><div>${MANO_LOGO}<div class="co">Mano CG LLC · Billing Statement</div></div><div class="meta">Client · <b>${esc(clientLabel)}</b><br>Period · <b>${formatDate(dateRange.start)} – ${formatDate(dateRange.end)}</b><br>Generated · ${generatedOn}</div></div>
-<div class="title">Billing Statement</div>
-<div class="title-sub">Billable hours by scope · reviewed before invoicing</div>
-${parts.join('')}
-<div class="grand"><span class="l">Total</span><span><span class="hrs">${grandHrs.toFixed(1)} hrs</span><span class="r">${fmt(grandAmt)}</span></span></div>
-<div class="foot"><span>Mano CG LLC · vantagefp.co</span><span>Generated ${generatedOn}</span></div>
-</body></html>`
-
+<style>*{box-sizing:border-box;margin:0;padding:0}body{padding:34px 30px}${STATEMENT_CSS}</style></head><body>${buildStatementBody()}</body></html>`
     const w = window.open('', '_blank')
     if (!w) { addToast('error', 'Allow pop-ups to generate the statement'); return }
     w.document.write(html); w.document.close()
@@ -2204,13 +2177,22 @@ ${parts.join('')}
       )}
 
       {showPdfConfig && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowPdfConfig(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h3 className="font-bold text-slate-900" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>Configure Billing PDF</h3>
-              <button onClick={() => setShowPdfConfig(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600"><X size={16} /></button>
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#0f172a' }}>
+          <div className="flex items-center justify-between px-6 py-3.5" style={{ background: 'linear-gradient(135deg,#1b2431,#10151c)', borderBottom: '1px solid #22303c' }}>
+            <div className="flex items-center gap-3">
+              <svg width="26" height="26" viewBox="0 0 48 48" fill="none"><path d="M13 12 L24 35" stroke="#3b82f6" strokeWidth="5.5" strokeLinecap="round" /><path d="M24 35 L35 12" stroke="#ea8a2f" strokeWidth="5.5" strokeLinecap="round" /></svg>
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.1em]" style={{ fontFamily: "'JetBrains Mono', monospace", color: '#93c5fd' }}>Billing · Export</div>
+                <h1 className="text-white font-extrabold text-[17px] leading-none" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>Configure Billing PDF</h1>
+              </div>
             </div>
-            <div className="p-5 space-y-5">
+            <div className="flex items-center gap-2.5">
+              <button onClick={() => setShowPdfConfig(false)} className="px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.07)', color: '#e2e8f0', border: '1px solid rgba(255,255,255,0.16)' }}>Cancel</button>
+              <button onClick={generateBillingStatement} disabled={pdfScopes.size === 0} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-white disabled:opacity-40" style={{ background: 'linear-gradient(135deg,#2563eb,#1e3a8a)' }}><Download size={14} /> Generate PDF</button>
+            </div>
+          </div>
+          <div className="flex-1 grid grid-cols-[360px_1fr] overflow-hidden">
+            <div className="bg-white overflow-y-auto p-5 space-y-6 border-r border-gray-200">
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Scopes</p>
@@ -2219,9 +2201,9 @@ ${parts.join('')}
                     <button onClick={() => setPdfScopes(new Set())} className="text-gray-400 hover:underline">Clear</button>
                   </div>
                 </div>
-                <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-48 overflow-y-auto">
+                <div className="space-y-1.5">
                   {dataByClient.flatMap(c => Object.values(c.projects)).map((p: any) => (
-                    <label key={p.id} className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50">
+                    <label key={p.id} className={`flex items-center gap-2.5 px-3 py-2 border rounded-lg text-sm cursor-pointer ${pdfScopes.has(p.id) ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
                       <input type="checkbox" checked={pdfScopes.has(p.id)} onChange={() => togglePdfScope(p.id)} className="accent-blue-600" />
                       <span className="text-slate-700">{p.name}</span>
                       <span className="ml-auto text-[11px] text-gray-400 tabular-nums">{p.totalBillableHours.toFixed(1)} hrs · {formatCurrency(p.totalRevenue)}</span>
@@ -2234,7 +2216,7 @@ ${parts.join('')}
                 <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">Line grouping</p>
                 <div className="space-y-1.5">
                   {([['resource', 'Per resource', 'each person as a line'], ['rate', 'Collapse by rate', 'one line per rate (e.g. AWS)'], ['scope', 'Per scope', 'one line per scope']] as const).map(([val, label, desc]) => (
-                    <label key={val} className={`flex items-start gap-2.5 px-3 py-2 border rounded-lg cursor-pointer text-sm ${pdfGrouping === val ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                    <label key={val} className={`flex items-start gap-2.5 px-3 py-2.5 border rounded-lg cursor-pointer text-sm ${pdfGrouping === val ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
                       <input type="radio" name="pdfgroup" checked={pdfGrouping === val} onChange={() => setPdfGrouping(val)} className="mt-0.5 accent-blue-600" />
                       <span><span className="font-medium text-slate-800">{label}</span><span className="block text-[11px] text-gray-400">{desc}</span></span>
                     </label>
@@ -2243,28 +2225,29 @@ ${parts.join('')}
               </div>
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">Columns</p>
-                <div className="flex gap-4">
+                <div className="space-y-1">
                   {([['hours', 'Hours'], ['rate', 'Rate'], ['amount', 'Amount']] as const).map(([key, label]) => (
-                    <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
-                      <input type="checkbox" checked={pdfCols[key]} onChange={e => setPdfCols(prev => ({ ...prev, [key]: e.target.checked }))} className="accent-blue-600" />
+                    <div key={key} className="flex items-center justify-between py-1.5 text-sm">
                       <span className="text-slate-700">{label}</span>
-                    </label>
+                      <button onClick={() => setPdfCols(prev => ({ ...prev, [key]: !prev[key] }))} className={`relative w-9 h-5 rounded-full transition-colors ${pdfCols[key] ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${pdfCols[key] ? 'left-[18px]' : 'left-0.5'}`} />
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
               <div>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between py-1.5">
                   <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Descriptions</p>
-                  <label className="flex items-center gap-2 text-xs cursor-pointer">
-                    <input type="checkbox" checked={pdfDescriptions} onChange={e => setPdfDescriptions(e.target.checked)} className="accent-blue-600" />
-                    <span className="text-slate-600">Include</span>
-                  </label>
+                  <button onClick={() => setPdfDescriptions(v => !v)} className={`relative w-9 h-5 rounded-full transition-colors ${pdfDescriptions ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${pdfDescriptions ? 'left-[18px]' : 'left-0.5'}`} />
+                  </button>
                 </div>
                 {pdfDescriptions && (
-                  <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-56 overflow-y-auto">
+                  <div className="space-y-2 mt-2">
                     {buildPdfLines().flatMap(sc => sc.lines.map(ln => (
-                      <div key={ln.key} className="px-3 py-2">
-                        <p className="text-[11px] font-medium text-slate-500 mb-1">{sc.scopeName} · {ln.label}</p>
+                      <div key={ln.key} className="border border-gray-200 rounded-lg p-2.5">
+                        <p className="text-[11px] font-medium text-slate-500 mb-1.5">{sc.scopeName} · {ln.label}</p>
                         <textarea value={lineNotes[ln.key] || ''} onChange={e => setLineNotes(prev => ({ ...prev, [ln.key]: e.target.value }))} rows={2} placeholder="Client-facing description..." className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none" />
                       </div>
                     )))}
@@ -2272,9 +2255,9 @@ ${parts.join('')}
                 )}
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-gray-100">
-              <button onClick={() => setShowPdfConfig(false)} className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Cancel</button>
-              <button onClick={generateBillingStatement} disabled={pdfScopes.size === 0} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"><Download size={14} /> Generate PDF</button>
+            <div className="overflow-y-auto p-7 flex justify-center" style={{ background: '#eef1f4' }}>
+              <style>{STATEMENT_CSS}</style>
+              <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-3xl h-fit" dangerouslySetInnerHTML={{ __html: buildStatementBody() }} />
             </div>
           </div>
         </div>
