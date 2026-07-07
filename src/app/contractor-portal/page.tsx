@@ -77,13 +77,13 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 
 // ============ DESIGN TOKENS — financial/institutional ============
 const T = {
-  card: "bg-white border border-gray-200 rounded",
-  cardHover: "bg-white border border-gray-200 rounded transition-colors hover:border-gray-300",
-  input: "w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-gray-900 text-[13px] placeholder-gray-300 focus:outline-none focus:border-gray-900 focus:bg-white transition-colors",
-  select: "w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-gray-900 text-[13px] focus:outline-none focus:border-gray-900 focus:bg-white transition-colors cursor-pointer appearance-none",
+  card: "bg-white border border-gray-200 rounded-lg",
+  cardHover: "bg-white border border-gray-200 rounded-lg transition-colors hover:border-blue-300",
+  input: "w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-[13px] placeholder-gray-300 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors",
+  select: "w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-[13px] focus:outline-none focus:border-blue-500 focus:bg-white transition-colors cursor-pointer appearance-none",
   label: "block text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400 mb-1.5",
-  btnPrimary: "px-4 py-2 bg-gray-900 hover:bg-gray-800 active:bg-black text-white text-[13px] font-medium rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2",
-  btnGhost: "px-3 py-1.5 rounded text-[13px] text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors border border-gray-200 hover:border-gray-300",
+  btnPrimary: "px-4 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-[13px] font-semibold rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2",
+  btnGhost: "px-3 py-1.5 rounded-lg text-[13px] text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors border border-gray-200 hover:border-gray-300",
   sectionTitle: "text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400",
 }
 
@@ -164,10 +164,10 @@ function DropZone({ file, onFile, onRemove, uploading, label, accept }: {
         dragging ? 'border-gray-400 bg-gray-50 scale-[1.01]' : 'border-gray-200 bg-gray-50/50 hover:border-gray-300 hover:bg-gray-50'
       }`}>
       <div className="flex flex-col items-center justify-center py-6 px-4">
-        <div className={`w-11 h-11 rounded flex items-center justify-center mb-3 transition-colors ${dragging ? 'bg-emerald-100 scale-110' : 'bg-gray-100 group-hover:bg-gray-200'}`}>
+        <div className={`w-11 h-11 rounded flex items-center justify-center mb-3 transition-colors ${dragging ? 'bg-blue-100 scale-110' : 'bg-gray-100 group-hover:bg-gray-200'}`}>
           <Upload size={18} className={`transition-colors duration-200 ${dragging ? 'text-gray-700' : 'text-gray-400 group-hover:text-gray-500'}`} />
         </div>
-        <p className={`text-[13px] font-medium transition-colors duration-200 ${dragging ? 'text-emerald-600' : 'text-gray-500'}`}>{dragging ? 'Drop file here' : label}</p>
+        <p className={`text-[13px] font-medium transition-colors duration-200 ${dragging ? 'text-blue-600' : 'text-gray-500'}`}>{dragging ? 'Drop file here' : label}</p>
         <p className="text-[11px] text-gray-400 mt-1.5">or click to browse</p>
       </div>
       <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={e => { if (e.target.files?.[0]) onFile(e.target.files[0]) }} />
@@ -199,10 +199,10 @@ function MultiDropZone({ files, onAddFiles, onRemoveFile, uploading, label, acce
           dragging ? 'border-gray-400 bg-gray-50 scale-[1.01]' : 'border-gray-200 bg-gray-50/50 hover:border-gray-300 hover:bg-gray-50'
         }`}>
         <div className="flex flex-col items-center justify-center py-6 px-4">
-          <div className={`w-11 h-11 rounded flex items-center justify-center mb-3 transition-colors ${dragging ? 'bg-emerald-100 scale-110' : 'bg-gray-100 group-hover:bg-gray-200'}`}>
+          <div className={`w-11 h-11 rounded flex items-center justify-center mb-3 transition-colors ${dragging ? 'bg-blue-100 scale-110' : 'bg-gray-100 group-hover:bg-gray-200'}`}>
             <Upload size={18} className={`transition-colors duration-200 ${dragging ? 'text-gray-700' : 'text-gray-400 group-hover:text-gray-500'}`} />
           </div>
-          <p className={`text-[13px] font-medium transition-colors duration-200 ${dragging ? 'text-emerald-600' : 'text-gray-500'}`}>{dragging ? 'Drop files here' : label}</p>
+          <p className={`text-[13px] font-medium transition-colors duration-200 ${dragging ? 'text-blue-600' : 'text-gray-500'}`}>{dragging ? 'Drop files here' : label}</p>
           <p className="text-[11px] text-gray-400 mt-1.5">PDF, JPEG, PNG — multiple files</p>
         </div>
         <input ref={inputRef} type="file" accept={accept} multiple className="hidden" onChange={e => {
@@ -974,20 +974,23 @@ export default function ContractorPortal() {
   // ============ LOGIN SCREEN ============
   if (step === 'email') {
     return (
-      <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center p-4" style={{ colorScheme: 'light' }}>
-        <div className="w-full max-w-[380px]">
+      <div className="min-h-screen flex items-center justify-center p-5 relative overflow-hidden" style={{ colorScheme: 'light', background: 'linear-gradient(135deg,#1b2431 0%,#141b24 55%,#10151c 100%)' }}>
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 14px)' }} />
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(80% 90% at 20% 10%, rgba(59,130,246,0.18), transparent 55%), radial-gradient(70% 80% at 85% 90%, rgba(234,138,47,0.10), transparent 55%)' }} />
+        <div className="relative w-full max-w-[390px]" style={{ zIndex: 1 }}>
           {/* Logo */}
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center justify-center mb-4">
-              <svg width={52} height={52} viewBox="0 0 40 40" fill="none">
-                <path d="M8 8L20 32L32 8" stroke="#10b981" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          <div className="text-center mb-7">
+            <div className="inline-flex items-center justify-center mb-3.5">
+              <svg width={52} height={52} viewBox="0 0 48 48" fill="none">
+                <path d="M13 12 L24 35" stroke="#3b82f6" strokeWidth="5.5" strokeLinecap="round" />
+                <path d="M24 35 L35 12" stroke="#ea8a2f" strokeWidth="5.5" strokeLinecap="round" />
               </svg>
             </div>
-            <h1 className="text-2xl font-medium text-gray-900 tracking-tight">Vantage</h1>
-            <p className="text-gray-400 text-[13px] mt-1.5 tracking-wide">Contractor Portal</p>
+            <h1 className="text-[27px] font-extrabold tracking-tight text-white" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>Vantage<span style={{ color: '#ea8a2f' }}>FP</span></h1>
+            <p className="text-[12.5px] mt-1.5 tracking-wide" style={{ color: '#8b97a7' }}>Contractor Portal</p>
           </div>
 
-          <div className={`${T.card} p-7`}>
+          <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.98)', border: '1px solid rgba(255,255,255,0.6)', boxShadow: '0 30px 70px -24px rgba(0,0,0,0.6), 0 2px 8px -2px rgba(0,0,0,0.3)' }}>
             <label className={T.label}>Email address</label>
             <input 
               type="email" value={email} onChange={e => setEmail(e.target.value)} 
@@ -1000,12 +1003,12 @@ export default function ContractorPortal() {
                 <AlertCircle size={15} className="shrink-0" /> {error}
               </div>
             )}
-            <button onClick={handleSignIn} disabled={loading} className={`w-full ${T.btnPrimary} py-3`}>
+            <button onClick={handleSignIn} disabled={loading} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white text-[14px] font-bold transition-all disabled:opacity-40" style={{ background: 'linear-gradient(135deg,#2563eb,#1e3a8a)', boxShadow: '0 12px 26px -10px rgba(37,99,235,0.6)' }}>
               {loading ? <><Loader2 size={16} className="animate-spin" /> Verifying...</> : <>Sign In <ArrowRight size={15} /></>}
             </button>
           </div>
 
-          <p className="text-center text-gray-300 text-[10px] mt-10 tracking-[0.12em] uppercase font-medium">Powered by Vantage</p>
+          <p className="text-center text-[10px] mt-6 tracking-[0.14em] uppercase font-medium" style={{ color: '#5b6670' }}>Powered by Vantage</p>
         </div>
       </div>
     )
@@ -1013,18 +1016,21 @@ export default function ContractorPortal() {
 
   // ============ PORTAL ============
   return (
-    <div className="min-h-screen text-gray-900" style={{ background: '#f5f5f3', colorScheme: 'light' }}>
+    <div className="min-h-screen text-gray-900" style={{ background: '#eef1f4', colorScheme: 'light' }}>
       {/* Top Bar */}
-      <header style={{ position: 'sticky', top: 0, zIndex: 40, borderBottom: '1px solid #e0e0db', background: '#fff' }}>
-        <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-[48px]">
+      <header style={{ position: 'sticky', top: 0, zIndex: 40, borderBottom: '1px solid #22303c', background: 'linear-gradient(135deg,#1b2431,#10151c)', overflow: 'hidden' }}>
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 13px)' }} />
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(70% 240% at 0% 0%, rgba(59,130,246,0.18), transparent 60%)' }} />
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 relative" style={{ zIndex: 1 }}>
+          <div className="flex items-center justify-between h-[52px]">
             {/* Logo + Name */}
             <div className="flex items-center gap-3">
-              <svg width={18} height={18} viewBox="0 0 40 40" fill="none">
-                <path d="M8 8L20 32L32 8" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              <svg width={22} height={22} viewBox="0 0 48 48" fill="none">
+                <path d="M13 12 L24 35" stroke="#3b82f6" strokeWidth="5.5" strokeLinecap="round" />
+                <path d="M24 35 L35 12" stroke="#ea8a2f" strokeWidth="5.5" strokeLinecap="round" />
               </svg>
-              <div style={{ width: '1px', height: '14px', background: '#e0e0db' }} />
-              <span className="text-[13px] font-medium text-gray-600">{member?.name}</span>
+              <div style={{ width: '1px', height: '15px', background: 'rgba(255,255,255,0.12)' }} />
+              <span className="text-[13px] font-medium" style={{ color: '#cbd5e1' }}>{member?.name}</span>
             </div>
 
             {/* Nav Tabs */}
@@ -1033,15 +1039,15 @@ export default function ContractorPortal() {
                 <button key={item.id} onClick={() => { setActiveTab(item.id); setError(null) }}
                   style={{
                     position: 'relative', display: 'flex', alignItems: 'center', gap: '5px',
-                    padding: '0 14px', height: '48px', fontSize: '12px',
-                    fontWeight: activeTab === item.id ? 500 : 400,
-                    color: activeTab === item.id ? '#111827' : '#9ca3af',
+                    padding: '0 14px', height: '52px', fontSize: '12px',
+                    fontWeight: activeTab === item.id ? 600 : 400,
+                    color: activeTab === item.id ? '#ffffff' : '#8b97a7',
                     background: 'none', border: 'none',
-                    borderBottom: activeTab === item.id ? '1.5px solid #111827' : '1.5px solid transparent',
+                    borderBottom: activeTab === item.id ? '2px solid #3b82f6' : '2px solid transparent',
                     cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 0.15s',
                     fontFamily: 'inherit'
                   }}>
-                  <item.icon size={13} style={{ color: activeTab === item.id ? '#374151' : '#9ca3af' }} />
+                  <item.icon size={13} style={{ color: activeTab === item.id ? '#60a5fa' : '#8b97a7' }} />
                   <span className="hidden sm:inline">{item.label}</span>
                 </button>
               ))}
@@ -1049,7 +1055,7 @@ export default function ContractorPortal() {
 
             {/* Sign out */}
             <button onClick={handleSignOut}
-              className="flex items-center gap-1.5 px-2 py-1.5 rounded text-[12px] text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors hover:bg-white/10" style={{ color: '#8b97a7' }}>
               <LogOut size={13} />
             </button>
           </div>
@@ -1308,7 +1314,7 @@ export default function ContractorPortal() {
                           {clientName && (
                             <>
                               <span className="w-0.5 h-0.5 rounded bg-gray-300" />
-                              <span className="text-emerald-600 font-medium">{clientName}</span>
+                              <span className="text-blue-600 font-medium">{clientName}</span>
                             </>
                           )}
                           {receiptUrl ? (
@@ -1693,7 +1699,7 @@ export default function ContractorPortal() {
                                     <span className="text-[13px] font-medium text-gray-700">{week.label}</span>
                                     <span className="text-[11px] text-gray-300 font-medium">{week.entries.length} entr{week.entries.length === 1 ? 'y' : 'ies'}</span>
                                   </div>
-                                  <span className="text-[15px] font-medium text-emerald-600 tabular-nums">{week.totalHours.toFixed(1)}h</span>
+                                  <span className="text-[15px] font-medium text-blue-600 tabular-nums">{week.totalHours.toFixed(1)}h</span>
                                 </div>
 
                                 {/* Chip tags — per-project colors */}
@@ -1853,7 +1859,7 @@ export default function ContractorPortal() {
                                 <div className="flex-1 min-w-0 text-left">
                                   <div className="flex items-center gap-2">
                                     <span className="text-[13px] text-gray-900 font-medium">#{inv.invoice_number}</span>
-                                    <span className="text-xs font-medium text-emerald-600 bg-gray-50 px-1.5 py-0.5 rounded">{clientName}</span>
+                                    <span className="text-xs font-medium text-blue-600 bg-gray-50 px-1.5 py-0.5 rounded">{clientName}</span>
                                     {receiptUrl ? (
                                       <a href={receiptUrl} target="_blank" rel="noopener noreferrer"
                                         onClick={e => e.stopPropagation()}
@@ -2045,10 +2051,10 @@ export default function ContractorPortal() {
                               radius={i === analyticsProjectNames.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
                           ))
                         ) : (
-                          <Bar dataKey="total" name="Total Hours" fill="#10b981" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="total" name="Total Hours" fill="#2563eb" radius={[4, 4, 0, 0]} />
                         )}
                         {/* Trend line overlay */}
-                        <Area type="monotone" dataKey="total" stroke="#10b981" strokeWidth={2} fill="none"
+                        <Area type="monotone" dataKey="total" stroke="#2563eb" strokeWidth={2} fill="none"
                           dot={false} strokeDasharray="4 2" opacity={hoursChartMode === 'total' ? 0 : 0.6} />
                       </RechartsBarChart>
                     </ResponsiveContainer>
@@ -2400,8 +2406,8 @@ export default function ContractorPortal() {
                   return (
                     <div key={field} className="flex items-center justify-between p-4 bg-gray-50 border border-gray-100 rounded">
                       <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded flex items-center justify-center shrink-0 ${url ? 'bg-emerald-50' : 'bg-gray-100'}`}>
-                          <FileText size={14} className={url ? 'text-emerald-600' : 'text-gray-300'} />
+                        <div className={`w-8 h-8 rounded flex items-center justify-center shrink-0 ${url ? 'bg-blue-50' : 'bg-gray-100'}`}>
+                          <FileText size={14} className={url ? 'text-blue-600' : 'text-gray-300'} />
                         </div>
                         <div>
                           <p className="text-[13px] text-gray-900 font-medium">{label}</p>
@@ -2418,7 +2424,7 @@ export default function ContractorPortal() {
                             const { data } = await supabase.storage.from('contractor-uploads').createSignedUrl(url, 3600)
                             if (data?.signedUrl) window.open(data.signedUrl, '_blank')
                           }}
-                          className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded hover:bg-emerald-100 flex items-center gap-1.5 transition-colors">
+                          className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 flex items-center gap-1.5 transition-colors">
                           <Eye size={12} /> View PDF
                         </button>
                       ) : (
