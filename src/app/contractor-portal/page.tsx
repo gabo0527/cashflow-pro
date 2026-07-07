@@ -19,7 +19,7 @@ const supabase = createClient(
 
 // ============ TYPES ============
 interface TeamMember {
-  id: string; name: string; email: string; cost_type?: string; cost_amount?: number; company_id?: string
+  id: string; name: string; email: string; cost_type?: string; cost_amount?: number; company_id?: string; onboarding_status?: string; entity_name?: string
   phone?: string; address?: string; city?: string; state?: string; zip?: string; country?: string
   bank_name?: string; routing_number?: string; account_number?: string; account_type?: string
   swift_code?: string; iban?: string; bank_address?: string; intermediary_bank?: string
