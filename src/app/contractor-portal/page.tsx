@@ -9,6 +9,7 @@ import {
   LayoutDashboard, TrendingUp, Menu, Shield, MapPin, Phone
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
+import OnboardingWizard from './OnboardingWizard'
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart } from 'recharts'
 
 const supabase = createClient(
@@ -439,7 +440,7 @@ export default function ContractorPortal() {
     if (!lookupValue) { setError('Please enter your email'); return }
     setLoading(true); setError(null)
     try {
-      const { data: md, error: me } = await supabase.from('team_members').select('id, name, email, cost_type, cost_amount, company_id, phone, address, city, state, zip, country, bank_name, routing_number, account_number, account_type, swift_code, iban, bank_address, intermediary_bank, nda_url, mspa_url, psa_schedule_url, w9_url, nda_expires, mspa_expires, psa_expires').eq('email', lookupValue).eq('status', 'active').single()
+      const { data: md, error: me } = await supabase.from('team_members').select('id, name, email, cost_type, cost_amount, company_id, phone, address, city, state, zip, country, bank_name, routing_number, account_number, account_type, swift_code, iban, bank_address, intermediary_bank, nda_url, mspa_url, psa_schedule_url, w9_url, nda_expires, mspa_expires, psa_expires, onboarding_status').eq('email', lookupValue).eq('status', 'active').single()
       if (me || !md) { setError('Email not found. Contact your administrator.'); setLoading(false); return }
 
       const { data: rcData } = await supabase.from('bill_rates').select('team_member_id, client_id, rate, cost_type, cost_amount').eq('team_member_id', md.id).eq('is_active', true)
@@ -1015,6 +1016,10 @@ export default function ContractorPortal() {
   }
 
   // ============ PORTAL ============
+  if (member && (member.onboarding_status === 'invited' || member.onboarding_status === 'onboarding')) {
+    return <OnboardingWizard member={member} onDone={() => window.location.reload()} />
+  }
+
   return (
     <div className="min-h-screen text-gray-900" style={{ background: '#eef1f4', colorScheme: 'light' }}>
       {/* Top Bar */}
