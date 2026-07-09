@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
         const bytes = new Uint8Array(await tpl.arrayBuffer())
         const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim()
         const filled = await fillIrsForm(bytes, formType, {
-          name: payload.name, entity_name: payload.entity_name, address: payload.address,
+          name: payload.name, entity_name: payload.entity_name, entity_type: payload.entity_type, address: payload.address,
           city: payload.city, state: payload.state, zip: payload.zip, country: payload.country,
           tax_id: payload.tax_id, tax_id_type: payload.tax_id_type, signature_name: payload.signature_name, signature_image: payload.signature_image, signed_at: payload.signed_at, ip,
         })
