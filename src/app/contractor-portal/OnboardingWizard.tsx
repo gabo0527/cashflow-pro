@@ -5,7 +5,7 @@
 // payment + tax form, captures typed e-signature, and POSTs to
 // /api/onboarding/submit (saves as PENDING for admin review).
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Loader2, ArrowRight, ArrowLeft, Check, FileText } from 'lucide-react'
 
 type Props = { member: any; onDone: () => void }
@@ -16,6 +16,33 @@ const FORMS: Record<string, [string, string]> = {
   'Foreign-Entity': ['W-8BEN-E', 'Foreign entity'],
 }
 const LABELS = ['Details', 'Payment', 'Tax Form', 'Done']
+
+function SignaturePad({ onChange }: { onChange: (dataUrl: string) => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const drawing = useRef(false)
+  const last = useRef<{ x: number; y: number } | null>(null)
+  const pos = (e: React.PointerEvent) => {
+    const c = canvasRef.current!; const r = c.getBoundingClientRect()
+    return { x: (e.clientX - r.left) * (c.width / r.width), y: (e.clientY - r.top) * (c.height / r.height) }
+  }
+  const down = (e: React.PointerEvent) => { drawing.current = true; last.current = pos(e); (e.target as Element).setPointerCapture(e.pointerId) }
+  const move = (e: React.PointerEvent) => {
+    if (!drawing.current) return
+    const c = canvasRef.current!; const ctx = c.getContext('2d')!; const p = pos(e)
+    ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 2; ctx.lineCap = 'round'
+    ctx.beginPath(); ctx.moveTo(last.current!.x, last.current!.y); ctx.lineTo(p.x, p.y); ctx.stroke()
+    last.current = p
+  }
+  const up = () => { drawing.current = false; const c = canvasRef.current; if (c) onChange(c.toDataURL('image/png')) }
+  const clear = () => { const c = canvasRef.current; if (c) { c.getContext('2d')!.clearRect(0, 0, c.width, c.height); onChange('') } }
+  return (
+    <div>
+      <canvas ref={canvasRef} width={520} height={120} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up}
+        className="w-full border border-gray-300 rounded-lg bg-white" style={{ height: 120, touchAction: 'none' }} />
+      <button type="button" onClick={clear} className="text-[11px] text-gray-400 hover:text-gray-600 mt-1">Clear signature</button>
+    </div>
+  )
+}
 
 function Field({ label, value, onChange, type = 'text', hint, full }: { label: string; value: string; onChange: (v: string) => void; type?: string; hint?: string; full?: boolean }) {
   return (
@@ -60,15 +87,34 @@ export default function OnboardingWizard({ member, onDone }: Props) {
     bank_id_type: 'SWIFT', bank_id: '', bank_address_1: '', bank_address_2: '', bank_address_3: '',
     recipient_name: '', recipient_account: '', recipient_address_1: '', recipient_address_2: '', recipient_address_3: '',
     tax_id: '', tax_id_type: 'EIN',
-    signature_name: member?.name || '',
+    signature_name: member?.name || '', signature_image: '',
   })
   const set = (k: string, v: string) => setF(prev => ({ ...prev, [k]: v }))
   const form = FORMS[f.residency_status] || FORMS['US']
 
+  const [sigStyle, setSigStyle] = useState('Dancing Script')
+  useEffect(() => {
+    const l = document.createElement('link'); l.rel = 'stylesheet'
+    l.href = 'https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&family=Great+Vibes&family=Sacramento&display=swap'
+    document.head.appendChild(l)
+    return () => { try { document.head.removeChild(l) } catch { /* noop */ } }
+  }, [])
+  const genSignature = async (nm: string, font: string): Promise<string> => {
+    try {
+      await (document as any).fonts.load(`56px "${font}"`)
+      const c = document.createElement('canvas'); c.width = 520; c.height = 130
+      const ctx = c.getContext('2d'); if (!ctx) return ''
+      ctx.clearRect(0, 0, 520, 130); ctx.fillStyle = '#12123a'; ctx.font = `56px "${font}"`; ctx.textBaseline = 'middle'
+      ctx.fillText(nm || '', 14, 70)
+      return c.toDataURL('image/png')
+    } catch { return '' }
+  }
+
   const submit = async () => {
     setSubmitting(true); setError(null)
     try {
-      const payload: any = { ...f, tax_form_type: form[0], signed_at: new Date().toISOString(), certified: 'true', __kind: 'onboarding' }
+      const signature_image = await genSignature(f.signature_name, sigStyle)
+      const payload: any = { ...f, tax_form_type: form[0], signature_image, signed_at: new Date().toISOString(), certified: 'true', __kind: 'onboarding' }
       const res = await fetch('/api/onboarding/submit', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       })
@@ -192,9 +238,17 @@ export default function OnboardingWizard({ member, onDone }: Props) {
                 <span className="text-[12px] text-gray-700 leading-relaxed">Under penalties of perjury, I certify the information is true, correct, and complete, and I am the person named above.</span>
               </label>
               <div className="mb-1">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.05em] text-gray-400">Signature (type your full name)</span>
-                <input value={f.signature_name} onChange={e => set('signature_name', e.target.value)} className="w-full border-b-2 border-gray-900 py-1.5 text-[20px] font-bold bg-transparent focus:outline-none" style={{ fontFamily: "'Archivo', cursive" }} />
-                <div className="text-[10px] text-gray-400 mt-1">Signed electronically · {new Date().toLocaleDateString()} · IP recorded for audit</div>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.05em] text-gray-400">Adopt your signature</span>
+                <input value={f.signature_name} onChange={e => set('signature_name', e.target.value)} placeholder="Type your full name" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[14px] bg-gray-50 focus:outline-none focus:border-blue-500 focus:bg-white mt-1.5 mb-2" />
+                <div className="grid grid-cols-3 gap-2">
+                  {['Dancing Script', 'Great Vibes', 'Sacramento'].map(fontName => (
+                    <button key={fontName} type="button" onClick={() => setSigStyle(fontName)}
+                      className="rounded-lg border px-2 py-3 text-center overflow-hidden" style={{ borderColor: sigStyle === fontName ? '#2563eb' : '#e2e8f0', background: sigStyle === fontName ? '#eff5ff' : '#fff' }}>
+                      <span style={{ fontFamily: `'${fontName}', cursive`, fontSize: 22, color: '#12123a', whiteSpace: 'nowrap' }}>{f.signature_name || 'Your Name'}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="text-[10px] text-gray-400 mt-2">Choose a style · signed electronically · {new Date().toLocaleDateString()} · IP recorded for audit</div>
               </div>
               <div className="flex justify-between mt-5">
                 <button onClick={() => setStep(2)} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-gray-500 text-[14px] font-bold bg-white border border-gray-200"><ArrowLeft size={15} /> Back</button>
