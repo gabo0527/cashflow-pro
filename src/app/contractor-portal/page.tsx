@@ -2345,7 +2345,7 @@ export default function ContractorPortal() {
                 </div>
                 <div>
                   <p className={T.label}>Routing Number</p>
-                  <p className="text-[13px] text-gray-900 font-mono">{member.routing_number || <span className="text-gray-300">—</span>}</p>
+                  <p className="text-[13px] text-gray-900 font-mono">{member.routing_number ? `••••${member.routing_number.slice(-4)}` : <span className="text-gray-300">—</span>}</p>
                 </div>
                 <div>
                   <p className={T.label}>Account Number</p>
