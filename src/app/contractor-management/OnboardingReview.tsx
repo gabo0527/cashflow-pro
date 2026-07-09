@@ -46,6 +46,15 @@ export default function OnboardingReview({ teamMembers, onChanged }: Props) {
     } catch { alert('Invite failed') } finally { setBusy(null) }
   }
 
+  const markOnboarded = async (id: string) => {
+    setBusy(id)
+    try {
+      const { error } = await supabase.from('team_members').update({ onboarding_status: 'active' }).eq('id', id)
+      if (error) throw error
+      onChanged()
+    } catch { alert('Failed to update') } finally { setBusy(null) }
+  }
+
   const review = async (changeId: string, action: 'approve' | 'reject') => {
     setBusy(changeId)
     try {
@@ -64,15 +73,15 @@ export default function OnboardingReview({ teamMembers, onChanged }: Props) {
       <div className="text-[13px] font-medium mt-0.5 text-slate-800">{value || '—'}</div>
     </div>
   )
-  const Sens = ({ changeId, field }: { changeId: string; field: string }) => {
+  const Sens = ({ changeId, field, value }: { changeId: string; field: string; value: any }) => {
     const key = `${changeId}:${field}`
     const shown = revealed[key]
     return (
       <div>
         <div className="text-[10px] uppercase tracking-[0.04em] text-gray-400">{SENS_LABELS[field]}</div>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[13px] font-mono text-slate-800">{shown || '••••••'}</span>
-          <button onClick={() => reveal(changeId, field)} className="flex items-center gap-1 text-[11px] text-blue-600 border border-gray-200 rounded-md px-2 py-0.5 hover:bg-blue-50">
+          <span className="text-[13px] font-mono text-slate-800">{shown ? (value || '\u2014') : maskVal(value)}</span>
+          <button onClick={() => toggleReveal(key)} className="flex items-center gap-1 text-[11px] text-blue-600 border border-gray-200 rounded-md px-2 py-0.5 hover:bg-blue-50">
             {shown ? <><EyeOff size={11} /> Hide</> : <><Eye size={11} /> Reveal</>}
           </button>
         </div>
@@ -167,6 +176,7 @@ export default function OnboardingReview({ teamMembers, onChanged }: Props) {
             <div className="text-[13px] font-medium">{m.name}</div>
             <div className="text-[11px] text-gray-400">{m.email}</div>
             <span className="ml-auto text-[9px] font-semibold uppercase tracking-[0.04em] rounded-md px-2 py-1 text-blue-600" style={{ background: 'rgba(37,99,235,.14)', border: '1px solid rgba(37,99,235,.3)', fontFamily: "'JetBrains Mono', monospace" }}>Invited</span>
+            <button onClick={() => markOnboarded(m.id)} disabled={busy === m.id} className="flex items-center gap-1.5 text-[12px] font-semibold text-gray-500 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 disabled:opacity-40"><Check size={13} /> Mark onboarded</button>
             <button onClick={() => invite(m.id)} disabled={busy === m.id} className="flex items-center gap-1.5 text-[12px] font-semibold text-gray-500 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 disabled:opacity-40"><Mail size={13} /> Resend</button>
           </div>
         ))}
