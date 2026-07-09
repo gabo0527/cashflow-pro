@@ -19,7 +19,7 @@ export default function OnboardingReview({ teamMembers, onChanged }: Props) {
   const [pending, setPending] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
-  const [revealed, setRevealed] = useState<Record<string, string>>({})
+  const [revealed, setRevealed] = useState<Record<string, boolean>>({})
 
   const memberById: Record<string, any> = {}
   teamMembers.forEach(m => { memberById[m.id] = m })
@@ -55,14 +55,8 @@ export default function OnboardingReview({ teamMembers, onChanged }: Props) {
     } catch { alert('Action failed') } finally { setBusy(null) }
   }
 
-  const reveal = async (changeId: string, field: string) => {
-    const key = `${changeId}:${field}`
-    if (revealed[key]) { setRevealed(prev => { const n = { ...prev }; delete n[key]; return n }); return }
-    try {
-      const res = await fetch('/api/onboarding/reveal', { method: 'POST', headers: await authHeaders(), body: JSON.stringify({ changeId, field }) })
-      if (res.ok) { const d = await res.json(); setRevealed(prev => ({ ...prev, [key]: d.value || '—' })) }
-    } catch { /* ignore */ }
-  }
+  const toggleReveal = (key: string) => setRevealed(prev => ({ ...prev, [key]: !prev[key] }))
+  const maskVal = (v: any) => { const s = v ? String(v) : ''; return s.length > 4 ? '\u2022\u2022\u2022\u2022' + s.slice(-4) : (s ? '\u2022\u2022\u2022\u2022' : '\u2014') }
 
   const Fld = ({ label, value }: { label: string; value: any }) => (
     <div>
@@ -125,7 +119,7 @@ export default function OnboardingReview({ teamMembers, onChanged }: Props) {
                     <Fld label="AP Email" value={p.ap_email} />
                     <Fld label="Address" value={p.address} />
                     <Fld label="Tax ID Type" value={p.tax_id_type} />
-                    {p.tax_id && <Sens changeId={ch.id} field="tax_id" />}
+                    {p.tax_id && <Sens changeId={ch.id} field="tax_id" value={p.tax_id} />}
                   </div>
                 </div>
                 <div>
@@ -133,12 +127,12 @@ export default function OnboardingReview({ teamMembers, onChanged }: Props) {
                   <div className="grid grid-cols-2 gap-x-5 gap-y-2.5">
                     <Fld label="Bank" value={p.bank_name} />
                     {!wire && <Fld label="Account Type" value={p.account_type} />}
-                    {!wire && p.routing_number && <Sens changeId={ch.id} field="routing_number" />}
-                    {!wire && p.account_number && <Sens changeId={ch.id} field="account_number" />}
+                    {!wire && p.routing_number && <Sens changeId={ch.id} field="routing_number" value={p.routing_number} />}
+                    {!wire && p.account_number && <Sens changeId={ch.id} field="account_number" value={p.account_number} />}
                     {wire && <Fld label="Bank ID Type" value={p.bank_id_type} />}
-                    {wire && p.bank_id && <Sens changeId={ch.id} field="bank_id" />}
+                    {wire && p.bank_id && <Sens changeId={ch.id} field="bank_id" value={p.bank_id} />}
                     {wire && <Fld label="Recipient Name" value={p.recipient_name} />}
-                    {wire && p.recipient_account && <Sens changeId={ch.id} field="recipient_account" />}
+                    {wire && p.recipient_account && <Sens changeId={ch.id} field="recipient_account" value={p.recipient_account} />}
                   </div>
                 </div>
                 <div>
