@@ -51,7 +51,7 @@ export default function OnboardingWizard({ member, onDone }: Props) {
     entity_type: 'LLC',
     residency_status: 'US',
     address: member?.address || '',
-    city: member?.city || '', state: member?.state || '', zip: member?.zip || '',
+    city: member?.city || '', state: member?.state || '', zip: member?.zip || '', country: member?.country || '',
     ap_contact_name: member?.name || '',
     ap_email: member?.email || '',
     ap_phone: '',
@@ -124,6 +124,7 @@ export default function OnboardingWizard({ member, onDone }: Props) {
                 <Field label="City" value={f.city} onChange={v => set('city', v)} />
                 <Field label="State" value={f.state} onChange={v => set('state', v)} />
                 <Field label="ZIP" value={f.zip} onChange={v => set('zip', v)} />
+                <Field label="Country" value={f.country} onChange={v => set('country', v)} hint="For W-8 (foreign) forms" />
                 <Field label="AP Contact" value={f.ap_contact_name} onChange={v => set('ap_contact_name', v)} />
                 <Field label="AP Email" value={f.ap_email} onChange={v => set('ap_email', v)} />
                 <Field label="AP Phone" value={f.ap_phone} onChange={v => set('ap_phone', v)} />
