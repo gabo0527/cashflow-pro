@@ -51,6 +51,7 @@ export default function OnboardingWizard({ member, onDone }: Props) {
     entity_type: 'LLC',
     residency_status: 'US',
     address: member?.address || '',
+    city: member?.city || '', state: member?.state || '', zip: member?.zip || '',
     ap_contact_name: member?.name || '',
     ap_email: member?.email || '',
     ap_phone: '',
@@ -119,7 +120,10 @@ export default function OnboardingWizard({ member, onDone }: Props) {
                 <Field label="Legal Entity" value={f.entity_name} onChange={v => set('entity_name', v)} />
                 <Select label="Entity Type" value={f.entity_type} onChange={v => set('entity_type', v)} options={[['LLC', 'LLC'], ['Sole Proprietor', 'Sole Proprietor'], ['Individual', 'Individual'], ['Foreign Entity', 'Foreign Entity']]} />
                 <Select label="Residency / Citizenship" value={f.residency_status} onChange={v => set('residency_status', v)} hint="Determines your tax form" options={[['US', 'U.S. person / entity'], ['Foreign-Individual', 'Foreign — individual'], ['Foreign-Entity', 'Foreign — entity']]} />
-                <Field label="Address" value={f.address} onChange={v => set('address', v)} full />
+                <Field label="Street Address" value={f.address} onChange={v => set('address', v)} full />
+                <Field label="City" value={f.city} onChange={v => set('city', v)} />
+                <Field label="State" value={f.state} onChange={v => set('state', v)} />
+                <Field label="ZIP" value={f.zip} onChange={v => set('zip', v)} />
                 <Field label="AP Contact" value={f.ap_contact_name} onChange={v => set('ap_contact_name', v)} />
                 <Field label="AP Email" value={f.ap_email} onChange={v => set('ap_email', v)} />
                 <Field label="AP Phone" value={f.ap_phone} onChange={v => set('ap_phone', v)} />
