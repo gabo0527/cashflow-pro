@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { readSessionFromCookie, getSupabaseAdmin } from '@/lib/contractor-auth'
-import { encryptField, maskValue } from '@/lib/field-crypto'
+import { maskValue } from '@/lib/field-crypto'
 
 const SENSITIVE = ['tax_id', 'routing_number', 'account_number', 'swift_code', 'clabe', 'iban', 'bank_id', 'recipient_account']
 
@@ -38,8 +38,8 @@ export async function POST(req: NextRequest) {
   for (const [k, v] of Object.entries(body)) {
     if (k === '__kind') continue
     if (v === undefined || v === null || v === '') continue
+    payload[k] = v
     if (SENSITIVE.includes(k)) {
-      payload[k] = encryptField(String(v))
       auditRows.push({
         contractor_id: contractorId,
         changed_by: session.email,
@@ -48,8 +48,6 @@ export async function POST(req: NextRequest) {
         new_value: maskValue(String(v)),
         action: 'submit'
       })
-    } else {
-      payload[k] = v
     }
   }
 
