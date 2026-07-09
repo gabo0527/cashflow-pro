@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
   await supabase.from('team_members').update({ onboarding_status: 'invited' }).eq('id', contractorId)
 
-  const url = (process.env.NEXT_PUBLIC_SITE_URL || 'https://cashflow-pro-jet.vercel.app').replace(/\/$/, '') + '/contractor-portal'
+  const url = 'https://vantagefp.co/contractor-portal'
   let emailSent = false
   try {
     const resend = new Resend(process.env.RESEND_API_KEY)
