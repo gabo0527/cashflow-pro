@@ -9,6 +9,7 @@ import {
   User, Phone, MapPin, CreditCard, FileUp, Shield, Save, Upload
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
+import OnboardingReview from './OnboardingReview'
 
 const supabase = createClient(
   'https://jmahfgpbtjeomuepfozf.supabase.co',
@@ -433,7 +434,7 @@ export default function ContractorManagement() {
       const [invRes, expRes, teamRes, clientRes, projRes] = await Promise.all([
         supabase.from('contractor_invoices').select('*, contractor_invoice_lines(*)').order('submitted_at', { ascending: false }),
         supabase.from('contractor_expenses').select('*').order('date', { ascending: false }),
-        supabase.from('team_members').select('id, name, email, status, phone, address, city, state, zip, country, bank_name, routing_number, account_number, account_type, swift_code, iban, bank_address, intermediary_bank, nda_url, mspa_url, psa_schedule_url, w9_url, nda_expires, mspa_expires, psa_expires').order('name'),
+        supabase.from('team_members').select('id, name, email, status, phone, address, city, state, zip, country, bank_name, routing_number, account_number, account_type, swift_code, iban, bank_address, intermediary_bank, nda_url, mspa_url, psa_schedule_url, w9_url, nda_expires, mspa_expires, psa_expires, onboarding_status').order('name'),
         supabase.from('clients').select('id, name'),
         supabase.from('projects').select('id, name, client_id'),
       ])
@@ -1325,6 +1326,7 @@ export default function ContractorManagement() {
       {/* ===================== CONTRACTORS ===================== */}
       {activeTab === 'contractors' && (
         <div className="space-y-4">
+          <OnboardingReview teamMembers={teamMembers} onChanged={() => window.location.reload()} />
           <div className="grid grid-cols-1 gap-3">
             {[...teamMembers].sort((a, b) => {
               const aActive = (a.status || 'active') === 'active' ? 0 : 1
