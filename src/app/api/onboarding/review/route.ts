@@ -18,7 +18,7 @@ const SYNC_FIELDS = [
   'bank_name', 'account_type', 'routing_number', 'account_number', 'swift_code', 'clabe', 'iban',
   'intermediary_bank', 'bank_address', 'bank_id_type', 'bank_id', 'bank_address_1', 'bank_address_2', 'bank_address_3',
   'recipient_name', 'recipient_account', 'recipient_address_1', 'recipient_address_2', 'recipient_address_3',
-  'tax_id', 'tax_id_type', 'tax_form_type',
+  'tax_id', 'tax_id_type', 'tax_form_type', 'w9_url', 'w8ben_url', 'w8bene_url',
 ]
 
 async function verifyAdmin(req: NextRequest): Promise<string | null> {
