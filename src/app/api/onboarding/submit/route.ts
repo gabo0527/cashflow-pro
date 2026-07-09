@@ -12,6 +12,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { readSessionFromCookie, getSupabaseAdmin } from '@/lib/contractor-auth'
 import { maskValue } from '@/lib/field-crypto'
+import { fillIrsForm, IrsFormType } from '@/lib/irs-forms'
+
+export const runtime = 'nodejs'
 
 const SENSITIVE = ['tax_id', 'routing_number', 'account_number', 'swift_code', 'clabe', 'iban', 'bank_id', 'recipient_account']
 
@@ -50,6 +53,30 @@ export async function POST(req: NextRequest) {
       })
     }
   }
+
+  // Generate the signed IRS tax form from the payload (non-blocking).
+  try {
+    const formType = payload.tax_form_type as IrsFormType
+    const tplName = formType === 'W-9' ? 'fw9.pdf' : formType === 'W-8BEN' ? 'fw8ben.pdf' : formType === 'W-8BEN-E' ? 'fw8bene.pdf' : ''
+    if (tplName) {
+      const { data: tpl } = await supabase.storage.from('irs-templates').download(tplName)
+      if (tpl) {
+        const bytes = new Uint8Array(await tpl.arrayBuffer())
+        const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim()
+        const filled = await fillIrsForm(bytes, formType, {
+          name: payload.name, entity_name: payload.entity_name, address: payload.address,
+          city: payload.city, state: payload.state, zip: payload.zip, country: payload.country,
+          tax_id: payload.tax_id, signature_name: payload.signature_name, signed_at: payload.signed_at, ip,
+        })
+        const path = `tax-forms/${contractorId}/${Date.now()}_${formType}.pdf`
+        const up = await supabase.storage.from('contractor-uploads').upload(path, Buffer.from(filled), { contentType: 'application/pdf', upsert: true })
+        if (!up.error) {
+          const urlKey = formType === 'W-9' ? 'w9_url' : formType === 'W-8BEN' ? 'w8ben_url' : 'w8bene_url'
+          payload[urlKey] = path
+        }
+      }
+    }
+  } catch { /* PDF generation is non-blocking; onboarding still succeeds */ }
 
   const { error: insErr } = await supabase
     .from('contractor_profile_changes')
