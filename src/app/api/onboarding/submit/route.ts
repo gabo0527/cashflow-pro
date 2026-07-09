@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
         const filled = await fillIrsForm(bytes, formType, {
           name: payload.name, entity_name: payload.entity_name, address: payload.address,
           city: payload.city, state: payload.state, zip: payload.zip, country: payload.country,
-          tax_id: payload.tax_id, signature_name: payload.signature_name, signed_at: payload.signed_at, ip,
+          tax_id: payload.tax_id, tax_id_type: payload.tax_id_type, signature_name: payload.signature_name, signature_image: payload.signature_image, signed_at: payload.signed_at, ip,
         })
         const path = `tax-forms/${contractorId}/${Date.now()}_${formType}.pdf`
         const up = await supabase.storage.from('contractor-uploads').upload(path, Buffer.from(filled), { contentType: 'application/pdf', upsert: true })
