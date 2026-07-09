@@ -20,6 +20,7 @@ export default function OnboardingReview({ teamMembers, onChanged }: Props) {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
   const [revealed, setRevealed] = useState<Record<string, boolean>>({})
+  const [docUrl, setDocUrl] = useState<string | null>(null)
 
   const memberById: Record<string, any> = {}
   teamMembers.forEach(m => { memberById[m.id] = m })
@@ -60,7 +61,7 @@ export default function OnboardingReview({ teamMembers, onChanged }: Props) {
       const res = await fetch('/api/onboarding/doc-url', { method: 'POST', headers: await authHeaders(), body: JSON.stringify({ path }) })
       if (!res.ok) throw new Error()
       const d = await res.json()
-      window.open(d.url, '_blank')
+      setDocUrl(d.url)
     } catch { alert('Could not open document') }
   }
 
@@ -201,6 +202,21 @@ export default function OnboardingReview({ teamMembers, onChanged }: Props) {
         ))}
         {teamMembers.length === 0 && <div className="p-5 text-[13px] text-gray-400">No contractors yet.</div>}
       </div>
+
+      {docUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setDocUrl(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-4xl h-[86vh] flex flex-col overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <span className="text-[13px] font-semibold">Signed tax form</span>
+              <div className="flex gap-2">
+                <a href={docUrl} target="_blank" rel="noreferrer" className="text-[12px] font-semibold text-blue-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-blue-50">Download</a>
+                <button onClick={() => setDocUrl(null)} className="text-[12px] font-semibold text-gray-500 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50">Close</button>
+              </div>
+            </div>
+            <iframe src={docUrl} className="flex-1 w-full" title="Signed tax form" />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
