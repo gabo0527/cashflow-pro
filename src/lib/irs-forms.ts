@@ -10,6 +10,7 @@ export type IrsFormType = 'W-9' | 'W-8BEN' | 'W-8BEN-E'
 export interface IrsData {
   name?: string
   entity_name?: string
+  entity_type?: string
   address?: string
   city?: string
   state?: string
@@ -48,10 +49,10 @@ const MAPS: Record<IrsFormType, Record<string, keyof IrsData | 'city_state_zip'>
 }
 
 // signature image placement (estimates for W-9 / W-8BEN-E; exact for W-8BEN)
-const SIG: Record<IrsFormType, { page: number; x: number; y: number; date?: { x: number; y: number } }> = {
-  'W-9': { page: 0, x: 78, y: 182, date: { x: 445, y: 186 } },
-  'W-8BEN': { page: 0, x: 112, y: 70 },
-  'W-8BEN-E': { page: 7, x: 120, y: 108, date: { x: 400, y: 108 } },
+const SIG: Record<IrsFormType, { page: number; x: number; y: number; w: number; h: number; date?: { x: number; y: number } }> = {
+  'W-9': { page: 0, x: 150, y: 205, w: 150, h: 30, date: { x: 410, y: 210 } },
+  'W-8BEN': { page: 0, x: 112, y: 70, w: 120, h: 26 },
+  'W-8BEN-E': { page: 7, x: 120, y: 108, w: 120, h: 28, date: { x: 400, y: 108 } },
 }
 
 function val(data: IrsData, key: string): string {
@@ -79,6 +80,17 @@ export async function fillIrsForm(templateBytes: ArrayBuffer | Uint8Array, formT
     }
   }
 
+  // W-9 federal tax classification checkbox (1=Individual/sole prop … 6=LLC)
+  if (formType === 'W-9') {
+    const cls = data.entity_type === 'LLC' ? '6'
+      : data.entity_type === 'C corporation' ? '2'
+      : data.entity_type === 'S corporation' ? '3'
+      : data.entity_type === 'Partnership' ? '4'
+      : data.entity_type === 'Trust/estate' ? '5'
+      : '1'
+    try { form.getRadioGroup(`${P}.Boxes3a-b_ReadOrder[0].c1_1`).select(cls) } catch { /* skip */ }
+  }
+
   const signedDate = data.signed_at ? new Date(data.signed_at) : new Date()
   const dateStr = `${String(signedDate.getMonth() + 1).padStart(2, '0')}-${String(signedDate.getDate()).padStart(2, '0')}-${signedDate.getFullYear()}`
   setText(`${P}.Date[0]`, dateStr) // W-8BEN date field
@@ -93,7 +105,7 @@ export async function fillIrsForm(templateBytes: ArrayBuffer | Uint8Array, formT
       const b64 = data.signature_image.split(',')[1]
       const png = await pdf.embedPng(Uint8Array.from(Buffer.from(b64, 'base64')))
       const page = pdf.getPage(sig.page)
-      page.drawImage(png, { x: sig.x, y: sig.y, width: 120, height: 30 })
+      page.drawImage(png, { x: sig.x, y: sig.y, width: sig.w, height: sig.h })
     } catch { /* skip image */ }
   }
   const helv = await pdf.embedFont(StandardFonts.Helvetica)
