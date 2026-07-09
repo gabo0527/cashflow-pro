@@ -55,6 +55,15 @@ export default function OnboardingReview({ teamMembers, onChanged }: Props) {
     } catch { alert('Failed to update') } finally { setBusy(null) }
   }
 
+  const viewDoc = async (path: string) => {
+    try {
+      const res = await fetch('/api/onboarding/doc-url', { method: 'POST', headers: await authHeaders(), body: JSON.stringify({ path }) })
+      if (!res.ok) throw new Error()
+      const d = await res.json()
+      window.open(d.url, '_blank')
+    } catch { alert('Could not open document') }
+  }
+
   const review = async (changeId: string, action: 'approve' | 'reject') => {
     setBusy(changeId)
     try {
@@ -152,6 +161,7 @@ export default function OnboardingReview({ teamMembers, onChanged }: Props) {
                       <div className="text-[12.5px] font-semibold">Form {p.tax_form_type || '—'}</div>
                       <div className="text-[11px] text-gray-400">e-signed "{p.signature_name || '—'}"{p.signed_at ? ` · ${new Date(p.signed_at).toLocaleDateString()}` : ''}</div>
                     </div>
+                    {(p.w9_url || p.w8ben_url || p.w8bene_url) && <button onClick={() => viewDoc(p.w9_url || p.w8ben_url || p.w8bene_url)} className="ml-auto text-[11.5px] font-semibold text-blue-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-blue-50">View PDF</button>}
                   </div>
                 </div>
                 <div className="flex justify-end gap-2.5 pt-1">
