@@ -383,6 +383,7 @@ export default function ContractorManagement() {
   // Profile drawer
   const [profileMember, setProfileMember] = useState<TeamMember | null>(null)
   const [profileForm, setProfileForm] = useState<Partial<TeamMember>>({})
+  const [showBank, setShowBank] = useState(false)
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileUploading, setProfileUploading] = useState<string | null>(null)
 
@@ -1548,6 +1549,7 @@ export default function ContractorManagement() {
                 <div className="flex items-center gap-2 mb-4">
                   <CreditCard size={13} className="text-gray-400" />
                   <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Banking — ACH (Domestic)</h3>
+                  <button type="button" onClick={() => setShowBank(v => !v)} className="ml-auto text-[11px] font-medium text-blue-600 hover:underline">{showBank ? 'Hide' : 'Show'}</button>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
@@ -1558,13 +1560,13 @@ export default function ContractorManagement() {
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Routing Number</label>
-                    <input value={profileForm.routing_number || ''} onChange={e => setProfileForm(p => ({ ...p, routing_number: e.target.value }))}
+                    <input type={showBank ? 'text' : 'password'} value={profileForm.routing_number || ''} onChange={e => setProfileForm(p => ({ ...p, routing_number: e.target.value }))}
                       placeholder="021000021"
                       className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Account Number</label>
-                    <input value={profileForm.account_number || ''} onChange={e => setProfileForm(p => ({ ...p, account_number: e.target.value }))}
+                    <input type={showBank ? 'text' : 'password'} value={profileForm.account_number || ''} onChange={e => setProfileForm(p => ({ ...p, account_number: e.target.value }))}
                       placeholder="000123456789"
                       className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                   </div>
@@ -1589,13 +1591,13 @@ export default function ContractorManagement() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">SWIFT / BIC Code</label>
-                    <input value={profileForm.swift_code || ''} onChange={e => setProfileForm(p => ({ ...p, swift_code: e.target.value }))}
+                    <input type={showBank ? 'text' : 'password'} value={profileForm.swift_code || ''} onChange={e => setProfileForm(p => ({ ...p, swift_code: e.target.value }))}
                       placeholder="CHASUS33"
                       className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">IBAN</label>
-                    <input value={profileForm.iban || ''} onChange={e => setProfileForm(p => ({ ...p, iban: e.target.value }))}
+                    <input type={showBank ? 'text' : 'password'} value={profileForm.iban || ''} onChange={e => setProfileForm(p => ({ ...p, iban: e.target.value }))}
                       placeholder="GB29 NWBK 6016 1331 9268 19"
                       className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                   </div>
