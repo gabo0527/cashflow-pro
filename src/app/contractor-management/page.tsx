@@ -385,6 +385,7 @@ export default function ContractorManagement() {
   const [profileForm, setProfileForm] = useState<Partial<TeamMember>>({})
   const [showBank, setShowBank] = useState(false)
   const [docViewUrl, setDocViewUrl] = useState<string | null>(null)
+  const [contractorFilter, setContractorFilter] = useState<'all' | 'needs_tax' | 'needs_profile' | 'complete'>('all')
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileUploading, setProfileUploading] = useState<string | null>(null)
 
@@ -436,7 +437,7 @@ export default function ContractorManagement() {
       const [invRes, expRes, teamRes, clientRes, projRes] = await Promise.all([
         supabase.from('contractor_invoices').select('*, contractor_invoice_lines(*)').order('submitted_at', { ascending: false }),
         supabase.from('contractor_expenses').select('*').order('date', { ascending: false }),
-        supabase.from('team_members').select('id, name, email, status, phone, address, city, state, zip, country, bank_name, routing_number, account_number, account_type, swift_code, iban, bank_address, intermediary_bank, nda_url, mspa_url, psa_schedule_url, w9_url, nda_expires, mspa_expires, psa_expires, onboarding_status').order('name'),
+        supabase.from('team_members').select('id, name, email, status, phone, address, city, state, zip, country, bank_name, routing_number, account_number, account_type, swift_code, iban, bank_address, intermediary_bank, nda_url, mspa_url, psa_schedule_url, w9_url, w8ben_url, w8bene_url, nda_expires, mspa_expires, psa_expires, onboarding_status').order('name'),
         supabase.from('clients').select('id, name'),
         supabase.from('projects').select('id, name, client_id'),
       ])
@@ -1329,14 +1330,41 @@ export default function ContractorManagement() {
       {activeTab === 'contractors' && (
         <div className="space-y-4">
           <OnboardingReview teamMembers={teamMembers} onChanged={() => window.location.reload()} />
+          <div className="flex items-center gap-2 flex-wrap">
+            {([['all', 'All'], ['needs_tax', 'Needs tax form'], ['needs_profile', 'Needs profile'], ['complete', 'Complete']] as const).map(([key, label]) => {
+              const count = teamMembers.filter(m => {
+                const hp = !!(m.phone || m.address || m.bank_name || m.nda_url)
+                const ht = !!(m.w9_url || (m as any).w8ben_url || (m as any).w8bene_url)
+                if (key === 'needs_tax') return !ht
+                if (key === 'needs_profile') return !hp
+                if (key === 'complete') return hp && ht
+                return true
+              }).length
+              const on = contractorFilter === key
+              return (
+                <button key={key} onClick={() => setContractorFilter(key)}
+                  className={`text-[12px] font-semibold rounded-lg px-3 py-1.5 border transition-colors ${on ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>
+                  {label} <span className={on ? 'text-blue-100' : 'text-gray-400'}>{count}</span>
+                </button>
+              )
+            })}
+          </div>
           <div className="grid grid-cols-1 gap-3">
-            {[...teamMembers].sort((a, b) => {
+            {[...teamMembers].filter(m => {
+              const hp = !!(m.phone || m.address || m.bank_name || m.nda_url)
+              const ht = !!(m.w9_url || (m as any).w8ben_url || (m as any).w8bene_url)
+              if (contractorFilter === 'needs_tax') return !ht
+              if (contractorFilter === 'needs_profile') return !hp
+              if (contractorFilter === 'complete') return hp && ht
+              return true
+            }).sort((a, b) => {
               const aActive = (a.status || 'active') === 'active' ? 0 : 1
               const bActive = (b.status || 'active') === 'active' ? 0 : 1
               if (aActive !== bActive) return aActive - bActive
               return a.name.localeCompare(b.name)
             }).map(m => {
               const hasProfile = !!(m.phone || m.address || m.bank_name || m.nda_url)
+              const hasTaxForm = !!(m.w9_url || (m as any).w8ben_url || (m as any).w8bene_url)
               const docsExpiring = [
                 m.nda_expires && new Date(m.nda_expires) < new Date(Date.now() + 30 * 86400000) ? 'NDA' : null,
                 m.mspa_expires && new Date(m.mspa_expires) < new Date(Date.now() + 30 * 86400000) ? 'MSPA' : null,
@@ -1359,6 +1387,9 @@ export default function ContractorManagement() {
                     )}
                   </div>
                   <div className="flex items-center gap-3">
+                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${hasTaxForm ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                      {hasTaxForm ? 'Tax form on file' : 'Needs tax form'}
+                    </span>
                     <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${m.status === 'inactive' ? 'bg-gray-100 text-gray-500 border-gray-300' : (hasProfile ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-50 text-gray-400 border-gray-200')}`}>
                       {m.status === 'inactive' ? 'Inactive' : (hasProfile ? 'Profile complete' : 'Profile incomplete')}
                     </span>
