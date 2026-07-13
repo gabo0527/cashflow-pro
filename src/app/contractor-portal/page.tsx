@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react'
 import {
   Clock, Receipt, FileText, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   AlertCircle, CheckCircle, Loader2, Upload, X, Plus, Trash2, Calendar,
@@ -517,7 +517,7 @@ export default function ContractorPortal() {
       }
       setMember(md); setAssignments(assigns)
 
-      const init: Record<string, TimeEntryForm> = {}; assigns.forEach(a => { init[a.project_id] = { project_id: a.project_id, hours: '', notes: '' } }); setTimeEntries(init)
+      const init: Record<string, TimeEntryForm> = {}; assigns.forEach(a => { init[a.project_id] = { project_id: a.project_id, days: {}, notes: '' } }); setTimeEntries(init)
 
       const { data: expData } = await supabase.from('contractor_expenses').select('*').eq('team_member_id', md.id).order('date', { ascending: false }).limit(50)
       setExpenses(expData || [])
