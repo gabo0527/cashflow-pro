@@ -23,7 +23,7 @@ interface TeamMember {
   phone?: string; address?: string; city?: string; state?: string; zip?: string; country?: string
   bank_name?: string; routing_number?: string; account_number?: string; account_type?: string
   swift_code?: string; iban?: string; bank_address?: string; intermediary_bank?: string
-  nda_url?: string; mspa_url?: string; psa_schedule_url?: string; w9_url?: string
+  nda_url?: string; mspa_url?: string; psa_schedule_url?: string; w9_url?: string; w8ben_url?: string; w8bene_url?: string
   nda_expires?: string; mspa_expires?: string; psa_expires?: string
 }
 interface Assignment { project_id: string; project_name: string; client_id: string; client_name: string; payment_type: string; rate: number }
@@ -259,6 +259,7 @@ export default function ContractorPortal() {
   const [step, setStep] = useState<'email' | 'portal'>('email')
   const [email, setEmail] = useState('')
   const [member, setMember] = useState<TeamMember | null>(null)
+  const [docViewUrl, setDocViewUrl] = useState<string | null>(null)
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [rateCards, setRateCards] = useState<RateCard[]>([])
   const [loading, setLoading] = useState(false)
@@ -440,7 +441,7 @@ export default function ContractorPortal() {
     if (!lookupValue) { setError('Please enter your email'); return }
     setLoading(true); setError(null)
     try {
-      const { data: md, error: me } = await supabase.from('team_members').select('id, name, email, cost_type, cost_amount, company_id, phone, address, city, state, zip, country, bank_name, routing_number, account_number, account_type, swift_code, iban, bank_address, intermediary_bank, nda_url, mspa_url, psa_schedule_url, w9_url, nda_expires, mspa_expires, psa_expires, onboarding_status').eq('email', lookupValue).eq('status', 'active').single()
+      const { data: md, error: me } = await supabase.from('team_members').select('id, name, email, cost_type, cost_amount, company_id, phone, address, city, state, zip, country, bank_name, routing_number, account_number, account_type, swift_code, iban, bank_address, intermediary_bank, nda_url, mspa_url, psa_schedule_url, w9_url, nda_expires, mspa_expires, psa_expires, onboarding_status, w8ben_url, w8bene_url').eq('email', lookupValue).eq('status', 'active').single()
       if (me || !md) { setError('Email not found. Contact your administrator.'); setLoading(false); return }
 
       const { data: rcData } = await supabase.from('bill_rates').select('team_member_id, client_id, rate, cost_type, cost_amount').eq('team_member_id', md.id).eq('is_active', true)
@@ -2404,8 +2405,11 @@ export default function ContractorPortal() {
                   { field: 'mspa_url' as const, label: 'Master Services & Purchase Agreement (MSPA)', expires: member.mspa_expires },
                   { field: 'psa_schedule_url' as const, label: 'PSA Schedule', expires: member.psa_expires },
                   { field: 'w9_url' as const, label: 'W-9 Tax Form', expires: null },
+                  { field: 'w8ben_url' as const, label: 'W-8BEN Tax Form', expires: null },
+                  { field: 'w8bene_url' as const, label: 'W-8BEN-E Tax Form', expires: null },
                 ] as const).map(({ field, label, expires }) => {
                   const url = member[field]
+                  if (!url && (field === 'w8ben_url' || field === 'w8bene_url')) return null
                   const isExpiringSoon = expires && new Date(expires) < new Date(Date.now() + 30 * 86400000)
                   const isExpired = expires && new Date(expires) < new Date()
                   return (
@@ -2427,7 +2431,7 @@ export default function ContractorPortal() {
                         <button
                           onClick={async () => {
                             const { data } = await supabase.storage.from('contractor-uploads').createSignedUrl(url, 3600)
-                            if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+                            if (data?.signedUrl) setDocViewUrl(data.signedUrl)
                           }}
                           className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 flex items-center gap-1.5 transition-colors">
                           <Eye size={12} /> View PDF
@@ -2447,6 +2451,21 @@ export default function ContractorPortal() {
           </div>
         )}
       </main>
+
+      {docViewUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setDocViewUrl(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-4xl h-[86vh] flex flex-col overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <span className="text-[13px] font-semibold text-gray-900">Document</span>
+              <div className="flex gap-2">
+                <a href={docViewUrl} target="_blank" rel="noreferrer" className="text-[12px] font-semibold text-blue-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-blue-50">Download</a>
+                <button onClick={() => setDocViewUrl(null)} className="text-[12px] font-semibold text-gray-500 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50">Close</button>
+              </div>
+            </div>
+            <iframe src={docViewUrl} className="flex-1 w-full" title="Document" />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
