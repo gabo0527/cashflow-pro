@@ -1310,7 +1310,6 @@ export default function ContractorPortal() {
                 </div>
               )}
             </div>
-            </div>
           </div>
         )}
 
