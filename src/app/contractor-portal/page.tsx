@@ -28,7 +28,7 @@ interface TeamMember {
 }
 interface Assignment { project_id: string; project_name: string; client_id: string; client_name: string; payment_type: string; rate: number }
 interface RateCard { team_member_id: string; client_id: string; client_name: string; cost_type: string; cost_amount: number; rate: number }
-interface TimeEntryForm { project_id: string; hours: string; notes: string }
+interface TimeEntryForm { project_id: string; days: Record<string, string>; notes: string }
 interface Expense { id: string; date: string; category: string; description: string; amount: number; project_id?: string; client_id?: string; status: string; receipt_url?: string; submitted_at: string }
 interface ContractorInvoice { id: string; invoice_number: string; invoice_date: string; due_date: string; period_start: string; period_end: string; total_amount: number; status: string; payment_terms: string; receipt_url?: string; submitted_at: string; notes?: string; client_id?: string; lines?: any[]; contractor_invoice_lines?: any[] }
 interface InvoiceLine { client_id: string; client_name: string; project_id?: string; project_name?: string; hours?: number; rate?: number; amount: number; allocation_pct?: number }
@@ -44,6 +44,25 @@ const getWeekRange = (date: Date) => {
   return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0],
     label: `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` }
 }
+// The 7 dates of the week being viewed. Each day is stored as its own dated
+// row, so a week crossing a month needs no special handling — Jun 30 posts to
+// June and Jul 1 posts to July automatically.
+const getWeekDays = (start: string) => {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const s0 = new Date(start + 'T00:00:00')
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(s0); d.setDate(s0.getDate() + i)
+    return {
+      iso: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+      dow: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      dnum: d.getDate(),
+      month: d.toLocaleDateString('en-US', { month: 'short' }),
+      monthIdx: d.getMonth(),
+      isWeekend: d.getDay() === 0 || d.getDay() === 6,
+    }
+  })
+}
+
 const getMonthRange = (date: Date) => {
   const start = new Date(date.getFullYear(), date.getMonth(), 1); const end = new Date(date.getFullYear(), date.getMonth() + 1, 0)
   return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0], label: start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) }
@@ -260,6 +279,8 @@ export default function ContractorPortal() {
   const [email, setEmail] = useState('')
   const [member, setMember] = useState<TeamMember | null>(null)
   const [docViewUrl, setDocViewUrl] = useState<string | null>(null)
+  const [monthHours, setMonthHours] = useState(0)
+  const [weekStatus, setWeekStatus] = useState<'none' | 'draft' | 'submitted'>('none')
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [rateCards, setRateCards] = useState<RateCard[]>([])
   const [loading, setLoading] = useState(false)
@@ -512,25 +533,25 @@ export default function ContractorPortal() {
   useEffect(() => {
     if (!member || assignments.length === 0) return
     const load = async () => {
-      const { data } = await supabase.from('time_entries').select('project_id, hours, description, date, id').eq('contractor_id', member.id).gte('date', week.start).lte('date', week.end)
+      const { data } = await supabase.from('time_entries').select('project_id, hours, description, date, id, status').eq('contractor_id', member.id).gte('date', week.start).lte('date', week.end)
+      const init: Record<string, TimeEntryForm> = {}
+      assignments.forEach(a => { init[a.project_id] = { project_id: a.project_id, days: {}, notes: '' } })
       if (data && data.length > 0) {
-        // Deduplicate on load: if same project appears multiple times (double-submit bug),
-        // keep only the latest entry per project and sum hours for display
-        const byProject: Record<string, any[]> = {}
-        data.forEach((e: any) => { if (!byProject[e.project_id]) byProject[e.project_id] = []; byProject[e.project_id].push(e) })
-        const hasDupes = Object.values(byProject).some(arr => arr.length > 1)
-        const grouped: Record<string, TimeEntryForm> = {}
-        assignments.forEach(a => { grouped[a.project_id] = { project_id: a.project_id, hours: '', notes: '' } })
-        // Use the canonical (latest) entry per project for display
-        const canonical: any[] = Object.values(byProject).map(arr => arr.sort((a: any, b: any) => b.id.localeCompare(a.id))[0])
+        // Dedupe key = project + date (one row per project per DAY)
+        const byKey: Record<string, any[]> = {}
+        data.forEach((e: any) => { const k = `${e.project_id}|${e.date}`; if (!byKey[k]) byKey[k] = []; byKey[k].push(e) })
+        const hasDupes = Object.values(byKey).some(arr => arr.length > 1)
+        const canonical: any[] = Object.values(byKey).map(arr => arr.sort((a: any, b: any) => b.id.localeCompare(a.id))[0])
         canonical.forEach((e: any) => {
-          if (grouped[e.project_id]) {
-            grouped[e.project_id].hours = String(e.hours || 0)
-            if (e.description) grouped[e.project_id].notes = e.description
-          }
+          const g = init[e.project_id]
+          if (!g) return
+          g.days[e.date] = String(e.hours || 0)
+          if (e.description) g.notes = e.description
         })
-        setTimeEntries(grouped); setExistingEntries(data)
-        // Auto-fix duplicates silently in background — deduplicate without bothering the user
+        setTimeEntries(init); setExistingEntries(data)
+        // Week is a draft only if every row is a draft
+        const statuses = canonical.map((e: any) => e.status || 'submitted')
+        setWeekStatus(statuses.length === 0 ? 'none' : statuses.every(st => st === 'draft') ? 'draft' : 'submitted')
         if (hasDupes) {
           const dupeIds = data.filter((e: any) => !canonical.find((c: any) => c.id === e.id)).map((e: any) => e.id)
           if (dupeIds.length > 0) supabase.from('time_entries').delete().in('id', dupeIds).then(() => {
@@ -538,74 +559,95 @@ export default function ContractorPortal() {
           })
         }
       } else {
-        const init: Record<string, TimeEntryForm> = {}
-        assignments.forEach(a => { init[a.project_id] = { project_id: a.project_id, hours: '', notes: '' } })
-        setTimeEntries(init); setExistingEntries([])
+        setTimeEntries(init); setExistingEntries([]); setWeekStatus('none')
       }
     }
     load()
   }, [member, assignments, week.start, week.end])
 
   // ============ SUBMIT TIME ============
-  const submitTime = async () => {
-    // Guard: prevent double-submit race condition
+  const weekDays = getWeekDays(week.start)
+  // A week locks for the contractor once it has been invoiced.
+  const weekLocked = invoices.some((inv: any) =>
+    ['approved', 'paid'].includes((inv.status || '').toLowerCase()) &&
+    inv.period_start && inv.period_end &&
+    inv.period_start <= week.start && inv.period_end >= week.end
+  )
+
+  // Month-to-date hours = all entries in the month of the week being viewed
+  useEffect(() => {
+    if (!member) return
+    const loadMonth = async () => {
+      const m = getMonthRange(weekDate)
+      const { data } = await supabase.from('time_entries').select('hours')
+        .eq('contractor_id', member.id).gte('date', m.start).lte('date', m.end)
+      setMonthHours((data || []).reduce((s: number, e: any) => s + (e.hours || 0), 0))
+    }
+    loadMonth()
+  }, [member, weekDate, timeSuccess])
+
+  // Save the week. status='draft' keeps it private; 'submitted' sends it to admin.
+  const saveWeek = async (status: 'draft' | 'submitted') => {
     if (!member || submittingTime) return
     setSubmittingTime(true); setError(null)
     try {
-      // Step 1: Fetch ALL current entries for this week fresh from DB (catches any race dupes)
+      // Clean slate for this week (idempotent)
       const { data: freshEntries } = await supabase
         .from('time_entries')
-        .select('id, project_id')
+        .select('id')
         .eq('contractor_id', member.id)
         .gte('date', week.start)
         .lte('date', week.end)
-
-      // Step 2: Delete all existing entries for this week (clean slate, idempotent)
       if (freshEntries && freshEntries.length > 0) {
-        const ids = freshEntries.map((e: any) => e.id)
-        const { error: de } = await supabase.from('time_entries').delete().in('id', ids)
+        const { error: de } = await supabase.from('time_entries').delete().in('id', freshEntries.map((e: any) => e.id))
         if (de) throw de
       }
 
-      // Step 3: Insert only projects with hours entered (exactly one row per project)
-      const entries = Object.values(timeEntries)
-        .filter(e => parseFloat(e.hours || '0') > 0)
-        .map(e => {
-          const a = assignments.find(a => a.project_id === e.project_id)
-          return {
+      // One row per project per DAY with hours > 0 — each dated correctly,
+      // so a week spanning two months posts to both automatically.
+      const now = new Date().toISOString()
+      const entries: any[] = []
+      Object.values(timeEntries).forEach(e => {
+        const a = assignments.find(a => a.project_id === e.project_id)
+        weekDays.forEach(d => {
+          const h = parseFloat(e.days?.[d.iso] || '0')
+          if (h > 0) entries.push({
             contractor_id: member.id,
             project_id: e.project_id,
-            date: week.start,
-            hours: parseFloat(e.hours),
-            billable_hours: parseFloat(e.hours),
+            date: d.iso,
+            hours: h,
+            billable_hours: h,
             is_billable: true,
             bill_rate: a?.rate || 0,
             description: e.notes || null,
-            company_id: member.company_id
-          }
+            company_id: member.company_id,
+            status,
+            submitted_at: status === 'submitted' ? now : null,
+          })
         })
+      })
 
       if (entries.length > 0) {
         const { error: ie } = await supabase.from('time_entries').insert(entries)
         if (ie) throw ie
       }
 
-      // Step 4: Refresh local state so existingEntries is accurate
       const { data: newEntries } = await supabase
         .from('time_entries')
-        .select('project_id, hours, description, date, id')
+        .select('project_id, hours, description, date, id, status')
         .eq('contractor_id', member.id)
         .gte('date', week.start)
         .lte('date', week.end)
       setExistingEntries(newEntries || [])
+      setWeekStatus(entries.length === 0 ? 'none' : status)
 
-      // Notify admin of timesheet submission — fire and forget
+      // Notify admin ONLY on submit — drafts stay private
       const totalHours = entries.reduce((s, e) => s + e.hours, 0)
-      if (totalHours > 0) {
+      if (status === 'submitted' && totalHours > 0) {
         fetch('/api/notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'timesheet', id: member.id, status: 'submitted', weekStart: week.start })
+          body: JSON.stringify({ type: 'timesheet', id: member.id, status: 'submitted', weekStart: week.start, weekEnd: week.end, hours: totalHours })
         }).catch(err => console.warn('Timesheet notification failed:', err))
       }
 
@@ -971,7 +1013,7 @@ export default function ContractorPortal() {
     { id: 'analytics' as const, label: 'Analytics', icon: TrendingUp },
     { id: 'profile' as const, label: 'Profile', icon: User },
   ]
-  const totalTimeHours = Object.values(timeEntries).reduce((s, e) => s + parseFloat(e.hours || '0'), 0)
+  const totalTimeHours = Object.values(timeEntries).reduce((s, e) => s + Object.values(e.days || {}).reduce((t: number, v: any) => t + (parseFloat(v) || 0), 0), 0)
 
   // ============ LOGIN SCREEN ============
   if (step === 'email') {
@@ -1091,13 +1133,13 @@ export default function ContractorPortal() {
                   onNext={() => { const d = new Date(weekDate); d.setDate(d.getDate() + 7); setWeekDate(d) }}
                 />
                 <span style={{ fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af' }}>
-                  {totalTimeHours > 0 ? 'Draft' : 'Not submitted'}
+                  {weekLocked ? 'Invoiced' : weekStatus === 'submitted' ? 'Submitted' : weekStatus === 'draft' ? 'Draft — not sent' : totalTimeHours > 0 ? 'Unsaved' : 'Not submitted'}
                 </span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr' }}>
                 {[
                   { label: 'This week', value: totalTimeHours > 0 ? `${totalTimeHours.toFixed(1)}h` : '—', em: totalTimeHours > 0 },
-                  { label: 'Month to date', value: assignments.length > 0 ? `${(existingEntries.reduce((s: number, e: any) => s + (e.hours || 0), 0)).toFixed(1)}h` : '—', em: false },
+                  { label: 'Month to date', value: monthHours > 0 ? `${monthHours.toFixed(1)}h` : '—', em: false },
                   { label: 'Projects', value: String(assignments.length), em: false },
                 ].map((kpi, i) => (
                   <div key={kpi.label} style={{ padding: '10px 16px', borderRight: i < 2 ? '1px solid #e8e8e4' : 'none' }}>
@@ -1114,125 +1156,160 @@ export default function ContractorPortal() {
               </div>
             )}
 
-            {/* Project rows */}
+            {/* Daily grid */}
             <div style={{ background: '#fff', border: '1px solid #e0e0db', borderRadius: '4px', overflow: 'hidden' }}>
-              {/* Section header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 16px', background: '#f7f7f5', borderBottom: '1px solid #e8e8e4' }}>
-                <span style={{ fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af' }}>Log hours — {week.label}</span>
-                {totalTimeHours > 0 && <span style={{ fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{totalTimeHours.toFixed(1)}h total</span>}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 16px', background: '#fafaf9', borderBottom: '1px solid #e8e8e4' }}>
+                <span style={{ fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af' }}>Log hours — {week.label}</span>
+                {totalTimeHours > 0 && <span style={{ fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b7280' }}>{totalTimeHours.toFixed(1)}h</span>}
               </div>
 
-              {Object.entries(assignmentsByClient).map(([cid, { clientName, projects }]) => {
-                const color = clientColorMap[cid] || '#9ca3af'
-                const muted: Record<string, string> = {
-                  '#f59e0b': '#b08d57', '#f97316': '#b07a50', '#eab308': '#a89040',
-                  '#10b981': '#4a9e7a', '#14b8a6': '#4a9490', '#06b6d4': '#4a8fa8',
-                  '#3b82f6': '#5b7eb8', '#6366f1': '#6b6eb8', '#8b5cf6': '#7b6eb8',
-                  '#ec4899': '#b06080', '#ef4444': '#b06060', '#f43f5e': '#a06070',
-                }
-                const dotColor = muted[color] || color
-
-                return (
-                  <div key={cid} style={{ borderTop: '1px solid #e8e8e4' }}>
-                    {/* Client header */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 16px', background: '#fafaf9' }}>
-                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
-                      <span style={{ fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af' }}>{clientName}</span>
-                    </div>
-
-                    {projects.map((p) => {
-                      const hasHours = parseFloat(timeEntries[p.project_id]?.hours || '0') > 0
-                      const hasNote = !!(timeEntries[p.project_id]?.notes)
-                      const noteOpen = hasHours || hasNote
-
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '620px' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'left', padding: '7px 16px', fontSize: '10px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em', background: '#fafaf9', borderBottom: '1px solid #e8e8e4' }}>Project</th>
+                      {weekDays.map(d => (
+                        <th key={d.iso} style={{ padding: '6px 4px', textAlign: 'center', background: d.isWeekend ? '#f4f4f2' : '#fafaf9', borderBottom: '1px solid #e8e8e4', width: '54px' }}>
+                          <span style={{ display: 'block', fontSize: '9.5px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{d.dow}</span>
+                          <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>{d.dnum}</span>
+                        </th>
+                      ))}
+                      <th style={{ padding: '7px 8px', textAlign: 'center', fontSize: '10px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em', background: '#fafaf9', borderBottom: '1px solid #e8e8e4', borderLeft: '1px solid #e8e8e4', width: '64px' }}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(assignmentsByClient).map(([cid, { clientName, projects }]) => {
+                      const color = clientColorMap[cid] || '#9ca3af'
                       return (
-                        <div key={p.project_id} style={{ borderTop: '1px solid #f0f0ec' }}>
-                          {/* Hour row */}
-                          <div style={{ display: 'flex', alignItems: 'center', padding: '0 16px', height: '44px', gap: '12px' }}>
-                            <span style={{ flex: 1, fontSize: '13px', color: hasHours ? '#111827' : '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {p.project_name}
-                            </span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                placeholder="—"
-                                value={timeEntries[p.project_id]?.hours || ''}
-                                onChange={e => {
-                                  const v = e.target.value
-                                  if (v === '' || /^\d*\.?\d*$/.test(v))
-                                    setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], hours: v } }))
-                                }}
-                                style={{
-                                  width: '52px', height: '28px', border: '1px solid #d1d5db',
-                                  borderRadius: '3px', background: hasHours ? '#fff' : '#f9fafb',
-                                  textAlign: 'right', fontSize: '14px', fontWeight: 500,
-                                  fontVariantNumeric: 'tabular-nums', color: '#111827',
-                                  padding: '0 8px', outline: 'none'
-                                }}
-                                onFocus={e => { e.currentTarget.style.borderColor = '#111827'; e.currentTarget.style.background = '#fff' }}
-                                onBlur={e => { e.currentTarget.style.borderColor = '#d1d5db'; e.currentTarget.style.background = hasHours ? '#fff' : '#f9fafb' }}
-                              />
-                              <span style={{ fontSize: '11px', color: '#d1d5db', width: '10px' }}>h</span>
-                            </div>
-                            {(hasHours || hasNote) && (
-                              <button
-                                onClick={() => {
-                                  setTimeEntries(prev => ({
-                                    ...prev,
-                                    [p.project_id]: { ...prev[p.project_id], notes: hasNote ? '' : (prev[p.project_id]?.notes ?? '') }
-                                  }))
-                                }}
-                                style={{ fontSize: '11px', color: hasNote ? '#6b7280' : '#9ca3af', padding: '0 4px', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit' }}
-                              >
-                                {hasNote ? '− note' : '+ note'}
-                              </button>
-                            )}
-                          </div>
-
-                          {/* Expandable note */}
-                          {noteOpen && (
-                            <div style={{ padding: '0 16px 10px' }}>
-                              <input
-                                type="text"
-                                placeholder="What did you work on this week?"
-                                value={timeEntries[p.project_id]?.notes || ''}
-                                onChange={e => setTimeEntries(prev => ({
-                                  ...prev,
-                                  [p.project_id]: { ...prev[p.project_id], notes: e.target.value }
-                                }))}
-                                style={{
-                                  width: '100%', padding: '6px 10px', border: '1px solid #e8e8e4',
-                                  borderRadius: '3px', background: '#f7f7f5', fontSize: '12px',
-                                  color: '#374151', outline: 'none', fontFamily: 'inherit'
-                                }}
-                                onFocus={e => { e.currentTarget.style.borderColor = '#9ca3af'; e.currentTarget.style.background = '#fff' }}
-                                onBlur={e => { e.currentTarget.style.borderColor = '#e8e8e4'; e.currentTarget.style.background = '#f7f7f5' }}
-                              />
-                            </div>
-                          )}
-                        </div>
+                        <Fragment key={cid}>
+                          <tr>
+                            <td colSpan={9} style={{ padding: '5px 16px', background: '#fafaf9', borderTop: '1px solid #e8e8e4' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: color, display: 'inline-block' }} />
+                                <span style={{ fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af' }}>{clientName}</span>
+                              </span>
+                            </td>
+                          </tr>
+                          {projects.map(p => {
+                            const entry = timeEntries[p.project_id]
+                            const rowTotal = Object.values(entry?.days || {}).reduce((t: number, v: any) => t + (parseFloat(v) || 0), 0)
+                            const hasNote = !!entry?.notes
+                            return (
+                              <Fragment key={p.project_id}>
+                                <tr>
+                                  <td style={{ padding: '0 16px', height: '42px', borderTop: '1px solid #f0f0ec', fontSize: '13px', color: rowTotal > 0 ? '#111827' : '#6b7280' }}>
+                                    {p.project_name}
+                                  </td>
+                                  {weekDays.map(d => (
+                                    <td key={d.iso} style={{ borderTop: '1px solid #f0f0ec', textAlign: 'center', background: d.isWeekend ? '#fbfbfa' : '#fff', padding: '0 2px' }}>
+                                      <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        placeholder="–"
+                                        disabled={weekLocked}
+                                        value={entry?.days?.[d.iso] || ''}
+                                        onChange={e => {
+                                          const v = e.target.value
+                                          if (v === '' || /^\d*\.?\d*$/.test(v)) {
+                                            setTimeEntries(prev => ({
+                                              ...prev,
+                                              [p.project_id]: { ...prev[p.project_id], days: { ...(prev[p.project_id]?.days || {}), [d.iso]: v } }
+                                            }))
+                                          }
+                                        }}
+                                        style={{
+                                          width: '44px', height: '28px', border: '1px solid #d1d5db', borderRadius: '3px',
+                                          background: entry?.days?.[d.iso] ? '#fff' : '#f9fafb', textAlign: 'center',
+                                          fontSize: '13px', fontWeight: 500, fontVariantNumeric: 'tabular-nums',
+                                          color: '#111827', padding: '0 2px', outline: 'none', fontFamily: 'inherit'
+                                        }}
+                                        onFocus={e => { e.currentTarget.style.borderColor = '#111827'; e.currentTarget.style.background = '#fff' }}
+                                        onBlur={e => { e.currentTarget.style.borderColor = '#d1d5db'; e.currentTarget.style.background = entry?.days?.[d.iso] ? '#fff' : '#f9fafb' }}
+                                      />
+                                    </td>
+                                  ))}
+                                  <td style={{ borderTop: '1px solid #f0f0ec', borderLeft: '1px solid #e8e8e4', textAlign: 'center', fontSize: '13px', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: rowTotal > 0 ? '#374151' : '#d1d5db' }}>
+                                    {rowTotal > 0 ? rowTotal.toFixed(1) : '—'}
+                                  </td>
+                                </tr>
+                                {(rowTotal > 0 || hasNote) && (
+                                  <tr>
+                                    <td colSpan={9} style={{ padding: '0 16px 10px 16px', background: '#fbfcfe' }}>
+                                      <textarea
+                                        placeholder={`What did you work on for ${p.project_name} this week?`}
+                                        disabled={weekLocked}
+                                        value={entry?.notes || ''}
+                                        onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], notes: e.target.value } }))}
+                                        style={{ width: '100%', border: '1px solid #dbe2ea', borderRadius: '5px', padding: '7px 9px', fontSize: '12px', fontFamily: 'inherit', resize: 'vertical', minHeight: '38px', background: '#fff', outline: 'none' }}
+                                      />
+                                    </td>
+                                  </tr>
+                                )}
+                              </Fragment>
+                            )
+                          })}
+                        </Fragment>
                       )
                     })}
-                  </div>
-                )
-              })}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td style={{ padding: '8px 16px', borderTop: '2px solid #e8e8e4', background: '#fafaf9', fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af' }}>Daily total</td>
+                      {weekDays.map(d => {
+                        const dayTotal = Object.values(timeEntries).reduce((t, e) => t + (parseFloat(e.days?.[d.iso] || '0') || 0), 0)
+                        return (
+                          <td key={d.iso} style={{ padding: '8px 4px', textAlign: 'center', borderTop: '2px solid #e8e8e4', background: '#fafaf9', fontSize: '12px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: dayTotal > 0 ? '#374151' : '#d1d5db' }}>
+                            {dayTotal > 0 ? dayTotal.toFixed(1) : '—'}
+                          </td>
+                        )
+                      })}
+                      <td style={{ padding: '8px 4px', textAlign: 'center', borderTop: '2px solid #e8e8e4', borderLeft: '1px solid #e8e8e4', background: '#fafaf9', fontSize: '14px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#2563eb' }}>
+                        {totalTimeHours > 0 ? `${totalTimeHours.toFixed(1)}h` : '—'}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              {weekDays[0].monthIdx !== weekDays[6].monthIdx && (
+                <div style={{ padding: '8px 16px', background: '#eff6ff', borderTop: '1px solid #dbeafe', fontSize: '11px', color: '#1e40af' }}>
+                  This week spans two months — each day posts to its own month automatically.
+                </div>
+              )}
             </div>
 
-            {/* Footer — submit */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '4px' }}>
+            {/* Footer — draft / submit */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '4px', gap: '10px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '12px', color: '#9ca3af' }}>
-                {totalTimeHours > 0
-                  ? `Submitting ${totalTimeHours.toFixed(1)}h across ${Object.values(timeEntries).filter(e => parseFloat(e.hours || '0') > 0).length} project${Object.values(timeEntries).filter(e => parseFloat(e.hours || '0') > 0).length !== 1 ? 's' : ''}`
-                  : 'Enter hours above to submit'}
+                {weekLocked
+                  ? 'This week has been invoiced and is locked. Contact your administrator to make changes.'
+                  : weekStatus === 'draft'
+                    ? 'Draft saved — only you can see this. Submit when the week is complete.'
+                    : weekStatus === 'submitted'
+                      ? 'Submitted. You can still edit and re-submit until it is invoiced.'
+                      : totalTimeHours > 0
+                        ? `${totalTimeHours.toFixed(1)}h entered`
+                        : 'Enter hours above'}
               </span>
-              <button
-                onClick={submitTime}
-                disabled={submittingTime || totalTimeHours === 0}
-                className={T.btnPrimary}
-              >
-                {submittingTime ? <><Loader2 size={13} className="animate-spin" /> Submitting...</> : <><Send size={13} /> Submit timesheet</>}
-              </button>
+              {!weekLocked && (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => saveWeek('draft')}
+                    disabled={submittingTime || totalTimeHours === 0}
+                    style={{ border: '1px solid #d1d5db', background: '#fff', color: '#374151', borderRadius: '6px', padding: '9px 16px', fontSize: '13px', fontWeight: 600, fontFamily: 'inherit', cursor: totalTimeHours === 0 ? 'not-allowed' : 'pointer', opacity: submittingTime || totalTimeHours === 0 ? 0.45 : 1 }}
+                  >
+                    Save draft
+                  </button>
+                  <button
+                    onClick={() => saveWeek('submitted')}
+                    disabled={submittingTime || totalTimeHours === 0}
+                    className={T.btnPrimary}
+                  >
+                    {submittingTime ? <><Loader2 size={13} className="animate-spin" /> Saving...</> : <><Send size={13} /> Submit week</>}
+                  </button>
+                </div>
+              )}
+            </div>
             </div>
           </div>
         )}
