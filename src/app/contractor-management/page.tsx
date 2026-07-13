@@ -384,6 +384,7 @@ export default function ContractorManagement() {
   const [profileMember, setProfileMember] = useState<TeamMember | null>(null)
   const [profileForm, setProfileForm] = useState<Partial<TeamMember>>({})
   const [showBank, setShowBank] = useState(false)
+  const [docViewUrl, setDocViewUrl] = useState<string | null>(null)
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileUploading, setProfileUploading] = useState<string | null>(null)
 
@@ -808,7 +809,7 @@ export default function ContractorManagement() {
 
   const openProfileDoc = async (path: string) => {
     const { data } = await supabase.storage.from('contractor-uploads').createSignedUrl(path, 3600)
-    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+    if (data?.signedUrl) setDocViewUrl(data.signedUrl)
   }
 
   // ============ INVOICE ROW GRID ============
@@ -1790,6 +1791,20 @@ export default function ContractorManagement() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {docViewUrl && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={() => setDocViewUrl(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-4xl h-[86vh] flex flex-col overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <span className="text-[13px] font-semibold">Document</span>
+              <div className="flex gap-2">
+                <a href={docViewUrl} target="_blank" rel="noreferrer" className="text-[12px] font-semibold text-blue-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-blue-50">Download</a>
+                <button onClick={() => setDocViewUrl(null)} className="text-[12px] font-semibold text-gray-500 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50">Close</button>
+              </div>
+            </div>
+            <iframe src={docViewUrl} className="flex-1 w-full" title="Document" />
           </div>
         </div>
       )}
