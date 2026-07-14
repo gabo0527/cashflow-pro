@@ -474,6 +474,10 @@ export default function ContractorManagement() {
     // they must never appear in any admin view, regardless of filters.
     let r = expenses.filter(e => e.status !== 'draft')
     if (dateRange !== 'all') r = r.filter(e => {
+      // The review queue never hides: anything awaiting a decision
+      // stays visible in every period view. Only reviewed items
+      // (approved / paid / rejected) respect the date filter.
+      if (e.status === 'submitted' || e.status === 'pending') return true
       const d = (e.date || '').split('T')[0]
       return d >= dateFilter.start && d <= dateFilter.end
     })
@@ -1802,7 +1806,7 @@ export default function ContractorManagement() {
               </div>
             </div>
             <div className="flex-1 bg-gray-100 overflow-hidden relative">
-              {previewUrl.match(/\.(jpg|jpeg|png|gif|webp|heic)$/i) || previewUrl.includes('image') ? (
+              {/\.(jpg|jpeg|png|gif|webp|heic)(\?|$)/i.test(previewUrl) || previewUrl.includes('image') ? (
                 <div className="h-full flex items-center justify-center p-4"><img src={previewUrl} alt="Attachment" className="max-h-full max-w-full object-contain rounded-lg shadow-lg" /></div>
               ) : (<iframe src={previewUrl} className="w-full h-full" title="Document preview" />)}
               {previewFiles.length > 1 && previewIndex > 0 && (
