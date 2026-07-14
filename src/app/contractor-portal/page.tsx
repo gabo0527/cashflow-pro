@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import OnboardingWizard from './OnboardingWizard'
-import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart } from 'recharts'
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart, LabelList } from 'recharts'
 
 const supabase = createClient(
   'https://jmahfgpbtjeomuepfozf.supabase.co',
@@ -290,6 +290,37 @@ function WeekNav({ week, onPrev, onNext }: { week: { label: string }; onPrev: ()
   )
 }
 
+// ============ ANALYTICS CHART HELPERS ============
+const CHART_COLORS = ['#2563eb', '#93c5fd', '#ea8a2f', '#94a3b8', '#1e3a8a', '#f0b26b', '#60a5fa']
+
+function HoursTooltip({ active, payload, label, money }: any) {
+  if (!active || !payload || payload.length === 0) return null
+  const rows = payload.filter((p: any) => (p.value || 0) > 0)
+  if (rows.length === 0) return null
+  const total = rows.reduce((sum: number, p: any) => sum + (p.value || 0), 0)
+  const fmtVal = (v: number) => (money ? formatCurrency(v) : `${Math.round(v * 10) / 10}h`)
+  return (
+    <div style={{ background: '#fff', border: '1px solid rgba(15,23,42,0.08)', borderRadius: '10px', padding: '10px 12px', boxShadow: '0 8px 24px -6px rgba(0,0,0,0.14), 0 1px 3px rgba(0,0,0,0.06)', minWidth: '180px' }}>
+      <div style={{ fontFamily: 'Archivo, sans-serif', fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#64748b', marginBottom: '6px' }}>{label}</div>
+      {rows.map((p: any) => (
+        <div key={p.name} style={{ display: 'flex', justifyContent: 'space-between', gap: '14px', fontSize: '11.5px', color: '#475569', padding: '2px 0' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '7px', height: '7px', borderRadius: '2px', background: p.fill || p.color, display: 'inline-block', flexShrink: 0 }} />
+            {p.name}
+          </span>
+          <b style={{ fontFamily: 'Archivo, sans-serif', fontVariantNumeric: 'tabular-nums', color: '#0f172a', fontWeight: 700 }}>{fmtVal(p.value || 0)}</b>
+        </div>
+      ))}
+      {rows.length > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(15,23,42,0.07)', fontSize: '11.5px', fontWeight: 600, color: '#0f172a' }}>
+          <span>Total</span>
+          <b style={{ fontFamily: 'Archivo, sans-serif', color: '#2563eb', fontVariantNumeric: 'tabular-nums' }}>{money ? formatCurrency(total) : `${Math.round(total * 10) / 10}h`}</b>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ============ MAIN COMPONENT ============
 export default function ContractorPortal() {
   const [step, setStep] = useState<'email' | 'portal'>('email')
@@ -341,15 +372,18 @@ export default function ContractorPortal() {
   const [expandedHistoryInvoices, setExpandedHistoryInvoices] = useState<Set<string>>(new Set())
 
   // Analytics
-  const [analyticsPreset, setAnalyticsPreset] = useState<'this_week'|'this_month'|'last_month'|'q1'|'q2'|'q3'|'q4'|'last_quarter'|'ytd'|'last_year'|'custom'>('this_month')
+  const [analyticsPreset, setAnalyticsPreset] = useState<'this_week'|'this_month'|'last_month'|'q1'|'q2'|'q3'|'q4'|'last_quarter'|'ytd'|'last_year'|'custom'>('ytd')
   const [analyticsCustomStart, setAnalyticsCustomStart] = useState('')
   const [analyticsCustomEnd, setAnalyticsCustomEnd] = useState('')
   const [analyticsTime, setAnalyticsTime] = useState<any[]>([])
-  const [analyticsExpenses, setAnalyticsExpenses] = useState<any[]>([])
-  const [analyticsInvoices, setAnalyticsInvoices] = useState<any[]>([])
+  const [analyticsGranularity, setAnalyticsGranularity] = useState<'auto' | 'daily' | 'weekly' | 'monthly'>('auto')
+  const [analyticsInvoicesA, setAnalyticsInvoicesA] = useState<any[]>([])
+  const [analyticsExpensesA, setAnalyticsExpensesA] = useState<any[]>([])
+  const [analyticsDrill, setAnalyticsDrill] = useState<string | null>(null) // 'YYYY-MM' when drilled into a month
+  const [isoProject, setIsoProject] = useState<string | null>(null)
+  const [isoClient, setIsoClient] = useState<string | null>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const [hoursChartMode, setHoursChartMode] = useState<'total' | 'byProject'>('byProject')
-  const [invoiceChartMode, setInvoiceChartMode] = useState<'total' | 'byClient'>('total')
 
   const week = useMemo(() => getWeekRange(weekDate), [weekDate])
   const billingMonth = useMemo(() => getMonthRange(invoiceMonth), [invoiceMonth])
@@ -855,8 +889,16 @@ export default function ContractorPortal() {
   const analyticsRange = useMemo(() => {
     const now = new Date()
     const yr = now.getFullYear()
-    const fmt = (d: Date) => d.toISOString().split('T')[0]
+    const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     const monthLabel = (d: Date) => d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+
+    // Drill-down focus: one month, daily view (set by clicking a bar)
+    if (analyticsDrill) {
+      const [yy, mm] = analyticsDrill.split('-').map(Number)
+      const s0 = new Date(yy, mm - 1, 1)
+      const e0 = new Date(yy, mm, 0)
+      return { start: fmt(s0), end: fmt(e0), label: monthLabel(s0), granularity: 'weekly' as const }
+    }
 
     // Quarter helpers
     const qBounds = (q: number, y: number) => {
@@ -912,7 +954,7 @@ export default function ContractorPortal() {
     const s = new Date(yr, now.getMonth(), 1)
     const e = new Date(yr, now.getMonth() + 1, 0)
     return { start: fmt(s), end: fmt(e), label: monthLabel(s), granularity: 'weekly' as const }
-  }, [analyticsPreset, analyticsCustomStart, analyticsCustomEnd])
+  }, [analyticsPreset, analyticsCustomStart, analyticsCustomEnd, analyticsDrill])
 
   // ============ LOAD ANALYTICS ============
   useEffect(() => {
@@ -920,57 +962,65 @@ export default function ContractorPortal() {
     const load = async () => {
       setAnalyticsLoading(true)
       try {
-        const { data: timeData } = await supabase.from('time_entries').select('id, project_id, hours, billable_hours, date').eq('contractor_id', member.id).gte('date', analyticsRange.start).lte('date', analyticsRange.end).order('date', { ascending: true })
+        // Submitted hours only — drafts live in timesheet_drafts and never appear here
+        const { data: timeData } = await supabase.from('time_entries').select('id, project_id, hours, billable_hours, date, status').eq('contractor_id', member.id).gte('date', analyticsRange.start).lte('date', analyticsRange.end).order('date', { ascending: true })
+        setAnalyticsTime((timeData || []).filter((e: any) => (e.status || 'submitted') !== 'draft'))
+        // Invoices count in the period their billing period STARTS (KPI total always equals chart sum)
+        const { data: invData } = await supabase.from('contractor_invoices').select('id, invoice_date, total_amount, status, period_start, period_end, client_id, contractor_invoice_lines(*)').eq('team_member_id', member.id).gte('period_start', analyticsRange.start).lte('period_start', analyticsRange.end).order('period_start', { ascending: true })
+        setAnalyticsInvoicesA(invData || [])
+        // Expenses by expense date; rejected excluded from all sums
         const { data: expData } = await supabase.from('contractor_expenses').select('id, date, category, amount, status, client_id').eq('team_member_id', member.id).gte('date', analyticsRange.start).lte('date', analyticsRange.end).order('date', { ascending: true })
-        const { data: invData } = await supabase.from('contractor_invoices').select('id, invoice_date, total_amount, status, period_start, period_end, contractor_invoice_lines(*)').eq('team_member_id', member.id).lte('period_start', analyticsRange.end).gte('period_end', analyticsRange.start).order('invoice_date', { ascending: true })
-        setAnalyticsTime(timeData || []); setAnalyticsExpenses(expData || []); setAnalyticsInvoices(invData || [])
+        setAnalyticsExpensesA((expData || []).filter((e: any) => (e.status || '').toLowerCase() !== 'rejected'))
       } catch (err) { console.error('Analytics load error:', err) }
       finally { setAnalyticsLoading(false) }
     }
     load()
   }, [member, activeTab, analyticsRange.start, analyticsRange.end])
 
-  // ============ ANALYTICS COMPUTED DATA ============
-  // Hours bucketed by week or month depending on range granularity
-  const analyticsWeeklyHours = useMemo(() => {
-    if (analyticsTime.length === 0) return [] as { week: string; total: number; projects: Record<string, number> }[]
+  // ============ ANALYTICS COMPUTED DATA (time only) ============
+  const effectiveGranularity: 'daily' | 'weekly' | 'monthly' =
+    analyticsDrill ? 'daily' : analyticsGranularity === 'auto' ? (analyticsRange.granularity as 'weekly' | 'monthly') : analyticsGranularity
+
+  // Hours bucketed by day, week, or month (local dates throughout — no UTC shift)
+  const analyticsBuckets = useMemo(() => {
+    if (analyticsTime.length === 0) return [] as { label: string; total: number; projects: Record<string, number> }[]
     const projectMap: Record<string, string> = {}
     assignments.forEach(a => { projectMap[a.project_id] = a.project_name })
-    const useMonthly = analyticsRange.granularity === 'monthly'
-    const buckets: Record<string, { week: string; total: number; projects: Record<string, number> }> = {}
-
+    const localIso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const buckets: Record<string, { label: string; total: number; projects: Record<string, number> }> = {}
     analyticsTime.forEach((e: any) => {
       const d = new Date(e.date + 'T00:00:00')
       let key: string, label: string
-      if (useMonthly) {
+      if (effectiveGranularity === 'daily') {
+        key = e.date
+        label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      } else if (effectiveGranularity === 'monthly') {
         key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
         label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
       } else {
         const day = d.getDay()
-        const weekStart = new Date(d); weekStart.setDate(d.getDate() - day)
-        key = weekStart.toISOString().split('T')[0]
-        label = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        const ws = new Date(d); ws.setDate(d.getDate() - day)
+        key = localIso(ws)
+        label = ws.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
       }
-      if (!buckets[key]) buckets[key] = { week: label, total: 0, projects: {} }
+      if (!buckets[key]) buckets[key] = { label, total: 0, projects: {} }
       const pName = projectMap[e.project_id] || 'Other'
       buckets[key].projects[pName] = (buckets[key].projects[pName] || 0) + (e.hours || 0)
       buckets[key].total += e.hours || 0
     })
-    return Object.entries(buckets).sort(([a], [b]) => a.localeCompare(b)).map(([_, v]) => v)
-  }, [analyticsTime, assignments, analyticsRange.granularity])
+    return Object.entries(buckets).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => ({ key: k, ...v, total: Math.round(v.total * 10) / 10 }))
+  }, [analyticsTime, assignments, effectiveGranularity])
 
-  // Only project names with actual hours logged in the period (no zero columns)
+  // Only project names with actual hours logged in the period
   const analyticsProjectNames = useMemo(() => {
     const withHours = new Set<string>()
-    analyticsWeeklyHours.forEach(wk => {
-      Object.entries(wk.projects).forEach(([name, hrs]) => { if (hrs > 0) withHours.add(name) })
-    })
+    analyticsBuckets.forEach(b => { Object.entries(b.projects).forEach(([name, hrs]) => { if (hrs > 0) withHours.add(name) }) })
     return Array.from(withHours)
-  }, [analyticsWeeklyHours])
+  }, [analyticsBuckets])
 
-  // Effort distribution by client (pie)
+  // Effort distribution by client (ranked)
   const analyticsEffortByClient = useMemo(() => {
-    if (analyticsTime.length === 0) return []
+    if (analyticsTime.length === 0) return [] as { name: string; hours: number }[]
     const clientMap: Record<string, string> = {}
     assignments.forEach(a => { clientMap[a.project_id] = a.client_name || 'Unassigned' })
     const totals: Record<string, number> = {}
@@ -981,75 +1031,108 @@ export default function ContractorPortal() {
     return Object.entries(totals).map(([name, hours]) => ({ name, hours: Math.round(hours * 10) / 10 })).sort((a, b) => b.hours - a.hours)
   }, [analyticsTime, assignments])
 
-  // Monthly invoice trend — grouped by period_start, fills all months in range with $0
-  const analyticsInvoiceTrend = useMemo(() => {
-    // Build full month scaffold from range start to end
-    const startD = new Date(analyticsRange.start + 'T00:00:00')
-    const endD = new Date(analyticsRange.end + 'T00:00:00')
-    const months: Record<string, { month: string; total: number; byClient: Record<string, number>; count: number }> = {}
-    const cur = new Date(startD.getFullYear(), startD.getMonth(), 1)
-    while (cur <= endD) {
-      const key = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`
-      const label = cur.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-      months[key] = { month: label, total: 0, byClient: {}, count: 0 }
-      cur.setMonth(cur.getMonth() + 1)
-    }
-    // Populate from invoices using period_start for bucketing
-    analyticsInvoices.forEach((inv: any) => {
+  // Working rhythm — average hours per weekday, over days that had hours
+  const analyticsWeekday = useMemo(() => {
+    const names = [
+      { short: 'Mon', full: 'Mondays' }, { short: 'Tue', full: 'Tuesdays' }, { short: 'Wed', full: 'Wednesdays' },
+      { short: 'Thu', full: 'Thursdays' }, { short: 'Fri', full: 'Fridays' }, { short: 'Sat', full: 'Saturdays' }, { short: 'Sun', full: 'Sundays' },
+    ]
+    const agg: Record<number, { total: number; dates: Set<string> }> = {}
+    analyticsTime.forEach((e: any) => {
+      if (!((e.hours || 0) > 0)) return
+      const d = new Date(e.date + 'T00:00:00')
+      const dow = (d.getDay() + 6) % 7 // Mon=0 … Sun=6
+      if (!agg[dow]) agg[dow] = { total: 0, dates: new Set() }
+      agg[dow].total += e.hours || 0
+      agg[dow].dates.add(e.date)
+    })
+    return names.map((n, i) => {
+      const a = agg[i]
+      const avg = a && a.dates.size > 0 ? a.total / a.dates.size : 0
+      return { name: n.short, full: n.full, avg: Math.round(avg * 10) / 10 }
+    })
+  }, [analyticsTime])
+
+  // KPIs — total hours, average per working day, busiest weekday
+  const analyticsKPIs = useMemo(() => {
+    const totalHours = analyticsTime.reduce((s: number, e: any) => s + (e.hours || 0), 0)
+    const workingDays = new Set(analyticsTime.filter((e: any) => (e.hours || 0) > 0).map((e: any) => e.date)).size
+    const avgPerDay = workingDays > 0 ? totalHours / workingDays : 0
+    const busiest = analyticsWeekday.reduce((best, d) => (d.avg > best.avg ? d : best), { name: '—', full: '—', avg: 0 })
+    return { totalHours, workingDays, avgPerDay, busiest }
+  }, [analyticsTime, analyticsWeekday])
+
+  // ============ ANALYTICS — EARNINGS & EXPENSES ============
+  const clientNameById = useMemo(() => {
+    const m: Record<string, string> = {}
+    assignments.forEach(a => { if (a.client_id) m[a.client_id] = a.client_name || 'Unassigned' })
+    return m
+  }, [assignments])
+
+  // Invoiced per month, split by client via invoice lines (fallback: invoice client, then Other)
+  const invoicedBuckets = useMemo(() => {
+    if (analyticsInvoicesA.length === 0) return [] as { key: string; label: string; total: number; clients: Record<string, number> }[]
+    const buckets: Record<string, { label: string; total: number; clients: Record<string, number> }> = {}
+    analyticsInvoicesA.forEach((inv: any) => {
       const d = new Date((inv.period_start || inv.invoice_date) + 'T00:00:00')
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      if (!months[key]) return // outside range, skip
-      months[key].total += inv.total_amount || 0
-      months[key].count += 1
-      // Per-client breakdown using invoice_lines
+      const label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+      if (!buckets[key]) buckets[key] = { label, total: 0, clients: {} }
       const lines = inv.contractor_invoice_lines || []
       if (lines.length > 0) {
-        lines.forEach((l: any) => {
-          const cid = l.client_id || 'General'
-          months[key].byClient[cid] = (months[key].byClient[cid] || 0) + (l.amount || 0)
+        lines.forEach((ln: any) => {
+          const name = clientNameById[ln.client_id] || 'Other'
+          buckets[key].clients[name] = (buckets[key].clients[name] || 0) + (ln.amount || 0)
+          buckets[key].total += ln.amount || 0
         })
       } else {
-        const cid = inv.client_id || 'General'
-        months[key].byClient[cid] = (months[key].byClient[cid] || 0) + (inv.total_amount || 0)
+        const name = clientNameById[inv.client_id] || 'Other'
+        buckets[key].clients[name] = (buckets[key].clients[name] || 0) + (inv.total_amount || 0)
+        buckets[key].total += inv.total_amount || 0
       }
     })
-    return Object.entries(months).sort(([a], [b]) => a.localeCompare(b)).map(([_, v]) => v)
-  }, [analyticsInvoices, analyticsRange.start, analyticsRange.end])
+    return Object.entries(buckets).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => ({ key: k, ...v, total: Math.round(v.total) }))
+  }, [analyticsInvoicesA, clientNameById])
 
-  // All unique client IDs that appear in invoice trend (for per-client toggle)
-  const analyticsInvoiceClientIds = useMemo(() => {
-    const ids = new Set<string>()
-    analyticsInvoiceTrend.forEach(m => { Object.keys(m.byClient).forEach(id => ids.add(id)) })
-    return Array.from(ids)
-  }, [analyticsInvoiceTrend])
+  const invoicedClientNames = useMemo(() => {
+    const names = new Set<string>()
+    invoicedBuckets.forEach(b => { Object.entries(b.clients).forEach(([n, v]) => { if (v > 0) names.add(n) }) })
+    return Array.from(names)
+  }, [invoicedBuckets])
 
-  // Expense breakdown by category
-  const analyticsExpensesByCategory = useMemo(() => {
-    if (analyticsExpenses.length === 0) return []
+  // Invoiced by client (ranked) + realized rate = invoiced ÷ hours for that client in range
+  const invoicedByClient = useMemo(() => {
+    const totals: Record<string, number> = {}
+    invoicedBuckets.forEach(b => { Object.entries(b.clients).forEach(([n, v]) => { totals[n] = (totals[n] || 0) + v }) })
+    const hoursByClient: Record<string, number> = {}
+    analyticsEffortByClient.forEach(c => { hoursByClient[c.name] = c.hours })
+    return Object.entries(totals)
+      .map(([name, amount]) => {
+        const hrs = hoursByClient[name] || 0
+        return { name, amount: Math.round(amount), rate: hrs > 0 ? Math.round(amount / hrs) : null }
+      })
+      .sort((a, b) => b.amount - a.amount)
+  }, [invoicedBuckets, analyticsEffortByClient])
+
+  // Expenses by category (rejected already excluded at load)
+  const expensesByCategory = useMemo(() => {
+    if (analyticsExpensesA.length === 0) return [] as { name: string; amount: number }[]
     const cats: Record<string, number> = {}
-    analyticsExpenses.forEach((e: any) => {
+    analyticsExpensesA.forEach((e: any) => {
       const cat = EXPENSE_CATEGORIES.find(c => c.id === e.category)?.label || e.category || 'Other'
       cats[cat] = (cats[cat] || 0) + (e.amount || 0)
     })
     return Object.entries(cats).map(([name, amount]) => ({ name, amount: Math.round(amount) })).sort((a, b) => b.amount - a.amount)
-  }, [analyticsExpenses])
+  }, [analyticsExpensesA])
 
-  // Analytics KPIs with period comparisons
-  const analyticsKPIs = useMemo(() => {
-    const totalHours = analyticsTime.reduce((s: number, e: any) => s + (e.hours || 0), 0)
-    const totalExpenses = analyticsExpenses.reduce((s: number, e: any) => s + (e.amount || 0), 0)
-    const totalInvoiced = analyticsInvoices.reduce((s: number, inv: any) => s + (inv.total_amount || 0), 0)
-    const uniqueProjects = new Set(analyticsTime.map((e: any) => e.project_id)).size
-    // Average weekly hours
-    const weeks = new Set<string>()
-    analyticsTime.forEach((e: any) => {
-      const d = new Date(e.date + 'T00:00:00'); const day = d.getDay()
-      const ws = new Date(d); ws.setDate(d.getDate() - day)
-      weeks.add(ws.toISOString().split('T')[0])
-    })
-    const avgWeeklyHours = weeks.size > 0 ? totalHours / weeks.size : 0
-    return { totalHours, totalExpenses, totalInvoiced, uniqueProjects, avgWeeklyHours, weekCount: weeks.size }
-  }, [analyticsTime, analyticsExpenses, analyticsInvoices])
+  // Money KPIs — Paid = status 'paid'; Pending = total − paid; Reimbursed = expenses with status 'paid'
+  const moneyKPIs = useMemo(() => {
+    const totalInvoiced = invoicedBuckets.reduce((sum, b) => sum + b.total, 0)
+    const paid = analyticsInvoicesA.filter((i: any) => (i.status || '').toLowerCase() === 'paid').reduce((sum: number, i: any) => sum + (i.total_amount || 0), 0)
+    const totalExpenses = analyticsExpensesA.reduce((sum: number, e: any) => sum + (e.amount || 0), 0)
+    const reimbursed = analyticsExpensesA.filter((e: any) => (e.status || '').toLowerCase() === 'paid').reduce((sum: number, e: any) => sum + (e.amount || 0), 0)
+    return { totalInvoiced: Math.round(totalInvoiced), paid: Math.round(paid), pending: Math.round(Math.max(0, totalInvoiced - paid)), invoiceCount: analyticsInvoicesA.length, totalExpenses: Math.round(totalExpenses), reimbursed: Math.round(reimbursed) }
+  }, [invoicedBuckets, analyticsInvoicesA, analyticsExpensesA])
 
   const historyTotals = useMemo(() => {
     const totalHours = historyTime.reduce((s: number, e: any) => s + (e.hours || 0), 0)
@@ -2110,363 +2193,397 @@ export default function ContractorPortal() {
 
         {/* ====== ANALYTICS ====== */}
         {activeTab === 'analytics' && (
-          <div className="space-y-5">
-            {/* Date Range — Dropdown */}
-            {(() => {
-              const yr = new Date().getFullYear()
-              const currentQ = Math.floor(new Date().getMonth() / 3)
-              const presetGroups = [
-                { label: 'Recent', options: [
-                  { value: 'this_week', label: 'This Week' },
-                  { value: 'this_month', label: 'This Month' },
-                  { value: 'last_month', label: 'Last Month' },
-                ]},
-                { label: `${yr} Quarters`, options: [
-                  { value: 'q1', label: `Q1 ${yr}` },
-                  { value: 'q2', label: `Q2 ${yr}` },
-                  { value: 'q3', label: `Q3 ${yr}` },
-                  { value: 'q4', label: `Q4 ${yr}` },
-                  { value: 'last_quarter', label: 'Last Quarter' },
-                ]},
-                { label: 'Year', options: [
-                  { value: 'ytd', label: `YTD ${yr}` },
-                  { value: 'last_year', label: `${yr - 1} (Full Year)` },
-                ]},
-                { label: 'Other', options: [
-                  { value: 'custom', label: 'Custom Range...' },
-                ]},
-              ]
-              const allOptions = presetGroups.flatMap(g => g.options)
-              const currentLabel = allOptions.find(o => o.value === analyticsPreset)?.label || analyticsRange.label
-              return (
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <select
-                      value={analyticsPreset}
-                      onChange={e => setAnalyticsPreset(e.target.value as any)}
-                      className="appearance-none pl-3 pr-8 py-1.5 bg-white border border-gray-200 rounded text-[12px] font-medium text-gray-700 focus:outline-none focus:border-gray-900 cursor-pointer transition-colors"
-                    >
-                      {presetGroups.map(group => (
-                        <optgroup key={group.label} label={group.label}>
-                          {group.options.map(o => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                    <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  </div>
-                  <span className="text-[11px] text-gray-400">{analyticsRange.label}</span>
-                </div>
-              )
-            })()}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-            {/* Custom Date Picker */}
-            {analyticsPreset === 'custom' && (
-              <div className={`${T.card} p-3 flex items-center gap-3 flex-wrap`}>
-                <div className="flex items-center gap-2">
-                  <label className="text-[10px] font-medium text-gray-400 uppercase tracking-[0.06em]">From</label>
-                  <input type="date" value={analyticsCustomStart} onChange={e => setAnalyticsCustomStart(e.target.value)} className={`${T.input} w-auto`} style={{ colorScheme: 'light' }} />
+            {/* Controls — range + drill chip + granularity */}
+            <div className="vUp" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative' }}>
+                  <select
+                    value={analyticsPreset}
+                    onChange={e => { setAnalyticsPreset(e.target.value as any); setAnalyticsGranularity('auto'); setAnalyticsDrill(null); setIsoProject(null); setIsoClient(null) }}
+                    style={{ appearance: 'none', padding: '0 30px 0 12px', height: '36px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', fontSize: '12px', fontWeight: 500, color: '#334155', outline: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    {(() => {
+                      const yr = new Date().getFullYear()
+                      return (
+                        <>
+                          <optgroup label="Recent">
+                            <option value="this_week">This Week</option>
+                            <option value="this_month">This Month</option>
+                            <option value="last_month">Last Month</option>
+                          </optgroup>
+                          <optgroup label={`${yr} Quarters`}>
+                            <option value="q1">{`Q1 ${yr}`}</option>
+                            <option value="q2">{`Q2 ${yr}`}</option>
+                            <option value="q3">{`Q3 ${yr}`}</option>
+                            <option value="q4">{`Q4 ${yr}`}</option>
+                            <option value="last_quarter">Last Quarter</option>
+                          </optgroup>
+                          <optgroup label="Year">
+                            <option value="ytd">{`YTD ${yr}`}</option>
+                            <option value="last_year">{`${yr - 1} (Full Year)`}</option>
+                          </optgroup>
+                          <optgroup label="Other">
+                            <option value="custom">Custom Range...</option>
+                          </optgroup>
+                        </>
+                      )
+                    })()}
+                  </select>
+                  <ChevronDown size={12} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-[10px] font-medium text-gray-400 uppercase tracking-[0.06em]">To</label>
-                  <input type="date" value={analyticsCustomEnd} onChange={e => setAnalyticsCustomEnd(e.target.value)} className={`${T.input} w-auto`} style={{ colorScheme: 'light' }} />
-                </div>
+                {analyticsPreset === 'custom' && !analyticsDrill && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <input type="date" value={analyticsCustomStart} onChange={e => setAnalyticsCustomStart(e.target.value)} style={{ height: '36px', padding: '0 10px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', fontSize: '12px', color: '#334155', outline: 'none', fontFamily: 'inherit' }} />
+                    <span style={{ color: '#94a3b8', fontSize: '12px' }}>–</span>
+                    <input type="date" value={analyticsCustomEnd} onChange={e => setAnalyticsCustomEnd(e.target.value)} style={{ height: '36px', padding: '0 10px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', fontSize: '12px', color: '#334155', outline: 'none', fontFamily: 'inherit' }} />
+                  </span>
+                )}
+                <span style={{ fontSize: '11.5px', color: '#94a3b8' }}>{formatDate(analyticsRange.start)} – {formatDate(analyticsRange.end)}</span>
+                {analyticsDrill && (
+                  <button
+                    onClick={() => setAnalyticsDrill(null)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', fontFamily: 'Archivo, sans-serif', fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1d4ed8', background: 'rgba(37,99,235,0.07)', border: '1px solid #bfdbfe', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}
+                  >
+                    Focused: {analyticsRange.label} ✕
+                  </button>
+                )}
               </div>
-            )}
+              <div style={{ display: 'inline-flex', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '3px', gap: '2px' }}>
+                {(['daily', 'weekly', 'monthly'] as const).map(g => (
+                  <button
+                    key={g}
+                    onClick={() => { setAnalyticsDrill(null); setAnalyticsGranularity(g) }}
+                    style={{ fontFamily: 'Archivo, sans-serif', fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', border: 'none', background: effectiveGranularity === g ? '#2563eb' : 'transparent', color: effectiveGranularity === g ? '#fff' : '#94a3b8', padding: '6px 14px', borderRadius: '7px', cursor: 'pointer', transition: 'all 0.18s', boxShadow: effectiveGranularity === g ? '0 2px 8px -2px rgba(37,99,235,0.4)' : 'none' }}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {analyticsLoading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 size={22} className="text-gray-400 animate-spin" />
+              <div className="v-card" style={{ padding: '48px 20px', display: 'flex', justifyContent: 'center' }}>
+                <Loader2 size={20} className="animate-spin" style={{ color: '#cbd5e1' }} />
               </div>
             ) : (
               <>
-                {/* KPI Summary Row */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 bg-gray-200 border border-gray-200 rounded overflow-hidden">
-                  {[
-                    { label: 'Total hours', value: analyticsKPIs.totalHours.toFixed(1) + 'h', sub: analyticsRange.granularity === 'monthly' ? `${analyticsKPIs.weekCount} months` : `${analyticsKPIs.avgWeeklyHours.toFixed(1)}h avg/wk` },
-                    { label: 'Invoiced', value: formatCurrency(analyticsKPIs.totalInvoiced), sub: `${analyticsInvoices.length} invoice${analyticsInvoices.length !== 1 ? 's' : ''}` },
-                    { label: 'Expenses', value: formatCurrency(analyticsKPIs.totalExpenses), sub: `${analyticsExpenses.length} item${analyticsExpenses.length !== 1 ? 's' : ''}` },
-                    { label: 'Projects', value: String(analyticsKPIs.uniqueProjects), sub: `${analyticsKPIs.weekCount} weeks tracked` },
-                  ].map(card => (
-                    <div key={card.label} className="bg-white px-4 py-3">
-                      <p className="text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400 mb-1">{card.label}</p>
-                      <p className="text-[18px] font-medium text-gray-900 tabular-nums">{card.value}</p>
-                      <p className="text-[11px] text-gray-400 mt-0.5">{card.sub}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* ── WEEKLY HOURS ── */}
-                {analyticsWeeklyHours.length > 0 && (
-                  <div className={`${T.card} p-4`}>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="w-[13px] h-[13px] text-gray-700" />
-                        <h2 className={T.sectionTitle}>{analyticsRange.granularity === 'monthly' ? 'Monthly Hours' : 'Weekly Hours'}</h2>
-                      </div>
-                      {analyticsProjectNames.length > 1 && (
-                        <div className="inline-flex border border-gray-200 rounded overflow-hidden">
-                          {(['byProject', 'total'] as const).map(mode => (
-                            <button key={mode} onClick={() => setHoursChartMode(mode)}
-                              className={`px-3 py-1 text-[11px] font-medium transition-colors border-r border-gray-200 last:border-r-0 ${
-                                hoursChartMode === mode ? 'bg-gray-900 text-white' : 'bg-white text-gray-400 hover:text-gray-700'
-                              }`}>
-                              {mode === 'byProject' ? 'By Project' : 'Total'}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <ResponsiveContainer width="100%" height={240}>
-                      <RechartsBarChart data={analyticsWeeklyHours} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                        <XAxis dataKey="week" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                        <Tooltip
-                          contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', fontSize: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-                          labelStyle={{ fontWeight: 600, color: '#1e293b', marginBottom: 4 }}
-                          formatter={(value: number, name: string) => [`${value.toFixed(1)}h`, name]}
-                        />
-                        {hoursChartMode === 'byProject' && analyticsProjectNames.length > 1 ? (
-                          analyticsProjectNames.map((name, i) => (
-                            <Bar key={name} dataKey={(d: any) => d.projects?.[name] || 0} name={name}
-                              stackId="hours" fill={CLIENT_COLORS[i % CLIENT_COLORS.length]}
-                              radius={i === analyticsProjectNames.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
-                          ))
-                        ) : (
-                          <Bar dataKey="total" name="Total Hours" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                        )}
-                        {/* Trend line overlay */}
-                        <Area type="monotone" dataKey="total" stroke="#2563eb" strokeWidth={2} fill="none"
-                          dot={false} strokeDasharray="4 2" opacity={hoursChartMode === 'total' ? 0 : 0.6} />
-                      </RechartsBarChart>
-                    </ResponsiveContainer>
-                    {hoursChartMode === 'byProject' && analyticsProjectNames.length > 1 && (
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 pl-2">
-                        {analyticsProjectNames.map((name, i) => (
-                          <div key={name} className="flex items-center gap-1.5">
-                            <div className="w-2.5 h-2.5 rounded-sm" style={{ background: CLIENT_COLORS[i % CLIENT_COLORS.length] }} />
-                            <span className="text-[11px] text-gray-500 font-medium">{name}</span>
+                {/* ---------- HOURS ---------- */}
+                {analyticsTime.length === 0 ? (
+                  <div className="v-card vUp" style={{ padding: '40px 20px', textAlign: 'center' }}>
+                    <TrendingUp size={20} style={{ color: '#cbd5e1', margin: '0 auto 8px' }} />
+                    <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748b' }}>No submitted hours for {analyticsRange.label}</p>
+                    <p style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '4px' }}>Hours appear here after you submit a week from the Timesheet tab.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="v-card vUp vD1" style={{ overflow: 'hidden' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr' }}>
+                        {[
+                          { label: 'Total hours', value: `${(Math.round(analyticsKPIs.totalHours * 10) / 10).toFixed(1)}h`, em: true, sub: `${analyticsRange.label} · submitted` },
+                          { label: 'Avg per working day', value: `${(Math.round(analyticsKPIs.avgPerDay * 10) / 10).toFixed(1)}h`, em: false, sub: `${analyticsKPIs.workingDays} working day${analyticsKPIs.workingDays === 1 ? '' : 's'} logged` },
+                          { label: 'Busiest day', value: analyticsKPIs.busiest.full, em: false, sub: analyticsKPIs.busiest.avg > 0 ? `${analyticsKPIs.busiest.avg}h average` : '' },
+                        ].map((kpi, i) => (
+                          <div key={kpi.label} style={{ position: 'relative', overflow: 'hidden', padding: '14px 20px', borderRight: i < 2 ? '1px solid rgba(15,23,42,0.06)' : 'none' }}>
+                            <div style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#94a3b8' }}>{kpi.label}</div>
+                            <div style={{ fontFamily: 'Archivo, sans-serif', fontSize: '24px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: kpi.em ? '#2563eb' : '#0f172a', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{kpi.value}</div>
+                            {kpi.sub ? <div style={{ fontSize: '10.5px', color: '#94a3b8', marginTop: '2px' }}>{kpi.sub}</div> : null}
+                            <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: '35%', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5))', pointerEvents: 'none' }} />
                           </div>
                         ))}
                       </div>
-                    )}
-                  </div>
-                )}
-
-                {/* ── TWO-COL: EFFORT + EXPENSES ── */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {analyticsEffortByClient.length > 0 && (
-                    <div className={`${T.card} p-4`}>
-                      <div className="flex items-center gap-2 mb-3">
-                        <Briefcase size={13} className="text-indigo-500" />
-                        <h2 className={T.sectionTitle}>Effort by Client</h2>
-                      </div>
-                      <ResponsiveContainer width="100%" height={180}>
-                        <PieChart>
-                          <Pie data={analyticsEffortByClient} cx="50%" cy="50%" innerRadius={45} outerRadius={72} paddingAngle={3} dataKey="hours" nameKey="name">
-                            {analyticsEffortByClient.map((_, i) => (
-                              <Cell key={i} fill={CLIENT_COLORS[i % CLIENT_COLORS.length]} stroke="none" />
-                            ))}
-                          </Pie>
-                          <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', fontSize: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-                            formatter={(value: number) => [`${value}h`, 'Hours']} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div className="space-y-1.5 mt-2">
-                        {analyticsEffortByClient.map((item, i) => {
-                          const total = analyticsEffortByClient.reduce((s, e) => s + e.hours, 0)
-                          const pct = total > 0 ? ((item.hours / total) * 100).toFixed(0) : '0'
-                          return (
-                            <div key={item.name} className="flex items-center justify-between text-xs">
-                              <div className="flex items-center gap-2">
-                                <div className="w-2.5 h-2.5 rounded-sm" style={{ background: CLIENT_COLORS[i % CLIENT_COLORS.length] }} />
-                                <span className="text-gray-600 font-medium">{item.name}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-gray-900 font-medium tabular-nums">{item.hours}h</span>
-                                <span className="text-gray-400 tabular-nums w-8 text-right">{pct}%</span>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
                     </div>
-                  )}
 
-                  {analyticsExpensesByCategory.length > 0 ? (
-                    <div className={`${T.card} p-4`}>
-                      <div className="flex items-center gap-2 mb-3">
-                        <Receipt size={13} className="text-gray-400" />
-                        <h2 className={T.sectionTitle}>Expenses by Category</h2>
-                      </div>
-                      <ResponsiveContainer width="100%" height={180}>
-                        <PieChart>
-                          <Pie data={analyticsExpensesByCategory} cx="50%" cy="50%" innerRadius={45} outerRadius={72} paddingAngle={3} dataKey="amount" nameKey="name">
-                            {analyticsExpensesByCategory.map((_, i) => (
-                              <Cell key={i} fill={['#f59e0b', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16'][i % 6]} stroke="none" />
-                            ))}
-                          </Pie>
-                          <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', fontSize: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-                            formatter={(value: number) => [formatCurrency(value), 'Amount']} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div className="space-y-1.5 mt-2">
-                        {analyticsExpensesByCategory.map((item, i) => {
-                          const total = analyticsExpensesByCategory.reduce((s, e) => s + e.amount, 0)
-                          const pct = total > 0 ? ((item.amount / total) * 100).toFixed(0) : '0'
-                          return (
-                            <div key={item.name} className="flex items-center justify-between text-xs">
-                              <div className="flex items-center gap-2">
-                                <div className="w-2.5 h-2.5 rounded-sm" style={{ background: ['#f59e0b', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16'][i % 6] }} />
-                                <span className="text-gray-600 font-medium">{item.name}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-gray-900 font-medium tabular-nums">{formatCurrency(item.amount)}</span>
-                                <span className="text-gray-400 tabular-nums w-8 text-right">{pct}%</span>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className={`${T.card} p-4 flex flex-col items-center justify-center text-center`}>
-                      <div className="w-12 h-12 rounded bg-gray-50 border border-gray-100 flex items-center justify-center mb-3">
-                        <Receipt size={18} className="text-gray-300" />
-                      </div>
-                      <p className="text-gray-400 text-[13px] font-medium">No expenses</p>
-                      <p className="text-gray-300 text-xs mt-1">for this period</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* ── INVOICE TREND ── */}
-                {analyticsInvoiceTrend.some(m => m.total > 0) && (
-                  <div className={`${T.card} p-4`}>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <DollarSign size={13} className="text-blue-500" />
-                        <h2 className={T.sectionTitle}>Invoice Trend</h2>
-                      </div>
-                      {analyticsInvoiceClientIds.length > 1 && (
-                        <div className="inline-flex items-center bg-gray-100 rounded p-0.5">
-                          {(['total', 'byClient'] as const).map(mode => (
-                            <button key={mode} onClick={() => setInvoiceChartMode(mode)}
-                              className={`px-3 py-1 rounded text-[11px] font-medium transition-colors ${
-                                invoiceChartMode === mode ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-gray-600'
-                              }`}>
-                              {mode === 'total' ? 'Total' : 'By Client'}
+                    <div className="v-card vUp vD2" style={{ overflow: 'hidden' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 20px', borderBottom: '1px solid rgba(15,23,42,0.06)', backgroundImage: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)', gap: '12px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#94a3b8' }}>
+                          Hours per {effectiveGranularity === 'daily' ? 'day' : effectiveGranularity === 'monthly' ? 'month' : 'week'}{analyticsDrill ? ` — ${analyticsRange.label}` : ''}
+                        </span>
+                        <span style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          {analyticsProjectNames.map((name, i) => (
+                            <button
+                              key={name}
+                              onClick={() => setIsoProject(isoProject === name ? null : name)}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '10.5px', color: isoProject === name ? '#1d4ed8' : '#64748b', opacity: isoProject && isoProject !== name ? 0.35 : 1, background: isoProject === name ? 'rgba(37,99,235,0.08)' : 'transparent', border: 'none', borderRadius: '6px', padding: '2px 5px', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}
+                            >
+                              <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: CHART_COLORS[i % CHART_COLORS.length], display: 'inline-block' }} />
+                              {name}
                             </button>
                           ))}
+                        </span>
+                      </div>
+                      <div style={{ padding: '16px 20px 8px' }}>
+                        <ResponsiveContainer width="100%" height={240}>
+                          <RechartsBarChart data={analyticsBuckets} margin={{ top: 22, right: 8, bottom: 0, left: -18 }}>
+                            <CartesianGrid vertical={false} stroke="rgba(15,23,42,0.05)" />
+                            <XAxis dataKey="label" tick={{ fontSize: 9.5, fill: '#94a3b8' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                            <YAxis tick={{ fontSize: 9.5, fill: '#94a3b8' }} axisLine={false} tickLine={false} domain={[0, (dataMax: number) => Math.max(1, Math.ceil(dataMax * 1.15))]} />
+                            <Tooltip content={<HoursTooltip />} cursor={{ fill: 'rgba(37,99,235,0.04)' }} />
+                            {analyticsProjectNames.filter(n => !isoProject || n === isoProject).map((name, i, arr) => (
+                              <Bar
+                                key={name}
+                                dataKey={(row: any) => row.projects[name] || 0}
+                                name={name}
+                                stackId="hours"
+                                fill={CHART_COLORS[analyticsProjectNames.indexOf(name) % CHART_COLORS.length]}
+                                radius={i === arr.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
+                                cursor={effectiveGranularity !== 'daily' ? 'pointer' : 'default'}
+                                onClick={(row: any) => {
+                                  if (effectiveGranularity !== 'daily' && row?.key) setAnalyticsDrill(String(row.key).slice(0, 7))
+                                }}
+                              >
+                                {i === arr.length - 1 && analyticsBuckets.length <= 14 && (
+                                  <LabelList
+                                    dataKey={isoProject ? ((row: any) => row.projects[isoProject] || 0) : 'total'}
+                                    position="top"
+                                    formatter={(v: any) => (v > 0 ? Math.round(v * 10) / 10 : '')}
+                                    style={{ fontFamily: 'Archivo, sans-serif', fontSize: '10px', fontWeight: 700, fill: '#334155' }}
+                                  />
+                                )}
+                              </Bar>
+                            ))}
+                          </RechartsBarChart>
+                        </ResponsiveContainer>
+                        <div style={{ fontSize: '11px', color: '#94a3b8', paddingBottom: '8px' }}>
+                          {effectiveGranularity !== 'daily' ? 'Click a bar to drill into that month · click a legend item to isolate a project.' : 'Click a legend item to isolate a project · totals move to hover beyond 14 bars.'}
                         </div>
-                      )}
+                      </div>
                     </div>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <AreaChart data={analyticsInvoiceTrend} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                        <defs>
-                          <linearGradient id="invoiceGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.15} />
-                            <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
-                          </linearGradient>
-                          {analyticsInvoiceClientIds.map((cid, i) => (
-                            <linearGradient key={cid} id={`invGrad_${i}`} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor={CLIENT_COLORS[i % CLIENT_COLORS.length]} stopOpacity={0.15} />
-                              <stop offset="95%" stopColor={CLIENT_COLORS[i % CLIENT_COLORS.length]} stopOpacity={0} />
-                            </linearGradient>
-                          ))}
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                        <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false}
-                          tickFormatter={(v) => v === 0 ? '$0' : `$${(v / 1000).toFixed(0)}k`} />
-                        <Tooltip
-                          contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', fontSize: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-                          formatter={(value: number, name: string) => [formatCurrency(value), name]}
-                        />
-                        {invoiceChartMode === 'total' || analyticsInvoiceClientIds.length <= 1 ? (
-                          <Area type="monotone" dataKey="total" name="Invoiced" stroke="#0ea5e9" strokeWidth={2.5}
-                            fill="url(#invoiceGrad)" dot={(props: any) => props.payload.total > 0 ? <circle cx={props.cx} cy={props.cy} r={4} fill="#0ea5e9" stroke="#fff" strokeWidth={2} /> : <g />} />
-                        ) : (
-                          analyticsInvoiceClientIds.map((cid, i) => {
-                            const clientName = assignmentsByClient[cid]?.clientName || cid
-                            return (
-                              <Area key={cid} type="monotone"
-                                dataKey={(d: any) => d.byClient?.[cid] || 0}
-                                name={clientName} stroke={CLIENT_COLORS[i % CLIENT_COLORS.length]} strokeWidth={2}
-                                fill={`url(#invGrad_${i})`} stackId="clients"
-                                dot={(props: any) => (props.payload.byClient?.[cid] || 0) > 0 ? <circle cx={props.cx} cy={props.cy} r={3} fill={CLIENT_COLORS[i % CLIENT_COLORS.length]} stroke="#fff" strokeWidth={2} /> : <g />} />
-                            )
-                          })
-                        )}
-                      </AreaChart>
-                    </ResponsiveContainer>
-                    {invoiceChartMode === 'byClient' && analyticsInvoiceClientIds.length > 1 && (
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 pl-2">
-                        {analyticsInvoiceClientIds.map((cid, i) => (
-                          <div key={cid} className="flex items-center gap-1.5">
-                            <div className="w-2.5 h-2.5 rounded-sm" style={{ background: CLIENT_COLORS[i % CLIENT_COLORS.length] }} />
-                            <span className="text-[11px] text-gray-500 font-medium">{assignmentsByClient[cid]?.clientName || cid}</span>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                      {/* Working rhythm */}
+                      <div className="v-card vUp vD3" style={{ overflow: 'hidden' }}>
+                        <div style={{ padding: '11px 20px', borderBottom: '1px solid rgba(15,23,42,0.06)', backgroundImage: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)' }}>
+                          <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#94a3b8' }}>Working rhythm — avg by weekday</span>
+                        </div>
+                        <div style={{ padding: '16px 20px 12px' }}>
+                          <ResponsiveContainer width="100%" height={190}>
+                            <RechartsBarChart data={analyticsWeekday} margin={{ top: 22, right: 8, bottom: 0, left: -22 }}>
+                              <CartesianGrid vertical={false} stroke="rgba(15,23,42,0.05)" />
+                              <XAxis dataKey="name" tick={{ fontSize: 9.5, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                              <YAxis tick={{ fontSize: 9.5, fill: '#94a3b8' }} axisLine={false} tickLine={false} domain={[0, (dataMax: number) => Math.max(1, Math.ceil(dataMax * 1.15))]} />
+                              <Tooltip
+                                cursor={{ fill: 'rgba(37,99,235,0.04)' }}
+                                content={({ active, payload }: any) => {
+                                  if (!active || !payload || payload.length === 0) return null
+                                  const d = payload[0]?.payload
+                                  if (!d || !(d.avg > 0)) return null
+                                  return (
+                                    <div style={{ background: '#fff', border: '1px solid rgba(15,23,42,0.08)', borderRadius: '10px', padding: '8px 11px', boxShadow: '0 8px 24px -6px rgba(0,0,0,0.14)', fontSize: '11.5px', color: '#475569' }}>
+                                      {d.full}: <b style={{ fontFamily: 'Archivo, sans-serif', color: '#0f172a' }}>{d.avg}h</b> average
+                                    </div>
+                                  )
+                                }}
+                              />
+                              <Bar dataKey="avg" radius={[4, 4, 0, 0]}>
+                                <LabelList dataKey="avg" position="top" formatter={(v: any) => (v > 0 ? v : '')} style={{ fontFamily: 'Archivo, sans-serif', fontSize: '10px', fontWeight: 700, fill: '#334155' }} />
+                                {analyticsWeekday.map((d, i) => (
+                                  <Cell key={i} fill={d.avg >= 5 ? '#2563eb' : d.avg >= 2 ? '#60a5fa' : d.avg > 0 ? '#cbd5e1' : '#e2e8f0'} />
+                                ))}
+                              </Bar>
+                            </RechartsBarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+
+                      {/* Effort by client */}
+                      <div className="v-card vUp vD4" style={{ overflow: 'hidden' }}>
+                        <div style={{ padding: '11px 20px', borderBottom: '1px solid rgba(15,23,42,0.06)', backgroundImage: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)' }}>
+                          <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#94a3b8' }}>Effort by client</span>
+                        </div>
+                        <div style={{ padding: '10px 20px 16px' }}>
+                          {(() => {
+                            const grand = analyticsEffortByClient.reduce((sum, c) => sum + c.hours, 0)
+                            return analyticsEffortByClient.map((c, i) => {
+                              const pct = grand > 0 ? Math.round((c.hours / grand) * 100) : 0
+                              const color = CHART_COLORS[i % CHART_COLORS.length]
+                              return (
+                                <div key={c.name} style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 160px) 1fr 64px', alignItems: 'center', gap: '12px', padding: '8px 0', borderTop: i === 0 ? 'none' : '1px solid rgba(15,23,42,0.04)' }}>
+                                  <span style={{ fontSize: '12.5px', color: '#334155', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                    <span style={{ width: '7px', height: '7px', borderRadius: '2px', background: color, flexShrink: 0 }} />
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                                  </span>
+                                  <span style={{ height: '14px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden', display: 'block' }}>
+                                    <span style={{ display: 'block', height: '100%', width: `${Math.max(pct, 2)}%`, background: color, borderRadius: '4px' }} />
+                                  </span>
+                                  <span style={{ fontFamily: 'Archivo, sans-serif', fontSize: '12px', fontWeight: 700, color: '#0f172a', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                                    {c.hours}h
+                                    <span style={{ display: 'block', fontSize: '10px', color: '#94a3b8', fontWeight: 400, fontFamily: 'Instrument Sans, sans-serif' }}>{pct}%</span>
+                                  </span>
+                                </div>
+                              )
+                            })
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* ---------- EARNINGS & EXPENSES ---------- */}
+                <div className="vUp" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
+                  <span style={{ fontFamily: 'Archivo, sans-serif', fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#64748b' }}>Earnings & Expenses</span>
+                  <span style={{ flex: 1, height: '1px', background: 'rgba(15,23,42,0.08)' }} />
+                </div>
+
+                {analyticsInvoicesA.length === 0 && analyticsExpensesA.length === 0 ? (
+                  <div className="v-card vUp" style={{ padding: '40px 20px', textAlign: 'center' }}>
+                    <FileText size={20} style={{ color: '#cbd5e1', margin: '0 auto 8px' }} />
+                    <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748b' }}>No invoices or expenses for {analyticsRange.label}</p>
+                    <p style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '4px' }}>Invoices count in the period their billing period starts.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="v-card vUp" style={{ overflow: 'hidden' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr' }}>
+                        {[
+                          { label: 'Total invoiced', value: formatCurrency(moneyKPIs.totalInvoiced), em: true, sub: `${moneyKPIs.invoiceCount} invoice${moneyKPIs.invoiceCount === 1 ? '' : 's'} · ${analyticsRange.label}` },
+                          { label: 'Paid', value: formatCurrency(moneyKPIs.paid), em: false, sub: moneyKPIs.pending > 0 ? `${formatCurrency(moneyKPIs.pending)} pending` : 'Nothing pending' },
+                          { label: 'Expenses submitted', value: formatCurrency(moneyKPIs.totalExpenses), em: false, sub: moneyKPIs.reimbursed > 0 ? `${formatCurrency(moneyKPIs.reimbursed)} reimbursed` : '' },
+                        ].map((kpi, i) => (
+                          <div key={kpi.label} style={{ position: 'relative', overflow: 'hidden', padding: '14px 20px', borderRight: i < 2 ? '1px solid rgba(15,23,42,0.06)' : 'none' }}>
+                            <div style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#94a3b8' }}>{kpi.label}</div>
+                            <div style={{ fontFamily: 'Archivo, sans-serif', fontSize: '24px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: kpi.em ? '#2563eb' : '#0f172a', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{kpi.value}</div>
+                            {kpi.sub ? <div style={{ fontSize: '10.5px', color: '#94a3b8', marginTop: '2px' }}>{kpi.sub}</div> : null}
+                            <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: '35%', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5))', pointerEvents: 'none' }} />
                           </div>
                         ))}
                       </div>
+                    </div>
+
+                    {invoicedBuckets.length > 0 && (
+                      <div className="v-card vUp" style={{ overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 20px', borderBottom: '1px solid rgba(15,23,42,0.06)', backgroundImage: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)', gap: '12px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#94a3b8' }}>Invoiced per month</span>
+                          <span style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            {invoicedClientNames.map((name, i) => (
+                              <button
+                                key={name}
+                                onClick={() => setIsoClient(isoClient === name ? null : name)}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '10.5px', color: isoClient === name ? '#1d4ed8' : '#64748b', opacity: isoClient && isoClient !== name ? 0.35 : 1, background: isoClient === name ? 'rgba(37,99,235,0.08)' : 'transparent', border: 'none', borderRadius: '6px', padding: '2px 5px', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}
+                              >
+                                <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: CHART_COLORS[i % CHART_COLORS.length], display: 'inline-block' }} />
+                                {name}
+                              </button>
+                            ))}
+                          </span>
+                        </div>
+                        <div style={{ padding: '16px 20px 12px' }}>
+                          <ResponsiveContainer width="100%" height={220}>
+                            <RechartsBarChart data={invoicedBuckets} margin={{ top: 22, right: 8, bottom: 0, left: -4 }}>
+                              <CartesianGrid vertical={false} stroke="rgba(15,23,42,0.05)" />
+                              <XAxis dataKey="label" tick={{ fontSize: 9.5, fill: '#94a3b8' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                              <YAxis tick={{ fontSize: 9.5, fill: '#94a3b8' }} axisLine={false} tickLine={false} domain={[0, (dataMax: number) => Math.max(1, Math.ceil(dataMax * 1.15))]} tickFormatter={(v: any) => `$${Math.round(v / 1000)}k`} />
+                              <Tooltip content={<HoursTooltip money />} cursor={{ fill: 'rgba(37,99,235,0.04)' }} />
+                              {invoicedClientNames.filter(n => !isoClient || n === isoClient).map((name, i, arr) => (
+                                <Bar
+                                  key={name}
+                                  dataKey={(row: any) => row.clients[name] || 0}
+                                  name={name}
+                                  stackId="inv"
+                                  fill={CHART_COLORS[invoicedClientNames.indexOf(name) % CHART_COLORS.length]}
+                                  radius={i === arr.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
+                                >
+                                  {i === arr.length - 1 && invoicedBuckets.length <= 14 && (
+                                    <LabelList
+                                      dataKey={isoClient ? ((row: any) => row.clients[isoClient] || 0) : 'total'}
+                                      position="top"
+                                      formatter={(v: any) => (v > 0 ? `$${(v / 1000).toFixed(1)}k` : '')}
+                                      style={{ fontFamily: 'Archivo, sans-serif', fontSize: '10px', fontWeight: 700, fill: '#334155' }}
+                                    />
+                                  )}
+                                </Bar>
+                              ))}
+                            </RechartsBarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
                     )}
-                  </div>
-                )}
 
-                {/* ── PROJECT BREAKDOWN — ranked summary, only when 2+ active projects ── */}
-                {analyticsProjectNames.length > 1 && (() => {
-                  const totalHrs = analyticsWeeklyHours.reduce((s, wk) => s + wk.total, 0)
-                  const projectTotals = analyticsProjectNames.map((name, i) => ({
-                    name,
-                    hours: analyticsWeeklyHours.reduce((s, wk) => s + (wk.projects[name] || 0), 0),
-                    color: CLIENT_COLORS[i % CLIENT_COLORS.length]
-                  })).filter(p => p.hours > 0).sort((a, b) => b.hours - a.hours)
-                  if (projectTotals.length === 0) return null
-                  return (
-                    <div className={`${T.card} p-4`}>
-                      <div className="flex items-center gap-2 mb-4">
-                        <LayoutDashboard size={13} className="text-violet-500" />
-                        <h2 className={T.sectionTitle}>Project Breakdown</h2>
-                        <span className="text-[11px] text-gray-400 ml-1">{analyticsRange.label}</span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                      {/* Invoiced by client + realized rate */}
+                      <div className="v-card vUp" style={{ overflow: 'hidden' }}>
+                        <div style={{ padding: '11px 20px', borderBottom: '1px solid rgba(15,23,42,0.06)', backgroundImage: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)' }}>
+                          <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#94a3b8' }}>Invoiced by client</span>
+                        </div>
+                        <div style={{ padding: '10px 20px 16px' }}>
+                          {invoicedByClient.length === 0 ? (
+                            <p style={{ fontSize: '12px', color: '#94a3b8', padding: '12px 0' }}>No invoices in this range.</p>
+                          ) : (
+                            <>
+                              {(() => {
+                                const grand = invoicedByClient.reduce((sum, c) => sum + c.amount, 0)
+                                return invoicedByClient.map((c, i) => {
+                                  const pct = grand > 0 ? Math.round((c.amount / grand) * 100) : 0
+                                  const color = CHART_COLORS[i % CHART_COLORS.length]
+                                  return (
+                                    <div key={c.name} style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 160px) 1fr 84px', alignItems: 'center', gap: '12px', padding: '8px 0', borderTop: i === 0 ? 'none' : '1px solid rgba(15,23,42,0.04)' }}>
+                                      <span style={{ fontSize: '12.5px', color: '#334155', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                        <span style={{ width: '7px', height: '7px', borderRadius: '2px', background: color, flexShrink: 0 }} />
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                                      </span>
+                                      <span style={{ height: '14px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden', display: 'block' }}>
+                                        <span style={{ display: 'block', height: '100%', width: `${Math.max(pct, 2)}%`, background: color, borderRadius: '4px' }} />
+                                      </span>
+                                      <span style={{ fontFamily: 'Archivo, sans-serif', fontSize: '12px', fontWeight: 700, color: '#0f172a', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                                        {formatCurrency(c.amount)}
+                                        <span style={{ display: 'block', fontSize: '10px', color: '#94a3b8', fontWeight: 400, fontFamily: 'Instrument Sans, sans-serif' }}>{c.rate !== null ? `$${c.rate}/h realized` : `${pct}%`}</span>
+                                      </span>
+                                    </div>
+                                  )
+                                })
+                              })()}
+                              <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed rgba(15,23,42,0.08)', fontSize: '11px', color: '#94a3b8' }}>
+                                Realized rate = invoiced ÷ hours logged for that client in range.
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div className="space-y-3">
-                        {projectTotals.map(p => {
-                          const pct = totalHrs > 0 ? (p.hours / totalHrs) * 100 : 0
-                          return (
-                            <div key={p.name}>
-                              <div className="flex items-center justify-between mb-1.5">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: p.color }} />
-                                  <span className="text-[13px] text-gray-700 font-medium">{p.name}</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <span className="text-[13px] font-medium text-gray-900 tabular-nums">{p.hours.toFixed(1)}h</span>
-                                  <span className="text-[11px] text-gray-400 tabular-nums w-8 text-right">{pct.toFixed(0)}%</span>
-                                </div>
+
+                      {/* Expenses by category */}
+                      <div className="v-card vUp" style={{ overflow: 'hidden' }}>
+                        <div style={{ padding: '11px 20px', borderBottom: '1px solid rgba(15,23,42,0.06)', backgroundImage: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)' }}>
+                          <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#94a3b8' }}>Expenses by category</span>
+                        </div>
+                        <div style={{ padding: '10px 20px 16px' }}>
+                          {expensesByCategory.length === 0 ? (
+                            <p style={{ fontSize: '12px', color: '#94a3b8', padding: '12px 0' }}>No expenses in this range.</p>
+                          ) : (
+                            <>
+                              {(() => {
+                                const grand = expensesByCategory.reduce((sum, c) => sum + c.amount, 0)
+                                const palette = ['#2563eb', '#60a5fa', '#93c5fd', '#cbd5e1', '#ea8a2f', '#94a3b8']
+                                return expensesByCategory.map((c, i) => {
+                                  const pct = grand > 0 ? Math.round((c.amount / grand) * 100) : 0
+                                  const color = palette[i % palette.length]
+                                  return (
+                                    <div key={c.name} style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 160px) 1fr 74px', alignItems: 'center', gap: '12px', padding: '8px 0', borderTop: i === 0 ? 'none' : '1px solid rgba(15,23,42,0.04)' }}>
+                                      <span style={{ fontSize: '12.5px', color: '#334155', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                        <span style={{ width: '7px', height: '7px', borderRadius: '2px', background: color, flexShrink: 0 }} />
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                                      </span>
+                                      <span style={{ height: '14px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden', display: 'block' }}>
+                                        <span style={{ display: 'block', height: '100%', width: `${Math.max(pct, 2)}%`, background: color, borderRadius: '4px' }} />
+                                      </span>
+                                      <span style={{ fontFamily: 'Archivo, sans-serif', fontSize: '12px', fontWeight: 700, color: '#0f172a', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                                        {formatCurrency(c.amount)}
+                                        <span style={{ display: 'block', fontSize: '10px', color: '#94a3b8', fontWeight: 400, fontFamily: 'Instrument Sans, sans-serif' }}>{pct}%</span>
+                                      </span>
+                                    </div>
+                                  )
+                                })
+                              })()}
+                              <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed rgba(15,23,42,0.08)', fontSize: '11px', color: '#94a3b8' }}>
+                                Invoices bucket by period start · expenses by expense date, within the selected range. Rejected expenses excluded.
                               </div>
-                              <div className="h-1.5 bg-gray-100 rounded overflow-hidden">
-                                <div className="h-full rounded transition-colors"
-                                  style={{ width: `${pct}%`, background: p.color }} />
-                              </div>
-                            </div>
-                          )
-                        })}
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  )
-                })()}
-
-                {/* Empty state */}
-                {analyticsTime.length === 0 && analyticsExpenses.length === 0 && analyticsInvoices.length === 0 && (
-                  <div className={`${T.card} text-center py-12`}>
-                    <div className="w-14 h-14 rounded bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto mb-4">
-                      <TrendingUp size={22} className="text-gray-300" />
-                    </div>
-                    <p className="text-gray-500 text-[13px] font-medium">No data for {analyticsRange.label}</p>
-                    <p className="text-gray-400 text-xs mt-1.5">Try selecting a different time period</p>
-                  </div>
+                  </>
                 )}
               </>
             )}
