@@ -877,7 +877,7 @@ export default function ContractorPortal() {
       setHistoryLoading(true)
       try {
         const { data: timeData } = await supabase.from('time_entries').select('id, project_id, hours, billable_hours, description, date, created_at').eq('contractor_id', member.id).gte('date', historyRange.start).lte('date', historyRange.end).order('date', { ascending: false })
-        const { data: expData } = await supabase.from('contractor_expenses').select('*').eq('team_member_id', member.id).neq('status', 'rejected').gte('date', historyRange.start).lte('date', historyRange.end).order('date', { ascending: false })
+        const { data: expData } = await supabase.from('contractor_expenses').select('*').eq('team_member_id', member.id).neq('status', 'rejected').neq('status', 'draft').gte('date', historyRange.start).lte('date', historyRange.end).order('date', { ascending: false })
         const { data: invData } = await supabase.from('contractor_invoices').select('*, contractor_invoice_lines(*)').eq('team_member_id', member.id).gte('period_start', historyRange.start).lte('period_start', historyRange.end).order('invoice_date', { ascending: false })
         setHistoryTime(timeData || []); setHistoryExpenses(expData || []); setHistoryInvoices(invData || [])
       } catch (err) { console.error('History load error:', err) }
@@ -971,7 +971,7 @@ export default function ContractorPortal() {
         setAnalyticsInvoicesA(invData || [])
         // Expenses by expense date; rejected excluded from all sums
         const { data: expData } = await supabase.from('contractor_expenses').select('id, date, category, amount, status, client_id').eq('team_member_id', member.id).gte('date', analyticsRange.start).lte('date', analyticsRange.end).order('date', { ascending: true })
-        setAnalyticsExpensesA((expData || []).filter((e: any) => (e.status || '').toLowerCase() !== 'rejected'))
+        setAnalyticsExpensesA((expData || []).filter((e: any) => { const s = (e.status || '').toLowerCase(); return s !== 'rejected' && s !== 'draft' }))
       } catch (err) { console.error('Analytics load error:', err) }
       finally { setAnalyticsLoading(false) }
     }
