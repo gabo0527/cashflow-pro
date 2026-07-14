@@ -1148,10 +1148,7 @@ export default function ContractorPortal() {
               </svg>
               <span className="hidden md:inline" style={{ fontFamily: 'Archivo, sans-serif', fontWeight: 800, fontSize: '13px', letterSpacing: '0.14em', color: '#ffffff', textTransform: 'uppercase' }}>Vantage</span>
               <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.12)' }} />
-              <div style={{ lineHeight: 1.2 }}>
-                <span className="text-[12.5px] font-medium block" style={{ color: '#cbd5e1' }}>{member?.name}</span>
-                <span className="hidden sm:block" style={{ fontSize: '9.5px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8b97a7' }}>Contractor portal</span>
-              </div>
+              <span className="text-[12.5px] font-medium" style={{ color: '#cbd5e1', whiteSpace: 'nowrap' }}>{member?.name}</span>
             </div>
 
             {/* Nav Tabs */}
@@ -1176,9 +1173,9 @@ export default function ContractorPortal() {
             </nav>
 
             {/* Sign out */}
-            <button onClick={handleSignOut}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors hover:bg-white/10 hover:text-white" style={{ color: '#8b97a7', border: '1px solid rgba(255,255,255,0.08)', fontSize: '11px', fontFamily: 'inherit' }}>
-              <LogOut size={13} /><span className="hidden sm:inline">Sign out</span>
+            <button onClick={handleSignOut} title="Sign out" aria-label="Sign out"
+              className="flex items-center justify-center rounded-lg transition-colors hover:bg-white/10 hover:text-white" style={{ color: '#8b97a7', border: '1px solid rgba(255,255,255,0.08)', width: '30px', height: '30px', flexShrink: 0 }}>
+              <LogOut size={13} />
             </button>
           </div>
         </div>
