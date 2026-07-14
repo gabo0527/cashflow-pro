@@ -42,7 +42,7 @@ export const dynamic = 'force-dynamic'
 const REPORT_COLUMNS =
   'id, client_id, title, description, status, trip_start, trip_end, invoice_id, invoiced_at, submitted_at, created_at'
 const LINE_COLUMNS =
-  'id, report_id, date, description, merchant, category, amount, currency, original_amount, fx_rate, fx_date, line_items, receipt_url, status'
+  'id, report_id, date, description, merchant, category, amount, currency, original_amount, fx_rate, fx_date, line_items, receipt_url, status, scan_source'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const cleanText = (v: any, max: number) => (typeof v === 'string' && v.trim().length > 0 ? v.trim().slice(0, max) : null)
