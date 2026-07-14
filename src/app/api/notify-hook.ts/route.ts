@@ -22,9 +22,15 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const table = body?.table as string | undefined
-    const record = body?.record as { id?: string } | undefined
+    const record = body?.record as { id?: string; status?: string } | undefined
     if (!record?.id || !table) {
       return NextResponse.json({ ok: true, skipped: "no record id or table" })
+    }
+
+    // Drafts are private working state — admin is notified on
+    // SUBMISSION only, never when a draft line is created.
+    if (record.status === "draft") {
+      return NextResponse.json({ ok: true, skipped: "draft record" })
     }
 
     let result
