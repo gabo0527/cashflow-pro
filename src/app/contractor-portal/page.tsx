@@ -530,37 +530,55 @@ export default function ContractorPortal() {
   }
 
   // ============ LOAD TIME ENTRIES FOR WEEK ============
+  // Submitted hours live in time_entries. Drafts live in the private
+  // timesheet_drafts table (read via API) and NEVER touch time_entries,
+  // so unsubmitted hours can't leak into Time Tracking, Reports, or Sage.
   useEffect(() => {
     if (!member || assignments.length === 0) return
     const load = async () => {
-      const { data } = await supabase.from('time_entries').select('project_id, hours, description, date, id, status').eq('contractor_id', member.id).gte('date', week.start).lte('date', week.end)
       const init: Record<string, TimeEntryForm> = {}
       assignments.forEach(a => { init[a.project_id] = { project_id: a.project_id, days: {}, notes: '' } })
-      if (data && data.length > 0) {
+
+      // STEP 1 — Submitted hours from time_entries (ignore any legacy draft rows)
+      const { data } = await supabase.from('time_entries').select('project_id, hours, description, date, id, status').eq('contractor_id', member.id).gte('date', week.start).lte('date', week.end)
+      const rows = (data || []).filter((e: any) => (e.status || 'submitted') !== 'draft')
+      let canonical: any[] = []
+      if (rows.length > 0) {
         // Dedupe key = project + date (one row per project per DAY)
         const byKey: Record<string, any[]> = {}
-        data.forEach((e: any) => { const k = `${e.project_id}|${e.date}`; if (!byKey[k]) byKey[k] = []; byKey[k].push(e) })
+        rows.forEach((e: any) => { const k = `${e.project_id}|${e.date}`; if (!byKey[k]) byKey[k] = []; byKey[k].push(e) })
         const hasDupes = Object.values(byKey).some(arr => arr.length > 1)
-        const canonical: any[] = Object.values(byKey).map(arr => arr.sort((a: any, b: any) => b.id.localeCompare(a.id))[0])
+        canonical = Object.values(byKey).map(arr => arr.sort((a: any, b: any) => b.id.localeCompare(a.id))[0])
         canonical.forEach((e: any) => {
           const g = init[e.project_id]
           if (!g) return
           g.days[e.date] = String(e.hours || 0)
           if (e.description) g.notes = e.description
         })
-        setTimeEntries(init); setExistingEntries(data)
-        // Week is a draft only if every row is a draft
-        const statuses = canonical.map((e: any) => e.status || 'submitted')
-        setWeekStatus(statuses.length === 0 ? 'none' : statuses.every(st => st === 'draft') ? 'draft' : 'submitted')
         if (hasDupes) {
-          const dupeIds = data.filter((e: any) => !canonical.find((c: any) => c.id === e.id)).map((e: any) => e.id)
-          if (dupeIds.length > 0) supabase.from('time_entries').delete().in('id', dupeIds).then(() => {
-            setExistingEntries(canonical)
-          })
+          const dupeIds = rows.filter((e: any) => !canonical.find((c: any) => c.id === e.id)).map((e: any) => e.id)
+          if (dupeIds.length > 0) supabase.from('time_entries').delete().in('id', dupeIds).then(() => {})
         }
-      } else {
-        setTimeEntries(init); setExistingEntries([]); setWeekStatus('none')
       }
+
+      // STEP 2 — Overlay private drafts — a draft is the contractor's latest edit,
+      //    so it replaces the submitted view for that project until re-submitted
+      let draftRows: any[] = []
+      try {
+        const res = await fetch(`/api/timesheet-drafts?week_ending=${week.end}`)
+        if (res.ok) { const j = await res.json(); draftRows = j.drafts || [] }
+      } catch (err) { console.warn('Draft load failed:', err) }
+      draftRows.forEach((d: any) => {
+        const g = init[d.project_id]
+        if (!g) return
+        g.days = {}
+        Object.entries(d.daily_hours || {}).forEach(([date, h]) => { g.days[date] = String(h) })
+        if (d.note) g.notes = d.note
+      })
+
+      setTimeEntries(init)
+      setExistingEntries(canonical)
+      setWeekStatus(draftRows.length > 0 ? 'draft' : canonical.length > 0 ? 'submitted' : 'none')
     }
     load()
   }, [member, assignments, week.start, week.end])
@@ -586,12 +604,39 @@ export default function ContractorPortal() {
     loadMonth()
   }, [member, weekDate, timeSuccess])
 
-  // Save the week. status='draft' keeps it private; 'submitted' sends it to admin.
+  // Save the week. Drafts go to the private timesheet_drafts table and never
+  // touch time_entries; submit writes time_entries and clears the drafts.
   const saveWeek = async (status: 'draft' | 'submitted') => {
     if (!member || submittingTime) return
     setSubmittingTime(true); setError(null)
     try {
-      // Clean slate for this week (idempotent)
+      if (status === 'draft') {
+        // Private save — one draft row per project. Admin never sees these.
+        // Saving an empty grid deletes the draft row server-side.
+        for (const e of Object.values(timeEntries)) {
+          const daily: Record<string, number> = {}
+          weekDays.forEach(d => {
+            const h = parseFloat(e.days?.[d.iso] || '0')
+            if (h > 0) daily[d.iso] = h
+          })
+          const res = await fetch('/api/timesheet-drafts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ project_id: e.project_id, week_ending: week.end, daily_hours: daily, note: e.notes || null })
+          })
+          if (!res.ok) {
+            const j = await res.json().catch(() => ({}))
+            throw new Error(j.error || 'Failed to save draft')
+          }
+        }
+        const hasAny = Object.values(timeEntries).some(e => weekDays.some(d => parseFloat(e.days?.[d.iso] || '0') > 0))
+        setWeekStatus(hasAny ? 'draft' : 'none')
+        setTimeSuccess(true); setTimeout(() => setTimeSuccess(false), 3000)
+        return
+      }
+
+      // SUBMIT — clean slate for this week in time_entries (idempotent).
+      // Also sweeps out any legacy draft rows left from the old system.
       const { data: freshEntries } = await supabase
         .from('time_entries')
         .select('id')
@@ -621,8 +666,8 @@ export default function ContractorPortal() {
             bill_rate: a?.rate || 0,
             description: e.notes || null,
             company_id: member.company_id,
-            status,
-            submitted_at: status === 'submitted' ? now : null,
+            status: 'submitted',
+            submitted_at: now,
           })
         })
       })
@@ -632,6 +677,12 @@ export default function ContractorPortal() {
         if (ie) throw ie
       }
 
+      // Clear this week's drafts — the submitted version is now the truth
+      await Promise.all(Object.values(timeEntries).map(e =>
+        fetch(`/api/timesheet-drafts?project_id=${e.project_id}&week_ending=${week.end}`, { method: 'DELETE' })
+          .catch(err => console.warn('Draft cleanup failed:', err))
+      ))
+
       const { data: newEntries } = await supabase
         .from('time_entries')
         .select('project_id, hours, description, date, id, status')
@@ -639,11 +690,11 @@ export default function ContractorPortal() {
         .gte('date', week.start)
         .lte('date', week.end)
       setExistingEntries(newEntries || [])
-      setWeekStatus(entries.length === 0 ? 'none' : status)
+      setWeekStatus(entries.length === 0 ? 'none' : 'submitted')
 
       // Notify admin ONLY on submit — drafts stay private
       const totalHours = entries.reduce((s, e) => s + e.hours, 0)
-      if (status === 'submitted' && totalHours > 0) {
+      if (totalHours > 0) {
         fetch('/api/notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
