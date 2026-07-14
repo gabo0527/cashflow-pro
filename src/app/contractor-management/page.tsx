@@ -470,7 +470,9 @@ export default function ContractorManagement() {
   }, [invoices, dateFilter, dateRange, searchQuery, filterStatus, filterMember, filterClient, memberMap])
 
   const filteredExpenses = useMemo(() => {
-    let r = [...expenses]
+    // Drafts are private to contractors until they submit a report —
+    // they must never appear in any admin view, regardless of filters.
+    let r = expenses.filter(e => e.status !== 'draft')
     if (dateRange !== 'all') r = r.filter(e => {
       const d = (e.date || '').split('T')[0]
       return d >= dateFilter.start && d <= dateFilter.end
