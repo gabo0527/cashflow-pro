@@ -107,6 +107,25 @@ const T = {
   sectionTitle: "text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400",
 }
 
+// ============ PORTAL CSS — Blueprint skin (visual only) ============
+const PORTAL_CSS = `
+  input.cp-cell { width:46px; height:30px; text-align:center; font-size:13px; font-weight:500; font-variant-numeric:tabular-nums; border:1px solid transparent; border-radius:8px; background:transparent; color:#0f172a; transition:all .18s ease; outline:none; font-family:inherit; padding:0 2px; }
+  input.cp-cell::placeholder { color:#d7dde5; }
+  input.cp-cell:hover:not(:disabled):not(:focus) { border-color:#e2e8f0; background:#fff; }
+  input.cp-cell:focus { border-color:#60a5fa; background:#fff; box-shadow:0 0 0 3px rgba(37,99,235,.06), 0 0 16px -6px rgba(37,99,235,.12); }
+  input.cp-cell:disabled { color:#94a3b8; cursor:not-allowed; }
+  input.cp-cell.cp-filled { color:#0f172a; font-weight:600; font-family:Archivo, sans-serif; }
+  textarea.cp-note { flex:1; border:1px solid transparent; border-radius:8px; background:transparent; font-family:inherit; font-size:12px; color:#475569; outline:none; resize:none; padding:6px 9px; min-height:32px; line-height:1.5; transition:all .18s ease; width:100%; }
+  textarea.cp-note::placeholder { color:#cbd5e1; }
+  textarea.cp-note:hover:not(:disabled):not(:focus) { border-color:#e2e8f0; background:#fff; }
+  textarea.cp-note:focus { border-color:#60a5fa; background:#fff; box-shadow:0 0 0 3px rgba(37,99,235,.06); }
+  .cp-tab-active::after { content:''; position:absolute; bottom:0; left:15%; right:15%; height:16px; background:radial-gradient(60% 100% at 50% 100%, rgba(59,130,246,.25), transparent 70%); pointer-events:none; }
+  .cp-chev { transition:transform .2s ease; }
+  .cp-chev.cp-closed { transform:rotate(-90deg); }
+  @keyframes cpPulse { 0%,100%{opacity:.5} 50%{opacity:1} }
+  .cp-dot { animation:cpPulse 3s ease-in-out infinite; }
+`
+
 // ============ FILE UPLOAD ============
 async function uploadFile(file: File, folder: string, memberId: string): Promise<string | null> {
   try {
@@ -257,16 +276,14 @@ function MultiDropZone({ files, onAddFiles, onRemoveFile, uploading, label, acce
 
 // ============ WEEK NAVIGATOR ============
 function WeekNav({ week, onPrev, onNext }: { week: { label: string }; onPrev: () => void; onNext: () => void }) {
+  const navBtn = "w-[26px] h-[26px] rounded-lg border border-gray-200 bg-white text-slate-400 hover:text-blue-600 hover:border-blue-300 transition-all flex items-center justify-center"
   return (
-    <div className="inline-flex items-center gap-0 border border-gray-200 rounded overflow-hidden bg-white">
-      <button onClick={onPrev} className="px-2.5 py-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-colors border-r border-gray-200">
+    <div className="inline-flex items-center gap-2.5">
+      <button onClick={onPrev} className={navBtn} aria-label="Previous week">
         <ChevronLeft size={14} />
       </button>
-      <div className="flex items-center gap-2 px-4 py-1.5">
-        <Calendar size={12} className="text-gray-400" />
-        <span className="text-[13px] font-medium text-gray-900 tracking-tight">{week.label}</span>
-      </div>
-      <button onClick={onNext} className="px-2.5 py-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-colors border-l border-gray-200">
+      <span style={{ fontFamily: 'Archivo, sans-serif', fontWeight: 700, fontSize: '13.5px', color: '#0f172a', letterSpacing: '0.01em' }}>{week.label}</span>
+      <button onClick={onNext} className={navBtn} aria-label="Next week">
         <ChevronRight size={14} />
       </button>
     </div>
@@ -1115,30 +1132,36 @@ export default function ContractorPortal() {
   }
 
   return (
-    <div className="min-h-screen text-gray-900" style={{ background: '#eef1f4', colorScheme: 'light' }}>
+    <div className="min-h-screen text-gray-900" style={{ background: '#eef1f4', colorScheme: 'light', backgroundImage: 'radial-gradient(1000px 460px at 12% 0%, rgba(37,99,235,0.05), transparent 60%), linear-gradient(rgba(15,23,42,0.022) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.022) 1px, transparent 1px)', backgroundSize: '100% 100%, 26px 26px, 26px 26px', backgroundAttachment: 'fixed' }}>
+      <style dangerouslySetInnerHTML={{ __html: PORTAL_CSS }} />
       {/* Top Bar */}
       <header style={{ position: 'sticky', top: 0, zIndex: 40, borderBottom: '1px solid #22303c', background: 'linear-gradient(135deg,#1b2431,#10151c)', overflow: 'hidden' }}>
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 13px)' }} />
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(70% 240% at 0% 0%, rgba(59,130,246,0.18), transparent 60%)' }} />
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 relative" style={{ zIndex: 1 }}>
-          <div className="flex items-center justify-between h-[52px]">
+        <div className="max-w-[960px] mx-auto px-4 sm:px-6 relative" style={{ zIndex: 1 }}>
+          <div className="flex items-center justify-between h-[56px]">
             {/* Logo + Name */}
             <div className="flex items-center gap-3">
               <svg width={22} height={22} viewBox="0 0 48 48" fill="none">
                 <path d="M13 12 L24 35" stroke="#3b82f6" strokeWidth="5.5" strokeLinecap="round" />
                 <path d="M24 35 L35 12" stroke="#ea8a2f" strokeWidth="5.5" strokeLinecap="round" />
               </svg>
-              <div style={{ width: '1px', height: '15px', background: 'rgba(255,255,255,0.12)' }} />
-              <span className="text-[13px] font-medium" style={{ color: '#cbd5e1' }}>{member?.name}</span>
+              <span className="hidden md:inline" style={{ fontFamily: 'Archivo, sans-serif', fontWeight: 800, fontSize: '13px', letterSpacing: '0.14em', color: '#ffffff', textTransform: 'uppercase' }}>Vantage</span>
+              <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.12)' }} />
+              <div style={{ lineHeight: 1.2 }}>
+                <span className="text-[12.5px] font-medium block" style={{ color: '#cbd5e1' }}>{member?.name}</span>
+                <span className="hidden sm:block" style={{ fontSize: '9.5px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8b97a7' }}>Contractor portal</span>
+              </div>
             </div>
 
             {/* Nav Tabs */}
             <nav className="flex items-center overflow-x-auto">
               {navItems.map(item => (
                 <button key={item.id} onClick={() => { setActiveTab(item.id); setError(null) }}
+                  className={activeTab === item.id ? 'cp-tab-active' : undefined}
                   style={{
                     position: 'relative', display: 'flex', alignItems: 'center', gap: '5px',
-                    padding: '0 14px', height: '52px', fontSize: '12px',
+                    padding: '0 15px', height: '56px', fontSize: '12px',
                     fontWeight: activeTab === item.id ? 600 : 400,
                     color: activeTab === item.id ? '#ffffff' : '#8b97a7',
                     background: 'none', border: 'none',
@@ -1154,15 +1177,15 @@ export default function ContractorPortal() {
 
             {/* Sign out */}
             <button onClick={handleSignOut}
-              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors hover:bg-white/10" style={{ color: '#8b97a7' }}>
-              <LogOut size={13} />
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors hover:bg-white/10 hover:text-white" style={{ color: '#8b97a7', border: '1px solid rgba(255,255,255,0.08)', fontSize: '11px', fontFamily: 'inherit' }}>
+              <LogOut size={13} /><span className="hidden sm:inline">Sign out</span>
             </button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-5">
+      <main className="max-w-[960px] mx-auto px-4 sm:px-6 py-6">
         {/* Error Banner */}
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded flex items-center gap-2.5 text-red-700 text-[13px]">
@@ -1177,55 +1200,72 @@ export default function ContractorPortal() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
             {/* Week Nav + KPI strip */}
-            <div style={{ background: '#fff', border: '1px solid #e0e0db', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid #e8e8e4' }}>
+            <div className="v-card vUp" style={{ overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid rgba(15,23,42,0.06)', backgroundImage: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)' }}>
                 <WeekNav week={week}
                   onPrev={() => { const d = new Date(weekDate); d.setDate(d.getDate() - 7); setWeekDate(d) }}
                   onNext={() => { const d = new Date(weekDate); d.setDate(d.getDate() + 7); setWeekDate(d) }}
                 />
-                <span style={{ fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af' }}>
-                  {weekLocked ? 'Invoiced' : weekStatus === 'submitted' ? 'Submitted' : weekStatus === 'draft' ? 'Draft — not sent' : totalTimeHours > 0 ? 'Unsaved' : 'Not submitted'}
-                </span>
+                {(() => {
+                  const st = weekLocked ? { t: 'Invoiced', c: '#475569', bg: 'rgba(148,163,184,0.12)', bd: '#cbd5e1' }
+                    : weekStatus === 'submitted' ? { t: 'Submitted', c: '#1d4ed8', bg: 'rgba(37,99,235,0.07)', bd: '#bfdbfe' }
+                    : weekStatus === 'draft' ? { t: 'Draft — not sent', c: '#b45309', bg: 'rgba(253,230,138,0.18)', bd: '#fde68a' }
+                    : totalTimeHours > 0 ? { t: 'Unsaved', c: '#b45309', bg: 'rgba(253,230,138,0.18)', bd: '#fde68a' }
+                    : { t: 'Not submitted', c: '#94a3b8', bg: 'transparent', bd: '#e2e8f0' }
+                  return (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', fontFamily: 'Archivo, sans-serif', fontSize: '9.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '5px 10px', borderRadius: '4px', border: `1px solid ${st.bd}`, color: st.c, background: st.bg, whiteSpace: 'nowrap' }}>
+                      <span className="cp-dot" style={{ width: '6px', height: '6px', borderRadius: '1.5px', background: 'currentColor' }} />
+                      {st.t}
+                    </span>
+                  )
+                })()}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr' }}>
                 {[
-                  { label: 'This week', value: totalTimeHours > 0 ? `${totalTimeHours.toFixed(1)}h` : '—', em: totalTimeHours > 0 },
-                  { label: 'Month to date', value: monthHours > 0 ? `${monthHours.toFixed(1)}h` : '—', em: false },
-                  { label: 'Projects', value: String(assignments.length), em: false },
+                  { label: 'This week', value: totalTimeHours > 0 ? `${totalTimeHours.toFixed(1)}h` : '—', em: totalTimeHours > 0, sub: (() => { const n = Object.values(timeEntries).filter(e => Object.values(e.days || {}).some((v: any) => (parseFloat(v) || 0) > 0)).length; return n > 0 ? `across ${n} project${n === 1 ? '' : 's'}` : '' })() },
+                  { label: 'Month to date', value: monthHours > 0 ? `${monthHours.toFixed(1)}h` : '—', em: false, sub: `${weekDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} · submitted` },
+                  { label: 'Active projects', value: String(assignments.length), em: false, sub: (() => { const c = Object.keys(assignmentsByClient).length; return `${c} client${c === 1 ? '' : 's'}` })() },
                 ].map((kpi, i) => (
-                  <div key={kpi.label} style={{ padding: '10px 16px', borderRight: i < 2 ? '1px solid #e8e8e4' : 'none' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', marginBottom: '3px' }}>{kpi.label}</div>
-                    <div style={{ fontSize: '20px', fontWeight: 500, fontVariantNumeric: 'tabular-nums', color: kpi.em ? '#10b981' : '#111827' }}>{kpi.value}</div>
+                  <div key={kpi.label} style={{ position: 'relative', overflow: 'hidden', padding: '14px 20px', borderRight: i < 2 ? '1px solid rgba(15,23,42,0.06)' : 'none' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#94a3b8' }}>{kpi.label}</div>
+                    <div style={{ fontFamily: 'Archivo, sans-serif', fontSize: '24px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: kpi.em ? '#2563eb' : '#0f172a', marginTop: '4px' }}>{kpi.value}</div>
+                    {kpi.sub ? <div style={{ fontSize: '10.5px', color: '#94a3b8', marginTop: '2px' }}>{kpi.sub}</div> : null}
+                    <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: '35%', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5))', pointerEvents: 'none' }} />
                   </div>
                 ))}
               </div>
             </div>
 
             {timeSuccess && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#065f46', fontSize: '13px', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '8px 12px', borderRadius: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#065f46', fontSize: '13px', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '9px 14px', borderRadius: '10px' }}>
                 <CheckCircle size={13} style={{ flexShrink: 0 }} /> Timesheet submitted successfully
               </div>
             )}
 
             {/* Daily grid */}
-            <div style={{ background: '#fff', border: '1px solid #e0e0db', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 16px', background: '#fafaf9', borderBottom: '1px solid #e8e8e4' }}>
-                <span style={{ fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af' }}>Log hours — {week.label}</span>
-                {totalTimeHours > 0 && <span style={{ fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b7280' }}>{totalTimeHours.toFixed(1)}h</span>}
+            <div className="v-card vUp vD2" style={{ overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '1px solid rgba(15,23,42,0.06)', backgroundImage: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)' }}>
+                <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#94a3b8' }}>Log hours — {week.label}</span>
+                {totalTimeHours > 0 && <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b' }}>{totalTimeHours.toFixed(1)}h entered</span>}
               </div>
 
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '620px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '640px' }}>
                   <thead>
                     <tr>
-                      <th style={{ textAlign: 'left', padding: '7px 16px', fontSize: '10px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em', background: '#fafaf9', borderBottom: '1px solid #e8e8e4' }}>Project</th>
-                      {weekDays.map(d => (
-                        <th key={d.iso} style={{ padding: '6px 4px', textAlign: 'center', background: d.isWeekend ? '#f4f4f2' : '#fafaf9', borderBottom: '1px solid #e8e8e4', width: '54px' }}>
-                          <span style={{ display: 'block', fontSize: '9.5px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{d.dow}</span>
-                          <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>{d.dnum}</span>
+                      <th style={{ textAlign: 'left', padding: '8px 20px', fontSize: '10px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', background: '#f8fafc', borderBottom: '1px solid rgba(15,23,42,0.07)' }}>Project</th>
+                      {weekDays.map(d => {
+                        const t = new Date()
+                        const todayIso = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`
+                        const isToday = d.iso === todayIso
+                        return (
+                        <th key={d.iso} style={{ padding: '8px 4px', textAlign: 'center', background: isToday ? 'linear-gradient(180deg, rgba(37,99,235,0.09), rgba(37,99,235,0.04))' : d.isWeekend ? '#f1f5f9' : '#f8fafc', borderBottom: '1px solid rgba(15,23,42,0.07)', width: '54px' }}>
+                          <span style={{ display: 'block', fontSize: '9.5px', fontWeight: 600, color: isToday ? '#2563eb' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{d.dow}</span>
+                          <span style={{ display: 'block', fontFamily: 'Archivo, sans-serif', fontSize: '13px', fontWeight: 700, color: isToday ? '#2563eb' : '#64748b', fontVariantNumeric: 'tabular-nums' }}>{d.dnum}</span>
                         </th>
-                      ))}
-                      <th style={{ padding: '7px 8px', textAlign: 'center', fontSize: '10px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em', background: '#fafaf9', borderBottom: '1px solid #e8e8e4', borderLeft: '1px solid #e8e8e4', width: '64px' }}>Total</th>
+                        )
+                      })}
+                      <th style={{ padding: '8px 8px', textAlign: 'center', fontSize: '10px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', background: '#f8fafc', borderBottom: '1px solid rgba(15,23,42,0.07)', borderLeft: '1px solid rgba(15,23,42,0.07)', width: '66px' }}>Total</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1233,31 +1273,47 @@ export default function ContractorPortal() {
                       const color = clientColorMap[cid] || '#9ca3af'
                       return (
                         <Fragment key={cid}>
-                          <tr>
-                            <td colSpan={9} style={{ padding: '5px 16px', background: '#fafaf9', borderTop: '1px solid #e8e8e4' }}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: color, display: 'inline-block' }} />
-                                <span style={{ fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af' }}>{clientName}</span>
+                          {(() => {
+                            const isCollapsed = collapsedClients.has(cid)
+                            const clientTotal = projects.reduce((t, p) => t + Object.values(timeEntries[p.project_id]?.days || {}).reduce((sum: number, v: any) => sum + (parseFloat(v) || 0), 0), 0)
+                            return (
+                          <tr onClick={() => { const n = new Set(collapsedClients); if (isCollapsed) { n.delete(cid) } else { n.add(cid) } setCollapsedClients(n) }} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                            <td colSpan={9} style={{ padding: '6px 20px', background: '#f8fafc', borderTop: '1px solid rgba(15,23,42,0.06)', backgroundImage: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.02) 0 1px, transparent 1px 12px)' }}>
+                              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                                  <ChevronDown size={11} className={`cp-chev ${isCollapsed ? 'cp-closed' : ''}`} style={{ color: '#94a3b8' }} />
+                                  <span style={{ width: '7px', height: '7px', borderRadius: '2px', background: color, display: 'inline-block' }} />
+                                  <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748b' }}>{clientName}</span>
+                                </span>
+                                <span style={{ fontFamily: 'Archivo, sans-serif', fontSize: '11px', fontWeight: 700, color: '#64748b', fontVariantNumeric: 'tabular-nums' }}>{clientTotal > 0 ? `${clientTotal.toFixed(1)}h` : ''}</span>
                               </span>
                             </td>
                           </tr>
-                          {projects.map(p => {
+                            )
+                          })()}
+                          {!collapsedClients.has(cid) && projects.map(p => {
                             const entry = timeEntries[p.project_id]
                             const rowTotal = Object.values(entry?.days || {}).reduce((t: number, v: any) => t + (parseFloat(v) || 0), 0)
                             const hasNote = !!entry?.notes
                             return (
                               <Fragment key={p.project_id}>
                                 <tr>
-                                  <td style={{ padding: '0 16px', height: '42px', borderTop: '1px solid #f0f0ec', fontSize: '13px', color: rowTotal > 0 ? '#111827' : '#6b7280' }}>
+                                  <td style={{ padding: '0 20px', height: '44px', borderTop: '1px solid rgba(15,23,42,0.045)', fontSize: '13px', fontWeight: rowTotal > 0 ? 500 : 400, color: rowTotal > 0 ? '#0f172a' : '#94a3b8' }}>
                                     {p.project_name}
                                   </td>
-                                  {weekDays.map(d => (
-                                    <td key={d.iso} style={{ borderTop: '1px solid #f0f0ec', textAlign: 'center', background: d.isWeekend ? '#fbfbfa' : '#fff', padding: '0 2px' }}>
+                                  {weekDays.map(d => {
+                                    const t = new Date()
+                                    const todayIso = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`
+                                    const isToday = d.iso === todayIso
+                                    const hasVal = (parseFloat(entry?.days?.[d.iso] || '0') || 0) > 0
+                                    return (
+                                    <td key={d.iso} style={{ borderTop: '1px solid rgba(15,23,42,0.045)', textAlign: 'center', background: isToday ? 'rgba(37,99,235,0.035)' : d.isWeekend ? '#fafbfc' : '#fff', padding: '0 3px' }}>
                                       <input
                                         type="text"
                                         inputMode="decimal"
                                         placeholder="–"
                                         disabled={weekLocked}
+                                        className={`cp-cell${hasVal ? ' cp-filled' : ''}`}
                                         value={entry?.days?.[d.iso] || ''}
                                         onChange={e => {
                                           const v = e.target.value
@@ -1268,31 +1324,27 @@ export default function ContractorPortal() {
                                             }))
                                           }
                                         }}
-                                        style={{
-                                          width: '44px', height: '28px', border: '1px solid #d1d5db', borderRadius: '3px',
-                                          background: entry?.days?.[d.iso] ? '#fff' : '#f9fafb', textAlign: 'center',
-                                          fontSize: '13px', fontWeight: 500, fontVariantNumeric: 'tabular-nums',
-                                          color: '#111827', padding: '0 2px', outline: 'none', fontFamily: 'inherit'
-                                        }}
-                                        onFocus={e => { e.currentTarget.style.borderColor = '#111827'; e.currentTarget.style.background = '#fff' }}
-                                        onBlur={e => { e.currentTarget.style.borderColor = '#d1d5db'; e.currentTarget.style.background = entry?.days?.[d.iso] ? '#fff' : '#f9fafb' }}
                                       />
                                     </td>
-                                  ))}
-                                  <td style={{ borderTop: '1px solid #f0f0ec', borderLeft: '1px solid #e8e8e4', textAlign: 'center', fontSize: '13px', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: rowTotal > 0 ? '#374151' : '#d1d5db' }}>
+                                    )
+                                  })}
+                                  <td style={{ borderTop: '1px solid rgba(15,23,42,0.045)', borderLeft: '1px solid rgba(15,23,42,0.06)', textAlign: 'center', fontFamily: 'Archivo, sans-serif', fontSize: '13px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: rowTotal > 0 ? '#0f172a' : '#cbd5e1' }}>
                                     {rowTotal > 0 ? rowTotal.toFixed(1) : '—'}
                                   </td>
                                 </tr>
                                 {(rowTotal > 0 || hasNote) && (
                                   <tr>
-                                    <td colSpan={9} style={{ padding: '0 16px 10px 16px', background: '#fbfcfe' }}>
-                                      <textarea
-                                        placeholder={`What did you work on for ${p.project_name} this week?`}
-                                        disabled={weekLocked}
-                                        value={entry?.notes || ''}
-                                        onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], notes: e.target.value } }))}
-                                        style={{ width: '100%', border: '1px solid #dbe2ea', borderRadius: '5px', padding: '7px 9px', fontSize: '12px', fontFamily: 'inherit', resize: 'vertical', minHeight: '38px', background: '#fff', outline: 'none' }}
-                                      />
+                                    <td colSpan={9} style={{ padding: '0 20px 12px', background: '#fbfcfe' }}>
+                                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                                        <span style={{ fontFamily: 'Archivo, sans-serif', fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#c2660c', paddingTop: '8px' }}>Note</span>
+                                        <textarea
+                                          className="cp-note"
+                                          placeholder={`What did you work on for ${p.project_name} this week?`}
+                                          disabled={weekLocked}
+                                          value={entry?.notes || ''}
+                                          onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], notes: e.target.value } }))}
+                                        />
+                                      </div>
                                     </td>
                                   </tr>
                                 )}
@@ -1305,16 +1357,16 @@ export default function ContractorPortal() {
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td style={{ padding: '8px 16px', borderTop: '2px solid #e8e8e4', background: '#fafaf9', fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af' }}>Daily total</td>
+                      <td style={{ padding: '9px 20px', borderTop: '2px solid rgba(15,23,42,0.08)', background: '#f8fafc', fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#94a3b8' }}>Daily total</td>
                       {weekDays.map(d => {
                         const dayTotal = Object.values(timeEntries).reduce((t, e) => t + (parseFloat(e.days?.[d.iso] || '0') || 0), 0)
                         return (
-                          <td key={d.iso} style={{ padding: '8px 4px', textAlign: 'center', borderTop: '2px solid #e8e8e4', background: '#fafaf9', fontSize: '12px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: dayTotal > 0 ? '#374151' : '#d1d5db' }}>
+                          <td key={d.iso} style={{ padding: '9px 4px', textAlign: 'center', borderTop: '2px solid rgba(15,23,42,0.08)', background: '#f8fafc', fontFamily: 'Archivo, sans-serif', fontSize: '12px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: dayTotal > 0 ? '#334155' : '#cbd5e1' }}>
                             {dayTotal > 0 ? dayTotal.toFixed(1) : '—'}
                           </td>
                         )
                       })}
-                      <td style={{ padding: '8px 4px', textAlign: 'center', borderTop: '2px solid #e8e8e4', borderLeft: '1px solid #e8e8e4', background: '#fafaf9', fontSize: '14px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#2563eb' }}>
+                      <td style={{ padding: '9px 4px', textAlign: 'center', borderTop: '2px solid rgba(15,23,42,0.08)', borderLeft: '1px solid rgba(15,23,42,0.06)', background: '#f8fafc', fontFamily: 'Archivo, sans-serif', fontSize: '14px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#2563eb' }}>
                         {totalTimeHours > 0 ? `${totalTimeHours.toFixed(1)}h` : '—'}
                       </td>
                     </tr>
@@ -1323,7 +1375,7 @@ export default function ContractorPortal() {
               </div>
 
               {weekDays[0].monthIdx !== weekDays[6].monthIdx && (
-                <div style={{ padding: '8px 16px', background: '#eff6ff', borderTop: '1px solid #dbeafe', fontSize: '11px', color: '#1e40af' }}>
+                <div style={{ padding: '9px 20px', background: '#eff6ff', borderTop: '1px solid #dbeafe', fontSize: '11.5px', color: '#1e40af' }}>
                   This week spans two months — each day posts to its own month automatically.
                 </div>
               )}
@@ -1347,7 +1399,8 @@ export default function ContractorPortal() {
                   <button
                     onClick={() => saveWeek('draft')}
                     disabled={submittingTime || totalTimeHours === 0}
-                    style={{ border: '1px solid #d1d5db', background: '#fff', color: '#374151', borderRadius: '6px', padding: '9px 16px', fontSize: '13px', fontWeight: 600, fontFamily: 'inherit', cursor: totalTimeHours === 0 ? 'not-allowed' : 'pointer', opacity: submittingTime || totalTimeHours === 0 ? 0.45 : 1 }}
+                    className="transition-all hover:border-gray-300 hover:text-gray-900 active:scale-[0.97]"
+                    style={{ border: '1px solid #e2e8f0', background: '#fff', color: '#475569', borderRadius: '10px', padding: '9px 16px', fontSize: '12.5px', fontWeight: 600, fontFamily: 'inherit', cursor: totalTimeHours === 0 ? 'not-allowed' : 'pointer', opacity: submittingTime || totalTimeHours === 0 ? 0.45 : 1 }}
                   >
                     Save draft
                   </button>
@@ -1355,6 +1408,7 @@ export default function ContractorPortal() {
                     onClick={() => saveWeek('submitted')}
                     disabled={submittingTime || totalTimeHours === 0}
                     className={T.btnPrimary}
+                    style={{ borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.1), 0 4px 16px -2px rgba(37,99,235,0.25)' }}
                   >
                     {submittingTime ? <><Loader2 size={13} className="animate-spin" /> Saving...</> : <><Send size={13} /> Submit week</>}
                   </button>
