@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import OnboardingWizard from './OnboardingWizard'
+import ExpensesTab from './ExpensesTab'
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart, LabelList } from 'recharts'
 
 const supabase = createClient(
@@ -1499,121 +1500,12 @@ export default function ContractorPortal() {
         )}
 
         {/* ====== EXPENSES ====== */}
-        {activeTab === 'expenses' && (
-          <div className="space-y-3">
-            {/* New Expense Button */}
-            {!showExpenseForm && (
-              <button onClick={() => setShowExpenseForm(true)} className="w-full py-2.5 border border-dashed border-gray-300 rounded text-[13px] text-gray-500 hover:border-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors">
-                <Plus size={13} className="inline mr-1.5" /> New expense
-              </button>
-            )}
-
-            {/* New Expense Form */}
-            {showExpenseForm && (
-              <div className={`${T.card} p-4`}>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-gray-900 font-medium text-[13px]">New expense</h2>
-                  <button onClick={() => { setShowExpenseForm(false); setExpenseFiles([]) }} className="p-1 rounded text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"><X size={14} /></button>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={T.label}>Date</label>
-                    <input type="date" value={expenseForm.date} onChange={e => setExpenseForm(p => ({ ...p, date: e.target.value }))} className={T.input} />
-                  </div>
-                  <div>
-                    <label className={T.label}>Category</label>
-                    <select value={expenseForm.category} onChange={e => setExpenseForm(p => ({ ...p, category: e.target.value }))} className={T.select}>
-                      {EXPENSE_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={T.label}>Amount</label>
-                    <div className="relative">
-                      <DollarSign size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input type="number" placeholder="0.00" step="0.01" min="0" value={expenseForm.amount} onChange={e => setExpenseForm(p => ({ ...p, amount: e.target.value }))} className={`${T.input} pl-9 tabular-nums`} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={T.label}>Client</label>
-                    <select value={expenseForm.client_id} onChange={e => setExpenseForm(p => ({ ...p, client_id: e.target.value, project_id: '' }))} className={T.select}>
-                      <option value="">No client (general)</option>
-                      {Object.entries(assignmentsByClient).map(([cid, { clientName }]) => <option key={cid} value={cid}>{clientName}</option>)}
-                    </select>
-                  </div>
-
-
-
-                  <div className="col-span-2">
-                    <label className={T.label}>Description</label>
-                    <input type="text" placeholder="What was this expense for?" value={expenseForm.description} onChange={e => setExpenseForm(p => ({ ...p, description: e.target.value }))} className={T.input} />
-                  </div>
-                  <div className="col-span-2">
-                    <label className={T.label}>Receipts / Documents</label>
-                    <MultiDropZone files={expenseFiles} onAddFiles={(f) => setExpenseFiles(prev => [...prev, ...f])} onRemoveFile={(i) => setExpenseFiles(prev => prev.filter((_, idx) => idx !== i))} uploading={submittingExpense} label="Drop receipts here" accept="image/*,.pdf" />
-                  </div>
-                </div>
-                <button onClick={submitExpense} disabled={submittingExpense || !expenseForm.description || !expenseForm.amount} className={`w-full mt-4 ${T.btnPrimary} py-3`}>
-                  {submittingExpense ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <><Send size={16} /> Submit Expense</>}
-                </button>
-              </div>
-            )}
-
-            {/* Expense List */}
-            {expenses.length > 0 ? (
-              <div className="space-y-2">
-                {expenses.map(exp => {
-                  const cat = EXPENSE_CATEGORIES.find(c => c.id === exp.category)
-                  const clientName = exp.client_id ? (assignmentsByClient[exp.client_id]?.clientName || '—') : null
-                  const receiptUrl = exp.receipt_url
-                    ? supabase.storage.from('contractor-uploads').getPublicUrl(exp.receipt_url).data.publicUrl
-                    : null
-                  return (
-                    <div key={exp.id} className={`${T.cardHover} px-4 py-3 flex items-center gap-3 sm:gap-3`}>
-                      <div className="w-10 h-10 rounded bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
-                        <Receipt size={15} className="text-gray-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-gray-900 text-[13px] font-medium truncate">{exp.description}</p>
-                        <div className="flex items-center gap-2 text-gray-400 text-xs mt-1">
-                          <span>{formatDate(exp.date)}</span>
-                          <span className="w-0.5 h-0.5 rounded bg-gray-300" />
-                          <span>{cat?.label || exp.category}</span>
-                          {clientName && (
-                            <>
-                              <span className="w-0.5 h-0.5 rounded bg-gray-300" />
-                              <span className="text-blue-600 font-medium">{clientName}</span>
-                            </>
-                          )}
-                          {receiptUrl ? (
-                            <>
-                              <span className="w-0.5 h-0.5 rounded bg-gray-300" />
-                              <a href={receiptUrl} target="_blank" rel="noopener noreferrer"
-                                className="text-blue-500 hover:text-blue-700 transition-colors" title="View receipt">
-                                <Paperclip size={10} />
-                              </a>
-                            </>
-                          ) : null}
-                        </div>
-                      </div>
-                      <span className="text-gray-900 font-medium text-[13px] tabular-nums">{formatCurrency(exp.amount)}</span>
-                      <StatusPill status={exp.status} />
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className={`${T.card} text-center py-12`}>
-                <div className="w-14 h-14 rounded bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto mb-4">
-                  <Receipt size={22} className="text-gray-300" />
-                </div>
-                <p className="text-gray-500 text-[13px] font-medium">No expenses yet</p>
-                <p className="text-gray-400 text-xs mt-1.5">Click "New Expense" to submit your first report</p>
-              </div>
-            )}
+        {activeTab === 'expenses' && member && (
+          <div className="vUp">
+            <ExpensesTab member={{ id: member.id, company_id: member.company_id }} assignments={assignments} legacyExpenses={expenses as any} />
           </div>
         )}
 
-        {/* ====== INVOICES ====== */}
         {activeTab === 'invoices' && (
           <div className="space-y-3">
             {/* New Invoice Button */}
