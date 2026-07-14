@@ -24,6 +24,11 @@
 //   POST   { action:'submit', report_id }
 //            → flips report + all draft lines to 'submitted',
 //              sends ONE admin notification for the whole report
+//   POST   { action:'add_line' | 'update_line', ... }
+//            → draft-report expense lines; USD amount is computed
+//              SERVER-SIDE from original_amount × fx_rate for
+//              foreign currency (server-authoritative math)
+//   POST   { action:'delete_line', line_id }
 //   PATCH  { report_id, ...fields }   (draft reports only)
 //   DELETE ?report_id=...             (draft reports only; removes lines too)
 // ============================================================
@@ -209,7 +214,135 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, status: 'submitted', total })
   }
 
-  return NextResponse.json({ error: "Invalid action. Use 'create' or 'submit'." }, { status: 400 })
+
+  // ---------- LINE OPS (draft reports only) ----------
+  if (body?.action === 'add_line' || body?.action === 'update_line') {
+    const isUpdate = body.action === 'update_line'
+    const reportId = body.report_id
+    if (typeof reportId !== 'string' || reportId.length === 0) {
+      return NextResponse.json({ error: 'Missing report_id' }, { status: 400 })
+    }
+    const { data: report } = await supabase
+      .from('expense_reports')
+      .select('id, status, client_id, company_id')
+      .eq('id', reportId)
+      .eq('team_member_id', session.contractorId)
+      .single()
+    if (!report) return NextResponse.json({ error: 'Report not found' }, { status: 404 })
+    if (report.status !== 'draft') {
+      return NextResponse.json({ error: 'Lines can only change while the report is a draft' }, { status: 400 })
+    }
+
+    const date = cleanDate(body.date)
+    if (!date) return NextResponse.json({ error: 'A valid expense date is required' }, { status: 400 })
+    const description = cleanText(body.description, 300)
+    if (!description) return NextResponse.json({ error: 'Description is required' }, { status: 400 })
+    const category = typeof body.category === 'string' && body.category.length > 0 ? body.category.slice(0, 40) : 'other'
+    const currency = typeof body.currency === 'string' && /^[A-Za-z]{3}$/.test(body.currency) ? body.currency.toUpperCase() : 'USD'
+
+    // Server-authoritative amounts
+    let amountUsd: number
+    let originalAmount: number | null = null
+    let fxRate: number | null = null
+    let fxDate: string | null = null
+    if (currency === 'USD') {
+      const a = Number(body.amount)
+      if (!Number.isFinite(a) || a <= 0) return NextResponse.json({ error: 'Amount must be greater than 0' }, { status: 400 })
+      amountUsd = Math.round(a * 100) / 100
+    } else {
+      const orig = Number(body.original_amount)
+      const rate = Number(body.fx_rate)
+      if (!Number.isFinite(orig) || orig <= 0) return NextResponse.json({ error: 'Original amount must be greater than 0' }, { status: 400 })
+      if (!Number.isFinite(rate) || rate <= 0) return NextResponse.json({ error: 'Missing FX rate — confirm the date to quote the conversion' }, { status: 400 })
+      originalAmount = Math.round(orig * 100) / 100
+      fxRate = rate
+      fxDate = cleanDate(body.fx_date) || date
+      amountUsd = Math.round(originalAmount * fxRate * 100) / 100
+    }
+
+    const lineItems = Array.isArray(body.line_items)
+      ? body.line_items
+          .filter((li: any) => li && typeof li.description === 'string' && Number.isFinite(Number(li.amount)))
+          .map((li: any) => ({ description: String(li.description).slice(0, 200), amount: Math.round(Number(li.amount) * 100) / 100 }))
+          .slice(0, 50)
+      : null
+
+    const fields = {
+      date,
+      description,
+      merchant: cleanText(body.merchant, 200),
+      category,
+      amount: amountUsd,
+      currency,
+      original_amount: originalAmount,
+      fx_rate: fxRate,
+      fx_date: fxDate,
+      line_items: lineItems,
+      receipt_url: cleanText(body.receipt_url, 500),
+      scan_source: body.scan_source === 'scan' ? 'scan' : 'manual',
+    }
+
+    if (isUpdate) {
+      const lineId = body.line_id
+      if (typeof lineId !== 'string' || lineId.length === 0) {
+        return NextResponse.json({ error: 'Missing line_id' }, { status: 400 })
+      }
+      const { data, error } = await supabase
+        .from('contractor_expenses')
+        .update(fields)
+        .eq('id', lineId)
+        .eq('team_member_id', session.contractorId)
+        .eq('report_id', reportId)
+        .eq('status', 'draft')
+        .select(LINE_COLUMNS)
+        .single()
+      if (error || !data) {
+        console.error('expense-reports update_line error:', error)
+        return NextResponse.json({ error: 'Line not found or not editable' }, { status: 400 })
+      }
+      return NextResponse.json({ ok: true, line: data })
+    }
+
+    const { data, error } = await supabase
+      .from('contractor_expenses')
+      .insert({
+        team_member_id: session.contractorId,
+        company_id: report.company_id,
+        client_id: report.client_id,
+        report_id: reportId,
+        status: 'draft',
+        is_billable: false,
+        ...fields,
+      })
+      .select(LINE_COLUMNS)
+      .single()
+    if (error) {
+      console.error('expense-reports add_line error:', error)
+      return NextResponse.json({ error: 'Failed to add the expense line' }, { status: 500 })
+    }
+    return NextResponse.json({ ok: true, line: data })
+  }
+
+  if (body?.action === 'delete_line') {
+    const lineId = body.line_id
+    if (typeof lineId !== 'string' || lineId.length === 0) {
+      return NextResponse.json({ error: 'Missing line_id' }, { status: 400 })
+    }
+    const { error } = await supabase
+      .from('contractor_expenses')
+      .delete()
+      .eq('id', lineId)
+      .eq('team_member_id', session.contractorId)
+      .eq('status', 'draft')
+      .not('report_id', 'is', null)
+    if (error) {
+      console.error('expense-reports delete_line error:', error)
+      return NextResponse.json({ error: 'Failed to delete the line' }, { status: 500 })
+    }
+    return NextResponse.json({ ok: true })
+  }
+
+  return NextResponse.json({ error: "Invalid action. Use 'create', 'submit', 'add_line', 'update_line', or 'delete_line'." }, { status: 400 })
 }
 
 // ------------------------------------------------------------
