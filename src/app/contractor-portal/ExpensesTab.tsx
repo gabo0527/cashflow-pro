@@ -35,7 +35,7 @@ interface ReportLine {
   id: string; report_id: string; date: string; description: string; merchant?: string | null
   category: string; amount: number; currency: string; original_amount?: number | null
   fx_rate?: number | null; fx_date?: string | null; line_items?: { description: string; amount: number }[] | null
-  receipt_url?: string | null; status: string
+  receipt_url?: string | null; status: string; scan_source?: string | null
 }
 interface Report {
   id: string; client_id?: string | null; title: string; description?: string | null; status: string
