@@ -29,6 +29,10 @@
 //              SERVER-SIDE from original_amount × fx_rate for
 //              foreign currency (server-authoritative math)
 //   POST   { action:'delete_line', line_id }
+//   POST   { action:'attach_to_invoice', report_id, invoice_id }
+//            → links an APPROVED report to one of the contractor's
+//              own invoices: inserts the generated reimbursement
+//              line and flips the report to 'invoiced'
 //   PATCH  { report_id, ...fields }   (draft reports only)
 //   DELETE ?report_id=...             (draft reports only; removes lines too)
 // ============================================================
@@ -40,7 +44,7 @@ import { sendAdminExpenseSubmittedEmail } from '@/lib/email'
 export const dynamic = 'force-dynamic'
 
 const REPORT_COLUMNS =
-  'id, client_id, title, description, status, trip_start, trip_end, invoice_id, invoiced_at, submitted_at, created_at'
+  'id, client_id, title, description, status, trip_start, trip_end, invoice_id, invoiced_at, submitted_at, approved_at, review_note, created_at'
 const LINE_COLUMNS =
   'id, report_id, date, description, merchant, category, amount, currency, original_amount, fx_rate, fx_date, line_items, receipt_url, status, scan_source'
 
@@ -342,7 +346,83 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
-  return NextResponse.json({ error: "Invalid action. Use 'create', 'submit', 'add_line', 'update_line', or 'delete_line'." }, { status: 400 })
+
+  // ---------- ATTACH TO INVOICE (approved reports only) ----------
+  if (body?.action === 'attach_to_invoice') {
+    const reportId = body.report_id
+    const invoiceId = body.invoice_id
+    if (typeof reportId !== 'string' || reportId.length === 0 || typeof invoiceId !== 'string' || invoiceId.length === 0) {
+      return NextResponse.json({ error: 'Missing report_id or invoice_id' }, { status: 400 })
+    }
+
+    // The invoice must belong to this contractor
+    const { data: invoice } = await supabase
+      .from('contractor_invoices')
+      .select('id, team_member_id')
+      .eq('id', invoiceId)
+      .eq('team_member_id', session.contractorId)
+      .single()
+    if (!invoice) return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
+
+    // Load the report + compute its total server-side
+    const { data: report } = await supabase
+      .from('expense_reports')
+      .select('id, title, client_id, status, invoice_id')
+      .eq('id', reportId)
+      .eq('team_member_id', session.contractorId)
+      .single()
+    if (!report) return NextResponse.json({ error: 'Report not found' }, { status: 404 })
+    if (report.status !== 'approved' || report.invoice_id) {
+      return NextResponse.json({ error: 'Only approved, un-invoiced reports can be added to an invoice' }, { status: 400 })
+    }
+    const { data: lines } = await supabase
+      .from('contractor_expenses')
+      .select('amount')
+      .eq('report_id', reportId)
+      .eq('team_member_id', session.contractorId)
+    const total = Math.round((lines || []).reduce((s: number, ln: any) => s + (ln.amount || 0), 0) * 100) / 100
+    if (!(total > 0)) return NextResponse.json({ error: 'Report has no amount to invoice' }, { status: 400 })
+
+    const now = new Date().toISOString()
+
+    // Claim the report first with a conditional update — a second
+    // concurrent attach finds zero rows and stops cleanly.
+    const { data: claimed, error: ce } = await supabase
+      .from('expense_reports')
+      .update({ invoice_id: invoiceId, invoiced_at: now, status: 'invoiced', updated_at: now })
+      .eq('id', reportId)
+      .eq('team_member_id', session.contractorId)
+      .eq('status', 'approved')
+      .is('invoice_id', null)
+      .select('id')
+    if (ce || !claimed || claimed.length === 0) {
+      return NextResponse.json({ error: 'Report was already attached to an invoice' }, { status: 409 })
+    }
+
+    // Insert the generated reimbursement line; on failure, release the claim
+    const { error: le } = await supabase.from('contractor_invoice_lines').insert({
+      invoice_id: invoiceId,
+      client_id: report.client_id,
+      project_id: null,
+      description: `Expense reimbursement — ${report.title}`,
+      hours: 0,
+      rate: 0,
+      amount: total,
+      allocation_pct: null,
+    })
+    if (le) {
+      console.error('attach_to_invoice line insert error:', le)
+      await supabase
+        .from('expense_reports')
+        .update({ invoice_id: null, invoiced_at: null, status: 'approved', updated_at: new Date().toISOString() })
+        .eq('id', reportId)
+      return NextResponse.json({ error: 'Failed to add the reimbursement line — try again' }, { status: 500 })
+    }
+
+    return NextResponse.json({ ok: true, amount: total })
+  }
+
+  return NextResponse.json({ error: "Invalid action. Use 'create', 'submit', 'add_line', 'update_line', 'delete_line', or 'attach_to_invoice'." }, { status: 400 })
 }
 
 // ------------------------------------------------------------
