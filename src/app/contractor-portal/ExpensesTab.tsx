@@ -763,7 +763,7 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
       {/* Receipt viewer */}
       {docView && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={() => setDocView(null)}>
-          <div style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '760px', height: '84vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+          <div style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '760px', height: docView.isImage ? 'auto' : '84vh', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid rgba(15,23,42,0.07)' }}>
               <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#0f172a' }}>Receipt</span>
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -772,9 +772,14 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
               </div>
             </div>
             {docView.isImage ? (
-              <div style={{ flex: 1, overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', padding: '14px' }}>
+              <div style={{ flex: 1, overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', padding: '14px', position: 'relative' }}>
+                <button onClick={() => setDocView(null)} aria-label="Close"
+                  style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 2, width: '32px', height: '32px', borderRadius: '999px', border: '1px solid rgba(15,23,42,0.1)', background: 'rgba(255,255,255,0.95)', color: '#334155', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>
+                  <X size={15} />
+                </button>
+                {/* Safari mishandles percentage max-height inside flex — use explicit viewport math */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={docView.url} alt="Receipt" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '6px', boxShadow: '0 4px 20px rgba(0,0,0,0.12)' }} />
+                <img src={docView.url} alt="Receipt" style={{ maxWidth: '100%', maxHeight: 'calc(90vh - 96px)', width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: '6px', boxShadow: '0 4px 20px rgba(0,0,0,0.12)' }} />
               </div>
             ) : (
               <iframe src={docView.url} style={{ flex: 1, width: '100%', border: 'none' }} title="Receipt" />
