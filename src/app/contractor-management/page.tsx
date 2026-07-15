@@ -42,6 +42,7 @@ interface ContractorExpense {
   id: string; team_member_id: string; project_id: string | null; client_id: string | null
   date: string; category: string; description: string; amount: number; receipt_url: string | null
   status: string; submitted_at: string; reviewed_at: string | null; notes: string | null; is_billable: boolean | null
+  report_id?: string | null; currency?: string | null; original_amount?: number | null; fx_rate?: number | null
 }
 interface TeamMember {
   id: string; name: string; email: string
