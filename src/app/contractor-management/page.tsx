@@ -6,8 +6,7 @@ import {
   CheckCircle, XCircle, Clock, DollarSign, Download, Eye, Building2,
   Loader2, X, Calendar, TrendingUp, Check,
   ExternalLink, Tag, Ban, Layers, MessageSquare, Send, Edit2, Trash2,
-  User, Phone, MapPin, CreditCard, FileUp, Shield, Save, Upload
-} from 'lucide-react'
+  User, Phone, MapPin, CreditCard, FileUp, Shield, Save, Upload, AlertCircle } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import OnboardingReview from './OnboardingReview'
 
@@ -385,6 +384,14 @@ export default function ContractorManagement() {
   const [profileForm, setProfileForm] = useState<Partial<TeamMember>>({})
   const [showBank, setShowBank] = useState(false)
   const [docViewUrl, setDocViewUrl] = useState<string | null>(null)
+
+  // ============ EXPENSE REPORT REVIEW (5a) ============
+  const [expenseReports, setExpenseReports] = useState<any[]>([])
+  const [reportBusy, setReportBusy] = useState<string | null>(null)
+  const [reportBillable, setReportBillable] = useState<Record<string, boolean>>({})
+  const [reportRejectId, setReportRejectId] = useState<string | null>(null)
+  const [reportRejectNote, setReportRejectNote] = useState('')
+  const [reportError, setReportError] = useState<string | null>(null)
   const [contractorFilter, setContractorFilter] = useState<'all' | 'needs_tax' | 'needs_profile' | 'complete'>('all')
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileUploading, setProfileUploading] = useState<string | null>(null)
@@ -600,6 +607,68 @@ export default function ContractorManagement() {
       }
     }
     setProcessing(null)
+  }
+
+  // ---- expense report review helpers ----
+  const authedFetch = async (url: string, init?: RequestInit) => {
+    const { data: sess } = await supabase.auth.getSession()
+    const token = sess.session?.access_token
+    return fetch(url, {
+      ...init,
+      headers: { ...(init?.headers || {}), 'Content-Type': 'application/json', Authorization: `Bearer ${token || ''}` },
+    })
+  }
+
+  const loadExpenseReports = async () => {
+    try {
+      const res = await authedFetch('/api/expense-reports/review')
+      if (!res.ok) return
+      const j = await res.json()
+      const reports = j.reports || []
+      setExpenseReports(reports)
+      // Seed billable toggles: existing flag, else default to true when a client is attached
+      setReportBillable(prev => {
+        const next = { ...prev }
+        reports.forEach((r: any) => { if (!(r.id in next)) next[r.id] = typeof r.billable === 'boolean' ? r.billable : !!r.client_id })
+        return next
+      })
+    } catch (err) { console.error('loadExpenseReports error:', err) }
+  }
+  useEffect(() => { loadExpenseReports() }, [])
+
+  const refreshExpensesOnly = async () => {
+    const { data } = await supabase.from('contractor_expenses').select('*').order('date', { ascending: false })
+    if (data) setExpenses(data)
+  }
+
+  const reviewReport = async (reportId: string, action: 'approve' | 'reject') => {
+    if (reportBusy) return
+    setReportBusy(reportId); setReportError(null)
+    try {
+      const body: any = { report_id: reportId, action }
+      if (action === 'approve') body.billable = !!reportBillable[reportId]
+      if (action === 'reject') body.note = reportRejectNote.trim()
+      const res = await authedFetch('/api/expense-reports/review', { method: 'POST', body: JSON.stringify(body) })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.error || 'Review failed')
+      setReportRejectId(null); setReportRejectNote('')
+      await Promise.all([loadExpenseReports(), refreshExpensesOnly()])
+    } catch (err: any) {
+      setReportError(err.message || 'Review failed')
+    } finally { setReportBusy(null) }
+  }
+
+  const toggleReportBillable = async (reportId: string, current: boolean) => {
+    setReportBillable(p => ({ ...p, [reportId]: !current }))
+    const report = expenseReports.find(r => r.id === reportId)
+    // Persist immediately for already-decided reports; for submitted ones
+    // the flag rides the approve action itself.
+    if (report && report.status !== 'submitted') {
+      const res = await authedFetch('/api/expense-reports/review', {
+        method: 'POST', body: JSON.stringify({ report_id: reportId, action: 'set_billable', billable: !current }),
+      })
+      if (!res.ok) setReportBillable(p => ({ ...p, [reportId]: current }))
+    }
   }
 
   const openPreview = async (path: string) => {
@@ -1108,6 +1177,95 @@ export default function ContractorManagement() {
       {/* ===================== EXPENSES ===================== */}
       {activeTab === 'expenses' && (
         <div className="space-y-4">
+          {/* ============ REPORT REVIEW QUEUE (5a) ============ */}
+          {expenseReports.filter(r => r.status === 'submitted').length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Review queue — expense reports</span>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-600">{expenseReports.filter(r => r.status === 'submitted').length} awaiting</span>
+              </div>
+              {reportError && (
+                <div className="flex items-center gap-2 text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  <AlertCircle size={13} /> {reportError}
+                  <button className="ml-auto" onClick={() => setReportError(null)}><X size={12} /></button>
+                </div>
+              )}
+              {expenseReports.filter(r => r.status === 'submitted').map(report => {
+                const lines = expenses.filter(e => e.report_id === report.id)
+                const total = Math.round(lines.reduce((sum, l) => sum + (l.amount || 0), 0) * 100) / 100
+                const billable = !!reportBillable[report.id]
+                return (
+                  <div key={report.id} className="bg-white border border-slate-200/70 rounded-xl shadow-sm overflow-hidden">
+                    <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-slate-100 flex-wrap" style={{ backgroundImage: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)' }}>
+                      <div className="min-w-0">
+                        <div className="font-bold text-[14px] text-slate-900 truncate" style={{ fontFamily: 'Archivo, sans-serif' }}>{report.title}</div>
+                        <div className="text-[10.5px] text-slate-400">
+                          {memberMap[report.team_member_id] || 'Unknown'} · {report.client_id ? (clientMap[report.client_id] || 'Client') : 'Internal / no client'}
+                          {report.trip_start ? ` · ${fmtDate(report.trip_start)} – ${fmtDate(report.trip_end)}` : ''}
+                          {report.description ? ` · "${report.description}"` : ''}
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.09em] px-2 py-1 rounded border text-sky-700 bg-sky-50 border-sky-200" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                        <span className="w-[5px] h-[5px] rounded-[1.5px] bg-current" />Submitted
+                      </span>
+                    </div>
+                    <div className="px-5 py-3 space-y-1">
+                      {lines.map(ln => (
+                        <div key={ln.id} className="flex items-center justify-between gap-3 py-1.5 border-t first:border-t-0 border-slate-100 text-[12px] text-slate-600">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {ln.receipt_url ? (
+                              <button onClick={() => openPreview(ln.receipt_url!)} title="View receipt" className="w-[26px] h-[32px] rounded border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:border-blue-300 flex-shrink-0">
+                                <Eye size={12} />
+                              </button>
+                            ) : <span className="w-[26px] text-center text-slate-300">—</span>}
+                            <span className="truncate">{ln.description}{ln.date ? ` · ${fmtDate(ln.date)}` : ''}{ln.category ? ` · ${ln.category}` : ''}</span>
+                            {ln.currency && ln.currency !== 'USD' && ln.original_amount ? (
+                              <span className="text-[9.5px] text-blue-800 bg-blue-50 border border-blue-200 rounded px-1.5 py-0.5 whitespace-nowrap">{ln.currency} {Number(ln.original_amount).toFixed(2)}{ln.fx_rate ? ` @ ${Number(ln.fx_rate).toFixed(4)}` : ''}</span>
+                            ) : null}
+                          </div>
+                          <span className="font-bold text-slate-900 tabular-nums whitespace-nowrap" style={{ fontFamily: 'Archivo, sans-serif' }}>{fmt$(ln.amount)}</span>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 mt-1">
+                        <span className="text-[12px] font-semibold text-slate-700">Report total — {lines.length} line{lines.length === 1 ? '' : 's'}</span>
+                        <span className="font-bold text-[15px] text-blue-600 tabular-nums" style={{ fontFamily: 'Archivo, sans-serif' }}>{fmt$(total)}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-lg px-3 py-2 mt-1" style={{ background: 'rgba(234,138,47,0.03)', border: '1px dashed #f6d3b3' }}>
+                        <button onClick={() => toggleReportBillable(report.id, billable)} className="flex items-center gap-2">
+                          <span className={`w-[34px] h-[19px] rounded-full relative transition-colors ${billable ? 'bg-emerald-700' : 'bg-slate-300'}`}>
+                            <span className={`absolute top-[2px] w-[15px] h-[15px] rounded-full bg-white transition-all ${billable ? 'right-[2px]' : 'left-[2px]'}`} />
+                          </span>
+                          <span className="text-[12px] font-semibold text-slate-700">Billable to client</span>
+                        </button>
+                        <span className="text-[9px] font-bold uppercase tracking-[0.08em] px-2 py-0.5 rounded border" style={{ color: '#c2660c', background: 'rgba(234,138,47,0.06)', borderColor: '#f6d3b3' }}>Admin only</span>
+                      </div>
+                      {reportRejectId === report.id ? (
+                        <div className="space-y-2 pt-1">
+                          <input autoFocus value={reportRejectNote} onChange={e => setReportRejectNote(e.target.value)} placeholder="Why is this rejected? The contractor sees this note." className="w-full px-3 py-2 border border-red-200 rounded-lg text-[12px] focus:outline-none focus:border-red-400" />
+                          <div className="flex gap-2">
+                            <button disabled={reportBusy === report.id || !reportRejectNote.trim()} onClick={() => reviewReport(report.id, 'reject')} className="flex-1 py-2 bg-red-600 text-white rounded-lg text-[12.5px] font-semibold disabled:opacity-50">
+                              {reportBusy === report.id ? 'Rejecting…' : 'Confirm reject'}
+                            </button>
+                            <button onClick={() => { setReportRejectId(null); setReportRejectNote('') }} className="flex-1 py-2 bg-white border border-slate-200 rounded-lg text-[12.5px] font-semibold text-slate-600">Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2 pt-1">
+                          <button disabled={reportBusy === report.id} onClick={() => reviewReport(report.id, 'approve')} className="flex-1 py-2.5 rounded-lg text-[12.5px] font-semibold text-white disabled:opacity-50" style={{ background: '#047857' }}>
+                            {reportBusy === report.id ? 'Approving…' : 'Approve report'}
+                          </button>
+                          <button disabled={reportBusy === report.id} onClick={() => { setReportRejectId(report.id); setReportRejectNote('') }} className="flex-1 py-2.5 bg-white border border-red-200 text-red-700 rounded-lg text-[12.5px] font-semibold">
+                            Reject…
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
           <div className="grid grid-cols-5 gap-3">
             <MetricCard label="Total Expenses" value={fmt$(expMetrics.total)} icon={Receipt} accentColor="#2563eb" sub={`${filteredExpenses.length} items`} />
             <MetricCard label="Pending" value={fmt$(expMetrics.pendingAmt)} icon={Clock} accentColor="#d97706" sub={`${expMetrics.pendingCount} awaiting`} highlight={expMetrics.pendingCount > 0} />
