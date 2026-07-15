@@ -18,6 +18,7 @@
 // ============================================================
 
 import React, { useState, useEffect, useRef, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Camera, Upload, Plus, X, ChevronLeft, Loader2, Send, Trash2,
   FileText, Eye, CheckCircle, AlertCircle, Globe, Pencil, Receipt,
@@ -174,7 +175,8 @@ function LineModal({ draft, onChange, onSave, onClose, saving, error, tripWindow
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.currency, draft.date, draft.original_amount])
 
-  return (
+  if (typeof document === 'undefined') return null
+  return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(15,23,42,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={onClose}>
       <div className="v-card" style={{ width: '100%', maxWidth: '440px', maxHeight: '92vh', overflowY: 'auto', background: '#fff', borderRadius: '14px' }} onClick={e => e.stopPropagation()}>
         <div style={headStyle}>
@@ -286,7 +288,8 @@ function LineModal({ draft, onChange, onSave, onClose, saving, error, tripWindow
           <span style={{ fontSize: '11px', color: '#94a3b8', textAlign: 'center' }}>Saved as a private draft line — admin sees nothing until you submit the report.</span>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -761,7 +764,7 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
       )}
 
       {/* Receipt viewer */}
-      {docView && (
+      {docView && typeof document !== 'undefined' && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={() => setDocView(null)}>
           <div style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '760px', height: docView.isImage ? 'auto' : '84vh', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid rgba(15,23,42,0.07)' }}>
@@ -785,7 +788,8 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
               <iframe src={docView.url} style={{ flex: 1, width: '100%', border: 'none' }} title="Receipt" />
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
