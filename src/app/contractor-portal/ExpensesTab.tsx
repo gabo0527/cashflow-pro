@@ -20,7 +20,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import {
   Camera, Upload, Plus, X, ChevronLeft, Loader2, Send, Trash2,
-  FileText, Eye, CheckCircle, AlertCircle, Globe, Pencil, Receipt
+  FileText, Eye, CheckCircle, AlertCircle, Globe, Pencil, Receipt,
+  Smartphone, Plane, AlertTriangle
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 
@@ -60,6 +61,37 @@ const fmtUsd = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency'
 const fmtDate = (d?: string | null) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—')
 const localToday = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}` }
 const catLabel = (id: string) => EXPENSE_CATEGORIES.find(c => c.id === id)?.label || id
+
+// iPhone cameras produce HEIC and very large images; the scan API accepts
+// JPEG/PNG/WebP under 5MB. Normalize every photo to a JPEG capped at 2000px
+// before upload — Safari decodes HEIC natively into the canvas. PDFs pass through.
+async function normalizeImage(file: File): Promise<File> {
+  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) return file
+  try {
+    const url = URL.createObjectURL(file)
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const im = new Image()
+      im.onload = () => resolve(im)
+      im.onerror = () => reject(new Error('Could not read the image'))
+      im.src = url
+    })
+    const MAX = 2000
+    const scale = Math.min(1, MAX / Math.max(img.width, img.height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(img.width * scale)
+    canvas.height = Math.round(img.height * scale)
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Canvas unavailable')
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+    URL.revokeObjectURL(url)
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85))
+    if (!blob) throw new Error('Image conversion failed')
+    return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' })
+  } catch (err) {
+    console.warn('Image normalization failed, uploading original:', err)
+    return file
+  }
+}
 
 async function uploadReceipt(file: File, memberId: string): Promise<string | null> {
   try {
@@ -111,9 +143,11 @@ function emptyDraft(): LineDraft {
   return { date: localToday(), description: '', merchant: '', category: 'travel', currency: 'USD', original_amount: '', amount: '', fx_rate: null, fx_date: null, line_items: null, receipt_url: null, scan_source: 'manual' }
 }
 
-function LineModal({ draft, onChange, onSave, onClose, saving, error }: {
+function LineModal({ draft, onChange, onSave, onClose, saving, error, tripWindow }: {
   draft: LineDraft; onChange: (d: LineDraft) => void; onSave: () => void; onClose: () => void; saving: boolean; error: string | null
+  tripWindow?: { start?: string | null; end?: string | null }
 }) {
+  const outsideWindow = !!(tripWindow?.start && tripWindow?.end && /^\d{4}-\d{2}-\d{2}$/.test(draft.date) && (draft.date < tripWindow.start || draft.date > tripWindow.end))
   const [quoting, setQuoting] = useState(false)
   const foreign = draft.currency !== 'USD'
   const usdPreview = foreign && draft.fx_rate && parseFloat(draft.original_amount) > 0
@@ -212,6 +246,13 @@ function LineModal({ draft, onChange, onSave, onClose, saving, error }: {
             </div>
           )}
 
+          {outsideWindow && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '11px', color: '#b45309', background: 'rgba(253,230,138,0.15)', border: '1px solid #fde68a', borderRadius: '9px', padding: '9px 11px', lineHeight: 1.5 }}>
+              <AlertTriangle size={12} style={{ flexShrink: 0, marginTop: '1px' }} />
+              <span>This receipt is dated <b>{fmtDate(draft.date)}</b> — outside this trip's window ({fmtDate(tripWindow!.start)} – {fmtDate(tripWindow!.end)}). That can be legitimate (e.g., a flight booked early), but double-check it belongs in this report.</span>
+            </div>
+          )}
+
           {draft.line_items && draft.line_items.length > 0 && (
             <div>
               <label style={flabStyle}>Line items — from receipt</label>
@@ -240,7 +281,7 @@ function LineModal({ draft, onChange, onSave, onClose, saving, error }: {
           )}
 
           <button style={{ ...btnPri, opacity: saving ? 0.6 : 1 }} disabled={saving} onClick={onSave}>
-            {saving ? <><Loader2 size={13} className="animate-spin" /> Saving…</> : <><CheckCircle size={13} /> Save to trip</>}
+            {saving ? <><Loader2 size={13} className="animate-spin" /> Saving…</> : <><CheckCircle size={13} /> Save to report</>}
           </button>
           <span style={{ fontSize: '11px', color: '#94a3b8', textAlign: 'center' }}>Saved as a private draft line — admin sees nothing until you submit the report.</span>
         </div>
@@ -261,6 +302,7 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
   const [activeReportId, setActiveReportId] = useState<string | null>(null)
   const [showNewTrip, setShowNewTrip] = useState(false)
   const [tripForm, setTripForm] = useState({ title: '', client_id: '', description: '', trip_start: '', trip_end: '' })
+  const [reportType, setReportType] = useState<'travel' | 'other'>('travel')
   const [creating, setCreating] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [lineDraft, setLineDraft] = useState<LineDraft | null>(null)
@@ -268,7 +310,7 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
   const [lineError, setLineError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
-  const [docViewUrl, setDocViewUrl] = useState<string | null>(null)
+  const [docView, setDocView] = useState<{ url: string; isImage: boolean } | null>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -303,7 +345,12 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
     try {
       const res = await fetch('/api/expense-reports', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create', ...tripForm, client_id: tripForm.client_id || null })
+        body: JSON.stringify({
+          action: 'create', ...tripForm, client_id: tripForm.client_id || null,
+          // Other-type reports carry no trip window
+          trip_start: reportType === 'travel' ? tripForm.trip_start : '',
+          trip_end: reportType === 'travel' ? tripForm.trip_end : '',
+        })
       })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error || 'Failed to create trip')
@@ -319,7 +366,8 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
     if (!file || !activeReport || scanning) return
     setScanning(true); setError(null)
     try {
-      const path = await uploadReceipt(file, member.id)
+      const normalized = await normalizeImage(file)
+      const path = await uploadReceipt(normalized, member.id)
       if (!path) throw new Error('Upload failed — try again')
       const res = await fetch('/api/expenses/scan', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -385,12 +433,12 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
       if (!res.ok) throw new Error(j.error || 'Failed to save')
       setLineDraft(null)
       await loadReports()
-      flash(lineDraft.line_id ? 'Expense updated' : 'Saved to trip')
+      flash(lineDraft.line_id ? 'Expense updated' : 'Saved to report')
     } catch (err: any) { setLineError(err.message) } finally { setLineSaving(false) }
   }
 
   const deleteLine = async (lineId: string) => {
-    if (!confirm('Remove this expense from the trip?')) return
+    if (!confirm('Remove this expense from the report?')) return
     try {
       const res = await fetch('/api/expense-reports', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -419,7 +467,7 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
   }
 
   const deleteReport = async (id: string) => {
-    if (!confirm('Delete this draft trip and all its expenses?')) return
+    if (!confirm('Delete this draft report and all its expenses?')) return
     try {
       const res = await fetch(`/api/expense-reports?report_id=${id}`, { method: 'DELETE' })
       if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || 'Failed to delete') }
@@ -431,8 +479,11 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
   const viewReceipt = async (path: string) => {
     try {
       const { data } = await supabase.storage.from('contractor-uploads').createSignedUrl(path, 300)
-      if (data?.signedUrl) setDocViewUrl(data.signedUrl)
-      else setError('Could not open the receipt')
+      if (data?.signedUrl) {
+        // Decide by the storage path (clean, no query string), not the signed URL
+        const isImage = /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(path)
+        setDocView({ url: data.signedUrl, isImage })
+      } else setError('Could not open the receipt')
     } catch { setError('Could not open the receipt') }
   }
 
@@ -465,7 +516,7 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
         <>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-              <button style={{ ...btnGhost, padding: '7px 10px', flexShrink: 0 }} onClick={() => setActiveReportId(null)}><ChevronLeft size={13} style={{ display: 'inline', verticalAlign: '-2px' }} /> Trips</button>
+              <button style={{ ...btnGhost, padding: '7px 10px', flexShrink: 0 }} onClick={() => setActiveReportId(null)}><ChevronLeft size={13} style={{ display: 'inline', verticalAlign: '-2px' }} /> Reports</button>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontFamily: 'Archivo, sans-serif', fontWeight: 700, fontSize: '15px', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeReport.title}</div>
                 <div style={{ fontSize: '11px', color: '#94a3b8' }}>
@@ -515,7 +566,7 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
                           <td style={{ padding: '9px 14px', borderTop: '1px solid rgba(15,23,42,0.045)' }}>
                             <div style={{ fontSize: '12.5px', fontWeight: 500, color: '#0f172a' }}>{ln.description}</div>
                             <div style={{ fontSize: '10px', color: '#94a3b8' }}>
-                              {fmtDate(ln.date)}{ln.line_items && ln.line_items.length > 0 ? ` · ${ln.line_items.length} line items` : ''} · <span style={{ letterSpacing: '0.04em', textTransform: 'uppercase' }}>{ln.scan_source === 'scan' ? '📱 scanned' : 'manual'}</span>
+                              {fmtDate(ln.date)}{ln.line_items && ln.line_items.length > 0 ? ` · ${ln.line_items.length} line items` : ''} · <span style={{ letterSpacing: '0.04em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>{ln.scan_source === 'scan' ? <><Smartphone size={9} style={{ display: 'inline' }} /> scanned</> : 'manual'}</span>
                             </div>
                           </td>
                           <td style={{ padding: '9px 14px', borderTop: '1px solid rgba(15,23,42,0.045)', fontSize: '12px', color: '#475569', whiteSpace: 'nowrap' }}>{catLabel(ln.category)}</td>
@@ -582,7 +633,7 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
                       {submitting ? <><Loader2 size={13} className="animate-spin" /> Submitting…</> : <><Send size={13} /> Submit report — {fmtUsd(activeReport.total)}</>}
                     </button>
                     <span style={{ fontSize: '10.5px', color: '#94a3b8', lineHeight: 1.5 }}>Submitting notifies admin and locks the report for review. Until then, it's a private draft.</span>
-                    <button style={{ ...btnGhost, borderColor: '#fecaca', color: '#b91c1c' }} onClick={() => deleteReport(activeReport.id)}>Delete draft trip</button>
+                    <button style={{ ...btnGhost, borderColor: '#fecaca', color: '#b91c1c' }} onClick={() => deleteReport(activeReport.id)}>Delete draft report</button>
                   </>
                 ) : (
                   <span style={{ fontSize: '11px', color: '#94a3b8', lineHeight: 1.55 }}>
@@ -600,20 +651,31 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
           {/* ================= TRIPS LIST ================= */}
           {!showNewTrip ? (
             <button style={{ ...btnGhost, borderStyle: 'dashed', padding: '11px', width: '100%' }} onClick={() => setShowNewTrip(true)}>
-              <Plus size={13} style={{ display: 'inline', verticalAlign: '-2px', marginRight: '5px' }} /> Start a new trip / expense report
+              <Plus size={13} style={{ display: 'inline', verticalAlign: '-2px', marginRight: '5px' }} /> New expense report
             </button>
           ) : (
             <div className="v-card" style={{ overflow: 'hidden' }}>
               <div style={headStyle}>
-                <span style={lblStyle}>New trip / expense report</span>
+                <span style={lblStyle}>New expense report</span>
                 <button onClick={() => setShowNewTrip(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={14} /></button>
               </div>
               <div style={{ padding: '14px 20px 18px', display: 'flex', flexDirection: 'column', gap: '11px' }}>
                 <div>
-                  <label style={flabStyle}>Title</label>
-                  <input style={inputStyle} value={tripForm.title} placeholder="e.g. Lyon commissioning — site visit" onChange={e => setTripForm(p => ({ ...p, title: e.target.value }))} />
+                  <label style={flabStyle}>Report type</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '3px', gap: '3px' }}>
+                    {([['travel', 'Travel / trip', Plane], ['other', 'Other expense', Receipt]] as const).map(([id, label, Icon]) => (
+                      <button key={id} type="button" onClick={() => setReportType(id)}
+                        style={{ padding: '8px', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: reportType === id ? '#fff' : 'transparent', color: reportType === id ? '#2563eb' : '#64748b', boxShadow: reportType === id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}>
+                        <Icon size={13} /> {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label style={flabStyle}>Title</label>
+                  <input style={inputStyle} value={tripForm.title} placeholder="e.g. Lyon site visit · Adobe license — July · Q3 mileage" onChange={e => setTripForm(p => ({ ...p, title: e.target.value }))} />
+                </div>
+                <div className={reportType === 'travel' ? 'grid grid-cols-1 sm:grid-cols-2 gap-2.5' : ''}>
                   <div>
                     <label style={flabStyle}>Client</label>
                     <select style={{ ...inputStyle, cursor: 'pointer' }} value={tripForm.client_id} onChange={e => setTripForm(p => ({ ...p, client_id: e.target.value }))}>
@@ -621,23 +683,25 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
                       {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
+                  {reportType === 'travel' && (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     <div>
-                      <label style={flabStyle}>Start</label>
+                      <label style={flabStyle}>Trip start</label>
                       <input type="date" style={inputStyle} value={tripForm.trip_start} onChange={e => setTripForm(p => ({ ...p, trip_start: e.target.value }))} />
                     </div>
                     <div>
-                      <label style={flabStyle}>End</label>
+                      <label style={flabStyle}>Trip end</label>
                       <input type="date" style={inputStyle} value={tripForm.trip_end} onChange={e => setTripForm(p => ({ ...p, trip_end: e.target.value }))} />
                     </div>
                   </div>
+                  )}
                 </div>
                 <div>
-                  <label style={flabStyle}>What was this trip for?</label>
-                  <input style={inputStyle} value={tripForm.description} placeholder="e.g. Substation commissioning support, week 2" onChange={e => setTripForm(p => ({ ...p, description: e.target.value }))} />
+                  <label style={flabStyle}>What is this report for?</label>
+                  <input style={inputStyle} value={tripForm.description} placeholder="e.g. Substation commissioning support · software reimbursement" onChange={e => setTripForm(p => ({ ...p, description: e.target.value }))} />
                 </div>
                 <button style={{ ...btnPri, opacity: creating || !tripForm.title.trim() ? 0.5 : 1 }} disabled={creating || !tripForm.title.trim()} onClick={createTrip}>
-                  {creating ? <><Loader2 size={13} className="animate-spin" /> Creating…</> : 'Create trip'}
+                  {creating ? <><Loader2 size={13} className="animate-spin" /> Creating…</> : 'Create report'}
                 </button>
               </div>
             </div>
@@ -647,7 +711,7 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
             <div className="v-card" style={{ padding: '40px 20px', textAlign: 'center' }}>
               <FileText size={20} style={{ color: '#cbd5e1', margin: '0 auto 8px' }} />
               <p style={{ fontSize: '13px', fontWeight: 500, color: '#64748b' }}>No expense reports yet</p>
-              <p style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '4px' }}>Start a trip, then scan receipts into it as you go.</p>
+              <p style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '4px' }}>Create a report — a trip, a software reimbursement, anything — then scan or add receipts into it.</p>
             </div>
           ) : (
             <div className="v-card" style={{ overflow: 'hidden' }}>
@@ -673,7 +737,7 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
           {/* Legacy standalone expenses (read-only history) */}
           {legacyExpenses.filter((e: any) => !(e as any).report_id).length > 0 && (
             <div className="v-card" style={{ overflow: 'hidden' }}>
-              <div style={headStyle}><span style={lblStyle}>Earlier expenses — before trips</span></div>
+              <div style={headStyle}><span style={lblStyle}>Earlier expenses — before reports</span></div>
               {legacyExpenses.filter((e: any) => !(e as any).report_id).slice(0, 10).map((e, i) => (
                 <div key={e.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '10px 20px', borderTop: i === 0 ? 'none' : '1px solid rgba(15,23,42,0.05)' }}>
                   <div style={{ minWidth: 0 }}>
@@ -693,21 +757,28 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
 
       {/* Line review modal */}
       {lineDraft && (
-        <LineModal draft={lineDraft} onChange={setLineDraft} onSave={saveLine} onClose={() => { setLineDraft(null); setLineError(null) }} saving={lineSaving} error={lineError} />
+        <LineModal draft={lineDraft} onChange={setLineDraft} onSave={saveLine} onClose={() => { setLineDraft(null); setLineError(null) }} saving={lineSaving} error={lineError} tripWindow={activeReport ? { start: activeReport.trip_start, end: activeReport.trip_end } : undefined} />
       )}
 
       {/* Receipt viewer */}
-      {docViewUrl && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={() => setDocViewUrl(null)}>
+      {docView && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={() => setDocView(null)}>
           <div style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '760px', height: '84vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid rgba(15,23,42,0.07)' }}>
               <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#0f172a' }}>Receipt</span>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <a href={docViewUrl} target="_blank" rel="noreferrer" style={{ ...btnGhost, textDecoration: 'none', color: '#2563eb' }}>Download</a>
-                <button style={btnGhost} onClick={() => setDocViewUrl(null)}>Close</button>
+                <a href={docView.url} target="_blank" rel="noreferrer" style={{ ...btnGhost, textDecoration: 'none', color: '#2563eb' }}>Download</a>
+                <button style={btnGhost} onClick={() => setDocView(null)}>Close</button>
               </div>
             </div>
-            <iframe src={docViewUrl} style={{ flex: 1, width: '100%', border: 'none' }} title="Receipt" />
+            {docView.isImage ? (
+              <div style={{ flex: 1, overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', padding: '14px' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={docView.url} alt="Receipt" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '6px', boxShadow: '0 4px 20px rgba(0,0,0,0.12)' }} />
+              </div>
+            ) : (
+              <iframe src={docView.url} style={{ flex: 1, width: '100%', border: 'none' }} title="Receipt" />
+            )}
           </div>
         </div>
       )}
