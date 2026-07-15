@@ -356,6 +356,9 @@ export default function ContractorPortal() {
   const [showInvoiceForm, setShowInvoiceForm] = useState(false)
   const [invoiceMonth, setInvoiceMonth] = useState(new Date())
   const [invoiceForm, setInvoiceForm] = useState({ invoice_number: '', payment_terms: 'NET30', notes: '', client_id: 'all', amount: '' })
+  // Approved expense reports awaiting inclusion on a monthly invoice (Step 4)
+  const [approvedReports, setApprovedReports] = useState<any[]>([])
+  const [includedReports, setIncludedReports] = useState<Set<string>>(new Set())
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null)
   const [invoiceDistribution, setInvoiceDistribution] = useState<InvoiceLine[]>([])
   const [submittingInvoice, setSubmittingInvoice] = useState(false)
@@ -814,11 +817,39 @@ export default function ContractorPortal() {
   useEffect(() => { if (showInvoiceForm) calculateDistribution() }, [showInvoiceForm, calculateDistribution])
 
   // ============ SUBMIT INVOICE ============
+  // ---- approved-report reminder (Step 4) ----
+  const loadApprovedReports = async () => {
+    try {
+      const res = await fetch('/api/expense-reports')
+      if (!res.ok) return
+      const j = await res.json()
+      setApprovedReports((j.reports || []).filter((r: any) => r.status === 'approved' && !r.invoice_id))
+    } catch (err) { console.warn('loadApprovedReports failed:', err) }
+  }
+  useEffect(() => { if (activeTab === 'invoices' && member) loadApprovedReports() }, [activeTab, member])
+
+  const reportDeadline = (r: any) => {
+    // Deadline: last day of the month the report was approved in
+    const base = (r.approved_at || r.submitted_at || r.created_at || '').split('T')[0]
+    if (!base) return { label: '', late: false }
+    const [y, m] = base.split('-').map(Number)
+    const end = new Date(y, m, 0) // day 0 of next month = last day of this month
+    const endStr = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`
+    const t = new Date(); const todayStr = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`
+    const late = todayStr > endStr
+    const days = Math.ceil((end.getTime() - t.getTime()) / 86400000)
+    return { label: end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), late, days }
+  }
+
+  const includedExpensesTotal = useMemo(() =>
+    Math.round(approvedReports.filter(r => includedReports.has(r.id)).reduce((s, r) => s + (r.total || 0), 0) * 100) / 100,
+  [approvedReports, includedReports])
+
   const submitInvoice = async () => {
     if (!member) return; setSubmittingInvoice(true); setError(null)
     try {
       const enteredAmount = parseFloat(invoiceForm.amount || '0')
-      if (enteredAmount <= 0) { setError('Please enter a valid amount'); setSubmittingInvoice(false); return }
+      if (enteredAmount + includedExpensesTotal <= 0) { setError('Please enter a valid amount'); setSubmittingInvoice(false); return }
 
       let receiptUrl: string | null = null
       if (invoiceFile) receiptUrl = await uploadFile(invoiceFile, 'invoices', member.id)
@@ -827,7 +858,7 @@ export default function ContractorPortal() {
         team_member_id: member.id, invoice_number: invoiceForm.invoice_number,
         invoice_date: billingMonth.end, due_date: new Date(new Date(billingMonth.end).getTime() + 30 * 86400000).toISOString().split('T')[0],
         period_start: billingMonth.start, period_end: billingMonth.end,
-        total_amount: enteredAmount, payment_terms: invoiceForm.payment_terms, receipt_url: receiptUrl, notes: invoiceForm.notes || null, status: 'submitted',
+        total_amount: Math.round((enteredAmount + includedExpensesTotal) * 100) / 100, payment_terms: invoiceForm.payment_terms, receipt_url: receiptUrl, notes: invoiceForm.notes || null, status: 'submitted',
         company_id: 'a1b2c3d4-0000-4000-a000-000000000001',
         client_id: invoiceForm.client_id && invoiceForm.client_id !== 'all' ? invoiceForm.client_id : null
       }).select().single()
@@ -844,6 +875,22 @@ export default function ContractorPortal() {
         }))
         await supabase.from('contractor_invoice_lines').insert(lines)
       }
+
+      // Attach included expense reports: generated line + report -> 'invoiced'.
+      // Server-authoritative amounts; a failed attach is surfaced, not swallowed.
+      const toAttach = approvedReports.filter(r => includedReports.has(r.id))
+      for (const r of toAttach) {
+        const res = await fetch('/api/expense-reports', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'attach_to_invoice', report_id: r.id, invoice_id: inv.id })
+        })
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}))
+          setError(`Invoice submitted, but "${r.title}" could not be attached: ${j.error || 'unknown error'}. It remains approved — add it to your next invoice.`)
+        }
+      }
+      setIncludedReports(new Set())
+      loadApprovedReports()
 
       // Notify — fire and forget, don't block UI
       fetch('/api/notify', {
@@ -1508,6 +1555,53 @@ export default function ContractorPortal() {
 
         {activeTab === 'invoices' && (
           <div className="space-y-3">
+            {/* ============ APPROVED EXPENSES — INVOICE REMINDER (Step 4) ============ */}
+            {approvedReports.length > 0 && (
+              <div className="v-card overflow-hidden">
+                <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-slate-100" style={{ backgroundImage: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)' }}>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Approved expenses — add to your invoice</span>
+                </div>
+                <div className="px-5 py-3 space-y-3">
+                  {approvedReports.map(r => {
+                    const dl = reportDeadline(r)
+                    const included = includedReports.has(r.id)
+                    return (
+                      <div key={r.id} className={`rounded-xl border p-3 space-y-2 ${dl.late ? 'border-red-200' : 'border-slate-200/80'}`}>
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div className="min-w-0">
+                            <div className="text-[12.5px] font-semibold text-slate-900 truncate">{r.title}</div>
+                            <div className={`text-[10.5px] ${dl.late ? 'text-red-700' : 'text-slate-400'}`}>
+                              {r.line_count} receipt{r.line_count === 1 ? '' : 's'}{dl.late ? ` · deadline was ${dl.label}` : ` · include by ${dl.label}${typeof dl.days === 'number' && dl.days >= 0 ? ` · ${dl.days} day${dl.days === 1 ? '' : 's'}` : ''}`}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2.5 flex-shrink-0">
+                            <span className="font-bold text-[14px] text-slate-900 tabular-nums" style={{ fontFamily: 'Archivo, sans-serif' }}>{formatCurrency(r.total || 0)}</span>
+                            {dl.late && (
+                              <span className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.09em] px-2 py-1 rounded border text-red-700 bg-red-50 border-red-200" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                                <span className="w-[5px] h-[5px] rounded-[1.5px] bg-current" />Late
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {showInvoiceForm ? (
+                          <button onClick={() => setIncludedReports(prev => { const next = new Set(prev); included ? next.delete(r.id) : next.add(r.id); return next })}
+                            className={`w-full py-2 rounded-lg text-[12px] font-semibold border transition-colors ${included ? 'bg-blue-600 text-white border-blue-600' : dl.late ? 'bg-white text-red-700 border-red-200' : 'bg-white text-blue-700 border-blue-200'}`}>
+                            {included ? `Included in this invoice — ${formatCurrency(r.total || 0)}` : `Add to this invoice — ${formatCurrency(r.total || 0)}`}
+                          </button>
+                        ) : (
+                          <button onClick={() => { setIncludedReports(prev => new Set(prev).add(r.id)); setShowInvoiceForm(true) }}
+                            className={`w-full py-2 rounded-lg text-[12px] font-semibold border ${dl.late ? 'bg-white text-red-700 border-red-200' : 'bg-white text-blue-700 border-blue-200'}`}>
+                            Add to invoice now — {formatCurrency(r.total || 0)}
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                  <p className="text-[10.5px] text-slate-400 leading-relaxed">A line item is generated for you — amount locked to the approved total. Include each approved report on an invoice by the last day of its approval month.</p>
+                </div>
+              </div>
+            )}
+
             {/* New Invoice Button */}
             {!showInvoiceForm && (
               <button onClick={() => { 
@@ -1615,7 +1709,13 @@ export default function ContractorPortal() {
                   <textarea rows={2} placeholder="Any additional notes..." value={invoiceForm.notes} onChange={e => setInvoiceForm(p => ({ ...p, notes: e.target.value }))} className={`${T.input} resize-none`} />
                 </div>
 
-                <button onClick={submitInvoice} disabled={submittingInvoice || !invoiceForm.invoice_number || parseFloat(invoiceForm.amount || '0') <= 0 || (contractorType !== 'pure_ls' && !invoiceForm.client_id)} className={`w-full ${T.btnPrimary} py-3`}>
+                {includedExpensesTotal > 0 && (
+                  <div className="flex items-center justify-between text-[11.5px] text-gray-500 bg-gray-50 rounded-lg px-3 py-2 mb-2">
+                    <span>Labor {formatCurrency(parseFloat(invoiceForm.amount || '0') || 0)} + Expenses {formatCurrency(includedExpensesTotal)}</span>
+                    <span className="font-semibold text-gray-900 tabular-nums" style={{ fontFamily: 'Archivo, sans-serif' }}>Total {formatCurrency((parseFloat(invoiceForm.amount || '0') || 0) + includedExpensesTotal)}</span>
+                  </div>
+                )}
+                <button onClick={submitInvoice} disabled={submittingInvoice || !invoiceForm.invoice_number || (parseFloat(invoiceForm.amount || '0') + includedExpensesTotal) <= 0 || (contractorType !== 'pure_ls' && !invoiceForm.client_id)} className={`w-full ${T.btnPrimary} py-3`}>
                   {submittingInvoice ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <><Send size={16} /> Submit Invoice</>}
                 </button>
               </div>
@@ -2138,7 +2238,7 @@ export default function ContractorPortal() {
                     onClick={() => setAnalyticsDrill(null)}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', fontFamily: 'Archivo, sans-serif', fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1d4ed8', background: 'rgba(37,99,235,0.07)', border: '1px solid #bfdbfe', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}
                   >
-                    Focused: {analyticsRange.label} ✕
+                    Focused: {analyticsRange.label} <X size={9} style={{ display: 'inline', verticalAlign: '-1px' }} />
                   </button>
                 )}
               </div>
