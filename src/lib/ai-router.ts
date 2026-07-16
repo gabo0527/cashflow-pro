@@ -4,6 +4,16 @@
  * Providers: Claude (primary), GPT-5.2 (secondary/structured tasks)
  */
 
+
+// ============================================================
+// MODEL CONFIGURATION — env-driven, no code changes to upgrade.
+// Change ANTHROPIC_MODEL / OPENAI_MODEL in Vercel (Production +
+// Preview) and redeploy to switch models. Defaults below are the
+// last versions verified working in production.
+// ============================================================
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6'
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.6-terra'
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type AIProvider = 'claude' | 'openai'
@@ -123,7 +133,7 @@ async function callClaude(options: AIRequestOptions): Promise<AIResponse> {
     .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
 
   const body: any = {
-    model: 'claude-sonnet-4-6',
+    model: ANTHROPIC_MODEL,
     max_tokens: options.maxTokens || 2048,
     messages,
   }
@@ -165,7 +175,7 @@ async function callClaude(options: AIRequestOptions): Promise<AIResponse> {
   return {
     content: text,
     provider: 'claude',
-    model: 'claude-sonnet-4-6',
+    model: ANTHROPIC_MODEL,
     usage: data.usage ? {
       inputTokens: data.usage.input_tokens,
       outputTokens: data.usage.output_tokens,
@@ -189,7 +199,7 @@ async function callOpenAI(options: AIRequestOptions): Promise<AIResponse> {
   })))
 
   const body: any = {
-    model: 'gpt-5.2',
+    model: OPENAI_MODEL,
     max_tokens: options.maxTokens || 2048,
     messages,
   }
@@ -227,7 +237,7 @@ async function callOpenAI(options: AIRequestOptions): Promise<AIResponse> {
   return {
     content: text,
     provider: 'openai',
-    model: data.model || 'gpt-5.2',
+    model: data.model || OPENAI_MODEL,
     usage: data.usage ? {
       inputTokens: data.usage.prompt_tokens,
       outputTokens: data.usage.completion_tokens,
