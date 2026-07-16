@@ -393,6 +393,8 @@ export default function ContractorManagement() {
   const [reportRejectId, setReportRejectId] = useState<string | null>(null)
   const [reportRejectNote, setReportRejectNote] = useState('')
   const [reportError, setReportError] = useState<string | null>(null)
+  const [pdfBusy, setPdfBusy] = useState<string | null>(null)
+  const [showDecidedReports, setShowDecidedReports] = useState(false)
   const [contractorFilter, setContractorFilter] = useState<'all' | 'needs_tax' | 'needs_profile' | 'complete'>('all')
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileUploading, setProfileUploading] = useState<string | null>(null)
@@ -657,6 +659,27 @@ export default function ContractorManagement() {
     } catch (err: any) {
       setReportError(err.message || 'Review failed')
     } finally { setReportBusy(null) }
+  }
+
+  const exportReportPdf = async (report: any) => {
+    if (pdfBusy) return
+    setPdfBusy(report.id); setReportError(null)
+    try {
+      const res = await authedFetch(`/api/expense-reports/pdf?report_id=${report.id}`)
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j.error || 'PDF export failed')
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Expense_Report_${String(report.title).replace(/[^a-zA-Z0-9]+/g, '_').slice(0, 60)}.pdf`
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err: any) {
+      setReportError(err.message || 'PDF export failed')
+    } finally { setPdfBusy(null) }
   }
 
   const toggleReportBillable = async (reportId: string, current: boolean) => {
@@ -1264,6 +1287,57 @@ export default function ContractorManagement() {
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {/* ============ DECIDED REPORTS — PDF EXPORT (5b) ============ */}
+          {expenseReports.filter(r => r.status !== 'submitted' && r.status !== 'draft').length > 0 && (
+            <div className="bg-white border border-slate-200/70 rounded-xl shadow-sm overflow-hidden">
+              <button onClick={() => setShowDecidedReports(v => !v)} className="w-full flex items-center justify-between px-5 py-3" style={{ backgroundImage: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)' }}>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Expense reports — reviewed</span>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 flex items-center gap-1.5">
+                  {expenseReports.filter(r => r.status !== 'submitted' && r.status !== 'draft').length} report{expenseReports.filter(r => r.status !== 'submitted' && r.status !== 'draft').length === 1 ? '' : 's'}
+                  <ChevronDown size={12} className={`transition-transform ${showDecidedReports ? 'rotate-180' : ''}`} />
+                </span>
+              </button>
+              {showDecidedReports && (
+                <div className="border-t border-slate-100">
+                  {expenseReports.filter(r => r.status !== 'submitted' && r.status !== 'draft').map(report => {
+                    const lines = expenses.filter(e => e.report_id === report.id)
+                    const total = Math.round(lines.reduce((sum, l) => sum + (l.amount || 0), 0) * 100) / 100
+                    const billable = !!reportBillable[report.id]
+                    const chip = report.status === 'approved' ? { t: 'Approved', c: 'text-emerald-700 bg-emerald-50 border-emerald-200' }
+                      : report.status === 'invoiced' ? { t: 'Invoiced', c: 'text-sky-700 bg-sky-50 border-sky-200' }
+                      : report.status === 'paid' ? { t: 'Paid', c: 'text-slate-600 bg-slate-50 border-slate-300' }
+                      : { t: 'Rejected', c: 'text-red-700 bg-red-50 border-red-200' }
+                    return (
+                      <div key={report.id} className="flex items-center justify-between gap-3 px-5 py-2.5 border-t first:border-t-0 border-slate-100 flex-wrap">
+                        <div className="min-w-0">
+                          <div className="text-[12.5px] font-semibold text-slate-900 truncate">{report.title}</div>
+                          <div className="text-[10.5px] text-slate-400">{memberMap[report.team_member_id] || 'Unknown'} · {report.client_id ? (clientMap[report.client_id] || 'Client') : 'Internal'} · {lines.length} line{lines.length === 1 ? '' : 's'}</div>
+                        </div>
+                        <div className="flex items-center gap-2.5 flex-shrink-0 flex-wrap">
+                          <span className="font-bold text-[13px] text-slate-900 tabular-nums" style={{ fontFamily: 'Archivo, sans-serif' }}>{fmt$(total)}</span>
+                          <span className={`inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.09em] px-2 py-1 rounded border ${chip.c}`} style={{ fontFamily: 'Archivo, sans-serif' }}>
+                            <span className="w-[5px] h-[5px] rounded-[1.5px] bg-current" />{chip.t}
+                          </span>
+                          {report.status !== 'rejected' && (
+                            <button onClick={() => toggleReportBillable(report.id, billable)} title="Billable to client — admin only" className="flex items-center gap-1.5">
+                              <span className={`w-[30px] h-[17px] rounded-full relative transition-colors ${billable ? 'bg-emerald-700' : 'bg-slate-300'}`}>
+                                <span className={`absolute top-[2px] w-[13px] h-[13px] rounded-full bg-white transition-all ${billable ? 'right-[2px]' : 'left-[2px]'}`} />
+                              </span>
+                              <span className="text-[10px] font-semibold uppercase tracking-[0.06em]" style={{ color: '#c2660c' }}>Billable</span>
+                            </button>
+                          )}
+                          <button disabled={pdfBusy === report.id} onClick={() => exportReportPdf(report)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white disabled:opacity-60" style={{ background: '#161C1F' }}>
+                            <FileText size={11} /> {pdfBusy === report.id ? 'Generating…' : 'Export PDF'}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
 
