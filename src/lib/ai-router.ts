@@ -123,7 +123,7 @@ async function callClaude(options: AIRequestOptions): Promise<AIResponse> {
     .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
 
   const body: any = {
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: options.maxTokens || 2048,
     messages,
   }
@@ -165,7 +165,7 @@ async function callClaude(options: AIRequestOptions): Promise<AIResponse> {
   return {
     content: text,
     provider: 'claude',
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     usage: data.usage ? {
       inputTokens: data.usage.input_tokens,
       outputTokens: data.usage.output_tokens,
