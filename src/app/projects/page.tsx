@@ -93,6 +93,16 @@ export default function ProjectsPage() {
 
   const handleSave = async () => {
     try {
+      // Completed projects file into client History by end-date year —
+      // an end date is required to close them into the right year.
+      if (formData.status === 'completed' && !formData.end_date) {
+        const today = new Date()
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+        if (!confirm(`Completed projects need an end date to file into the client's yearly history.\n\nUse today (${todayStr}) as the end date?`)) {
+          return // let the user pick a date in the form instead
+        }
+        formData.end_date = todayStr
+      }
       const payload: any = {
         name: formData.name, client_id: formData.client_id || null,
         budget: parseFloat(formData.budget) || 0, spent: parseFloat(formData.spent) || 0,
