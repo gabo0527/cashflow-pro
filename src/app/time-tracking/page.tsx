@@ -656,6 +656,35 @@ function EditableBillableCell({ actualHours, billableHours, onSave }: {
   )
 }
 
+// ============ EDITABLE CELL — for entry date (admin move; visible to contractor) ============
+function EditableDateCell({ date, onSave }: { date: string; onSave: (newDate: string) => void }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editValue, setEditValue] = useState(date)
+
+  const handleSave = () => {
+    if (editValue && editValue !== date) onSave(editValue)
+    setIsEditing(false)
+  }
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSave()
+    if (e.key === 'Escape') { setEditValue(date); setIsEditing(false) }
+  }
+
+  if (isEditing) {
+    return (
+      <input type="date" value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={handleSave} onKeyDown={handleKeyDown}
+        className="px-1 py-0.5 bg-white border border-blue-400 rounded text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400/40" autoFocus />
+    )
+  }
+  return (
+    <button onClick={() => { setEditValue(date); setIsEditing(true) }}
+      className="px-1.5 py-0.5 rounded text-xs tabular-nums text-gray-500 hover:bg-blue-50 hover:text-blue-700 transition-colors whitespace-nowrap"
+      title="Click to change the entry date (updates the contractor's view too)">
+      {formatDate(date)}
+    </button>
+  )
+}
+
 // ============ MAIN PAGE ============
 export default function TimeTrackingPage() {
   const [loading, setLoading] = useState(true)
@@ -1138,6 +1167,32 @@ export default function TimeTrackingPage() {
       }
       addToast('success', 'Billable hours updated')
     } catch (error: any) { console.error('Error updating:', error); addToast('error', `Failed to update: ${error.message}`) }
+  }
+
+  const updateEntryDate = async (entryId: string, newDate: string) => {
+    try {
+      const prevEntry = entries.find(e => e.id === entryId)
+      const oldDate = prevEntry ? prevEntry.date : null
+      const { error } = await supabase.from('time_entries').update({ date: newDate }).eq('id', entryId)
+      if (error) throw error
+      setEntries(prev => prev.map(e => e.id === entryId ? { ...e, date: newDate } : e))
+      // Audit trail: who/when/old→new. Internal only — the date itself IS visible
+      // to the contractor (same time_entries row), but this log is admin-only.
+      if (companyId && oldDate && oldDate !== newDate) {
+        try {
+          const who = await getCurrentUser()
+          await supabase.from('time_entry_date_adjustments').insert({
+            company_id: companyId,
+            time_entry_id: entryId,
+            old_date: oldDate,
+            new_date: newDate,
+            changed_by: who?.user?.id || null,
+            changed_by_name: who?.user?.email || null,
+          })
+        } catch (logErr) { console.error('Date audit log failed:', logErr) }
+      }
+      addToast('success', `Entry moved to ${formatDate(newDate)}`)
+    } catch (error: any) { console.error('Error updating date:', error); addToast('error', `Failed to update date: ${error.message}`) }
   }
 
   const deleteEntry = async (entryId: string) => {
@@ -2108,7 +2163,7 @@ ${parts.join('')}
                                           const revenue = entry.is_billable ? entry.billable_hours * entry.bill_rate : 0
                                           out.push(
                                             <tr key={entry.id} className="border-t border-gray-100 hover:bg-white">
-                                              <td className={`px-3 py-2 ${THEME.textMuted} whitespace-nowrap text-xs tabular-nums`}>{formatDate(entry.date)}</td>
+                                              <td className="px-3 py-2 whitespace-nowrap"><EditableDateCell date={entry.date} onSave={(v) => updateEntryDate(entry.id, v)} /></td>
                                               <td className="px-3 py-2 text-right"><span className="text-gray-600 flex items-center justify-end gap-1 tabular-nums text-xs"><Lock size={10} className="text-gray-400" />{entry.hours.toFixed(1)}</span></td>
                                               <td className="px-3 py-2 text-right"><EditableBillableCell actualHours={entry.hours} billableHours={entry.billable_hours} onSave={(v) => updateBillableHours(entry.id, v)} /></td>
                                               <td className={`px-3 py-2 text-right text-xs ${THEME.textDim} tabular-nums`}>{formatCurrency(entry.bill_rate)}</td>
