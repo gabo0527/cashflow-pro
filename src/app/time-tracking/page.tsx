@@ -416,24 +416,21 @@ const countWorkingDays = (start: string, end: string): number => {
 }
 
 const getWeekColumns = (start: string, end: string): { start: string; end: string; label: string }[] => {
+  // Timezone-proof: build dates from Y-M-D parts (local), never UTC string parsing.
+  // Weeks run Monday–Sunday to match the contractor portal grid, and are
+  // labeled by their Monday START ("Week of 7/6" = Jul 6–12).
+  const parse = (s: string) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
+  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   const weeks: { start: string; end: string; label: string }[] = []
-  const startDate = new Date(start); const endDate = new Date(end)
-  let current = new Date(startDate)
-  const dayOfWeek = current.getDay()
-  if (dayOfWeek !== 0) current.setDate(current.getDate() + (7 - dayOfWeek))
-  while (current <= endDate || (current.getMonth() === endDate.getMonth() && current.getFullYear() === endDate.getFullYear())) {
-    const weekEnd = current.toISOString().split('T')[0]
-    const weekStart = new Date(current); weekStart.setDate(weekStart.getDate() - 6)
-    weeks.push({ start: weekStart.toISOString().split('T')[0], end: weekEnd, label: formatShortDate(weekEnd) })
-    current.setDate(current.getDate() + 7)
-    if (current > endDate) break
-  }
-  // Ensure the final column covers through the period end (e.g. Jun 30 when the
-  // last week-end lands on Jun 29). Without this, trailing days fall in no bucket
-  // and disappear from the weekly strip and PDF even though totals include them.
-  if (weeks.length > 0) {
-    const last = weeks[weeks.length - 1]
-    if (new Date(last.end) < new Date(end)) last.end = end
+  const endDate = parse(end)
+  const cursor = parse(start)
+  // Walk back to the Monday on/before the range start
+  cursor.setDate(cursor.getDate() - ((cursor.getDay() + 6) % 7))
+  while (cursor <= endDate) {
+    const wkStart = iso(cursor)
+    const wkEndDate = new Date(cursor); wkEndDate.setDate(wkEndDate.getDate() + 6)
+    weeks.push({ start: wkStart, end: iso(wkEndDate), label: formatShortDate(wkStart) })
+    cursor.setDate(cursor.getDate() + 7)
   }
   return weeks
 }
@@ -950,8 +947,8 @@ export default function TimeTrackingPage() {
     })
     const idxByEnd: Record<string, number> = {}; weekColumns.forEach((w, i) => { idxByEnd[w.end] = i })
     tmEntries.forEach(e => {
-      const d = new Date(e.date)
-      const wc = weekColumns.find(w => { const ws = new Date(w.start); const we = new Date(w.end); we.setHours(23, 59, 59); return d >= ws && d <= we })
+      const d = (e.date || '').slice(0, 10)
+      const wc = weekColumns.find(w => d >= w.start && d <= w.end)
       if (!wc) return
       const r = rows[idxByEnd[wc.end]]
       r[e.client_name] = ((r[e.client_name] as number) || 0) + e.hours
@@ -988,8 +985,8 @@ export default function TimeTrackingPage() {
   }, [costAdjustedEntries])
 
   const weekLabelFor = (date: string) => {
-    const d = new Date(date)
-    const wc = weekColumns.find(w => { const ws = new Date(w.start); const we = new Date(w.end); we.setHours(23, 59, 59); return d >= ws && d <= we })
+    const d = (date || '').slice(0, 10)
+    const wc = weekColumns.find(w => d >= w.start && d <= w.end)
     return wc ? wc.label : formatShortDate(date)
   }
   const detailKeys = () => {
@@ -1015,10 +1012,8 @@ export default function TimeTrackingPage() {
       if (!project.members[entry.team_member_id]) project.members[entry.team_member_id] = { id: entry.team_member_id, name: entry.team_member_name, billRate: entry.bill_rate, costRate: entry.display_cost_rate, weekActualHours: {}, weekBillableHours: {}, totalActualHours: 0, totalBillableHours: 0, totalCost: 0, totalRevenue: 0, weekEntries: {} }
       const member = project.members[entry.team_member_id]
       
-      const weekCol = weekColumns.find(w => {
-        const entryDate = new Date(entry.date); const weekStart = new Date(w.start); const weekEnd = new Date(w.end); weekEnd.setHours(23, 59, 59)
-        return entryDate >= weekStart && entryDate <= weekEnd
-      })
+      const entryDay = (entry.date || '').slice(0, 10)
+      const weekCol = weekColumns.find(w => entryDay >= w.start && entryDay <= w.end)
       if (weekCol) {
         member.weekActualHours[weekCol.end] = (member.weekActualHours[weekCol.end] || 0) + entry.hours
         member.weekBillableHours[weekCol.end] = (member.weekBillableHours[weekCol.end] || 0) + entry.billable_hours
@@ -1067,8 +1062,8 @@ export default function TimeTrackingPage() {
 
   const weeklyTrendData = useMemo(() => weekColumns.map(week => {
     const weekEntries = costAdjustedEntries.filter(e => {
-      const entryDate = new Date(e.date); const weekStart = new Date(week.start); const weekEnd = new Date(week.end); weekEnd.setHours(23, 59, 59)
-      return entryDate >= weekStart && entryDate <= weekEnd
+      const entryDay = (e.date || '').slice(0, 10)
+      return entryDay >= week.start && entryDay <= week.end
     })
     return {
       week: week.label,
