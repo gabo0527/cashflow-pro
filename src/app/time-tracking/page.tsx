@@ -1249,8 +1249,8 @@ export default function TimeTrackingPage() {
   const togglePdfScope = (id: string) => setPdfScopes(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const [pdfDescriptions, setPdfDescriptions] = useState(false)
   const [projectTerms, setProjectTerms] = useState<any[]>([])
-  // NTE / phase options: burn column + remaining column + summary banner + phase split
-  const [pdfNte, setPdfNte] = useState({ burnCol: true, remainingCol: false, banner: true, phaseSplit: true })
+  // NTE / phase options: NTE + Delta + Burn % columns, phase split
+  const [pdfNte, setPdfNte] = useState({ nteCol: true, deltaCol: true, burnCol: true, phaseSplit: true })
   const [lineNotes, setLineNotes] = useState<Record<string, string>>({})
   // ============ NTE BURN (range-aware, monthly caps, never capped) ============
   // Billed $ comes from costAdjustedEntries (same rates the PDF prints), so
@@ -1464,7 +1464,7 @@ ${parts.join('')}
   }
 
   const MANO_LOGO = `<svg height="24" viewBox="0 0 331.63 65.13" xmlns="http://www.w3.org/2000/svg"><defs><style>.d{fill:#24333b}</style></defs><g><path class="d" d="M155.28,65.07c-5.65,0-10.8-1.45-15.46-4.36-4.66-2.9-8.36-6.81-11.1-11.7-2.75-4.9-4.12-10.33-4.12-16.3,0-4.46,.79-8.66,2.39-12.6,1.59-3.94,3.78-7.4,6.57-10.39,2.79-2.99,6.03-5.33,9.73-7.04,3.7-1.71,7.7-2.57,12-2.57,5.41,0,9.63,1.01,12.66,3.04,3.02,2.03,5.37,4.72,7.04,8.06V0h16V65.07h-15.64v-11.7c-1.67,3.5-4.04,6.33-7.1,8.48-3.07,2.15-7.38,3.22-12.95,3.22Zm2.63-14.57c3.58,0,6.67-.82,9.25-2.45,2.59-1.63,4.6-3.8,6.03-6.51,1.43-2.7,2.15-5.65,2.15-8.83s-.72-6.25-2.15-8.95c-1.43-2.7-3.44-4.9-6.03-6.57-2.59-1.67-5.67-2.51-9.25-2.51s-6.43,.82-9.01,2.45c-2.59,1.63-4.6,3.8-6.03,6.51-1.43,2.71-2.15,5.69-2.15,8.95s.72,6.03,2.15,8.78c1.43,2.75,3.44,4.95,6.03,6.63,2.59,1.67,5.59,2.51,9.01,2.51Z"/><path class="d" d="M200.53,65.07V0h15.88V10.51c3.26-7,9.59-10.51,18.98-10.51,4.46,0,8.48,1.04,12.06,3.1,3.58,2.07,6.41,5.01,8.48,8.83,2.07,3.82,3.1,8.36,3.1,13.61v39.52h-16.12V29.49c0-5.41-1.24-9.33-3.7-11.76-2.47-2.43-5.69-3.64-9.67-3.64-3.42,0-6.43,1.21-9.01,3.64-2.59,2.43-3.88,6.35-3.88,11.76v35.58h-16.12Z"/><path class="d" d="M298.55,65.13c-6.37,0-12.06-1.47-17.07-4.42-5.01-2.94-8.94-6.87-11.76-11.76-2.83-4.9-4.24-10.33-4.24-16.3s1.41-11.42,4.24-16.36c2.82-4.93,6.75-8.87,11.76-11.82C286.5,1.53,292.19,.06,298.55,.06s12.16,1.47,17.13,4.42c4.97,2.95,8.87,6.89,11.7,11.82,2.82,4.94,4.24,10.39,4.24,16.36s-1.41,11.4-4.24,16.3c-2.83,4.9-6.73,8.82-11.7,11.76-4.98,2.94-10.69,4.42-17.13,4.42Zm0-14.69c3.42,0,6.41-.81,8.95-2.45,2.55-1.63,4.52-3.8,5.91-6.51,1.39-2.71,2.09-5.65,2.09-8.84s-.7-6.25-2.09-8.95c-1.39-2.71-3.36-4.88-5.91-6.51-2.55-1.63-5.53-2.45-8.95-2.45s-6.41,.82-8.95,2.45c-2.55,1.63-4.52,3.8-5.91,6.51-1.39,2.71-2.09,5.69-2.09,8.95s.7,6.13,2.09,8.84c1.39,2.71,3.36,4.88,5.91,6.51,2.55,1.63,5.53,2.45,8.95,2.45Z"/><polygon class="d" points="20.51 65.07 65.06 20.52 85.5 0 65.06 0 65.06 .01 0 65.07 20.51 65.07"/><polygon class="d" points="59.1 65.07 103.65 20.52 103.65 65.07 118.15 65.07 118.15 0 103.65 0 103.65 .01 38.59 65.07 59.1 65.07"/></g></svg>`
-  const STATEMENT_CSS = `.stmt{font-family:'Instrument Sans',system-ui,sans-serif;color:#0f172a;font-size:12px}.stmt .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #10151c;padding-bottom:16px;margin-bottom:8px}.stmt .co{font-size:11px;color:#64748b;margin-top:6px}.stmt .meta{font-size:11.5px;color:#64748b;text-align:right;line-height:1.7}.stmt .meta b{color:#0f172a}.stmt .title{font-family:'Archivo',sans-serif;font-size:19px;font-weight:800;margin:14px 0 2px}.stmt .title-sub{font-size:11.5px;color:#64748b;margin-bottom:16px}.stmt .scope{margin-bottom:14px;break-inside:avoid}.stmt .scope-name{font-family:'Archivo',sans-serif;font-size:13px;font-weight:800;margin:12px 0 5px}.stmt table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}.stmt th{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0}.stmt th.l,.stmt td.l{text-align:left}.stmt td{font-size:11.5px;text-align:right;padding:7px 8px;border-bottom:1px solid #f1f4f6}.stmt .amt{color:#c2660c;font-weight:600}.stmt .ldesc{font-size:10px;color:#64748b;font-style:italic;margin-top:2px;font-weight:400}.stmt .subtot td{background:#f8fafc;font-weight:700;border-top:1px solid #e2e8f0}.stmt .grand{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:14px 8px;border-top:2px solid #10151c}.stmt .grand .l{font-family:'Archivo',sans-serif;font-weight:800;font-size:14px}.stmt .grand .r{font-family:'Archivo',sans-serif;font-weight:800;font-size:18px;color:#c2660c}.stmt .grand .hrs{color:#64748b;font-weight:600;font-size:12px;margin-right:18px}.stmt .foot{margin-top:22px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8;display:flex;justify-content:space-between}.stmt .nteb{display:flex;align-items:center;gap:12px;border:1px solid #fed7aa;border-left:3px solid #ea8a2f;background:#fff7ed;border-radius:9px;padding:8px 12px;margin-bottom:8px}.stmt .nteb.over{border-color:#fecaca;border-left-color:#dc2626;background:#fef2f2}.stmt .nteb .t{font-size:10.5px;color:#9a3412}.stmt .nteb.over .t{color:#991b1b}.stmt .nteb .t b{font-family:'Archivo',sans-serif}.stmt .ntrack{flex:1;max-width:170px;height:7px;background:#fde8d3;border-radius:99px;overflow:hidden}.stmt .nteb.over .ntrack{background:#fecaca}.stmt .nfill{height:100%;background:#ea8a2f;border-radius:99px}.stmt .nteb.over .nfill{background:#dc2626}.stmt .npct{font-family:'Archivo',sans-serif;font-weight:800;font-size:11.5px;color:#ea8a2f}.stmt .nteb.over .npct{color:#dc2626}.stmt .schip{display:inline-block;font-size:8.5px;font-weight:800;font-family:'Archivo',sans-serif;padding:2px 7px;border-radius:99px;background:#ffedd5;color:#c2660c;margin-left:7px;vertical-align:1px;letter-spacing:.03em}.stmt .schip.over{background:#dc2626;color:#fff}.stmt .phead td{background:#f4f8ff;color:#2563eb;font-weight:800;font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-family:'Archivo',sans-serif;border-bottom:1px solid #dbe7fb}.stmt .wnote{font-size:9.5px;color:#94a3b8;margin-top:2px}`
+  const STATEMENT_CSS = `.stmt{font-family:'Instrument Sans',system-ui,sans-serif;color:#0f172a;font-size:12px}.stmt .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #10151c;padding-bottom:16px;margin-bottom:8px}.stmt .co{font-size:11px;color:#64748b;margin-top:6px}.stmt .meta{font-size:11.5px;color:#64748b;text-align:right;line-height:1.7}.stmt .meta b{color:#0f172a}.stmt .title{font-family:'Archivo',sans-serif;font-size:19px;font-weight:800;margin:14px 0 2px}.stmt .title-sub{font-size:11.5px;color:#64748b;margin-bottom:16px}.stmt .scope{margin-bottom:14px;break-inside:avoid}.stmt .scope-name{font-family:'Archivo',sans-serif;font-size:13px;font-weight:800;margin:12px 0 5px}.stmt table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}.stmt th{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0}.stmt th.l,.stmt td.l{text-align:left}.stmt td{font-size:11.5px;text-align:right;padding:7px 8px;border-bottom:1px solid #f1f4f6}.stmt .amt{color:#c2660c;font-weight:600}.stmt .ldesc{font-size:10px;color:#64748b;font-style:italic;margin-top:2px;font-weight:400}.stmt .subtot td{background:#f8fafc;font-weight:700;border-top:1px solid #e2e8f0}.stmt .grand{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:14px 8px;border-top:2px solid #10151c}.stmt .grand .l{font-family:'Archivo',sans-serif;font-weight:800;font-size:14px}.stmt .grand .r{font-family:'Archivo',sans-serif;font-weight:800;font-size:18px;color:#c2660c}.stmt .grand .hrs{color:#64748b;font-weight:600;font-size:12px;margin-right:18px}.stmt .foot{margin-top:22px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8;display:flex;justify-content:space-between}.stmt .schip{display:inline-block;font-size:8.5px;font-weight:800;font-family:'Archivo',sans-serif;padding:2px 7px;border-radius:99px;background:#ffedd5;color:#c2660c;margin-left:7px;vertical-align:1px;letter-spacing:.03em}.stmt .schip.over{background:#dc2626;color:#fff}.stmt .phead td{background:#f4f8ff;color:#2563eb;font-weight:800;font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-family:'Archivo',sans-serif;border-bottom:1px solid #dbe7fb}.stmt .wnote{font-size:9.5px;color:#94a3b8;margin-top:2px}`
 
   const buildStatementBody = () => {
     const esc = (str: string) => String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -1476,27 +1476,18 @@ ${parts.join('')}
     const parts: string[] = []
     let grandHrs = 0, grandAmt = 0
 
+    const showNteCol = pdfNte.nteCol
+    const showDeltaCol = pdfNte.deltaCol
     const showBurnCol = pdfNte.burnCol
-    const showRemCol = pdfNte.remainingCol
     const colH = (t: string) => `<th>${t}</th>`
-    const headCols = `<th class="l">Line</th>${pdfCols.hours ? colH('Hours') : ''}${pdfCols.rate ? colH('Rate') : ''}${pdfCols.amount ? colH('Amount') : ''}${showBurnCol ? colH('Burn %') : ''}${showRemCol ? colH('NTE Left') : ''}`
-    const blankTail = `${showBurnCol ? '<td>—</td>' : ''}${showRemCol ? '<td></td>' : ''}`
+    const headCols = `<th class="l">Line</th>${pdfCols.hours ? colH('Hours') : ''}${pdfCols.rate ? colH('Rate') : ''}${pdfCols.amount ? colH('Amount') : ''}${showNteCol ? colH('NTE') : ''}${showDeltaCol ? colH('Δ vs NTE') : ''}${showBurnCol ? colH('Burn %') : ''}`
+    const blankTail = `${showNteCol ? '<td></td>' : ''}${showDeltaCol ? '<td></td>' : ''}${showBurnCol ? '<td>—</td>' : ''}`
 
     // Ordered selected scopes with their entries in range
     const selScopes: { id: string; name: string }[] = []
     dataByClient.forEach(client => Object.values(client.projects).forEach((project: any) => {
       if (pdfScopes.has(project.id)) selScopes.push({ id: project.id, name: project.name })
     }))
-
-    // ── NTE summary banners ──
-    if (pdfNte.banner) selScopes.forEach(sc => {
-      const b = scopePhaseInfo[sc.id]?.burn
-      if (!b) return
-      const overCls = b.over ? ' over' : ''
-      const monthsLbl = b.months.length === 1 ? monthNameOf(b.months[0]) : `${monthNameOf(b.months[0])}–${monthNameOf(b.months[b.months.length - 1])}`
-      const overTxt = b.over ? ` · <b>OVER by ${fmt(b.billed - b.denom)}</b>` : ''
-      parts.push(`<div class="nteb${overCls}"><div class="t"><b>${esc(sc.name)} · NTE ${fmt(b.nte)}/mo</b> · ${monthsLbl} (${b.months.length} mo cap ${fmt(b.denom)}) · billed <b>${fmt(b.billed)}</b>${overTxt}</div><div class="ntrack"><div class="nfill" style="width:${Math.min(b.pct, 100)}%"></div></div><div class="npct">${b.pct.toFixed(1)}%</div></div>`)
-    })
 
     // ── Scope sections ──
     const entriesInRange = (pid: string) => costAdjustedEntries.filter(e =>
@@ -1533,7 +1524,7 @@ ${parts.join('')}
 
       if (multiPhase) {
         // One sub-section per phase touched by the range, in order
-        const nCols = 1 + (pdfCols.hours ? 1 : 0) + (pdfCols.rate ? 1 : 0) + (pdfCols.amount ? 1 : 0) + (showBurnCol ? 1 : 0) + (showRemCol ? 1 : 0)
+        const nCols = 1 + (pdfCols.hours ? 1 : 0) + (pdfCols.rate ? 1 : 0) + (pdfCols.amount ? 1 : 0) + (showNteCol ? 1 : 0) + (showDeltaCol ? 1 : 0) + (showBurnCol ? 1 : 0)
         phasesTouched.forEach(ph => {
           const s0 = ph.effective_start > dateRange.start ? ph.effective_start : dateRange.start
           const e0 = ph.effective_end && ph.effective_end < dateRange.end ? ph.effective_end : dateRange.end
@@ -1544,7 +1535,7 @@ ${parts.join('')}
             if (feeMonths.length === 0) return
             rows.push(`<tr class="phead"><td class="l" colspan="${nCols}">${phLabel} · ${range}</td></tr>`)
             feeMonths.forEach(mk => {
-              rows.push(`<tr><td class="l">${monthNameOf(mk)} ${mk.slice(0, 4)} fee</td>${pdfCols.hours ? '<td>—</td>' : ''}${pdfCols.rate ? '<td></td>' : ''}${pdfCols.amount ? `<td class="amt">${fmt(ph.monthly_fee || 0)}</td>` : ''}${showBurnCol ? '<td>n/a</td>' : ''}${showRemCol ? '<td></td>' : ''}</tr>`)
+              rows.push(`<tr><td class="l">${monthNameOf(mk)} ${mk.slice(0, 4)} fee</td>${pdfCols.hours ? '<td>—</td>' : ''}${pdfCols.rate ? '<td></td>' : ''}${pdfCols.amount ? `<td class="amt">${fmt(ph.monthly_fee || 0)}</td>` : ''}${showNteCol ? '<td></td>' : ''}${showDeltaCol ? '<td></td>' : ''}${showBurnCol ? '<td>n/a</td>' : ''}</tr>`)
               scAmt += ph.monthly_fee || 0
             })
           } else {
@@ -1570,10 +1561,12 @@ ${parts.join('')}
         }
       }
 
-      // Subtotal with cumulative burn / remaining
-      const burnCell = showBurnCol ? `<td>${b ? `${b.pct.toFixed(1)}% cum.` : ''}</td>` : ''
-      const remCell = showRemCol ? `<td>${b ? (b.denom - b.billed >= 0 ? fmt(b.denom - b.billed) + ' left' : fmt(b.billed - b.denom) + ' over') : ''}</td>` : ''
-      rows.push(`<tr class="subtot"><td class="l">Subtotal</td>${pdfCols.hours ? `<td>${scHrs.toFixed(1)}</td>` : ''}${pdfCols.rate ? '<td></td>' : ''}${pdfCols.amount ? `<td class="amt">${fmt(scAmt)}</td>` : ''}${burnCell}${remCell}</tr>`)
+      // Subtotal: NTE cap for the range, signed delta vs cap, cumulative burn
+      const nteCell = showNteCol ? `<td>${b ? (b.months.length > 1 ? `${fmt(b.denom)} (${b.months.length} mo)` : fmt(b.denom)) : ''}</td>` : ''
+      const delta = b ? b.billed - b.denom : 0
+      const deltaCell = showDeltaCol ? `<td>${b ? (delta > 0 ? `<span style="color:#dc2626;font-weight:700">+${fmt(delta)}</span>` : `−${fmt(Math.abs(delta))}`) : ''}</td>` : ''
+      const burnCell = showBurnCol ? `<td>${b ? `<span style="${b.over ? 'color:#dc2626;font-weight:700' : ''}">${b.pct.toFixed(1)}%</span>` : ''}</td>` : ''
+      rows.push(`<tr class="subtot"><td class="l">Subtotal</td>${pdfCols.hours ? `<td>${scHrs.toFixed(1)}</td>` : ''}${pdfCols.rate ? '<td></td>' : ''}${pdfCols.amount ? `<td class="amt">${fmt(scAmt)}</td>` : ''}${nteCell}${deltaCell}${burnCell}</tr>`)
 
       parts.push(`<div class="scope"><div class="scope-name">${esc(sc.name)}${chip}${wnote}</div><table><thead><tr>${headCols}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`)
       grandHrs += scHrs; grandAmt += scAmt
@@ -2473,7 +2466,7 @@ ${parts.join('')}
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">NTE & Phases <span className="normal-case font-semibold text-[10px]" style={{ color: '#ea8a2f' }}>new</span></p>
                 <div className="space-y-1">
-                  {([['banner', 'NTE summary banner'], ['burnCol', 'Burn % column'], ['remainingCol', 'NTE remaining column'], ['phaseSplit', 'Split by phase']] as const).map(([key, label]) => (
+                  {([['nteCol', 'NTE column'], ['deltaCol', 'Δ vs NTE column'], ['burnCol', 'Burn % column'], ['phaseSplit', 'Split by phase']] as const).map(([key, label]) => (
                     <div key={key} className="flex items-center justify-between py-1.5 text-sm">
                       <span className="text-slate-700">{label}</span>
                       <button onClick={() => setPdfNte(prev => ({ ...prev, [key]: !prev[key] }))} className={`relative w-9 h-5 rounded-full transition-colors ${pdfNte[key] ? 'bg-blue-600' : 'bg-gray-300'}`}>
