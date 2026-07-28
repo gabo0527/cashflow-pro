@@ -509,3 +509,162 @@ export function getRenewalWatch(projects: any[], todayIso?: string, windowDays =
     .filter(x => x.days >= 0 && x.days <= windowDays)
     .sort((a, b) => a.days - b.days)
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// CONTRACT TERMS PHASES (project_terms) + MONTHLY NTE BURN ENGINE
+// A project's billing structure over time. NTE is MONTHLY: each month is
+// scored against its own cap; burn % is range-aware and never capped.
+// ═══════════════════════════════════════════════════════════════════════
+
+export type PhaseTerms = 'tm_nte' | 'tm_open' | 'lump_sum'
+export interface ProjectPhase {
+  id?: string
+  project_id: string
+  terms: PhaseTerms
+  effective_start: string           // 'YYYY-MM-DD'
+  effective_end: string | null      // null = open-ended
+  nte_amount: number | null         // tm_nte: MONTHLY not-to-exceed
+  monthly_fee: number | null        // lump_sum: monthly fee
+  notes?: string | null
+  auto?: boolean                    // synthesized auto-continue phase (not in DB)
+}
+
+export const PHASE_LABELS: Record<PhaseTerms, string> = {
+  tm_nte: 'T&M with NTE', tm_open: 'Open T&M', lump_sum: 'Lump Sum',
+}
+
+export function sortPhases(phases: ProjectPhase[]): ProjectPhase[] {
+  return [...phases].sort((a, b) => (a.effective_start < b.effective_start ? -1 : 1))
+}
+
+/**
+ * Phases for one project, with two safety nets:
+ * 1. No rows yet → derive a single phase from the project's own fields
+ *    (identical behavior to the pre-phases engine).
+ * 2. Last phase has an end date in the past and nothing follows → append a
+ *    synthetic auto-continue Open T&M phase (flagged `auto: true`).
+ */
+export function getProjectPhases(project: any, termRows: any[], todayIso?: string): ProjectPhase[] {
+  const today = todayIso || todayISO()
+  let phases: ProjectPhase[] = sortPhases((termRows || [])
+    .filter(t => t.project_id === project.id)
+    .map(t => ({
+      id: t.id, project_id: t.project_id, terms: t.terms,
+      effective_start: (t.effective_start || '').slice(0, 10),
+      effective_end: t.effective_end ? (t.effective_end || '').slice(0, 10) : null,
+      nte_amount: t.nte_amount != null ? parseFloat(t.nte_amount) : null,
+      monthly_fee: t.monthly_fee != null ? parseFloat(t.monthly_fee) : null,
+      notes: t.notes || null,
+    })))
+  if (phases.length === 0) {
+    const type = getContractType(project)
+    phases = [{
+      project_id: project.id,
+      terms: type === 'lump_sum' ? 'lump_sum' : ((project.budget || 0) > 0 ? 'tm_nte' : 'tm_open'),
+      effective_start: (project.start_date || '2020-01-01').slice(0, 10),
+      effective_end: project.end_date ? (project.end_date || '').slice(0, 10) : null,
+      nte_amount: type !== 'lump_sum' && (project.budget || 0) > 0 ? project.budget : null,
+      monthly_fee: type === 'lump_sum' && (project.fixed_amount || 0) > 0 ? project.fixed_amount : null,
+    }]
+  }
+  const last = phases[phases.length - 1]
+  if (last.effective_end && last.effective_end < today) {
+    const [y, m, d] = last.effective_end.split('-').map(Number)
+    const next = new Date(y, m - 1, d); next.setDate(next.getDate() + 1)
+    const iso = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
+    phases.push({ project_id: project.id, terms: 'tm_open', effective_start: iso, effective_end: null, nte_amount: null, monthly_fee: null, auto: true })
+  }
+  return phases
+}
+
+/** The phase governing a specific date, or null if before the first phase. */
+export function phaseForDate(phases: ProjectPhase[], dateIso: string): ProjectPhase | null {
+  const d = (dateIso || '').slice(0, 10)
+  for (const ph of phases) {
+    if (d >= ph.effective_start && (!ph.effective_end || d <= ph.effective_end)) return ph
+  }
+  return null
+}
+
+/** Months ('YYYY-MM') where a phase overlaps a date range. A month counts in
+ *  full once touched — consistent with LS recognition. */
+export function phaseMonthsInRange(phase: ProjectPhase, rangeStart: string, rangeEnd: string): string[] {
+  const s = phase.effective_start > rangeStart ? phase.effective_start : rangeStart
+  const e = phase.effective_end && phase.effective_end < rangeEnd ? phase.effective_end : rangeEnd
+  if (s > e) return []
+  return monthRange(monthKeyOf(s), monthKeyOf(e))
+}
+
+export interface NteBurn {
+  billed: number                  // $ billed in range under this phase
+  denom: number                   // monthly NTE × NTE months in range
+  pct: number | null              // null when phase has no NTE (dollar-only)
+  months: { mk: string; billed: number; nte: number | null; pct: number | null }[]
+  worst: { mk: string; pct: number } | null   // worst single month in range
+  over: boolean                   // range burn > 100%
+}
+
+/**
+ * Range-aware monthly-NTE burn for one phase of one project.
+ * `entries` = that project's time entries; only those dated inside both the
+ * range and the phase window count. Never capped.
+ */
+export function calcNteBurn(
+  phase: ProjectPhase,
+  project: any,
+  entries: any[],
+  rateCardLookup: Record<string, any>,
+  assignmentLookup: Record<string, any>,
+  rangeStart: string,
+  rangeEnd: string,
+): NteBurn {
+  const months = phaseMonthsInRange(phase, rangeStart, rangeEnd)
+  const perMonth: Record<string, number> = {}
+  months.forEach(mk => { perMonth[mk] = 0 })
+  ;(entries || []).forEach(e => {
+    const d = (e.date || '').slice(0, 10)
+    if (d < rangeStart || d > rangeEnd) return
+    if (d < phase.effective_start || (phase.effective_end && d > phase.effective_end)) return
+    const mk = monthKeyOf(d)
+    if (!(mk in perMonth)) return
+    perMonth[mk] += entryRevenue(e, project, rateCardLookup, assignmentLookup)
+  })
+  const nte = phase.terms === 'tm_nte' && phase.nte_amount ? phase.nte_amount : null
+  const billed = months.reduce((s, mk) => s + perMonth[mk], 0)
+  const denom = nte ? nte * months.length : 0
+  const monthRows = months.map(mk => ({
+    mk, billed: perMonth[mk], nte,
+    pct: nte ? (perMonth[mk] / nte) * 100 : null,
+  }))
+  let worst: { mk: string; pct: number } | null = null
+  monthRows.forEach(m => { if (m.pct != null && (!worst || m.pct > worst.pct)) worst = { mk: m.mk, pct: m.pct } })
+  return {
+    billed, denom,
+    pct: nte && denom > 0 ? (billed / denom) * 100 : null,
+    months: monthRows, worst,
+    over: nte ? denom > 0 && billed > denom : false,
+  }
+}
+
+/** LS recognition restricted to lump_sum phases (phase fee wins over
+ *  project.fixed_amount). Same rules: full month once started, hard stop at
+ *  phase end, never a future month. */
+export function phaseLSRecognition(phases: ProjectPhase[], project: any, todayIso?: string): { recognized: number; thisMonth: number; monthlyFee: number; recognizedMonths: string[] } {
+  const today = todayIso || todayISO()
+  const curMonth = monthKeyOf(today)
+  let recognized = 0, thisMonth = 0, monthlyFee = 0
+  const recognizedMonths: string[] = []
+  phases.filter(p => p.terms === 'lump_sum').forEach(ph => {
+    const fee = ph.monthly_fee ?? (project.fixed_amount || 0)
+    if (fee <= 0) return
+    monthlyFee = fee
+    const capKey = ph.effective_end && monthKeyOf(ph.effective_end) < curMonth ? monthKeyOf(ph.effective_end) : curMonth
+    if (monthKeyOf(ph.effective_start) > capKey) return
+    monthRange(monthKeyOf(ph.effective_start), capKey).forEach(mk => {
+      recognizedMonths.push(mk)
+      recognized += fee
+      if (mk === curMonth) thisMonth = fee
+    })
+  })
+  return { recognized, thisMonth, monthlyFee, recognizedMonths }
+}
