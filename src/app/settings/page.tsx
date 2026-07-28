@@ -287,7 +287,6 @@ function SecuritySection({ companyId }: { companyId: string }) {
 function IntegrationsSection({ companyId }: { companyId: string }) {
   const integrations = [
     { type: 'xero', name: 'Xero', desc: 'Connect Xero accounting', icon: '📘', connected: false },
-    { type: 'plaid', name: 'Plaid', desc: 'Direct bank feed', icon: '🏦', connected: false },
     { type: 'stripe', name: 'Stripe', desc: 'Accept payments', icon: '💳', connected: false },
     { type: 'slack', name: 'Slack', desc: 'Get notifications in Slack', icon: '💬', connected: false },
   ]
