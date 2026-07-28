@@ -13,6 +13,8 @@ import {
   PieChart as RechartsPie, Pie, LineChart, Line, Legend, Area, AreaChart, ComposedChart
 } from 'recharts'
 import { getCurrentUser } from '@/lib/supabase'
+import { getProjectPhases } from '@/components/projects/shared'
+import type { ProjectPhase } from '@/components/projects/shared'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
@@ -753,14 +755,16 @@ export default function TimeTrackingPage() {
         if (!profile?.company_id) { setLoading(false); return }
         setCompanyId(profile.company_id)
 
-        const [teamRes, projRes, clientRes, entriesRes, assignRes, billRatesRes] = await Promise.all([
+        const [teamRes, projRes, clientRes, entriesRes, assignRes, billRatesRes, termsRes] = await Promise.all([
           supabase.from('team_members').select('*').eq('company_id', profile.company_id),
           supabase.from('projects').select('*').eq('company_id', profile.company_id),
           supabase.from('clients').select('*').eq('company_id', profile.company_id),
           supabase.from('time_entries').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
           supabase.from('team_project_assignments').select('*').eq('company_id', profile.company_id),
           supabase.from('bill_rates').select('*').eq('company_id', profile.company_id),
+          supabase.from('project_terms').select('*').eq('company_id', profile.company_id),
         ])
+        setProjectTerms(termsRes.data || [])
 
         const projectMap: Record<string, any> = {}; (projRes.data || []).forEach((p: any) => { projectMap[p.id] = p })
         const clientMap: Record<string, any> = {}; (clientRes.data || []).forEach((c: any) => { clientMap[c.id] = c })
@@ -1244,7 +1248,85 @@ export default function TimeTrackingPage() {
   }
   const togglePdfScope = (id: string) => setPdfScopes(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const [pdfDescriptions, setPdfDescriptions] = useState(false)
+  const [projectTerms, setProjectTerms] = useState<any[]>([])
+  // NTE / phase options: burn column + remaining column + summary banner + phase split
+  const [pdfNte, setPdfNte] = useState({ burnCol: true, remainingCol: false, banner: true, phaseSplit: true })
   const [lineNotes, setLineNotes] = useState<Record<string, string>>({})
+  // ============ NTE BURN (range-aware, monthly caps, never capped) ============
+  // Billed $ comes from costAdjustedEntries (same rates the PDF prints), so
+  // burn and statement amounts can never disagree.
+  const monthsBetween = (aIso: string, bIso: string): string[] => {
+    const a = aIso.slice(0, 7), b = bIso.slice(0, 7)
+    if (a > b) return []
+    const out: string[] = []
+    let [y, m] = a.split('-').map(Number)
+    const [ey, em] = b.split('-').map(Number)
+    while (y < ey || (y === ey && m <= em)) { out.push(`${y}-${String(m).padStart(2, '0')}`); m++; if (m > 12) { m = 1; y++ } }
+    return out
+  }
+  const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const monthNameOf = (mk: string) => MONTH_NAMES[Number(mk.slice(5, 7)) - 1] || mk
+
+  const scopePhaseInfo = useMemo(() => {
+    const info: Record<string, { phases: ProjectPhase[]; burn: { nte: number; months: string[]; billed: number; denom: number; pct: number; over: boolean; worst: { mk: string; pct: number } | null } | null }> = {}
+    const todayIso = new Date().toLocaleDateString('en-CA')
+    projects.forEach((p: any) => {
+      const phases = getProjectPhases(p, projectTerms, todayIso)
+      // NTE phase overlapping the selected range (use the latest if several)
+      const ntePhases = phases.filter(ph => ph.terms === 'tm_nte' && ph.nte_amount
+        && ph.effective_start <= dateRange.end && (!ph.effective_end || ph.effective_end >= dateRange.start))
+      let burn: any = null
+      const ph = ntePhases[ntePhases.length - 1]
+      if (ph) {
+        const s0 = ph.effective_start > dateRange.start ? ph.effective_start : dateRange.start
+        const e0 = ph.effective_end && ph.effective_end < dateRange.end ? ph.effective_end : dateRange.end
+        const months = monthsBetween(s0, e0)
+        if (months.length > 0) {
+          const perMonth: Record<string, number> = {}; months.forEach(mk => { perMonth[mk] = 0 })
+          costAdjustedEntries.forEach(e => {
+            if (e.project_id !== p.id || !e.is_billable) return
+            const d = (e.date || '').slice(0, 10)
+            if (d < s0 || d > e0) return
+            const mk = d.slice(0, 7)
+            if (mk in perMonth) perMonth[mk] += (e.billable_hours || 0) * (e.bill_rate || 0)
+          })
+          const billed = months.reduce((t, mk) => t + perMonth[mk], 0)
+          const denom = (ph.nte_amount || 0) * months.length
+          let worst: { mk: string; pct: number } | null = null
+          months.forEach(mk => { const pct = (perMonth[mk] / (ph.nte_amount || 1)) * 100; if (!worst || pct > worst.pct) worst = { mk, pct } })
+          burn = { nte: ph.nte_amount, months, billed, denom, pct: denom > 0 ? (billed / denom) * 100 : 0, over: billed > denom, worst }
+        }
+      }
+      info[p.id] = { phases, burn }
+    })
+    return info
+  }, [projects, projectTerms, costAdjustedEntries, dateRange])
+
+  // Lines from a set of entries (used for phase-split sections)
+  const linesFromEntries = (list: any[], keyPrefix: string) => {
+    if (pdfGrouping === 'rate') {
+      const byRate: Record<string, { hours: number; amount: number; count: Set<string>; rate: number }> = {}
+      list.forEach(e => {
+        const k = String(e.bill_rate || 0)
+        if (!byRate[k]) byRate[k] = { hours: 0, amount: 0, count: new Set(), rate: e.bill_rate || 0 }
+        byRate[k].hours += e.billable_hours || 0
+        byRate[k].amount += (e.billable_hours || 0) * (e.bill_rate || 0)
+        byRate[k].count.add(e.team_member_id)
+      })
+      return Object.values(byRate).sort((a, b) => b.amount - a.amount)
+        .map(r => ({ key: `${keyPrefix}:rate:${r.rate}`, label: r.count.size > 1 ? `${r.count.size} resources` : 'Resource', hours: r.hours, rate: r.rate, amount: r.amount }))
+    }
+    const byMember: Record<string, { name: string; hours: number; amount: number; rate: number }> = {}
+    list.forEach(e => {
+      const k = e.team_member_id
+      if (!byMember[k]) byMember[k] = { name: e.team_member_name, hours: 0, amount: 0, rate: e.bill_rate || 0 }
+      byMember[k].hours += e.billable_hours || 0
+      byMember[k].amount += (e.billable_hours || 0) * (e.bill_rate || 0)
+    })
+    return Object.values(byMember).sort((a, b) => b.amount - a.amount)
+      .map(m => ({ key: `${keyPrefix}:res:${m.name}`, label: m.name, hours: m.hours, rate: m.rate, amount: m.amount }))
+  }
+
   const buildPdfLines = () => {
     const scopes: { scopeId: string; scopeName: string; subHours: number; subAmount: number; lines: { key: string; label: string; hours: number; rate: number | null; amount: number }[] }[] = []
     dataByClient.forEach(client => Object.values(client.projects).forEach((project: any) => {
@@ -1381,39 +1463,123 @@ ${parts.join('')}
     addToast('success', 'Report ready — choose "Save as PDF"')
   }
 
-  const MANO_LOGO = `<svg height="30" viewBox="0 0 331.63 65.13" xmlns="http://www.w3.org/2000/svg"><defs><style>.d{fill:#24333b}</style></defs><g><path class="d" d="M155.28,65.07c-5.65,0-10.8-1.45-15.46-4.36-4.66-2.9-8.36-6.81-11.1-11.7-2.75-4.9-4.12-10.33-4.12-16.3,0-4.46,.79-8.66,2.39-12.6,1.59-3.94,3.78-7.4,6.57-10.39,2.79-2.99,6.03-5.33,9.73-7.04,3.7-1.71,7.7-2.57,12-2.57,5.41,0,9.63,1.01,12.66,3.04,3.02,2.03,5.37,4.72,7.04,8.06V0h16V65.07h-15.64v-11.7c-1.67,3.5-4.04,6.33-7.1,8.48-3.07,2.15-7.38,3.22-12.95,3.22Zm2.63-14.57c3.58,0,6.67-.82,9.25-2.45,2.59-1.63,4.6-3.8,6.03-6.51,1.43-2.7,2.15-5.65,2.15-8.83s-.72-6.25-2.15-8.95c-1.43-2.7-3.44-4.9-6.03-6.57-2.59-1.67-5.67-2.51-9.25-2.51s-6.43,.82-9.01,2.45c-2.59,1.63-4.6,3.8-6.03,6.51-1.43,2.71-2.15,5.69-2.15,8.95s.72,6.03,2.15,8.78c1.43,2.75,3.44,4.95,6.03,6.63,2.59,1.67,5.59,2.51,9.01,2.51Z"/><path class="d" d="M200.53,65.07V0h15.88V10.51c3.26-7,9.59-10.51,18.98-10.51,4.46,0,8.48,1.04,12.06,3.1,3.58,2.07,6.41,5.01,8.48,8.83,2.07,3.82,3.1,8.36,3.1,13.61v39.52h-16.12V29.49c0-5.41-1.24-9.33-3.7-11.76-2.47-2.43-5.69-3.64-9.67-3.64-3.42,0-6.43,1.21-9.01,3.64-2.59,2.43-3.88,6.35-3.88,11.76v35.58h-16.12Z"/><path class="d" d="M298.55,65.13c-6.37,0-12.06-1.47-17.07-4.42-5.01-2.94-8.94-6.87-11.76-11.76-2.83-4.9-4.24-10.33-4.24-16.3s1.41-11.42,4.24-16.36c2.82-4.93,6.75-8.87,11.76-11.82C286.5,1.53,292.19,.06,298.55,.06s12.16,1.47,17.13,4.42c4.97,2.95,8.87,6.89,11.7,11.82,2.82,4.94,4.24,10.39,4.24,16.36s-1.41,11.4-4.24,16.3c-2.83,4.9-6.73,8.82-11.7,11.76-4.98,2.94-10.69,4.42-17.13,4.42Zm0-14.69c3.42,0,6.41-.81,8.95-2.45,2.55-1.63,4.52-3.8,5.91-6.51,1.39-2.71,2.09-5.65,2.09-8.84s-.7-6.25-2.09-8.95c-1.39-2.71-3.36-4.88-5.91-6.51-2.55-1.63-5.53-2.45-8.95-2.45s-6.41,.82-8.95,2.45c-2.55,1.63-4.52,3.8-5.91,6.51-1.39,2.71-2.09,5.69-2.09,8.95s.7,6.13,2.09,8.84c1.39,2.71,3.36,4.88,5.91,6.51,2.55,1.63,5.53,2.45,8.95,2.45Z"/><polygon class="d" points="20.51 65.07 65.06 20.52 85.5 0 65.06 0 65.06 .01 0 65.07 20.51 65.07"/><polygon class="d" points="59.1 65.07 103.65 20.52 103.65 65.07 118.15 65.07 118.15 0 103.65 0 103.65 .01 38.59 65.07 59.1 65.07"/></g></svg>`
-  const STATEMENT_CSS = `.stmt{font-family:'Instrument Sans',system-ui,sans-serif;color:#0f172a;font-size:12px}.stmt .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #10151c;padding-bottom:16px;margin-bottom:8px}.stmt .co{font-size:11px;color:#64748b;margin-top:6px}.stmt .meta{font-size:11.5px;color:#64748b;text-align:right;line-height:1.7}.stmt .meta b{color:#0f172a}.stmt .title{font-family:'Archivo',sans-serif;font-size:19px;font-weight:800;margin:14px 0 2px}.stmt .title-sub{font-size:11.5px;color:#64748b;margin-bottom:16px}.stmt .scope{margin-bottom:14px;break-inside:avoid}.stmt .scope-name{font-family:'Archivo',sans-serif;font-size:13px;font-weight:800;margin:12px 0 5px}.stmt table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}.stmt th{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0}.stmt th.l,.stmt td.l{text-align:left}.stmt td{font-size:11.5px;text-align:right;padding:7px 8px;border-bottom:1px solid #f1f4f6}.stmt .amt{color:#c2660c;font-weight:600}.stmt .ldesc{font-size:10px;color:#64748b;font-style:italic;margin-top:2px;font-weight:400}.stmt .subtot td{background:#f8fafc;font-weight:700;border-top:1px solid #e2e8f0}.stmt .grand{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:14px 8px;border-top:2px solid #10151c}.stmt .grand .l{font-family:'Archivo',sans-serif;font-weight:800;font-size:14px}.stmt .grand .r{font-family:'Archivo',sans-serif;font-weight:800;font-size:18px;color:#c2660c}.stmt .grand .hrs{color:#64748b;font-weight:600;font-size:12px;margin-right:18px}.stmt .foot{margin-top:22px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8;display:flex;justify-content:space-between}`
+  const MANO_LOGO = `<svg height="24" viewBox="0 0 331.63 65.13" xmlns="http://www.w3.org/2000/svg"><defs><style>.d{fill:#24333b}</style></defs><g><path class="d" d="M155.28,65.07c-5.65,0-10.8-1.45-15.46-4.36-4.66-2.9-8.36-6.81-11.1-11.7-2.75-4.9-4.12-10.33-4.12-16.3,0-4.46,.79-8.66,2.39-12.6,1.59-3.94,3.78-7.4,6.57-10.39,2.79-2.99,6.03-5.33,9.73-7.04,3.7-1.71,7.7-2.57,12-2.57,5.41,0,9.63,1.01,12.66,3.04,3.02,2.03,5.37,4.72,7.04,8.06V0h16V65.07h-15.64v-11.7c-1.67,3.5-4.04,6.33-7.1,8.48-3.07,2.15-7.38,3.22-12.95,3.22Zm2.63-14.57c3.58,0,6.67-.82,9.25-2.45,2.59-1.63,4.6-3.8,6.03-6.51,1.43-2.7,2.15-5.65,2.15-8.83s-.72-6.25-2.15-8.95c-1.43-2.7-3.44-4.9-6.03-6.57-2.59-1.67-5.67-2.51-9.25-2.51s-6.43,.82-9.01,2.45c-2.59,1.63-4.6,3.8-6.03,6.51-1.43,2.71-2.15,5.69-2.15,8.95s.72,6.03,2.15,8.78c1.43,2.75,3.44,4.95,6.03,6.63,2.59,1.67,5.59,2.51,9.01,2.51Z"/><path class="d" d="M200.53,65.07V0h15.88V10.51c3.26-7,9.59-10.51,18.98-10.51,4.46,0,8.48,1.04,12.06,3.1,3.58,2.07,6.41,5.01,8.48,8.83,2.07,3.82,3.1,8.36,3.1,13.61v39.52h-16.12V29.49c0-5.41-1.24-9.33-3.7-11.76-2.47-2.43-5.69-3.64-9.67-3.64-3.42,0-6.43,1.21-9.01,3.64-2.59,2.43-3.88,6.35-3.88,11.76v35.58h-16.12Z"/><path class="d" d="M298.55,65.13c-6.37,0-12.06-1.47-17.07-4.42-5.01-2.94-8.94-6.87-11.76-11.76-2.83-4.9-4.24-10.33-4.24-16.3s1.41-11.42,4.24-16.36c2.82-4.93,6.75-8.87,11.76-11.82C286.5,1.53,292.19,.06,298.55,.06s12.16,1.47,17.13,4.42c4.97,2.95,8.87,6.89,11.7,11.82,2.82,4.94,4.24,10.39,4.24,16.36s-1.41,11.4-4.24,16.3c-2.83,4.9-6.73,8.82-11.7,11.76-4.98,2.94-10.69,4.42-17.13,4.42Zm0-14.69c3.42,0,6.41-.81,8.95-2.45,2.55-1.63,4.52-3.8,5.91-6.51,1.39-2.71,2.09-5.65,2.09-8.84s-.7-6.25-2.09-8.95c-1.39-2.71-3.36-4.88-5.91-6.51-2.55-1.63-5.53-2.45-8.95-2.45s-6.41,.82-8.95,2.45c-2.55,1.63-4.52,3.8-5.91,6.51-1.39,2.71-2.09,5.69-2.09,8.95s.7,6.13,2.09,8.84c1.39,2.71,3.36,4.88,5.91,6.51,2.55,1.63,5.53,2.45,8.95,2.45Z"/><polygon class="d" points="20.51 65.07 65.06 20.52 85.5 0 65.06 0 65.06 .01 0 65.07 20.51 65.07"/><polygon class="d" points="59.1 65.07 103.65 20.52 103.65 65.07 118.15 65.07 118.15 0 103.65 0 103.65 .01 38.59 65.07 59.1 65.07"/></g></svg>`
+  const STATEMENT_CSS = `.stmt{font-family:'Instrument Sans',system-ui,sans-serif;color:#0f172a;font-size:12px}.stmt .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #10151c;padding-bottom:16px;margin-bottom:8px}.stmt .co{font-size:11px;color:#64748b;margin-top:6px}.stmt .meta{font-size:11.5px;color:#64748b;text-align:right;line-height:1.7}.stmt .meta b{color:#0f172a}.stmt .title{font-family:'Archivo',sans-serif;font-size:19px;font-weight:800;margin:14px 0 2px}.stmt .title-sub{font-size:11.5px;color:#64748b;margin-bottom:16px}.stmt .scope{margin-bottom:14px;break-inside:avoid}.stmt .scope-name{font-family:'Archivo',sans-serif;font-size:13px;font-weight:800;margin:12px 0 5px}.stmt table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}.stmt th{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0}.stmt th.l,.stmt td.l{text-align:left}.stmt td{font-size:11.5px;text-align:right;padding:7px 8px;border-bottom:1px solid #f1f4f6}.stmt .amt{color:#c2660c;font-weight:600}.stmt .ldesc{font-size:10px;color:#64748b;font-style:italic;margin-top:2px;font-weight:400}.stmt .subtot td{background:#f8fafc;font-weight:700;border-top:1px solid #e2e8f0}.stmt .grand{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:14px 8px;border-top:2px solid #10151c}.stmt .grand .l{font-family:'Archivo',sans-serif;font-weight:800;font-size:14px}.stmt .grand .r{font-family:'Archivo',sans-serif;font-weight:800;font-size:18px;color:#c2660c}.stmt .grand .hrs{color:#64748b;font-weight:600;font-size:12px;margin-right:18px}.stmt .foot{margin-top:22px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8;display:flex;justify-content:space-between}.stmt .nteb{display:flex;align-items:center;gap:12px;border:1px solid #fed7aa;border-left:3px solid #ea8a2f;background:#fff7ed;border-radius:9px;padding:8px 12px;margin-bottom:8px}.stmt .nteb.over{border-color:#fecaca;border-left-color:#dc2626;background:#fef2f2}.stmt .nteb .t{font-size:10.5px;color:#9a3412}.stmt .nteb.over .t{color:#991b1b}.stmt .nteb .t b{font-family:'Archivo',sans-serif}.stmt .ntrack{flex:1;max-width:170px;height:7px;background:#fde8d3;border-radius:99px;overflow:hidden}.stmt .nteb.over .ntrack{background:#fecaca}.stmt .nfill{height:100%;background:#ea8a2f;border-radius:99px}.stmt .nteb.over .nfill{background:#dc2626}.stmt .npct{font-family:'Archivo',sans-serif;font-weight:800;font-size:11.5px;color:#ea8a2f}.stmt .nteb.over .npct{color:#dc2626}.stmt .schip{display:inline-block;font-size:8.5px;font-weight:800;font-family:'Archivo',sans-serif;padding:2px 7px;border-radius:99px;background:#ffedd5;color:#c2660c;margin-left:7px;vertical-align:1px;letter-spacing:.03em}.stmt .schip.over{background:#dc2626;color:#fff}.stmt .phead td{background:#f4f8ff;color:#2563eb;font-weight:800;font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-family:'Archivo',sans-serif;border-bottom:1px solid #dbe7fb}.stmt .wnote{font-size:9.5px;color:#94a3b8;margin-top:2px}`
 
   const buildStatementBody = () => {
-    const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const esc = (str: string) => String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     const fmt = (n: number) => formatCurrency(n)
     const generatedOn = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
     const clientLabel = selectedClient !== 'all' ? (clients.find(c => c.id === selectedClient)?.name || 'Client') : 'All clients'
+    const todayIso = new Date().toLocaleDateString('en-CA')
+    const curMk = todayIso.slice(0, 7)
     const parts: string[] = []
     let grandHrs = 0, grandAmt = 0
+
+    const showBurnCol = pdfNte.burnCol
+    const showRemCol = pdfNte.remainingCol
     const colH = (t: string) => `<th>${t}</th>`
-    const headCols = `<th class="l">Line</th>${pdfCols.hours ? colH('Hours') : ''}${pdfCols.rate ? colH('Rate') : ''}${pdfCols.amount ? colH('Amount') : ''}`
-    if (pdfGrouping === 'scope') {
-      parts.push(`<div class="scope"><table><thead><tr>${headCols}</tr></thead><tbody>`)
-      buildPdfLines().forEach(sc => {
-        const ln = sc.lines[0]
-        const desc = pdfDescriptions && lineNotes[ln.key] ? `<div class="ldesc">${esc(lineNotes[ln.key])}</div>` : ''
-        parts.push(`<tr><td class="l">${esc(sc.scopeName)}${desc}</td>${pdfCols.hours ? `<td>${sc.subHours.toFixed(1)}</td>` : ''}${pdfCols.rate ? `<td>${ln.rate != null ? fmt(ln.rate) + '/hr' : ''}</td>` : ''}${pdfCols.amount ? `<td class="amt">${fmt(sc.subAmount)}</td>` : ''}</tr>`)
-        grandHrs += sc.subHours; grandAmt += sc.subAmount
-      })
-      parts.push(`</tbody></table></div>`)
-    } else {
-      buildPdfLines().forEach(sc => {
-        parts.push(`<div class="scope"><div class="scope-name">${esc(sc.scopeName)}</div><table><thead><tr>${headCols}</tr></thead><tbody>`)
-        sc.lines.forEach(ln => {
+    const headCols = `<th class="l">Line</th>${pdfCols.hours ? colH('Hours') : ''}${pdfCols.rate ? colH('Rate') : ''}${pdfCols.amount ? colH('Amount') : ''}${showBurnCol ? colH('Burn %') : ''}${showRemCol ? colH('NTE Left') : ''}`
+    const blankTail = `${showBurnCol ? '<td>—</td>' : ''}${showRemCol ? '<td></td>' : ''}`
+
+    // Ordered selected scopes with their entries in range
+    const selScopes: { id: string; name: string }[] = []
+    dataByClient.forEach(client => Object.values(client.projects).forEach((project: any) => {
+      if (pdfScopes.has(project.id)) selScopes.push({ id: project.id, name: project.name })
+    }))
+
+    // ── NTE summary banners ──
+    if (pdfNte.banner) selScopes.forEach(sc => {
+      const b = scopePhaseInfo[sc.id]?.burn
+      if (!b) return
+      const overCls = b.over ? ' over' : ''
+      const monthsLbl = b.months.length === 1 ? monthNameOf(b.months[0]) : `${monthNameOf(b.months[0])}–${monthNameOf(b.months[b.months.length - 1])}`
+      const overTxt = b.over ? ` · <b>OVER by ${fmt(b.billed - b.denom)}</b>` : ''
+      parts.push(`<div class="nteb${overCls}"><div class="t"><b>${esc(sc.name)} · NTE ${fmt(b.nte)}/mo</b> · ${monthsLbl} (${b.months.length} mo cap ${fmt(b.denom)}) · billed <b>${fmt(b.billed)}</b>${overTxt}</div><div class="ntrack"><div class="nfill" style="width:${Math.min(b.pct, 100)}%"></div></div><div class="npct">${b.pct.toFixed(1)}%</div></div>`)
+    })
+
+    // ── Scope sections ──
+    const entriesInRange = (pid: string) => costAdjustedEntries.filter(e =>
+      e.project_id === pid && e.is_billable && (e.date || '').slice(0, 10) >= dateRange.start && (e.date || '').slice(0, 10) <= dateRange.end)
+
+    selScopes.forEach(sc => {
+      const info = scopePhaseInfo[sc.id]
+      const b = info?.burn
+      const scEntries = entriesInRange(sc.id)
+      const phasesTouched = (info?.phases || []).filter(ph =>
+        ph.effective_start <= dateRange.end && (!ph.effective_end || ph.effective_end >= dateRange.start))
+      const multiPhase = pdfNte.phaseSplit && phasesTouched.length > 1
+
+      // Burn chip + worst-month note on the scope header
+      let chip = ''
+      let wnote = ''
+      if (b) {
+        chip = b.over
+          ? `<span class="schip over">NTE ${b.pct.toFixed(1)}% · OVER by ${fmt(b.billed - b.denom)}</span>`
+          : `<span class="schip">NTE ${b.pct.toFixed(1)}% burned</span>`
+        if (b.months.length > 1 && b.worst && b.worst.pct > 100)
+          wnote = `<div class="wnote">Worst month: ${monthNameOf(b.worst.mk)} · ${b.worst.pct.toFixed(1)}% of monthly cap</div>`
+      }
+
+      let scHrs = 0, scAmt = 0
+      const rows: string[] = []
+
+      const pushLines = (lines: { key: string; label: string; hours: number; rate: number | null; amount: number }[]) => {
+        lines.forEach(ln => {
           const desc = pdfDescriptions && lineNotes[ln.key] ? `<div class="ldesc">${esc(lineNotes[ln.key])}</div>` : ''
-          parts.push(`<tr><td class="l">${esc(ln.label)}${desc}</td>${pdfCols.hours ? `<td>${ln.hours.toFixed(1)}</td>` : ''}${pdfCols.rate ? `<td>${ln.rate != null ? fmt(ln.rate) + '/hr' : ''}</td>` : ''}${pdfCols.amount ? `<td class="amt">${fmt(ln.amount)}</td>` : ''}</tr>`)
+          rows.push(`<tr><td class="l">${esc(ln.label)}${desc}</td>${pdfCols.hours ? `<td>${ln.hours.toFixed(1)}</td>` : ''}${pdfCols.rate ? `<td>${ln.rate != null && ln.rate > 0 ? fmt(ln.rate) + '/hr' : ''}</td>` : ''}${pdfCols.amount ? `<td class="amt">${fmt(ln.amount)}</td>` : ''}${blankTail}</tr>`)
         })
-        parts.push(`<tr class="subtot"><td class="l">Subtotal</td>${pdfCols.hours ? `<td>${sc.subHours.toFixed(1)}</td>` : ''}${pdfCols.rate ? '<td></td>' : ''}${pdfCols.amount ? `<td class="amt">${fmt(sc.subAmount)}</td>` : ''}</tr></tbody></table></div>`)
-        grandHrs += sc.subHours; grandAmt += sc.subAmount
-      })
-    }
-    if (parts.length === 0) parts.push(`<p style="color:#94a3b8;font-size:12px;padding:20px 0">Select at least one scope to preview.</p>`)
+      }
+
+      if (multiPhase) {
+        // One sub-section per phase touched by the range, in order
+        const nCols = 1 + (pdfCols.hours ? 1 : 0) + (pdfCols.rate ? 1 : 0) + (pdfCols.amount ? 1 : 0) + (showBurnCol ? 1 : 0) + (showRemCol ? 1 : 0)
+        phasesTouched.forEach(ph => {
+          const s0 = ph.effective_start > dateRange.start ? ph.effective_start : dateRange.start
+          const e0 = ph.effective_end && ph.effective_end < dateRange.end ? ph.effective_end : dateRange.end
+          const phLabel = ph.terms === 'tm_nte' ? `T&M · NTE ${fmt(ph.nte_amount || 0)}/mo` : ph.terms === 'lump_sum' ? `Lump Sum · ${fmt(ph.monthly_fee || 0)}/mo` : 'Open T&M'
+          const range = `${formatDate(s0)} – ${formatDate(e0)}`
+          if (ph.terms === 'lump_sum') {
+            const feeMonths = monthsBetween(s0, e0).filter(mk => mk <= curMk)
+            if (feeMonths.length === 0) return
+            rows.push(`<tr class="phead"><td class="l" colspan="${nCols}">${phLabel} · ${range}</td></tr>`)
+            feeMonths.forEach(mk => {
+              rows.push(`<tr><td class="l">${monthNameOf(mk)} ${mk.slice(0, 4)} fee</td>${pdfCols.hours ? '<td>—</td>' : ''}${pdfCols.rate ? '<td></td>' : ''}${pdfCols.amount ? `<td class="amt">${fmt(ph.monthly_fee || 0)}</td>` : ''}${showBurnCol ? '<td>n/a</td>' : ''}${showRemCol ? '<td></td>' : ''}</tr>`)
+              scAmt += ph.monthly_fee || 0
+            })
+          } else {
+            const phEntries = scEntries.filter(e => { const d = (e.date || '').slice(0, 10); return d >= s0 && d <= e0 })
+            if (phEntries.length === 0) return
+            rows.push(`<tr class="phead"><td class="l" colspan="${nCols}">${phLabel} · ${range}</td></tr>`)
+            const lines = linesFromEntries(phEntries, `${sc.id}:${ph.effective_start}`)
+            pushLines(lines)
+            lines.forEach(ln => { scHrs += ln.hours; scAmt += ln.amount })
+          }
+        })
+      } else {
+        // Single phase (or split off) — identical to the classic statement
+        const lines = linesFromEntries(scEntries, sc.id)
+        if (pdfGrouping === 'scope') {
+          const hrs = lines.reduce((t, l) => t + l.hours, 0)
+          const amt = lines.reduce((t, l) => t + l.amount, 0)
+          pushLines([{ key: `${sc.id}:scope`, label: sc.name, hours: hrs, rate: hrs > 0 ? amt / hrs : null, amount: amt }])
+          scHrs = hrs; scAmt = amt
+        } else {
+          pushLines(lines)
+          lines.forEach(ln => { scHrs += ln.hours; scAmt += ln.amount })
+        }
+      }
+
+      // Subtotal with cumulative burn / remaining
+      const burnCell = showBurnCol ? `<td>${b ? `${b.pct.toFixed(1)}% cum.` : ''}</td>` : ''
+      const remCell = showRemCol ? `<td>${b ? (b.denom - b.billed >= 0 ? fmt(b.denom - b.billed) + ' left' : fmt(b.billed - b.denom) + ' over') : ''}</td>` : ''
+      rows.push(`<tr class="subtot"><td class="l">Subtotal</td>${pdfCols.hours ? `<td>${scHrs.toFixed(1)}</td>` : ''}${pdfCols.rate ? '<td></td>' : ''}${pdfCols.amount ? `<td class="amt">${fmt(scAmt)}</td>` : ''}${burnCell}${remCell}</tr>`)
+
+      parts.push(`<div class="scope"><div class="scope-name">${esc(sc.name)}${chip}${wnote}</div><table><thead><tr>${headCols}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`)
+      grandHrs += scHrs; grandAmt += scAmt
+    })
+
+    if (selScopes.length === 0) parts.push(`<p style="color:#94a3b8;font-size:12px;padding:20px 0">Select at least one scope to preview.</p>`)
     return `<div class="stmt"><div class="head"><div>${MANO_LOGO}<div class="co">Mano CG LLC · Billing Statement</div></div><div class="meta">Client · <b>${esc(clientLabel)}</b><br>Period · <b>${formatDate(dateRange.start)} – ${formatDate(dateRange.end)}</b><br>Generated · ${generatedOn}</div></div><div class="title">Billing Statement</div><div class="title-sub">Billable hours by scope · reviewed before invoicing</div>${parts.join('')}<div class="grand"><span class="l">Total</span><span><span class="hrs">${grandHrs.toFixed(1)} hrs</span><span class="r">${fmt(grandAmt)}</span></span></div><div class="foot"><span>Mano CG LLC · vantagefp.co</span><span>Generated ${generatedOn}</span></div></div>`
   }
 
@@ -2302,6 +2468,20 @@ ${parts.join('')}
                       </button>
                     </div>
                   ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">NTE & Phases <span className="normal-case font-semibold text-[10px]" style={{ color: '#ea8a2f' }}>new</span></p>
+                <div className="space-y-1">
+                  {([['banner', 'NTE summary banner'], ['burnCol', 'Burn % column'], ['remainingCol', 'NTE remaining column'], ['phaseSplit', 'Split by phase']] as const).map(([key, label]) => (
+                    <div key={key} className="flex items-center justify-between py-1.5 text-sm">
+                      <span className="text-slate-700">{label}</span>
+                      <button onClick={() => setPdfNte(prev => ({ ...prev, [key]: !prev[key] }))} className={`relative w-9 h-5 rounded-full transition-colors ${pdfNte[key] ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${pdfNte[key] ? 'left-[18px]' : 'left-0.5'}`} />
+                      </button>
+                    </div>
+                  ))}
+                  <p className="text-[10.5px] text-slate-400 leading-relaxed pt-1">Burn is range-aware: monthly NTE × months in the selected period. Phase labels only appear when the period crosses a terms change. Scopes without an NTE are unaffected.</p>
                 </div>
               </div>
               <div>
