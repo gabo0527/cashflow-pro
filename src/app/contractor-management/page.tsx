@@ -6,7 +6,7 @@ import {
   CheckCircle, XCircle, Clock, DollarSign, Download, Eye, Building2,
   Loader2, X, Calendar, TrendingUp, Check,
   ExternalLink, Tag, Ban, Layers, MessageSquare, Send, Edit2, Trash2,
-  User, Phone, MapPin, CreditCard, FileUp, Shield, Save, Upload, AlertCircle } from 'lucide-react'
+  User, Phone, MapPin, CreditCard, FileUp, Shield, Save, Upload, AlertCircle, Plus } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import OnboardingReview from './OnboardingReview'
 
@@ -402,6 +402,85 @@ export default function ContractorManagement() {
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; type: 'invoice' | 'expense'; label: string } | null>(null)
 
+  // ============ ADMIN ADD-ON-BEHALF (emailed invoices/expenses) ============
+  // Records land in the SAME tables the portal reads, status 'submitted' (same
+  // as a contractor entry), tagged entered_by='admin', and fire the same
+  // submission email the contractor would get from their own portal entry.
+  const emptyAdd = { team_member_id: '', client_id: '', project_id: '', invoice_number: '', period_start: '', period_end: '', date: new Date().toLocaleDateString('en-CA'), category: 'mixed', description: '', amount: '', payment_terms: 'Net 30', notes: '', is_billable: true, file: null as File | null }
+  const [addModal, setAddModal] = useState<'invoice' | 'expense' | null>(null)
+  const [addForm, setAddForm] = useState(emptyAdd)
+  const [addSaving, setAddSaving] = useState(false)
+  const openAdd = (kind: 'invoice' | 'expense') => { setAddForm(emptyAdd); setAddModal(kind) }
+
+  const resolvedCompanyId = () =>
+    (invoices[0] as any)?.company_id || (expenses[0] as any)?.company_id || 'a1b2c3d4-0000-4000-a000-000000000001'
+
+  const uploadAddFile = async (kind: string): Promise<string | null> => {
+    if (!addForm.file) return null
+    const ext = addForm.file.name.split('.').pop() || 'pdf'
+    const path = `admin-uploads/${addForm.team_member_id}/${kind}_${Date.now()}.${ext}`
+    const { data, error } = await supabase.storage.from('contractor-uploads').upload(path, addForm.file, { contentType: addForm.file.type, upsert: true })
+    if (error) throw new Error(`File upload failed: ${error.message}`)
+    return data.path
+  }
+
+  const saveAddInvoice = async () => {
+    if (!addForm.team_member_id || !addForm.invoice_number || !addForm.period_start || !addForm.period_end || !parseFloat(addForm.amount)) {
+      alert('Contractor, invoice #, period, and amount are required.'); return
+    }
+    setAddSaving(true)
+    try {
+      const receiptUrl = await uploadAddFile('inv')
+      const termDays = parseInt((addForm.payment_terms.match(/\d+/) || ['30'])[0], 10)
+      const [y, m, d] = addForm.period_end.split('-').map(Number)
+      const due = new Date(y, m - 1, d); due.setDate(due.getDate() + termDays)
+      const dueIso = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}-${String(due.getDate()).padStart(2, '0')}`
+      const amount = Math.round(parseFloat(addForm.amount) * 100) / 100
+      const { data: inv, error } = await supabase.from('contractor_invoices').insert({
+        team_member_id: addForm.team_member_id, invoice_number: addForm.invoice_number,
+        invoice_date: addForm.period_end, due_date: dueIso,
+        period_start: addForm.period_start, period_end: addForm.period_end,
+        total_amount: amount, payment_terms: addForm.payment_terms,
+        receipt_url: receiptUrl, notes: addForm.notes || null, status: 'submitted',
+        company_id: resolvedCompanyId(),
+        client_id: addForm.client_id || null,
+        entered_by: 'admin',
+      }).select('*, contractor_invoice_lines(*)').single()
+      if (error || !inv) throw error || new Error('Insert failed')
+      if (addForm.client_id) {
+        await supabase.from('contractor_invoice_lines').insert({
+          invoice_id: inv.id, client_id: addForm.client_id, project_id: addForm.project_id || null,
+          description: 'Invoice (entered by admin)', hours: 0, rate: 0, amount, allocation_pct: 100,
+        })
+      }
+      sendNotification('invoice', inv.id, 'submitted')
+      setInvoices(prev => [inv, ...prev])
+      setAddModal(null)
+    } catch (err: any) { alert(`Error: ${err.message}`) } finally { setAddSaving(false) }
+  }
+
+  const saveAddExpense = async () => {
+    if (!addForm.team_member_id || !addForm.description || !parseFloat(addForm.amount)) {
+      alert('Contractor, description, and amount are required.'); return
+    }
+    setAddSaving(true)
+    try {
+      const receiptUrl = await uploadAddFile('exp')
+      const { data: exp, error } = await supabase.from('contractor_expenses').insert({
+        team_member_id: addForm.team_member_id, date: addForm.date, category: addForm.category,
+        description: addForm.description, amount: Math.round(parseFloat(addForm.amount) * 100) / 100,
+        project_id: addForm.project_id || null, client_id: addForm.client_id || null,
+        receipt_url: receiptUrl, is_billable: addForm.is_billable, status: 'submitted',
+        company_id: resolvedCompanyId(),
+        entered_by: 'admin',
+      }).select().single()
+      if (error || !exp) throw error || new Error('Insert failed')
+      sendNotification('expense', exp.id, 'submitted')
+      setExpenses(prev => [{ ...exp, is_billable: exp.is_billable ?? addForm.is_billable }, ...prev])
+      setAddModal(null)
+    } catch (err: any) { alert(`Error: ${err.message}`) } finally { setAddSaving(false) }
+  }
+
   // Fire-and-forget notification
   const sendNotification = (type: 'invoice' | 'expense', id: string, status: string, notes?: string, paidDate?: string, paymentMethod?: string) => {
     fetch('/api/notify', {
@@ -410,6 +489,10 @@ export default function ContractorManagement() {
       body: JSON.stringify({ type, id, status, notes, paidDate, paymentMethod }),
     }).catch(err => console.warn('Notification failed (non-blocking):', err))
   }
+
+  const ADMIN_CHIP = (
+    <span className="text-[8.5px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 shrink-0" title="Entered by admin on the contractor's behalf">ADMIN</span>
+  )
 
   const memberMap = useMemo(() => { const m: Record<string, string> = {}; teamMembers.forEach(t => { m[t.id] = t.name }); return m }, [teamMembers])
   const clientMap = useMemo(() => { const m: Record<string, string> = {}; clients.forEach(c => { m[c.id] = c.name }); return m }, [clients])
@@ -935,7 +1018,7 @@ export default function ContractorManagement() {
                   {isExp ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                 </button>
                 <div className="min-w-0">
-                  <p className="text-gray-900 text-sm font-medium truncate">{inv.invoice_number}</p>
+                  <div className="flex items-center gap-1.5 min-w-0"><p className="text-gray-900 text-sm font-medium truncate">{inv.invoice_number}</p>{(inv as any).entered_by === 'admin' && ADMIN_CHIP}</div>
                   <p className="text-gray-400 text-[11px]">Submitted {fmtDate(inv.submitted_at?.split('T')[0] || inv.invoice_date)}</p>
                 </div>
               </div>
@@ -1021,7 +1104,7 @@ export default function ContractorManagement() {
         const isRejected = exp.status === 'rejected'
         return (
           <div key={exp.id} className={`grid ${expGrid} gap-2 px-5 py-3 items-center border-b border-gray-100 last:border-0 ${THEME.cardHover} transition-colors ${getRowBorder(exp.status)}`}>
-            <p className="text-gray-900 text-sm truncate">{exp.description}</p>
+            <div className="flex items-center gap-1.5 min-w-0"><p className="text-gray-900 text-sm truncate">{exp.description}</p>{(exp as any).entered_by === 'admin' && ADMIN_CHIP}</div>
             <span className="text-gray-600 text-sm truncate">{memberMap[exp.team_member_id] || '—'}</span>
             <div className="flex items-center gap-1.5 min-w-0">
               <div className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-bold shrink-0 ${oh ? 'bg-gray-100 text-gray-500' : 'bg-blue-50 text-blue-700'}`}>
@@ -1110,6 +1193,11 @@ export default function ContractorManagement() {
       {/* ===================== AP INVOICES ===================== */}
       {activeTab === 'invoices' && (
         <div className="space-y-4">
+          <div className="flex justify-end">
+            <button onClick={() => openAdd('invoice')} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 vBtn">
+              <Plus size={13} /> Add Invoice <span className="font-normal opacity-75">· on behalf of contractor</span>
+            </button>
+          </div>
           <div className="grid grid-cols-4 gap-3">
             <MetricCard label="Total AP" value={fmt$(invMetrics.total)} icon={DollarSign} accentColor="#2563eb" sub={`${filteredInvoices.length} invoices`} />
             <MetricCard label="Pending" value={fmt$(invMetrics.pendingAmt)} icon={Clock} accentColor="#d97706" sub={`${invMetrics.pendingCount} awaiting`} highlight={invMetrics.pendingCount > 0} />
@@ -1201,6 +1289,11 @@ export default function ContractorManagement() {
       {/* ===================== EXPENSES ===================== */}
       {activeTab === 'expenses' && (
         <div className="space-y-4">
+          <div className="flex justify-end">
+            <button onClick={() => openAdd('expense')} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 vBtn">
+              <Plus size={13} /> Add Expense <span className="font-normal opacity-75">· on behalf of contractor</span>
+            </button>
+          </div>
           {/* ============ REPORT REVIEW QUEUE (5a) ============ */}
           {expenseReports.filter(r => r.status === 'submitted').length > 0 && (
             <div className="space-y-3">
@@ -1968,6 +2061,121 @@ export default function ContractorManagement() {
       )}
 
       {/* ===================== REJECTION NOTES MODAL ===================== */}
+      {addModal && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => !addSaving && setAddModal(null)}>
+          <div className="bg-white rounded-xl w-full max-w-lg mx-4 shadow-2xl max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">{addModal === 'invoice' ? 'Add Invoice' : 'Add Expense'} — on behalf of contractor</h2>
+                <p className="text-[11px] text-gray-400 mt-0.5">Lands as Submitted, tagged ADMIN, visible in their portal, and emails them — exactly as if they entered it.</p>
+              </div>
+              <button onClick={() => setAddModal(null)} className="p-1 hover:bg-gray-100 rounded"><X size={17} className="text-gray-400" /></button>
+            </div>
+            <div className="p-6 space-y-3.5">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Contractor *</label>
+                <select value={addForm.team_member_id} onChange={e => setAddForm(f => ({ ...f, team_member_id: e.target.value }))} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30">
+                  <option value="">Select contractor…</option>
+                  {teamMembers.filter(m => (m.status || 'active') === 'active').map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+              {addModal === 'invoice' ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Invoice # *</label>
+                      <input value={addForm.invoice_number} onChange={e => setAddForm(f => ({ ...f, invoice_number: e.target.value }))} placeholder="INV-2026-03" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Amount ($) *</label>
+                      <input type="number" value={addForm.amount} onChange={e => setAddForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Period Start *</label>
+                      <input type="date" value={addForm.period_start} onChange={e => setAddForm(f => ({ ...f, period_start: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Period End *</label>
+                      <input type="date" value={addForm.period_end} onChange={e => setAddForm(f => ({ ...f, period_end: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Client (optional)</label>
+                      <select value={addForm.client_id} onChange={e => setAddForm(f => ({ ...f, client_id: e.target.value, project_id: '' }))} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30">
+                        <option value="">—</option>
+                        {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Payment Terms</label>
+                      <select value={addForm.payment_terms} onChange={e => setAddForm(f => ({ ...f, payment_terms: e.target.value }))} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30">
+                        <option>Net 15</option><option>Net 30</option><option>Net 45</option><option>Net 60</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+                    <input value={addForm.notes} onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))} placeholder="e.g. received via email Jul 26" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Date *</label>
+                      <input type="date" value={addForm.date} onChange={e => setAddForm(f => ({ ...f, date: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Amount ($) *</label>
+                      <input type="number" value={addForm.amount} onChange={e => setAddForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Description *</label>
+                    <input value={addForm.description} onChange={e => setAddForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Site visit mileage" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
+                      <select value={addForm.category} onChange={e => setAddForm(f => ({ ...f, category: e.target.value }))} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30">
+                        {Object.entries(EXPENSE_CATEGORIES).map(([id, label]) => <option key={id} value={id}>{String(label)}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Client (optional)</label>
+                      <select value={addForm.client_id} onChange={e => setAddForm(f => ({ ...f, client_id: e.target.value }))} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30">
+                        <option value="">—</option>
+                        {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" checked={addForm.is_billable} onChange={e => setAddForm(f => ({ ...f, is_billable: e.target.checked }))} className="accent-blue-600" />
+                    Billable to client
+                  </label>
+                </>
+              )}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">{addModal === 'invoice' ? 'Invoice PDF (from their email)' : 'Receipt'}</label>
+                <input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={e => setAddForm(f => ({ ...f, file: e.target.files?.[0] || null }))} className="w-full text-xs text-gray-500 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:text-xs file:font-semibold hover:file:bg-blue-100" />
+                <p className="text-[10.5px] text-gray-400 mt-1">Stored with the record — you and the contractor can open it anytime from the eye icon.</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
+              <button onClick={() => setAddModal(null)} disabled={addSaving} className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Cancel</button>
+              <button onClick={addModal === 'invoice' ? saveAddInvoice : saveAddExpense} disabled={addSaving}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
+                {addSaving && <Loader2 size={14} className="animate-spin" />}
+                {addSaving ? 'Saving…' : addModal === 'invoice' ? 'Add Invoice' : 'Add Expense'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {rejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm vFade" onClick={() => setRejectModal(null)}>
           <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
