@@ -344,3 +344,168 @@ export function WaterfallItem({ label, value, isTotal = false }: { label: string
     </div>
   )
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// BLUEPRINT BRANDING + REVENUE RECOGNITION ENGINE (v2 rebuild)
+// Everything below is additive — legacy exports above remain untouched so
+// old components keep compiling during the file-by-file deploy sequence.
+// ═══════════════════════════════════════════════════════════════════════
+
+// ============ BLUEPRINT THEME TOKENS ============
+export const BLUEPRINT = {
+  blue: '#2563eb', blueDark: '#1d4ed8', blueSoft: '#dbeafe',
+  copper: '#ea8a2f', copperSoft: '#ffedd5',
+  midnight: '#161C1F', emerald: '#10B981', mint: '#6EE7B7',
+  slate400: '#94a3b8', slate500: '#64748b',
+  fontDisplay: "'Archivo', sans-serif",
+  pinstripe: 'repeating-linear-gradient(135deg, rgba(37,99,235,0.06) 0 1px, transparent 1px 7px)',
+}
+
+// ============ DATE PRIMITIVES (timezone-proof: string math only) ============
+export function todayISO(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+export function monthKeyOf(iso: string): string { return (iso || '').slice(0, 7) } // 'YYYY-MM'
+export function monthLabel(monthKey: string): string {
+  const [y, m] = monthKey.split('-').map(Number)
+  return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1] || monthKey
+}
+/** List of 'YYYY-MM' keys from start month through end month, inclusive. */
+export function monthRange(startKey: string, endKey: string): string[] {
+  if (!startKey || !endKey || startKey > endKey) return []
+  const out: string[] = []
+  let [y, m] = startKey.split('-').map(Number)
+  const [ey, em] = endKey.split('-').map(Number)
+  while (y < ey || (y === ey && m <= em)) {
+    out.push(`${y}-${String(m).padStart(2, '0')}`)
+    m++; if (m > 12) { m = 1; y++ }
+  }
+  return out
+}
+export function daysUntil(iso: string, todayIso: string): number {
+  const p = (s: string) => { const [y, m, d] = s.split('-').map(Number); return Date.UTC(y, m - 1, d) }
+  return Math.round((p(iso) - p(todayIso)) / 86400000)
+}
+
+// ============ LUMP SUM RECOGNITION ============
+// Rule (locked): fixed_amount = MONTHLY fee. A month is recognized in full
+// the moment it starts. Recognition hard-stops at the project end date.
+// No future months are ever counted.
+export interface LSRecognition {
+  monthlyFee: number
+  recognizedMonths: string[]   // 'YYYY-MM' keys actually recognized
+  recognized: number           // total $ recognized to date
+  ended: boolean               // end date is in the past
+  missingEndDate: boolean      // LS cannot reconcile without an end date
+  missingStartDate: boolean
+  endsInDays: number | null    // days until end date (negative = ended)
+}
+export function calcLSRecognition(project: any, todayIso?: string): LSRecognition {
+  const today = todayIso || todayISO()
+  const monthlyFee = project.fixed_amount || 0
+  const start = (project.start_date || '').slice(0, 10)
+  const end = (project.end_date || '').slice(0, 10)
+  const missingStartDate = !start
+  const missingEndDate = !end
+  if (missingStartDate || monthlyFee <= 0) {
+    return { monthlyFee, recognizedMonths: [], recognized: 0, ended: false, missingEndDate, missingStartDate, endsInDays: end ? daysUntil(end, today) : null }
+  }
+  // Recognize from start month through min(current month, end month)
+  const capKey = missingEndDate ? monthKeyOf(today) : (monthKeyOf(end) < monthKeyOf(today) ? monthKeyOf(end) : monthKeyOf(today))
+  const recognizedMonths = monthRange(monthKeyOf(start), capKey)
+  return {
+    monthlyFee,
+    recognizedMonths,
+    recognized: recognizedMonths.length * monthlyFee,
+    ended: !missingEndDate && end < today,
+    missingEndDate,
+    missingStartDate,
+    endsInDays: end ? daysUntil(end, today) : null,
+  }
+}
+/** $ recognized for ONE specific month ('YYYY-MM') — for the monthly chart. */
+export function lsAmountForMonth(project: any, monthKey: string, todayIso?: string): number {
+  const rec = calcLSRecognition(project, todayIso)
+  return rec.recognizedMonths.includes(monthKey) ? rec.monthlyFee : 0
+}
+
+// ============ T&M RATE RESOLUTION ============
+// EXACT mirror of Time Tracking's logic so both pages always agree:
+//   per_scope billing → project scope rate overrides everyone
+//   otherwise         → rate card (member × client) > entry stored > assignment > 0
+export function buildRateLookups(billRates: any[], assignments: any[]) {
+  const rateCardLookup: Record<string, any> = {}
+  ;(billRates || []).forEach((r: any) => { if (r.is_active) rateCardLookup[`${r.team_member_id}_${r.client_id}`] = r })
+  const assignmentLookup: Record<string, any> = {}
+  ;(assignments || []).forEach((a: any) => { assignmentLookup[`${a.team_member_id}_${a.project_id}`] = a })
+  return { rateCardLookup, assignmentLookup }
+}
+export function resolveBillRate(entry: any, project: any, rateCardLookup: Record<string, any>, assignmentLookup: Record<string, any>): number {
+  if (project?.billing_model === 'per_scope') return project?.bill_rate || 0
+  const memberId = entry.contractor_id || entry.user_id || ''
+  const clientId = project?.client_id || ''
+  const rateCard = rateCardLookup[`${memberId}_${clientId}`]
+  const assignment = assignmentLookup[`${memberId}_${entry.project_id}`]
+  return rateCard?.rate || entry.bill_rate || assignment?.bill_rate || 0
+}
+/** Revenue for one raw time_entries row. billable_hours ?? hours × resolved rate. */
+export function entryRevenue(entry: any, project: any, rateCardLookup: Record<string, any>, assignmentLookup: Record<string, any>): number {
+  if (entry.is_billable === false) return 0
+  const hours = entry.billable_hours != null ? entry.billable_hours : (entry.hours || 0)
+  return hours * resolveBillRate(entry, project, rateCardLookup, assignmentLookup)
+}
+
+// ============ PROJECT REVENUE (unified, revenue-only) ============
+export interface ProjectRevenue {
+  type: ContractType
+  recognized: number        // $ earned to date (LS: months elapsed × fee; T&M: hours × rate)
+  thisMonth: number         // $ recognized in the current month
+  basisLabel: string        // "$14k / mo" | "$240 / hr" | "Resource rates"
+  hours: number             // actual submitted hours (T&M and LS alike, for reference)
+  ls: LSRecognition | null
+}
+export function calcProjectRevenue(
+  project: any,
+  projectEntries: any[],
+  rateCardLookup: Record<string, any>,
+  assignmentLookup: Record<string, any>,
+  todayIso?: string
+): ProjectRevenue {
+  const today = todayIso || todayISO()
+  const curMonth = monthKeyOf(today)
+  const type = getContractType(project)
+  const hours = (projectEntries || []).reduce((s, e) => s + (e.hours || 0), 0)
+
+  if (type === 'lump_sum') {
+    const ls = calcLSRecognition(project, today)
+    return {
+      type, recognized: ls.recognized,
+      thisMonth: ls.recognizedMonths.includes(curMonth) ? ls.monthlyFee : 0,
+      basisLabel: ls.monthlyFee > 0 ? `${formatCompactCurrency(ls.monthlyFee)} / mo` : 'No fee set',
+      hours, ls,
+    }
+  }
+  // T&M
+  let recognized = 0, thisMonth = 0
+  ;(projectEntries || []).forEach(e => {
+    const rev = entryRevenue(e, project, rateCardLookup, assignmentLookup)
+    recognized += rev
+    if (monthKeyOf(e.date) === curMonth) thisMonth += rev
+  })
+  const basisLabel = project.billing_model === 'per_scope' && project.bill_rate
+    ? `$${project.bill_rate} / hr`
+    : 'Resource rates'
+  return { type, recognized, thisMonth, basisLabel, hours, ls: null }
+}
+
+// ============ RENEWAL WATCH ============
+/** Active LS projects whose end date falls within `windowDays` from today. */
+export function getRenewalWatch(projects: any[], todayIso?: string, windowDays = 60) {
+  const today = todayIso || todayISO()
+  return (projects || [])
+    .filter(p => (p.status || 'active') === 'active' && getContractType(p) === 'lump_sum' && p.end_date)
+    .map(p => ({ project: p, days: daysUntil((p.end_date || '').slice(0, 10), today) }))
+    .filter(x => x.days >= 0 && x.days <= windowDays)
+    .sort((a, b) => a.days - b.days)
+}
