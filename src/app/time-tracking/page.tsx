@@ -6,7 +6,7 @@ import {
   Clock, Plus, Edit2, X, Check, Trash2, Calendar, Users, DollarSign,
   TrendingUp, TrendingDown, Gauge, Activity, Building2, User, Briefcase,
   CheckCircle, AlertCircle, RefreshCw, Eye, EyeOff, ArrowUpDown, BadgeCheck, FileText,
-  Lock, Unlock
+  Lock, Unlock, MessageSquare
 } from 'lucide-react'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -1234,6 +1234,10 @@ export default function TimeTrackingPage() {
   const [projectTerms, setProjectTerms] = useState<any[]>([])
   // NTE / phase options: NTE + Delta + Burn % columns, phase split
   const [pdfNte, setPdfNte] = useState({ nteCol: true, deltaCol: true, burnCol: true, phaseSplit: true })
+  // Client-facing descriptions: Sage-summarized from timesheet notes, editable before export.
+  // Keyed `${scopeId}::${lineLabel}` so edits survive phase splits and re-renders.
+  const [pdfDesc, setPdfDesc] = useState<Record<string, string>>({})
+  const [summarizing, setSummarizing] = useState(false)
 
   // ============ NTE BURN (range-aware, monthly caps, never capped) ============
   // Billed $ comes from costAdjustedEntries (same rates the PDF prints), so
@@ -1319,6 +1323,59 @@ export default function TimeTrackingPage() {
     })
     return Object.values(byMember).sort((a, b) => b.amount - a.amount)
       .map(m => ({ key: `${keyPrefix}:res:${m.name}`, label: m.name, hours: m.hours, rate: m.rate, amount: m.amount, notes: collectNotes(m.entries) }))
+  }
+
+  const pdfEntriesInRange = (pid: string) => costAdjustedEntries.filter(e =>
+    e.project_id === pid && e.is_billable && (e.date || '').slice(0, 10) >= dateRange.start && (e.date || '').slice(0, 10) <= dateRange.end)
+
+  const pdfLineSets = () => {
+    const sets: { scopeId: string; scopeName: string; lines: ReturnType<typeof linesFromEntries> }[] = []
+    dataByClient.forEach(client => Object.values(client.projects).forEach((project: any) => {
+      if (!pdfScopes.has(project.id)) return
+      sets.push({ scopeId: project.id, scopeName: project.name, lines: linesFromEntries(pdfEntriesInRange(project.id), project.id) })
+    }))
+    return sets
+  }
+
+  const generateSummaries = async () => {
+    setSummarizing(true)
+    try {
+      const payload = pdfLineSets().flatMap(sc => sc.lines.map(ln => ({
+        key: `${sc.scopeId}::${ln.label}`,
+        scope: sc.scopeName,
+        resource: ln.label,
+        hours: ln.hours,
+        notes: ln.notes || [],
+      })))
+      const res = await fetch('/api/billing-summaries', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lines: payload }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error || 'Summarization failed')
+      const { summaries } = await res.json()
+      // Prefill AI text; fall back to raw joined notes where Sage returned nothing
+      setPdfDesc(prev => {
+        const next = { ...prev }
+        payload.forEach(l => {
+          const ai = (summaries?.[l.key] || '').trim()
+          next[l.key] = ai || (l.notes.length > 0 ? l.notes.map(n => n.note).join('; ') : (prev[l.key] || ''))
+        })
+        return next
+      })
+      addToast('success', 'Summaries drafted — review and edit before export')
+    } catch (err: any) {
+      console.error(err)
+      // Full fallback: raw notes so descriptions are still editable/usable
+      setPdfDesc(prev => {
+        const next = { ...prev }
+        pdfLineSets().forEach(sc => sc.lines.forEach(ln => {
+          const k = `${sc.scopeId}::${ln.label}`
+          if (!next[k] && ln.notes && ln.notes.length > 0) next[k] = ln.notes.map(n => n.note).join('; ')
+        }))
+        return next
+      })
+      addToast('error', 'Sage unavailable — prefilled raw notes instead, edit as needed')
+    } finally { setSummarizing(false) }
   }
 
   const billingCmp = (a: { name: string; totalRevenue: number }, b: { name: string; totalRevenue: number }) => billingSort === 'az' ? a.name.localeCompare(b.name) : b.totalRevenue - a.totalRevenue
@@ -1489,13 +1546,14 @@ ${parts.join('')}
 
       let scHrs = 0, scAmt = 0
       const rows: string[] = []
+      const descShown = new Set<string>()
 
-      const fmtNoteDate = (d: string) => `${monthNameOf(d.slice(0, 7))} ${Number(d.slice(8, 10))}`
       const pushLines = (lines: { key: string; label: string; hours: number; rate: number | null; amount: number; notes?: { date: string; note: string }[] }[]) => {
         lines.forEach(ln => {
-          const desc = pdfDescriptions && ln.notes && ln.notes.length > 0
-            ? `<div class="ldesc">${ln.notes.map(n => `${fmtNoteDate(n.date)} — ${esc(n.note)}`).join('<br>')}</div>`
-            : ''
+          const dk = `${sc.id}::${ln.label}`
+          const text = (pdfDesc[dk] || '').trim()
+          const desc = pdfDescriptions && text && !descShown.has(dk) ? `<div class="ldesc">${esc(text)}</div>` : ''
+          if (desc) descShown.add(dk)
           rows.push(`<tr><td class="l">${esc(ln.label)}${desc}</td>${pdfCols.hours ? `<td>${ln.hours.toFixed(1)}</td>` : ''}${pdfCols.rate ? `<td>${ln.rate != null && ln.rate > 0 ? fmt(ln.rate) + '/hr' : ''}</td>` : ''}${pdfCols.amount ? `<td class="amt">${fmt(ln.amount)}</td>` : ''}${blankTail}</tr>`)
         })
       }
@@ -2462,7 +2520,27 @@ ${parts.join('')}
                   </button>
                 </div>
                 {pdfDescriptions && (
-                  <p className="text-[10.5px] text-slate-400 leading-relaxed mt-2">Pulled automatically from the notes contractors submit with their timesheets for the selected period — dated, deduplicated, per line. Nothing to type here.</p>
+                  <div className="mt-2 space-y-2">
+                    <button onClick={generateSummaries} disabled={summarizing}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-white disabled:opacity-50 transition-all"
+                      style={{ background: 'linear-gradient(135deg,#2563eb,#1e3a8a)' }}>
+                      {summarizing ? <RefreshCw size={13} className="animate-spin" /> : <MessageSquare size={13} />}
+                      {summarizing ? 'Sage is summarizing…' : 'Summarize notes with Sage'}
+                    </button>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">Sage drafts one client-facing paragraph per line from the timesheet notes in this period. Review, edit, or write your own below — what's in the box is what prints.</p>
+                    {pdfLineSets().flatMap(sc => sc.lines.map(ln => {
+                      const dk = `${sc.scopeId}::${ln.label}`
+                      const noNotes = !ln.notes || ln.notes.length === 0
+                      return (
+                        <div key={dk} className="border border-gray-200 rounded-lg p-2.5">
+                          <p className="text-[11px] font-medium text-slate-500 mb-1.5">{sc.scopeName} · {ln.label}{noNotes && <span className="ml-1.5 text-[9px] font-bold text-amber-600 uppercase">no notes submitted</span>}</p>
+                          <textarea value={pdfDesc[dk] || ''} onChange={e => setPdfDesc(prev => ({ ...prev, [dk]: e.target.value }))} rows={2}
+                            placeholder={noNotes ? 'No timesheet notes for this line — describe the work here…' : 'Sage summary will appear here — or type your own…'}
+                            className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none" />
+                        </div>
+                      )
+                    }))}
+                  </div>
                 )}
               </div>
             </div>
