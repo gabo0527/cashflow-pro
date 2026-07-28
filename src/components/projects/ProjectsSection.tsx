@@ -1,24 +1,28 @@
 'use client'
 
+// PROJECTS LIST — Blueprint rebuild (revenue-only)
+// Row layout: Project | Status | Type | Basis | Recognized | Hours | Ends
+// Removed: Spent, Margin, Burn, effective rate — cost layers in later, admin-only.
+
 import React, { useMemo, useState, forwardRef, useImperativeHandle } from 'react'
 import {
-  Building2, Briefcase, ChevronDown, ChevronRight, Search,
-  Plus, ArrowUpDown, ArrowUp, ArrowDown, Upload, Trash2,
-  Edit2, AlertTriangle, CheckCircle2, Clock, DollarSign,
-  TrendingUp, Users, Filter, Eye, EyeOff
+  Building2, ChevronDown, ChevronRight, Search, Plus, ArrowUpDown,
+  ArrowUp, ArrowDown, Trash2, Edit2, FilePlus2, Eye,
 } from 'lucide-react'
 import {
-  THEME, COLORS, PROJECT_STATUSES, getContractType, getServiceLine,
-  calculateProjectEconomics, getMonthsActive,
-  formatCurrency, formatPercent, formatCompactCurrency,
-  StatusBadge, ContractBadge, MarginBadge, ProgressBar, MarginIndicator,
-  ContractType
+  BLUEPRINT, PROJECT_STATUSES, getContractType,
+  formatCompactCurrency, formatDateShort, StatusBadge,
+  calcProjectRevenue, buildRateLookups, todayISO, daysUntil,
 } from './shared'
+
+const AR = { fontFamily: BLUEPRINT.fontDisplay }
 
 interface ProjectsSectionProps {
   projects: any[]
   clients: any[]
   timesheets: any[]
+  billRates?: any[]
+  assignments?: any[]
   onAddProject: () => void
   onEditProject: (project: any) => void
   onDeleteProject: (id: string, name: string) => void
@@ -30,15 +34,44 @@ export interface ProjectsSectionHandle {
   scrollToProject: (id: string) => void
 }
 
+function TypeBadge({ type }: { type: string }) {
+  const ls = type === 'lump_sum'
+  return (
+    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md" style={{ ...AR, background: ls ? BLUEPRINT.blueSoft : '#f3e8ff', color: ls ? BLUEPRINT.blue : '#7c3aed' }}>
+      {ls ? 'LS' : 'T&M'}
+    </span>
+  )
+}
+
+function EndsChip({ project, type, today }: { project: any; type: string; today: string }) {
+  const end = (project.end_date || '').slice(0, 10)
+  if (!end) {
+    if (type === 'lump_sum' && (project.fixed_amount || 0) > 0 && project.status === 'active')
+      return <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">No end date</span>
+    return <span className="text-slate-300">—</span>
+  }
+  const days = daysUntil(end, today)
+  if (days < 0) return <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 whitespace-nowrap">Ended {formatDateShort(end)}</span>
+  const soon = days <= 60
+  return (
+    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap tabular-nums"
+      style={soon ? { background: BLUEPRINT.copperSoft, color: BLUEPRINT.copper } : { background: '#f1f5f9', color: '#64748b' }}>
+      {formatDateShort(end)} · {days}d{soon ? ' ⚠' : ''}
+    </span>
+  )
+}
+
 const ProjectsSection = forwardRef<ProjectsSectionHandle, ProjectsSectionProps>(({
-  projects, clients, timesheets, onAddProject, onEditProject, onDeleteProject, onAddChangeOrder, onViewProject
+  projects, clients, timesheets, billRates = [], assignments = [],
+  onAddProject, onEditProject, onDeleteProject, onAddChangeOrder, onViewProject
 }, ref) => {
   const [statusFilter, setStatusFilter] = useState<string>('active')
   const [searchQuery, setSearchQuery] = useState('')
-  const [sortField, setSortField] = useState<string>('name')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
-  const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set())
-  const [allExpanded, setAllExpanded] = useState(true)
+  const [sortField, setSortField] = useState<string>('recognized')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set())
+
+  const today = todayISO()
 
   useImperativeHandle(ref, () => ({
     scrollToProject: (id: string) => {
@@ -47,238 +80,170 @@ const ProjectsSection = forwardRef<ProjectsSectionHandle, ProjectsSectionProps>(
     }
   }))
 
-  // Enrich projects
-  const enrichedProjects = useMemo(() => {
-    const hoursMap = new Map<string, number>()
-    timesheets.forEach(t => hoursMap.set(t.project_id, (hoursMap.get(t.project_id) || 0) + (t.hours || 0)))
+  const { rateCardLookup, assignmentLookup } = useMemo(() => buildRateLookups(billRates, assignments), [billRates, assignments])
 
+  // Enrich: revenue engine per project (COs carry their own recognition)
+  const enriched = useMemo(() => {
+    const entriesByProject: Record<string, any[]> = {}
+    timesheets.forEach(t => { (entriesByProject[t.project_id] = entriesByProject[t.project_id] || []).push(t) })
     return projects.map(p => {
-      const budget = p.budget || 0
-      const spent = p.spent || 0
-      const actualHours = hoursMap.get(p.id) || 0
-      const contractType = getContractType(p)
-      const serviceLine = getServiceLine(p)
-      const margin = budget > 0 ? ((budget - spent) / budget) * 100 : 0
-      const burnRate = budget > 0 ? (spent / budget) * 100 : 0
-      const effectiveRate = actualHours > 0 ? spent / actualHours : 0
-
-      const cos = projects.filter(co => co.parent_id === p.id && co.is_change_order)
-      const clientName = clients.find(c => c.id === p.client_id)?.name || 'No Client'
-
+      const rev = calcProjectRevenue(p, entriesByProject[p.id] || [], rateCardLookup, assignmentLookup, today)
       return {
-        ...p, margin, burnRate, actualHours, effectiveRate, contractType, serviceLine,
-        budgetedHours: p.budgeted_hours || 0,
-        changeOrders: cos, clientName,
+        ...p,
+        contractType: rev.type,
+        recognized: rev.recognized,
+        thisMonth: rev.thisMonth,
+        basisLabel: rev.basisLabel,
+        actualHours: rev.hours,
+        clientName: clients.find(c => c.id === p.client_id)?.name || 'No Client',
+        changeOrders: [] as any[],
       }
     })
-  }, [projects, clients, timesheets])
+  }, [projects, clients, timesheets, rateCardLookup, assignmentLookup, today])
 
-  // Filter + Sort
+  // Attach COs to parents (CO revenue shown on its own indented row)
+  const withCOs = useMemo(() => {
+    const parents = enriched.filter(p => !p.is_change_order)
+    const coByParent: Record<string, any[]> = {}
+    enriched.filter(p => p.is_change_order && p.parent_id).forEach(co => { (coByParent[co.parent_id] = coByParent[co.parent_id] || []).push(co) })
+    return parents.map(p => ({ ...p, changeOrders: coByParent[p.id] || [] }))
+  }, [enriched])
+
+  // Filter + sort
   const filtered = useMemo(() => {
-    let result = enrichedProjects.filter(p => !p.is_change_order)
+    let result = withCOs
     if (statusFilter !== 'all') result = result.filter(p => p.status === statusFilter)
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
-      result = result.filter(p => p.name.toLowerCase().includes(q) || p.clientName.toLowerCase().includes(q))
+      result = result.filter(p => p.name?.toLowerCase().includes(q) || p.clientName.toLowerCase().includes(q))
     }
-    result.sort((a, b) => {
-      let cmp = 0
-      switch (sortField) {
-        case 'name': cmp = a.name.localeCompare(b.name); break
-        case 'budget': cmp = (a.budget || 0) - (b.budget || 0); break
-        case 'margin': cmp = a.margin - b.margin; break
-        case 'cpi': cmp = a.burnRate - b.burnRate; break
-        case 'burn': cmp = a.burnRate - b.burnRate; break
-      }
-      return sortDir === 'asc' ? cmp : -cmp
-    })
-    return result
-  }, [enrichedProjects, statusFilter, searchQuery, sortField, sortDir])
+    const dir = sortDir === 'asc' ? 1 : -1
+    const val = (p: any) => {
+      if (sortField === 'name') return p.name || ''
+      if (sortField === 'hours') return p.actualHours
+      if (sortField === 'ends') return p.end_date || '9999-12-31'
+      return p.recognized + p.changeOrders.reduce((s: number, co: any) => s + co.recognized, 0)
+    }
+    return [...result].sort((a, b) => { const av = val(a), bv = val(b); return (av < bv ? -1 : av > bv ? 1 : 0) * dir })
+  }, [withCOs, statusFilter, searchQuery, sortField, sortDir])
 
-  // Group by client
-  const clientGroups = useMemo(() => {
-    const groups = new Map<string, typeof filtered>()
+  // Group by client, ordered by client total
+  const byClient = useMemo(() => {
+    const groups: Record<string, { id: string; name: string; rows: any[]; total: number }> = {}
     filtered.forEach(p => {
-      const existing = groups.get(p.clientName) || []
-      existing.push(p)
-      groups.set(p.clientName, existing)
+      const key = p.client_id || 'none'
+      if (!groups[key]) groups[key] = { id: key, name: p.clientName, rows: [], total: 0 }
+      groups[key].rows.push(p)
+      groups[key].total += p.recognized + p.changeOrders.reduce((s: number, co: any) => s + co.recognized, 0)
     })
-    const sorted = Array.from(groups.entries())
-      .map(([name, projs]) => ({
-        name,
-        projects: projs,
-        totalBudget: projs.reduce((sum, p) => sum + (p.budget || 0), 0),
-        totalSpent: projs.reduce((sum, p) => sum + (p.spent || 0), 0),
-        avgMargin: projs.length > 0 ? projs.reduce((sum, p) => sum + p.margin, 0) / projs.length : 0,
-        flaggedCount: projs.filter(p => p.margin < 10 && p.spent > 0).length,
-      }))
-      .sort((a, b) => b.totalBudget - a.totalBudget)
-    return sorted
+    return Object.values(groups).sort((a, b) => b.total - a.total)
   }, [filtered])
 
-  // Expand/collapse
-  React.useEffect(() => {
-    if (allExpanded) setExpandedClients(new Set(clientGroups.map(g => g.name)))
-    else setExpandedClients(new Set())
-  }, [clientGroups, allExpanded])
-
-  const toggleClient = (name: string) => {
-    const next = new Set(expandedClients)
-    if (next.has(name)) next.delete(name); else next.add(name)
-    setExpandedClients(next)
-  }
-
+  const toggleClient = (id: string) => setCollapsedClients(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   const toggleSort = (field: string) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortField(field); setSortDir('desc') }
+    else { setSortField(field); setSortDir(field === 'name' ? 'asc' : 'desc') }
   }
+  const SortIcon = ({ field }: { field: string }) => sortField !== field
+    ? <ArrowUpDown size={11} className="opacity-40" />
+    : sortDir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />
 
-  // Status counts
-  const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    enrichedProjects.filter(p => !p.is_change_order).forEach(p => counts[p.status] = (counts[p.status] || 0) + 1)
-    return counts
-  }, [enrichedProjects])
+  const grandTotal = byClient.reduce((s, g) => s + g.total, 0)
+  const statusOptions = ['active', 'prospect', 'on_hold', 'completed', 'archived', 'all']
 
-  const SortIcon = ({ field }: { field: string }) => {
-    if (sortField !== field) return <ArrowUpDown size={12} className="text-slate-300" />
-    return sortDir === 'asc' ? <ArrowUp size={12} className="text-emerald-600" /> : <ArrowDown size={12} className="text-emerald-600" />
-  }
+  const Row = ({ p, isCO = false }: { p: any; isCO?: boolean }) => (
+    <div id={`project-${p.id}`}
+      className="group grid items-center gap-2 px-4 py-3 border-b border-slate-100 bg-white hover:bg-slate-50 transition-colors text-[13.5px]"
+      style={{ gridTemplateColumns: '2.4fr 0.9fr 0.55fr 1fr 1fr 0.7fr 1.1fr 0.9fr' }}>
+      <div className={`flex items-center gap-2 min-w-0 ${isCO ? 'pl-7' : ''}`}>
+        {isCO && <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0" style={AR}>CO</span>}
+        <button onClick={() => onViewProject?.(p.id)} className="font-semibold text-slate-900 truncate text-left hover:underline" style={{ textDecorationColor: BLUEPRINT.blue }}>
+          {p.name}
+        </button>
+      </div>
+      <div className="text-right"><StatusBadge status={p.status} /></div>
+      <div className="text-right"><TypeBadge type={p.contractType} /></div>
+      <div className="text-right text-[12.5px] text-slate-500 whitespace-nowrap">{p.basisLabel}</div>
+      <div className="text-right font-bold text-slate-900 tabular-nums" style={AR}>{formatCompactCurrency(p.recognized)}</div>
+      <div className="text-right tabular-nums text-slate-600">{p.actualHours > 0 ? Math.round(p.actualHours).toLocaleString() : '—'}</div>
+      <div className="text-right"><EndsChip project={p} type={p.contractType} today={today} /></div>
+      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {onViewProject && <button onClick={() => onViewProject(p.id)} title="View" className="p-1.5 rounded-md hover:bg-slate-200 text-slate-500"><Eye size={14} /></button>}
+        {!isCO && <button onClick={() => onAddChangeOrder(p.id, p.name)} title="Add change order" className="p-1.5 rounded-md hover:bg-slate-200 text-slate-500"><FilePlus2 size={14} /></button>}
+        <button onClick={() => onEditProject(p)} title="Edit" className="p-1.5 rounded-md hover:bg-slate-200 text-slate-500"><Edit2 size={14} /></button>
+        <button onClick={() => onDeleteProject(p.id, p.name)} title="Delete" className="p-1.5 rounded-md hover:bg-rose-100 text-slate-500 hover:text-rose-600"><Trash2 size={14} /></button>
+      </div>
+    </div>
+  )
 
   return (
     <div className="space-y-4">
-      {/* Status Tabs */}
-      <div className="flex items-center gap-1 flex-wrap">
-        {['active', 'completed', 'on_hold', 'archived'].map(status => {
-          const config = PROJECT_STATUSES[status as keyof typeof PROJECT_STATUSES]
-          const count = statusCounts[status] || 0
-          return (
-            <button key={status} onClick={() => setStatusFilter(status)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                statusFilter === status
-                  ? `${config.bg} ${config.text} border ${config.border}`
-                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50 border border-transparent'
-              }`}>
-              {config.label}
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                statusFilter === status ? 'bg-white/60' : 'bg-slate-100 text-slate-500'
-              }`}>{count}</span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Table Card */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900">Projects by Client</h3>
-            <p className="text-xs text-slate-400">{clientGroups.length} clients • {filtered.length} projects</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search projects..."
-                className="pl-8 pr-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 w-48" />
-            </div>
-            <button onClick={() => setAllExpanded(!allExpanded)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-lg transition-colors border border-slate-200">
-              {allExpanded ? <EyeOff size={14} /> : <Eye size={14} />}
-              {allExpanded ? 'Collapse' : 'Expand'}
-            </button>
-            <button onClick={onAddProject}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-sm">
-              <Plus size={14} />Add Project
-            </button>
-          </div>
+      {/* TOOLBAR */}
+      <div className="flex flex-wrap items-center gap-2.5">
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search projects or clients…"
+            className="pl-9 pr-3 py-2 w-[240px] bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
         </div>
-
-        {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 bg-slate-50">
-          <div className="w-8 shrink-0"></div>
-          <div className="flex-1 cursor-pointer flex items-center gap-1 hover:text-slate-600" onClick={() => toggleSort('name')}>Client / Project <SortIcon field="name" /></div>
-          <div className="w-24 shrink-0 text-left">Status</div>
-          <div className="w-28 shrink-0 text-right cursor-pointer flex items-center justify-end gap-1 hover:text-slate-600" onClick={() => toggleSort('budget')}>Contract <SortIcon field="budget" /></div>
-          <div className="w-24 shrink-0 text-right">Spent</div>
-          <div className="w-20 shrink-0 text-right cursor-pointer flex items-center justify-end gap-1 hover:text-slate-600" onClick={() => toggleSort('margin')}>Margin <SortIcon field="margin" /></div>
-          <div className="w-16 shrink-0 text-center">Type</div>
-          <div className="w-24 shrink-0 text-right">Hours</div>
-          <div className="w-16 shrink-0 text-center">Burn</div>
-          <div className="w-24 shrink-0 text-right">Actions</div>
-        </div>
-
-        {/* Client Groups */}
-        <div className="divide-y divide-slate-100">
-          {clientGroups.map(({ name: clientName, projects: clientProjects, totalBudget, totalSpent, avgMargin, flaggedCount }) => (
-            <div key={clientName}>
-              {/* Client Row */}
-              <div className="flex items-center gap-3 py-3 px-4 bg-slate-50/50 hover:bg-slate-100 cursor-pointer transition-colors border-b border-slate-100"
-                onClick={() => toggleClient(clientName)}>
-                <div className="w-8 shrink-0 flex items-center justify-center">
-                  {expandedClients.has(clientName) ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
-                </div>
-                <div className="flex-1 min-w-0 flex items-center gap-2">
-                  <Building2 size={14} className="text-emerald-600 shrink-0" />
-                  <span className="font-semibold text-slate-800">{clientName}</span>
-                  <span className="text-xs text-slate-400">{clientProjects.length} projects</span>
-                  {flaggedCount > 0 && <span className="text-xs text-rose-600 font-medium">• {flaggedCount} thin margin</span>}
-                </div>
-                <div className="w-24 shrink-0"></div>
-                <div className="w-28 shrink-0 text-right font-semibold text-slate-700">{formatCurrency(totalBudget)}</div>
-                <div className="w-24 shrink-0 text-right text-rose-600">{formatCurrency(totalSpent)}</div>
-                <div className="w-20 shrink-0 text-right">
-                  <span className={`font-semibold ${avgMargin >= 20 ? 'text-emerald-600' : avgMargin >= 10 ? 'text-amber-600' : 'text-rose-600'}`}>{formatPercent(avgMargin)}</span>
-                </div>
-                <div className="w-16 shrink-0"></div>
-                <div className="w-24 shrink-0"></div>
-                <div className="w-16 shrink-0"></div>
-                <div className="w-24 shrink-0"></div>
-              </div>
-
-              {/* Project Rows */}
-              {expandedClients.has(clientName) && clientProjects.map(project => (
-                <React.Fragment key={project.id}>
-                  <ProjectRow
-                    project={project}
-                    onEdit={() => onEditProject(project)}
-                    onDelete={() => onDeleteProject(project.id, project.name)}
-                    onAddCO={() => onAddChangeOrder(project.id, project.name)}
-                    onView={onViewProject ? () => onViewProject(project.id) : undefined}
-                  />
-                  {project.changeOrders?.map((co: any) => (
-                    <ProjectRow key={co.id} project={co} isChangeOrder
-                      onEdit={() => onEditProject(co)}
-                      onDelete={() => onDeleteProject(co.id, co.name)}
-                      onAddCO={() => {}}
-                      onView={onViewProject ? () => onViewProject(co.id) : undefined}
-                    />
-                  ))}
-                </React.Fragment>
-              ))}
-            </div>
+        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1">
+          {statusOptions.map(s => (
+            <button key={s} onClick={() => setStatusFilter(s)}
+              className={`px-2.5 py-1 rounded-md text-[12px] font-semibold capitalize transition-colors ${statusFilter === s ? 'text-white' : 'text-slate-500 hover:bg-slate-100'}`}
+              style={statusFilter === s ? { background: BLUEPRINT.blue } : undefined}>
+              {s === 'all' ? 'All' : (PROJECT_STATUSES[s]?.label || s)}
+            </button>
           ))}
         </div>
+        <button onClick={onAddProject}
+          className="ml-auto flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:-translate-y-px"
+          style={{ background: BLUEPRINT.blue }}>
+          <Plus size={15} /> Add Project
+        </button>
+      </div>
 
-        {/* Footer */}
-        {filtered.length > 0 && (
-          <div className="flex items-center gap-3 px-4 py-3 border-t-2 border-slate-300 bg-slate-50 text-sm font-semibold">
-            <div className="w-8 shrink-0"></div>
-            <div className="flex-1 text-slate-700">{clientGroups.length} clients • {filtered.length} projects</div>
-            <div className="w-24 shrink-0"></div>
-            <div className="w-28 shrink-0 text-right text-slate-900">{formatCurrency(filtered.reduce((s, p) => s + (p.budget || 0), 0))}</div>
-            <div className="w-24 shrink-0 text-right text-rose-600">{formatCurrency(filtered.reduce((s, p) => s + (p.spent || 0), 0))}</div>
-            <div className="w-20 shrink-0 text-right">
-              {(() => {
-                const tb = filtered.reduce((s, p) => s + (p.budget || 0), 0)
-                const ts = filtered.reduce((s, p) => s + (p.spent || 0), 0)
-                const m = tb > 0 ? ((tb - ts) / tb) * 100 : 0
-                return <span className={m >= 20 ? 'text-emerald-600' : m >= 10 ? 'text-amber-600' : 'text-rose-600'}>{formatPercent(m)}</span>
-              })()}
-            </div>
-            <div className="w-16 shrink-0"></div>
-            <div className="w-24 shrink-0"></div>
-            <div className="w-16 shrink-0"></div>
-            <div className="w-24 shrink-0"></div>
+      {/* TABLE */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <div className="grid gap-2 px-4 py-2.5 text-[10px] font-bold uppercase text-slate-400 bg-slate-50 border-b border-slate-200"
+          style={{ gridTemplateColumns: '2.4fr 0.9fr 0.55fr 1fr 1fr 0.7fr 1.1fr 0.9fr', letterSpacing: '0.1em', ...AR }}>
+          <button onClick={() => toggleSort('name')} className="flex items-center gap-1 text-left uppercase">Client / Project <SortIcon field="name" /></button>
+          <div className="text-right">Status</div>
+          <div className="text-right">Type</div>
+          <div className="text-right">Basis</div>
+          <button onClick={() => toggleSort('recognized')} className="flex items-center justify-end gap-1 uppercase">Recognized <SortIcon field="recognized" /></button>
+          <button onClick={() => toggleSort('hours')} className="flex items-center justify-end gap-1 uppercase">Hours <SortIcon field="hours" /></button>
+          <button onClick={() => toggleSort('ends')} className="flex items-center justify-end gap-1 uppercase">Ends <SortIcon field="ends" /></button>
+          <div />
+        </div>
+
+        {byClient.length === 0 ? (
+          <div className="py-14 text-center text-slate-400 text-sm">No projects match this view</div>
+        ) : byClient.map(group => (
+          <div key={group.id}>
+            <button onClick={() => toggleClient(group.id)}
+              className="w-full flex items-center gap-2 px-4 py-2.5 bg-slate-100/70 border-b border-slate-200 hover:bg-slate-100 transition-colors">
+              {collapsedClients.has(group.id) ? <ChevronRight size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+              <Building2 size={13} className="text-slate-400" />
+              <span className="font-bold text-[13px] text-slate-700">{group.name}</span>
+              <span className="text-[11.5px] text-slate-400">· {group.rows.length} project{group.rows.length !== 1 ? 's' : ''}</span>
+              <span className="ml-auto font-extrabold text-slate-900 tabular-nums text-[13.5px]" style={AR}>{formatCompactCurrency(group.total)}</span>
+            </button>
+            {!collapsedClients.has(group.id) && group.rows.map(p => (
+              <React.Fragment key={p.id}>
+                <Row p={p} />
+                {p.changeOrders.map((co: any) => <Row key={co.id} p={co} isCO />)}
+              </React.Fragment>
+            ))}
+          </div>
+        ))}
+
+        {byClient.length > 0 && (
+          <div className="grid gap-2 px-4 py-3 bg-slate-50 border-t-2 border-slate-200 text-[13.5px] font-bold"
+            style={{ gridTemplateColumns: '2.4fr 0.9fr 0.55fr 1fr 1fr 0.7fr 1.1fr 0.9fr' }}>
+            <div>Total · {filtered.length} project{filtered.length !== 1 ? 's' : ''}</div>
+            <div /><div /><div />
+            <div className="text-right tabular-nums" style={AR}>{formatCompactCurrency(grandTotal)}</div>
+            <div className="text-right tabular-nums text-slate-600">{Math.round(filtered.reduce((s, p) => s + p.actualHours, 0)).toLocaleString()}</div>
+            <div /><div />
           </div>
         )}
       </div>
@@ -288,47 +253,3 @@ const ProjectsSection = forwardRef<ProjectsSectionHandle, ProjectsSectionProps>(
 
 ProjectsSection.displayName = 'ProjectsSection'
 export default ProjectsSection
-export type { ProjectsSectionProps }
-
-// ============ PROJECT ROW ============
-function ProjectRow({ project, isChangeOrder = false, onEdit, onDelete, onAddCO, onView }: {
-  project: any; isChangeOrder?: boolean
-  onEdit: () => void; onDelete: () => void; onAddCO: () => void; onView?: () => void
-}) {
-  return (
-    <div id={`project-${project.id}`} className={`flex items-center gap-3 py-3 px-4 hover:bg-slate-50 transition-colors border-b border-slate-100 ${isChangeOrder ? 'bg-slate-50/50' : ''}`}>
-      <div className="w-8 shrink-0"></div>
-      <div className={`flex-1 min-w-0 flex items-center gap-2 ${isChangeOrder ? 'pl-8' : ''}`}>
-        {isChangeOrder && <div className="w-4 h-px bg-slate-200" />}
-        <Briefcase size={14} className={THEME.textDim} />
-        <span onClick={onView} className={`font-medium ${THEME.textPrimary} truncate ${onView ? 'cursor-pointer hover:text-emerald-600 hover:underline transition-colors' : ''}`}>{project.name}</span>
-        {isChangeOrder && <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-cyan-50 text-cyan-600 shrink-0">CO</span>}
-      </div>
-      <div className="w-24 shrink-0"><StatusBadge status={project.status} /></div>
-      <div className="w-28 shrink-0 text-right"><span className={`font-medium ${THEME.textPrimary}`}>{formatCurrency(project.budget)}</span></div>
-      <div className="w-24 shrink-0 text-right"><span className="text-rose-600">{formatCurrency(project.spent)}</span></div>
-      <div className="w-20 shrink-0 text-right">
-        <span className={`font-semibold ${project.margin >= 20 ? 'text-emerald-600' : project.margin >= 10 ? 'text-amber-600' : 'text-rose-600'}`}>{formatPercent(project.margin)}</span>
-      </div>
-      <div className="w-16 shrink-0 text-center">
-        <ContractBadge type={project.contractType || 'lump_sum'} />
-      </div>
-      <div className="w-24 shrink-0 text-right">
-        <span className="text-slate-600">{project.actualHours || 0}</span>
-        {project.budgetedHours > 0 && <span className="text-slate-300">/{project.budgetedHours}</span>}
-      </div>
-      <div className="w-16 shrink-0 text-center">
-        <span className={`text-xs font-semibold tabular-nums ${project.burnRate > 90 ? 'text-rose-600' : project.burnRate > 70 ? 'text-amber-600' : 'text-slate-500'}`}>
-          {project.budget > 0 ? `${project.burnRate.toFixed(0)}%` : '—'}
-        </span>
-      </div>
-      <div className="w-24 shrink-0 flex items-center justify-end gap-1">
-        {!isChangeOrder && (
-          <button onClick={onAddCO} className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-emerald-600" title="Add Change Order"><Plus size={14} /></button>
-        )}
-        <button onClick={onEdit} className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-blue-600" title="Edit"><Edit2 size={14} /></button>
-        <button onClick={onDelete} className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-rose-600" title="Delete"><Trash2 size={14} /></button>
-      </div>
-    </div>
-  )
-}
