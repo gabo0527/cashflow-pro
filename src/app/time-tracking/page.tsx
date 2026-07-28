@@ -1224,34 +1224,17 @@ export default function TimeTrackingPage() {
   const [pdfScopes, setPdfScopes] = useState<Set<string>>(new Set())
   const [pdfGrouping, setPdfGrouping] = useState<'resource' | 'rate' | 'scope'>('resource')
   const [pdfCols, setPdfCols] = useState({ hours: true, rate: true, amount: true })
-  const loadLineNotes = async () => {
-    if (!companyId) return
-    const { data } = await supabase.from('billing_line_notes').select('line_key, client_description').eq('company_id', companyId).eq('period', dateRange.start)
-    const map: Record<string, string> = {}
-    ;(data || []).forEach((r: any) => { map[r.line_key] = r.client_description || '' })
-    setLineNotes(map)
-  }
-  const saveLineNotes = async () => {
-    if (!companyId) return
-    const clientId = selectedClient !== 'all' ? selectedClient : null
-    const entries = Object.entries(lineNotes)
-    const toUpsert = entries.filter(([, v]) => v && v.trim()).map(([line_key, v]) => ({ company_id: companyId, client_id: clientId, period: dateRange.start, line_key, client_description: v.trim(), updated_at: new Date().toISOString() }))
-    const toDelete = entries.filter(([, v]) => !v || !v.trim()).map(([k]) => k)
-    if (toUpsert.length) await supabase.from('billing_line_notes').upsert(toUpsert, { onConflict: 'company_id,period,line_key' })
-    if (toDelete.length) await supabase.from('billing_line_notes').delete().eq('company_id', companyId).eq('period', dateRange.start).in('line_key', toDelete)
-  }
   const openPdfConfig = () => {
     const ids = new Set<string>()
     dataByClient.forEach(c => Object.values(c.projects).forEach((p: any) => ids.add(p.id)))
     setPdfScopes(ids); setShowPdfConfig(true)
-    loadLineNotes()
   }
   const togglePdfScope = (id: string) => setPdfScopes(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const [pdfDescriptions, setPdfDescriptions] = useState(false)
   const [projectTerms, setProjectTerms] = useState<any[]>([])
   // NTE / phase options: NTE + Delta + Burn % columns, phase split
   const [pdfNte, setPdfNte] = useState({ nteCol: true, deltaCol: true, burnCol: true, phaseSplit: true })
-  const [lineNotes, setLineNotes] = useState<Record<string, string>>({})
+
   // ============ NTE BURN (range-aware, monthly caps, never capped) ============
   // Billed $ comes from costAdjustedEntries (same rates the PDF prints), so
   // burn and statement amounts can never disagree.
@@ -1302,50 +1285,42 @@ export default function TimeTrackingPage() {
     return info
   }, [projects, projectTerms, costAdjustedEntries, dateRange])
 
-  // Lines from a set of entries (used for phase-split sections)
+  // Lines from a set of entries. Descriptions come straight from the notes
+  // contractors submit with their timesheets — never manually re-entered.
+  const collectNotes = (list: any[]) => {
+    const seen = new Set<string>()
+    return list
+      .filter(e => (e.notes || '').trim())
+      .sort((a, b) => ((a.date || '') < (b.date || '') ? -1 : 1))
+      .filter(e => { const k = `${(e.date || '').slice(0, 10)}|${e.notes.trim()}`; if (seen.has(k)) return false; seen.add(k); return true })
+      .map(e => ({ date: (e.date || '').slice(0, 10), note: e.notes.trim() }))
+  }
   const linesFromEntries = (list: any[], keyPrefix: string) => {
     if (pdfGrouping === 'rate') {
-      const byRate: Record<string, { hours: number; amount: number; count: Set<string>; rate: number }> = {}
+      const byRate: Record<string, { hours: number; amount: number; count: Set<string>; rate: number; entries: any[] }> = {}
       list.forEach(e => {
         const k = String(e.bill_rate || 0)
-        if (!byRate[k]) byRate[k] = { hours: 0, amount: 0, count: new Set(), rate: e.bill_rate || 0 }
+        if (!byRate[k]) byRate[k] = { hours: 0, amount: 0, count: new Set(), rate: e.bill_rate || 0, entries: [] }
         byRate[k].hours += e.billable_hours || 0
         byRate[k].amount += (e.billable_hours || 0) * (e.bill_rate || 0)
         byRate[k].count.add(e.team_member_id)
+        byRate[k].entries.push(e)
       })
       return Object.values(byRate).sort((a, b) => b.amount - a.amount)
-        .map(r => ({ key: `${keyPrefix}:rate:${r.rate}`, label: r.count.size > 1 ? `${r.count.size} resources` : 'Resource', hours: r.hours, rate: r.rate, amount: r.amount }))
+        .map(r => ({ key: `${keyPrefix}:rate:${r.rate}`, label: r.count.size > 1 ? `${r.count.size} resources` : 'Resource', hours: r.hours, rate: r.rate, amount: r.amount, notes: collectNotes(r.entries) }))
     }
-    const byMember: Record<string, { name: string; hours: number; amount: number; rate: number }> = {}
+    const byMember: Record<string, { name: string; hours: number; amount: number; rate: number; entries: any[] }> = {}
     list.forEach(e => {
       const k = e.team_member_id
-      if (!byMember[k]) byMember[k] = { name: e.team_member_name, hours: 0, amount: 0, rate: e.bill_rate || 0 }
+      if (!byMember[k]) byMember[k] = { name: e.team_member_name, hours: 0, amount: 0, rate: e.bill_rate || 0, entries: [] }
       byMember[k].hours += e.billable_hours || 0
       byMember[k].amount += (e.billable_hours || 0) * (e.bill_rate || 0)
+      byMember[k].entries.push(e)
     })
     return Object.values(byMember).sort((a, b) => b.amount - a.amount)
-      .map(m => ({ key: `${keyPrefix}:res:${m.name}`, label: m.name, hours: m.hours, rate: m.rate, amount: m.amount }))
+      .map(m => ({ key: `${keyPrefix}:res:${m.name}`, label: m.name, hours: m.hours, rate: m.rate, amount: m.amount, notes: collectNotes(m.entries) }))
   }
 
-  const buildPdfLines = () => {
-    const scopes: { scopeId: string; scopeName: string; subHours: number; subAmount: number; lines: { key: string; label: string; hours: number; rate: number | null; amount: number }[] }[] = []
-    dataByClient.forEach(client => Object.values(client.projects).forEach((project: any) => {
-      if (!pdfScopes.has(project.id)) return
-      const members = Object.values(project.members) as any[]
-      let lines: { key: string; label: string; hours: number; rate: number | null; amount: number }[] = []
-      if (pdfGrouping === 'scope') {
-        lines = [{ key: `${project.id}:scope`, label: project.name, hours: project.totalBillableHours, rate: project.totalBillableHours > 0 ? project.totalRevenue / project.totalBillableHours : null, amount: project.totalRevenue }]
-      } else if (pdfGrouping === 'rate') {
-        const byRate: Record<string, { hours: number; amount: number; count: number; rate: number }> = {}
-        members.forEach(m => { const k = String(m.billRate); if (!byRate[k]) byRate[k] = { hours: 0, amount: 0, count: 0, rate: m.billRate }; byRate[k].hours += m.totalBillableHours; byRate[k].amount += m.totalRevenue; byRate[k].count += 1 })
-        lines = Object.values(byRate).sort((a, b) => b.amount - a.amount).map(r => ({ key: `${project.id}:rate:${r.rate}`, label: r.count > 1 ? `${r.count} resources` : 'Resource', hours: r.hours, rate: r.rate, amount: r.amount }))
-      } else {
-        lines = members.sort((a, b) => b.totalRevenue - a.totalRevenue).map(m => ({ key: `${project.id}:res:${m.id}`, label: m.name, hours: m.totalBillableHours, rate: m.billRate, amount: m.totalRevenue }))
-      }
-      scopes.push({ scopeId: project.id, scopeName: project.name, subHours: project.totalBillableHours, subAmount: project.totalRevenue, lines })
-    }))
-    return scopes
-  }
   const billingCmp = (a: { name: string; totalRevenue: number }, b: { name: string; totalRevenue: number }) => billingSort === 'az' ? a.name.localeCompare(b.name) : b.totalRevenue - a.totalRevenue
 
   const exportToCSV = () => {
@@ -1515,9 +1490,12 @@ ${parts.join('')}
       let scHrs = 0, scAmt = 0
       const rows: string[] = []
 
-      const pushLines = (lines: { key: string; label: string; hours: number; rate: number | null; amount: number }[]) => {
+      const fmtNoteDate = (d: string) => `${monthNameOf(d.slice(0, 7))} ${Number(d.slice(8, 10))}`
+      const pushLines = (lines: { key: string; label: string; hours: number; rate: number | null; amount: number; notes?: { date: string; note: string }[] }[]) => {
         lines.forEach(ln => {
-          const desc = pdfDescriptions && lineNotes[ln.key] ? `<div class="ldesc">${esc(lineNotes[ln.key])}</div>` : ''
+          const desc = pdfDescriptions && ln.notes && ln.notes.length > 0
+            ? `<div class="ldesc">${ln.notes.map(n => `${fmtNoteDate(n.date)} — ${esc(n.note)}`).join('<br>')}</div>`
+            : ''
           rows.push(`<tr><td class="l">${esc(ln.label)}${desc}</td>${pdfCols.hours ? `<td>${ln.hours.toFixed(1)}</td>` : ''}${pdfCols.rate ? `<td>${ln.rate != null && ln.rate > 0 ? fmt(ln.rate) + '/hr' : ''}</td>` : ''}${pdfCols.amount ? `<td class="amt">${fmt(ln.amount)}</td>` : ''}${blankTail}</tr>`)
         })
       }
@@ -1580,7 +1558,6 @@ ${parts.join('')}
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Billing Statement</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Archivo:wght@700;800&display=swap" rel="stylesheet">
 <style>*{box-sizing:border-box;margin:0;padding:0}body{padding:34px 30px}${STATEMENT_CSS}</style></head><body>${buildStatementBody()}</body></html>`
-    saveLineNotes()
     const w = window.open('', '_blank')
     if (!w) { addToast('error', 'Allow pop-ups to generate the statement'); return }
     w.document.write(html); w.document.close()
@@ -2485,14 +2462,7 @@ ${parts.join('')}
                   </button>
                 </div>
                 {pdfDescriptions && (
-                  <div className="space-y-2 mt-2">
-                    {buildPdfLines().flatMap(sc => sc.lines.map(ln => (
-                      <div key={ln.key} className="border border-gray-200 rounded-lg p-2.5">
-                        <p className="text-[11px] font-medium text-slate-500 mb-1.5">{sc.scopeName} · {ln.label}</p>
-                        <textarea value={lineNotes[ln.key] || ''} onChange={e => setLineNotes(prev => ({ ...prev, [ln.key]: e.target.value }))} rows={2} placeholder="Client-facing description..." className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none" />
-                      </div>
-                    )))}
-                  </div>
+                  <p className="text-[10.5px] text-slate-400 leading-relaxed mt-2">Pulled automatically from the notes contractors submit with their timesheets for the selected period — dated, deduplicated, per line. Nothing to type here.</p>
                 )}
               </div>
             </div>
