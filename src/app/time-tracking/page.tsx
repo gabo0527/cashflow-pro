@@ -1292,11 +1292,17 @@ export default function TimeTrackingPage() {
   // Lines from a set of entries. Descriptions come straight from the notes
   // contractors submit with their timesheets — never manually re-entered.
   const collectNotes = (list: any[]) => {
+    // Dedupe by note TEXT across the whole range — contractors often paste the
+    // same cumulative note on multiple days. Normalized compare (whitespace/case).
     const seen = new Set<string>()
     return list
       .filter(e => (e.notes || '').trim())
       .sort((a, b) => ((a.date || '') < (b.date || '') ? -1 : 1))
-      .filter(e => { const k = `${(e.date || '').slice(0, 10)}|${e.notes.trim()}`; if (seen.has(k)) return false; seen.add(k); return true })
+      .filter(e => {
+        const k = e.notes.trim().toLowerCase().replace(/\s+/g, ' ')
+        if (seen.has(k)) return false
+        seen.add(k); return true
+      })
       .map(e => ({ date: (e.date || '').slice(0, 10), note: e.notes.trim() }))
   }
   const linesFromEntries = (list: any[], keyPrefix: string) => {
@@ -1358,7 +1364,8 @@ export default function TimeTrackingPage() {
         const next = { ...prev }
         payload.forEach(l => {
           const ai = (summaries?.[l.key] || '').trim()
-          next[l.key] = ai || (l.notes.length > 0 ? l.notes.map(n => n.note).join('; ') : (prev[l.key] || ''))
+          const raw = l.notes.length > 0 ? l.notes.map(n => n.note).join('; ') : ''
+          next[l.key] = ai || (raw ? raw.slice(0, 600) + (raw.length > 600 ? ' …' : '') : (prev[l.key] || ''))
         })
         return next
       })
@@ -1370,7 +1377,7 @@ export default function TimeTrackingPage() {
         const next = { ...prev }
         pdfLineSets().forEach(sc => sc.lines.forEach(ln => {
           const k = `${sc.scopeId}::${ln.label}`
-          if (!next[k] && ln.notes && ln.notes.length > 0) next[k] = ln.notes.map(n => n.note).join('; ')
+          if (!next[k] && ln.notes && ln.notes.length > 0) { const raw = ln.notes.map(n => n.note).join('; '); next[k] = raw.slice(0, 600) + (raw.length > 600 ? ' …' : '') }
         }))
         return next
       })
