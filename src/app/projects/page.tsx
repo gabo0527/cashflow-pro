@@ -25,6 +25,7 @@ export default function ProjectsPage() {
   const [timesheets, setTimesheets] = useState<any[]>([])
   const [billRates, setBillRates] = useState<any[]>([])
   const [assignments, setAssignments] = useState<any[]>([])
+  const [projectTerms, setProjectTerms] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const [showProjectModal, setShowProjectModal] = useState(false)
@@ -43,14 +44,16 @@ export default function ProjectsPage() {
     try {
       // Dead QBO-era `invoices` and cost-side `expenses` queries removed —
       // revenue comes from the recognition engine (LS fees + hours × rates).
-      const [pRes, cRes, tmRes, tsRes, brRes, aRes] = await Promise.all([
+      const [pRes, cRes, tmRes, tsRes, brRes, aRes, ptRes] = await Promise.all([
         supabase.from('projects').select('*').order('name'),
         supabase.from('clients').select('*').order('name'),
         supabase.from('team_members').select('*'),
         supabase.from('time_entries').select('*'),
         supabase.from('bill_rates').select('*'),
         supabase.from('team_project_assignments').select('*'),
+        supabase.from('project_terms').select('*'),
       ])
+      setProjectTerms(ptRes.data || [])
       setProjects((pRes.data || []).map(p => ({
         ...p,
         budget: parseFloat(p.budget) || 0,
@@ -214,8 +217,8 @@ export default function ProjectsPage() {
 
         {/* TAB CONTENT */}
         {activeTab === 'dashboard' && <DashboardSection projects={projects} clients={clients} timesheets={timesheets} billRates={billRates} assignments={assignments} onDrillDown={handleDrillDown} />}
-        {activeTab === 'projects' && <ProjectsSection ref={projectsSectionRef} projects={projects} clients={clients} timesheets={timesheets} billRates={billRates} assignments={assignments} onAddProject={openAddProject} onEditProject={openEditProject} onDeleteProject={handleDeleteProject} onAddChangeOrder={openAddChangeOrder} onViewProject={handleViewProject} />}
-        {activeTab === 'pipeline' && <ProjectsSection ref={projectsSectionRef} projects={projects.filter(p => p.status === 'prospect')} clients={clients} timesheets={timesheets} billRates={billRates} assignments={assignments} onAddProject={() => { resetForm(); setFormData(prev => ({ ...prev, status: 'prospect' })); setShowProjectModal(true) }} onEditProject={openEditProject} onDeleteProject={handleDeleteProject} onAddChangeOrder={openAddChangeOrder} onViewProject={handleViewProject} />}
+        {activeTab === 'projects' && <ProjectsSection ref={projectsSectionRef} projects={projects} clients={clients} timesheets={timesheets} billRates={billRates} assignments={assignments} projectTerms={projectTerms} onAddProject={openAddProject} onEditProject={openEditProject} onDeleteProject={handleDeleteProject} onAddChangeOrder={openAddChangeOrder} onViewProject={handleViewProject} />}
+        {activeTab === 'pipeline' && <ProjectsSection ref={projectsSectionRef} projects={projects.filter(p => p.status === 'prospect')} clients={clients} timesheets={timesheets} billRates={billRates} assignments={assignments} projectTerms={projectTerms} onAddProject={() => { resetForm(); setFormData(prev => ({ ...prev, status: 'prospect' })); setShowProjectModal(true) }} onEditProject={openEditProject} onDeleteProject={handleDeleteProject} onAddChangeOrder={openAddChangeOrder} onViewProject={handleViewProject} />}
         {activeTab === 'import' && <ImportSection projects={projects} clients={clients} teamMembers={teamMembers} onImportProjects={handleImportProjects} onImportBudgets={handleImportBudgets} onImportResources={handleImportResources} />}
 
         {/* Project Detail View */}
