@@ -13,6 +13,7 @@ import {
   BLUEPRINT, PROJECT_STATUSES, getContractType,
   formatCompactCurrency, formatDateShort, StatusBadge,
   calcProjectRevenue, buildRateLookups, todayISO, daysUntil,
+  getProjectPhases, phaseForDate, entryRevenue, monthKeyOf, monthLabel,
 } from './shared'
 
 const AR = { fontFamily: BLUEPRINT.fontDisplay }
@@ -23,6 +24,7 @@ interface ProjectsSectionProps {
   timesheets: any[]
   billRates?: any[]
   assignments?: any[]
+  projectTerms?: any[]
   onAddProject: () => void
   onEditProject: (project: any) => void
   onDeleteProject: (id: string, name: string) => void
@@ -62,7 +64,7 @@ function EndsChip({ project, type, today }: { project: any; type: string; today:
 }
 
 const ProjectsSection = forwardRef<ProjectsSectionHandle, ProjectsSectionProps>(({
-  projects, clients, timesheets, billRates = [], assignments = [],
+  projects, clients, timesheets, billRates = [], assignments = [], projectTerms = [],
   onAddProject, onEditProject, onDeleteProject, onAddChangeOrder, onViewProject
 }, ref) => {
   const [statusFilter, setStatusFilter] = useState<string>('active')
@@ -86,20 +88,41 @@ const ProjectsSection = forwardRef<ProjectsSectionHandle, ProjectsSectionProps>(
   const enriched = useMemo(() => {
     const entriesByProject: Record<string, any[]> = {}
     timesheets.forEach(t => { (entriesByProject[t.project_id] = entriesByProject[t.project_id] || []).push(t) })
+    const curMonth = monthKeyOf(today)
     return projects.map(p => {
-      const rev = calcProjectRevenue(p, entriesByProject[p.id] || [], rateCardLookup, assignmentLookup, today)
+      const pEntries = entriesByProject[p.id] || []
+      const rev = calcProjectRevenue(p, pEntries, rateCardLookup, assignmentLookup, today)
+      // Current-month NTE burn chip for projects under an active monthly-NTE phase
+      let burn: { pct: number; nte: number } | null = null
+      let basisLabel = rev.basisLabel
+      const phases = getProjectPhases(p, projectTerms, today)
+      const cur = phaseForDate(phases, today)
+      if (cur?.terms === 'tm_nte' && cur.nte_amount) {
+        let billed = 0
+        pEntries.forEach(e => {
+          const d = (e.date || '').slice(0, 10)
+          if (monthKeyOf(d) !== curMonth) return
+          if (d < cur.effective_start || (cur.effective_end && d > cur.effective_end)) return
+          billed += entryRevenue(e, p, rateCardLookup, assignmentLookup)
+        })
+        burn = { pct: (billed / cur.nte_amount) * 100, nte: cur.nte_amount }
+        basisLabel = `${formatCompactCurrency(cur.nte_amount)}/mo NTE`
+      } else if (cur?.terms === 'lump_sum' && cur.monthly_fee) {
+        basisLabel = `${formatCompactCurrency(cur.monthly_fee)} / mo`
+      }
       return {
         ...p,
         contractType: rev.type,
         recognized: rev.recognized,
         thisMonth: rev.thisMonth,
-        basisLabel: rev.basisLabel,
+        basisLabel,
+        burn,
         actualHours: rev.hours,
         clientName: clients.find(c => c.id === p.client_id)?.name || 'No Client',
         changeOrders: [] as any[],
       }
     })
-  }, [projects, clients, timesheets, rateCardLookup, assignmentLookup, today])
+  }, [projects, clients, timesheets, rateCardLookup, assignmentLookup, projectTerms, today])
 
   // Attach COs to parents (CO revenue shown on its own indented row)
   const withCOs = useMemo(() => {
@@ -163,7 +186,16 @@ const ProjectsSection = forwardRef<ProjectsSectionHandle, ProjectsSectionProps>(
       </div>
       <div className="text-right"><StatusBadge status={p.status} /></div>
       <div className="text-right"><TypeBadge type={p.contractType} /></div>
-      <div className="text-right text-[12.5px] text-slate-500 whitespace-nowrap">{p.basisLabel}</div>
+      <div className="text-right text-[12.5px] text-slate-500 whitespace-nowrap">
+        {p.basisLabel}
+        {p.burn && (
+          <span className="ml-1.5 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full tabular-nums align-middle"
+            style={{ fontFamily: BLUEPRINT.fontDisplay, background: p.burn.pct > 100 ? '#fee2e2' : p.burn.pct >= 80 ? BLUEPRINT.copperSoft : '#f1f5f9', color: p.burn.pct > 100 ? '#dc2626' : p.burn.pct >= 80 ? BLUEPRINT.copper : '#64748b' }}
+            title={`${monthLabel(monthKeyOf(todayISO()))} billed vs monthly NTE — never capped`}>
+            {p.burn.pct.toFixed(0)}%
+          </span>
+        )}
+      </div>
       <div className="text-right font-bold text-slate-900 tabular-nums" style={AR}>{formatCompactCurrency(p.recognized)}</div>
       <div className="text-right tabular-nums text-slate-600">{p.actualHours > 0 ? Math.round(p.actualHours).toLocaleString() : '—'}</div>
       <div className="text-right"><EndsChip project={p} type={p.contractType} today={today} /></div>
