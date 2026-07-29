@@ -740,11 +740,14 @@ export default function ExpensesTab({ member, assignments, legacyExpenses }: {
           {/* Legacy standalone expenses (read-only history) */}
           {legacyExpenses.filter((e: any) => !(e as any).report_id).length > 0 && (
             <div className="v-card" style={{ overflow: 'hidden' }}>
-              <div style={headStyle}><span style={lblStyle}>Earlier expenses — before reports</span></div>
+              <div style={headStyle}><span style={lblStyle}>Individual expenses</span></div>
               {legacyExpenses.filter((e: any) => !(e as any).report_id).slice(0, 10).map((e, i) => (
                 <div key={e.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '10px 20px', borderTop: i === 0 ? 'none' : '1px solid rgba(15,23,42,0.05)' }}>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '12.5px', color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.description || catLabel(e.category)}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                      <span style={{ fontSize: '12.5px', color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.description || catLabel(e.category)}</span>
+                      {(e as any).entered_by === 'admin' && <span title="Entered by Mano admin on your behalf" style={{ fontSize: '8px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: '#eef2ff', color: '#4f46e5', flexShrink: 0 }}>MANO</span>}
+                    </div>
                     <div style={{ fontSize: '10px', color: '#94a3b8' }}>{fmtDate(e.date)} · {catLabel(e.category)}</div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
