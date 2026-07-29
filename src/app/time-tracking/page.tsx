@@ -1225,6 +1225,11 @@ export default function TimeTrackingPage() {
   const [pdfGrouping, setPdfGrouping] = useState<'resource' | 'rate' | 'scope'>('resource')
   const [pdfCols, setPdfCols] = useState({ hours: true, rate: true, amount: true })
   const openPdfConfig = () => {
+    // Re-fetch contract terms on every open — phases edited on the Projects
+    // page mid-session must reflect here without a page reload.
+    supabase.from('project_terms').select('*').eq('company_id', companyId || '').then(({ data, error }) => {
+      if (!error && data) setProjectTerms(data)
+    })
     const ids = new Set<string>()
     dataByClient.forEach(c => Object.values(c.projects).forEach((p: any) => ids.add(p.id)))
     setPdfScopes(ids); setShowPdfConfig(true)
