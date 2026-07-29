@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import OnboardingWizard from './OnboardingWizard'
+import IdleLogout from '@/components/IdleLogout'
 import ExpensesTab from './ExpensesTab'
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart, LabelList } from 'recharts'
 
@@ -1265,6 +1266,8 @@ export default function ContractorPortal() {
   return (
     <div className="min-h-screen text-gray-900" style={{ background: '#eef1f4', colorScheme: 'light', backgroundImage: 'radial-gradient(1000px 460px at 12% 0%, rgba(37,99,235,0.05), transparent 60%), linear-gradient(rgba(15,23,42,0.022) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.022) 1px, transparent 1px)', backgroundSize: '100% 100%, 26px 26px, 26px 26px', backgroundAttachment: 'fixed' }}>
       <style dangerouslySetInnerHTML={{ __html: PORTAL_CSS }} />
+      {/* Privacy: auto sign-out after 10 min of inactivity (60s warning) */}
+      {member && <IdleLogout onLogout={handleSignOut} />}
       {/* Top Bar */}
       <header style={{ position: 'sticky', top: 0, zIndex: 40, borderBottom: '1px solid #22303c', background: 'linear-gradient(135deg,#1b2431,#10151c)', overflow: 'hidden' }}>
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 13px)' }} />
@@ -1767,6 +1770,7 @@ export default function ContractorPortal() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="text-gray-900 text-[13px] font-medium">{inv.invoice_number}</p>
+                          {(inv as any).entered_by === 'admin' && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 shrink-0" title="Entered by Mano admin on your behalf">MANO</span>}
                           {receiptUrl && <a href={receiptUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-blue-500 hover:text-blue-700 transition-colors"><Paperclip size={11} /></a>}
                         </div>
                         <p className="text-gray-400 text-xs mt-0.5">{bMonth}</p>
@@ -2118,6 +2122,7 @@ export default function ContractorPortal() {
                                 <div className="flex-1 min-w-0 text-left">
                                   <div className="flex items-center gap-2">
                                     <span className="text-[13px] text-gray-900 font-medium">#{inv.invoice_number}</span>
+                                    {(inv as any).entered_by === 'admin' && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 shrink-0" title="Entered by Mano admin on your behalf">MANO</span>}
                                     <span className="text-xs font-medium text-blue-600 bg-gray-50 px-1.5 py-0.5 rounded">{clientName}</span>
                                     {receiptUrl ? (
                                       <a href={receiptUrl} target="_blank" rel="noopener noreferrer"
