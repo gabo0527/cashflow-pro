@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
+import IdleLogout from '@/components/IdleLogout'
 import Header from './Header'
 import ChatPanel from '@/components/ai/ChatPanel'
 import { cn } from '@/lib/utils'
@@ -146,6 +147,9 @@ export default function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="v-app min-h-screen bg-[#f4f5f7]">
+      {/* Privacy: auto sign-out after 10 min of inactivity (60s warning) */}
+      {user && <IdleLogout onLogout={handleSignOut} />}
+
       {/* Sidebar */}
       <Sidebar
         collapsed={sidebarCollapsed}
