@@ -41,10 +41,20 @@ const formatDate = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('
 const normalizeCostType = (t: string) => (t || '').toLowerCase().replace(/\s+/g, '_')
 
 const getWeekRange = (date: Date) => {
-  const d = new Date(date); const day = d.getDay(); const start = new Date(d); start.setDate(d.getDate() - day)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const toLocalISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  // Normalize to local midnight so clock time can never roll the date over.
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  // Monday-start week: Sunday (0) is day 7 of the week that just ended.
+  const dow = d.getDay()
+  const offset = dow === 0 ? 6 : dow - 1
+  const start = new Date(d); start.setDate(d.getDate() - offset)
   const end = new Date(start); end.setDate(start.getDate() + 6)
-  return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0],
-    label: `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` }
+  return {
+    start: toLocalISO(start),
+    end: toLocalISO(end),
+    label: `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+  }
 }
 // The 7 dates of the week being viewed. Each day is stored as its own dated
 // row, so a week crossing a month needs no special handling — Jun 30 posts to
