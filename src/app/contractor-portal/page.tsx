@@ -12,6 +12,7 @@ import { createClient } from '@supabase/supabase-js'
 import OnboardingWizard from './OnboardingWizard'
 import IdleLogout from '@/components/IdleLogout'
 import ExpensesTab from './ExpensesTab'
+import { cleanDailyEntry, DailyTimeForm, isTimeAndMaterials, MAX_DESCRIPTION_LENGTH } from '@/lib/timesheet-daily'
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart, LabelList } from 'recharts'
 
 const supabase = createClient(
@@ -30,7 +31,7 @@ interface TeamMember {
 }
 interface Assignment { project_id: string; project_name: string; client_id: string; client_name: string; payment_type: string; rate: number }
 interface RateCard { team_member_id: string; client_id: string; client_name: string; cost_type: string; cost_amount: number; rate: number }
-interface TimeEntryForm { project_id: string; days: Record<string, string>; notes: string }
+type TimeEntryForm = DailyTimeForm
 interface Expense { id: string; date: string; category: string; description: string; amount: number; project_id?: string; client_id?: string; status: string; receipt_url?: string; submitted_at: string }
 interface ContractorInvoice { id: string; invoice_number: string; invoice_date: string; due_date: string; period_start: string; period_end: string; total_amount: number; status: string; payment_terms: string; receipt_url?: string; submitted_at: string; notes?: string; client_id?: string; lines?: any[]; contractor_invoice_lines?: any[] }
 interface InvoiceLine { client_id: string; client_name: string; project_id?: string; project_name?: string; hours?: number; rate?: number; amount: number; allocation_pct?: number }
@@ -353,6 +354,10 @@ export default function ContractorPortal() {
   const [existingEntries, setExistingEntries] = useState<any[]>([])
   const [submittingTime, setSubmittingTime] = useState(false)
   const [timeSuccess, setTimeSuccess] = useState(false)
+  const [timeSuccessMessage, setTimeSuccessMessage] = useState('')
+  const [selectedTimeDay, setSelectedTimeDay] = useState<{ projectId: string; date: string } | null>(null)
+  const [showAllDescriptions, setShowAllDescriptions] = useState(false)
+  const [timeLoaded, setTimeLoaded] = useState(false)
   const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set())
 
   // Expenses
@@ -583,7 +588,7 @@ export default function ContractorPortal() {
       }
       setMember(md); setAssignments(assigns)
 
-      const init: Record<string, TimeEntryForm> = {}; assigns.forEach(a => { init[a.project_id] = { project_id: a.project_id, days: {}, notes: '' } }); setTimeEntries(init)
+      const init: Record<string, TimeEntryForm> = {}; assigns.forEach(a => { init[a.project_id] = { project_id: a.project_id, days: {}, descriptions: {} } }); setTimeEntries(init)
 
       const { data: expData } = await supabase.from('contractor_expenses').select('*').eq('team_member_id', md.id).order('date', { ascending: false }).limit(50)
       setExpenses(expData || [])
@@ -600,31 +605,32 @@ export default function ContractorPortal() {
   // timesheet_drafts table (read via API) and NEVER touch time_entries,
   // so unsubmitted hours can't leak into Time Tracking, Reports, or Sage.
   useEffect(() => {
-    if (!member || assignments.length === 0) return
+    if (!member) return
+    let cancelled = false
     const load = async () => {
+      setTimeLoaded(false)
+      setTimeSuccess(false)
+      setSelectedTimeDay(null)
+      setShowAllDescriptions(false)
       const init: Record<string, TimeEntryForm> = {}
-      assignments.forEach(a => { init[a.project_id] = { project_id: a.project_id, days: {}, notes: '' } })
+      assignments.forEach(a => { init[a.project_id] = { project_id: a.project_id, days: {}, descriptions: {} } })
 
       // STEP 1 — Submitted hours from time_entries (ignore any legacy draft rows)
-      const { data } = await supabase.from('time_entries').select('project_id, hours, description, date, id, status').eq('contractor_id', member.id).gte('date', week.start).lte('date', week.end)
+      const { data, error: loadError } = await supabase.from('time_entries').select('project_id, hours, description, date, id, status').eq('contractor_id', member.id).gte('date', week.start).lte('date', week.end)
+      if (loadError) { setError('Unable to load submitted time. Reload this week before making changes.'); return }
       const rows = (data || []).filter((e: any) => (e.status || 'submitted') !== 'draft')
       let canonical: any[] = []
       if (rows.length > 0) {
         // Dedupe key = project + date (one row per project per DAY)
         const byKey: Record<string, any[]> = {}
         rows.forEach((e: any) => { const k = `${e.project_id}|${e.date}`; if (!byKey[k]) byKey[k] = []; byKey[k].push(e) })
-        const hasDupes = Object.values(byKey).some(arr => arr.length > 1)
         canonical = Object.values(byKey).map(arr => arr.sort((a: any, b: any) => b.id.localeCompare(a.id))[0])
         canonical.forEach((e: any) => {
           const g = init[e.project_id]
           if (!g) return
           g.days[e.date] = String(e.hours || 0)
-          if (e.description) g.notes = e.description
+          if (e.description) g.descriptions[e.date] = e.description
         })
-        if (hasDupes) {
-          const dupeIds = rows.filter((e: any) => !canonical.find((c: any) => c.id === e.id)).map((e: any) => e.id)
-          if (dupeIds.length > 0) supabase.from('time_entries').delete().in('id', dupeIds).then(() => {})
-        }
       }
 
       // STEP 2 — Overlay private drafts — a draft is the contractor's latest edit,
@@ -633,20 +639,27 @@ export default function ContractorPortal() {
       try {
         const res = await fetch(`/api/timesheet-drafts?week_ending=${week.end}`)
         if (res.ok) { const j = await res.json(); draftRows = j.drafts || [] }
-      } catch (err) { console.warn('Draft load failed:', err) }
+        else { setError('Unable to load saved drafts. Reload this week before making changes.'); return }
+      } catch (err) { console.warn('Draft load failed:', err); setError('Unable to load saved drafts. Reload this week before making changes.'); return }
       draftRows.forEach((d: any) => {
         const g = init[d.project_id]
         if (!g) return
         g.days = {}
+        g.descriptions = {}
         Object.entries(d.daily_hours || {}).forEach(([date, h]) => { g.days[date] = String(h) })
-        if (d.note) g.notes = d.note
+        Object.entries(d.daily_descriptions || {}).forEach(([date, note]) => { if (typeof note === 'string') g.descriptions[date] = note })
+        // Preserve the old weekly note as a reference without inventing daily work.
+        g.legacyNote = d.note || undefined
       })
 
+      if (cancelled) return
       setTimeEntries(init)
       setExistingEntries(canonical)
       setWeekStatus(draftRows.length > 0 ? 'draft' : canonical.length > 0 ? 'submitted' : 'none')
+      setTimeLoaded(true)
     }
     load()
+    return () => { cancelled = true }
   }, [member, assignments, week.start, week.end])
 
   // ============ SUBMIT TIME ============
@@ -673,90 +686,48 @@ export default function ContractorPortal() {
   // Save the week. Drafts go to the private timesheet_drafts table and never
   // touch time_entries; submit writes time_entries and clears the drafts.
   const saveWeek = async (status: 'draft' | 'submitted') => {
-    if (!member || submittingTime) return
+    if (!member || submittingTime || weekLocked || !timeLoaded) return
     setSubmittingTime(true); setError(null)
     try {
+      // Validate the entire grid before any draft save or submitted write.
+      const projects = Object.values(timeEntries).map(e => {
+        const assignment = assignments.find(a => a.project_id === e.project_id)
+        const daily = cleanDailyEntry(e.days, e.descriptions, weekDays.map(d => d.iso), isTimeAndMaterials(assignment?.payment_type || 'tm'))
+        return { project_id: e.project_id, ...daily, note: e.legacyNote || null }
+      })
       if (status === 'draft') {
         // Private save — one draft row per project. Admin never sees these.
         // Saving an empty grid deletes the draft row server-side.
-        for (const e of Object.values(timeEntries)) {
-          const daily: Record<string, number> = {}
-          weekDays.forEach(d => {
-            const h = parseFloat(e.days?.[d.iso] || '0')
-            if (h > 0) daily[d.iso] = h
-          })
+        for (const project of projects) {
           const res = await fetch('/api/timesheet-drafts', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ project_id: e.project_id, week_ending: week.end, daily_hours: daily, note: e.notes || null })
+            body: JSON.stringify({ ...project, week_ending: week.end })
           })
           if (!res.ok) {
             const j = await res.json().catch(() => ({}))
             throw new Error(j.error || 'Failed to save draft')
           }
         }
-        const hasAny = Object.values(timeEntries).some(e => weekDays.some(d => parseFloat(e.days?.[d.iso] || '0') > 0))
+        const hasAny = projects.some(p => Object.keys(p.daily_hours).length > 0 || Object.keys(p.daily_descriptions).length > 0 || p.note)
         setWeekStatus(hasAny ? 'draft' : 'none')
+        setTimeSuccessMessage('Draft saved — only you can see this.')
         setTimeSuccess(true); setTimeout(() => setTimeSuccess(false), 3000)
         return
       }
 
-      // SUBMIT — clean slate for this week in time_entries (idempotent).
-      // Also sweeps out any legacy draft rows left from the old system.
-      const { data: freshEntries } = await supabase
-        .from('time_entries')
-        .select('id')
-        .eq('contractor_id', member.id)
-        .gte('date', week.start)
-        .lte('date', week.end)
-      if (freshEntries && freshEntries.length > 0) {
-        const { error: de } = await supabase.from('time_entries').delete().in('id', freshEntries.map((e: any) => e.id))
-        if (de) throw de
-      }
-
-      // One row per project per DAY with hours > 0 — each dated correctly,
-      // so a week spanning two months posts to both automatically.
-      const now = new Date().toISOString()
-      const entries: any[] = []
-      Object.values(timeEntries).forEach(e => {
-        const a = assignments.find(a => a.project_id === e.project_id)
-        weekDays.forEach(d => {
-          const h = parseFloat(e.days?.[d.iso] || '0')
-          if (h > 0) entries.push({
-            contractor_id: member.id,
-            project_id: e.project_id,
-            date: d.iso,
-            hours: h,
-            billable_hours: h,
-            is_billable: true,
-            bill_rate: a?.rate || 0,
-            description: e.notes || null,
-            company_id: member.company_id,
-            status: 'submitted',
-            submitted_at: now,
-          })
-        })
+      // The server validates again and atomically replaces the week. A failure
+      // cannot delete previously submitted time or clear private drafts.
+      const response = await fetch('/api/contractor-timesheets', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ week_ending: week.end, projects }),
       })
-
-      if (entries.length > 0) {
-        const { error: ie } = await supabase.from('time_entries').insert(entries)
-        if (ie) throw ie
-      }
-
-      // Clear this week's drafts — the submitted version is now the truth
-      await Promise.all(Object.values(timeEntries).map(e =>
-        fetch(`/api/timesheet-drafts?project_id=${e.project_id}&week_ending=${week.end}`, { method: 'DELETE' })
-          .catch(err => console.warn('Draft cleanup failed:', err))
-      ))
-
-      const { data: newEntries } = await supabase
-        .from('time_entries')
-        .select('project_id, hours, description, date, id, status')
-        .eq('contractor_id', member.id)
-        .gte('date', week.start)
-        .lte('date', week.end)
-      setExistingEntries(newEntries || [])
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Failed to submit timesheet')
+      const entries: any[] = result.entries || []
+      setExistingEntries(entries)
       setWeekStatus(entries.length === 0 ? 'none' : 'submitted')
+      setTimeEntries(prev => Object.fromEntries(Object.entries(prev).map(([id, entry]) => [id, { ...entry, legacyNote: undefined }])))
 
       // Notify admin ONLY on submit — drafts stay private
       const totalHours = entries.reduce((s, e) => s + e.hours, 0)
@@ -768,6 +739,7 @@ export default function ContractorPortal() {
         }).catch(err => console.warn('Timesheet notification failed:', err))
       }
 
+      setTimeSuccessMessage('Timesheet submitted successfully')
       setTimeSuccess(true); setTimeout(() => setTimeSuccess(false), 3000)
     } catch (err: any) { setError(err.message || 'Failed to submit') } finally { setSubmittingTime(false) }
   }
@@ -1224,6 +1196,16 @@ export default function ContractorPortal() {
     { id: 'profile' as const, label: 'Profile', icon: User },
   ]
   const totalTimeHours = Object.values(timeEntries).reduce((s, e) => s + Object.values(e.days || {}).reduce((t: number, v: any) => t + (parseFloat(v) || 0), 0), 0)
+  const timeValidationIssues = Object.values(timeEntries).flatMap(entry => {
+    const assignment = assignments.find(a => a.project_id === entry.project_id)
+    try {
+      cleanDailyEntry(entry.days, entry.descriptions, weekDays.map(d => d.iso), isTimeAndMaterials(assignment?.payment_type || 'tm'))
+      return []
+    } catch (error: any) {
+      return [`${assignment?.project_name || 'Project'}: ${error.message}`]
+    }
+  })
+  const timeSaveDisabled = submittingTime || !timeLoaded || timeValidationIssues.length > 0
 
   // ============ LOGIN SCREEN ============
   if (step === 'email') {
@@ -1344,8 +1326,8 @@ export default function ContractorPortal() {
             <div className="v-card vUp" style={{ overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid rgba(15,23,42,0.06)', backgroundImage: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)' }}>
                 <WeekNav week={week}
-                  onPrev={() => { const d = new Date(weekDate); d.setDate(d.getDate() - 7); setWeekDate(d) }}
-                  onNext={() => { const d = new Date(weekDate); d.setDate(d.getDate() + 7); setWeekDate(d) }}
+                  onPrev={() => { if (submittingTime) return; setTimeLoaded(false); const d = new Date(weekDate); d.setDate(d.getDate() - 7); setWeekDate(d) }}
+                  onNext={() => { if (submittingTime) return; setTimeLoaded(false); const d = new Date(weekDate); d.setDate(d.getDate() + 7); setWeekDate(d) }}
                 />
                 {(() => {
                   const st = weekLocked ? { t: 'Invoiced', c: '#475569', bg: 'rgba(148,163,184,0.12)', bd: '#cbd5e1' }
@@ -1379,7 +1361,7 @@ export default function ContractorPortal() {
 
             {timeSuccess && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#065f46', fontSize: '13px', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '9px 14px', borderRadius: '10px' }}>
-                <CheckCircle size={13} style={{ flexShrink: 0 }} /> Timesheet submitted successfully
+                <CheckCircle size={13} style={{ flexShrink: 0 }} /> {timeSuccessMessage}
               </div>
             )}
 
@@ -1387,7 +1369,9 @@ export default function ContractorPortal() {
             <div className="v-card vUp vD2" style={{ overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '1px solid rgba(15,23,42,0.06)', backgroundImage: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)' }}>
                 <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#94a3b8' }}>Log hours — {week.label}</span>
-                {totalTimeHours > 0 && <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b' }}>{totalTimeHours.toFixed(1)}h entered</span>}
+                <button type="button" onClick={() => { if (!showAllDescriptions) setCollapsedClients(new Set()); setShowAllDescriptions(value => !value) }} aria-pressed={showAllDescriptions} style={{ fontFamily: 'inherit', fontSize: '11px', color: '#64748b', background: 'transparent', border: 0, cursor: 'pointer' }}>
+                  {showAllDescriptions ? 'Show selected day only' : 'Show all daily descriptions'}
+                </button>
               </div>
 
               <div style={{ overflowX: 'auto' }}>
@@ -1435,7 +1419,11 @@ export default function ContractorPortal() {
                           {!collapsedClients.has(cid) && projects.map(p => {
                             const entry = timeEntries[p.project_id]
                             const rowTotal = Object.values(entry?.days || {}).reduce((t: number, v: any) => t + (parseFloat(v) || 0), 0)
-                            const hasNote = !!entry?.notes
+                            const descriptionRequired = isTimeAndMaterials(p.payment_type)
+                            const visibleDescriptionDays = weekDays.filter(d =>
+                              (parseFloat(entry?.days?.[d.iso] || '0') || 0) > 0 &&
+                              (showAllDescriptions || (selectedTimeDay?.projectId === p.project_id && selectedTimeDay.date === d.iso))
+                            )
                             return (
                               <Fragment key={p.project_id}>
                                 <tr>
@@ -1453,19 +1441,34 @@ export default function ContractorPortal() {
                                         type="text"
                                         inputMode="decimal"
                                         placeholder="–"
-                                        disabled={weekLocked}
+                                        disabled={weekLocked || !timeLoaded || submittingTime}
+                                        aria-label={`${clientName}, ${p.project_name}, ${formatDate(d.iso)}, hours`}
+                                        aria-controls={`daily-description-${p.project_id}-${d.iso}`}
+                                        aria-expanded={hasVal && (showAllDescriptions || (selectedTimeDay?.projectId === p.project_id && selectedTimeDay.date === d.iso))}
+                                        aria-invalid={hasVal && descriptionRequired && !entry?.descriptions?.[d.iso]?.trim()}
                                         className={`cp-cell${hasVal ? ' cp-filled' : ''}`}
                                         value={entry?.days?.[d.iso] || ''}
+                                        onFocus={() => { setShowAllDescriptions(false); setSelectedTimeDay({ projectId: p.project_id, date: d.iso }) }}
                                         onChange={e => {
                                           const v = e.target.value
                                           if (v === '' || /^\d*\.?\d*$/.test(v)) {
+                                            setSelectedTimeDay({ projectId: p.project_id, date: d.iso })
                                             setTimeEntries(prev => ({
                                               ...prev,
                                               [p.project_id]: { ...prev[p.project_id], days: { ...(prev[p.project_id]?.days || {}), [d.iso]: v } }
                                             }))
                                           }
                                         }}
+                                        onKeyDown={event => {
+                                          if (event.key === 'Enter' && hasVal) {
+                                            event.preventDefault()
+                                            document.getElementById(`daily-description-${p.project_id}-${d.iso}`)?.focus()
+                                          } else if (event.key === 'Escape') {
+                                            setSelectedTimeDay(null); setShowAllDescriptions(false)
+                                          }
+                                        }}
                                       />
+                                      {hasVal && <span aria-hidden="true" style={{ display: 'block', fontSize: '10px', lineHeight: '10px', color: entry?.descriptions?.[d.iso]?.trim() ? '#94a3b8' : '#c2660c' }}>{entry?.descriptions?.[d.iso]?.trim() ? '✓' : descriptionRequired ? '•' : ''}</span>}
                                     </td>
                                     )
                                   })}
@@ -1473,22 +1476,39 @@ export default function ContractorPortal() {
                                     {rowTotal > 0 ? rowTotal.toFixed(1) : '—'}
                                   </td>
                                 </tr>
-                                {(rowTotal > 0 || hasNote) && (
-                                  <tr>
+                                {entry?.legacyNote && (
+                                  <tr><td colSpan={9} style={{ padding: '6px 20px', color: '#64748b', fontSize: '11px', background: '#fbfcfe' }}>Previous weekly note: {entry.legacyNote} — complete the descriptions for each day with hours.</td></tr>
+                                )}
+                                {visibleDescriptionDays.map(d => (
+                                  <tr key={`description-${d.iso}`}>
                                     <td colSpan={9} style={{ padding: '0 20px 12px', background: '#fbfcfe' }}>
                                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                                        <span style={{ fontFamily: 'Archivo, sans-serif', fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#c2660c', paddingTop: '8px' }}>Note</span>
+                                        <label htmlFor={`daily-description-${p.project_id}-${d.iso}`} style={{ fontFamily: 'Archivo, sans-serif', fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#c2660c', paddingTop: '8px', flexShrink: 0 }}>{d.dow} {d.dnum} · Note</label>
+                                        <div style={{ flex: 1 }}>
                                         <textarea
+                                          id={`daily-description-${p.project_id}-${d.iso}`}
                                           className="cp-note"
-                                          placeholder={`What did you work on for ${p.project_name} this week?`}
-                                          disabled={weekLocked}
-                                          value={entry?.notes || ''}
-                                          onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], notes: e.target.value } }))}
+                                          placeholder={`What did you work on for ${p.project_name} on ${formatDate(d.iso)}?`}
+                                          disabled={weekLocked || submittingTime}
+                                          maxLength={MAX_DESCRIPTION_LENGTH}
+                                          aria-required={descriptionRequired}
+                                          aria-invalid={descriptionRequired && !entry?.descriptions?.[d.iso]?.trim()}
+                                          aria-describedby={`daily-description-error-${p.project_id}-${d.iso}`}
+                                          value={entry?.descriptions?.[d.iso] || ''}
+                                          onChange={e => setTimeEntries(prev => ({ ...prev, [p.project_id]: { ...prev[p.project_id], descriptions: { ...prev[p.project_id].descriptions, [d.iso]: e.target.value } } }))}
+                                          onKeyDown={event => {
+                                            if ((event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) || event.key === 'Escape') {
+                                              event.preventDefault(); setSelectedTimeDay(null); setShowAllDescriptions(false)
+                                            }
+                                          }}
                                         />
+                                        <div id={`daily-description-error-${p.project_id}-${d.iso}`} style={{ fontSize: '11px', color: '#c2660c' }}>{descriptionRequired && !entry?.descriptions?.[d.iso]?.trim() ? 'Description required before saving or submitting.' : ''}</div>
+                                        </div>
+                                        <button type="button" aria-label={`Close description for ${formatDate(d.iso)}`} onClick={() => { setSelectedTimeDay(null); setShowAllDescriptions(false) }} style={{ background: 'transparent', border: 0, color: '#94a3b8', cursor: 'pointer', paddingTop: '8px' }}><X size={12} /></button>
                                       </div>
                                     </td>
                                   </tr>
-                                )}
+                                ))}
                               </Fragment>
                             )
                           })}
@@ -1527,6 +1547,8 @@ export default function ContractorPortal() {
               <span style={{ fontSize: '12px', color: '#9ca3af' }}>
                 {weekLocked
                   ? 'This week has been invoiced and is locked. Contact your administrator to make changes.'
+                  : !timeLoaded ? 'Loading timesheet…'
+                  : timeValidationIssues.length > 0 ? timeValidationIssues[0]
                   : weekStatus === 'draft'
                     ? 'Draft saved — only you can see this. Submit when the week is complete.'
                     : weekStatus === 'submitted'
@@ -1539,15 +1561,15 @@ export default function ContractorPortal() {
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
                     onClick={() => saveWeek('draft')}
-                    disabled={submittingTime || totalTimeHours === 0}
+                    disabled={timeSaveDisabled}
                     className="transition-all hover:border-gray-300 hover:text-gray-900 active:scale-[0.97]"
-                    style={{ border: '1px solid #e2e8f0', background: '#fff', color: '#475569', borderRadius: '10px', padding: '9px 16px', fontSize: '12.5px', fontWeight: 600, fontFamily: 'inherit', cursor: totalTimeHours === 0 ? 'not-allowed' : 'pointer', opacity: submittingTime || totalTimeHours === 0 ? 0.45 : 1 }}
+                    style={{ border: '1px solid #e2e8f0', background: '#fff', color: '#475569', borderRadius: '10px', padding: '9px 16px', fontSize: '12.5px', fontWeight: 600, fontFamily: 'inherit', cursor: timeSaveDisabled ? 'not-allowed' : 'pointer', opacity: timeSaveDisabled ? 0.45 : 1 }}
                   >
                     Save draft
                   </button>
                   <button
                     onClick={() => saveWeek('submitted')}
-                    disabled={submittingTime || totalTimeHours === 0}
+                    disabled={timeSaveDisabled}
                     className={T.btnPrimary}
                     style={{ borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.1), 0 4px 16px -2px rgba(37,99,235,0.25)' }}
                   >

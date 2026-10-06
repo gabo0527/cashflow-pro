@@ -19,7 +19,7 @@
 //   GET    /api/timesheet-drafts?week_ending=YYYY-MM-DD
 //          → returns all of this contractor's drafts for that week
 //   POST   /api/timesheet-drafts
-//          body: { project_id, week_ending, daily_hours, note }
+//          body: { project_id, week_ending, daily_hours, daily_descriptions, note }
 //          → creates or updates one draft row (upsert)
 //   DELETE /api/timesheet-drafts?project_id=...&week_ending=YYYY-MM-DD
 //          → removes one draft row
@@ -27,6 +27,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { readSessionFromCookie, getSupabaseAdmin } from '@/lib/contractor-auth'
+import { cleanDailyEntry, validISODate, weekDates } from '@/lib/timesheet-daily'
+import { contractorTimesheetProjects } from '@/lib/contractor-timesheet-projects'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,24 +36,8 @@ export const dynamic = 'force-dynamic'
 // Validation helpers
 // ------------------------------------------------------------
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
-
 function isValidDate(value: unknown): value is string {
-  return typeof value === 'string' && DATE_RE.test(value)
-}
-
-// daily_hours must be an object like { "2026-07-13": 8, "2026-07-14": 6.5 }
-// Every key must be a date string, every value a number 0–24.
-function validateDailyHours(value: unknown): { [date: string]: number } | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
-  const cleaned: { [date: string]: number } = {}
-  for (const [key, raw] of Object.entries(value)) {
-    if (!DATE_RE.test(key)) return null
-    const num = typeof raw === 'number' ? raw : Number(raw)
-    if (!Number.isFinite(num) || num < 0 || num > 24) return null
-    if (num > 0) cleaned[key] = num
-  }
-  return cleaned
+  return validISODate(value)
 }
 
 // ------------------------------------------------------------
@@ -72,7 +58,7 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabaseAdmin()
   const { data, error } = await supabase
     .from('timesheet_drafts')
-    .select('id, project_id, week_ending, daily_hours, note, updated_at')
+    .select('id, project_id, week_ending, daily_hours, daily_descriptions, note, updated_at')
     .eq('team_member_id', session.contractorId)
     .eq('week_ending', weekEnding)
 
@@ -101,7 +87,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { project_id, week_ending, daily_hours, note } = body ?? {}
+  const { project_id, week_ending, daily_hours, daily_descriptions, note } = body ?? {}
 
   if (typeof project_id !== 'string' || project_id.length === 0) {
     return NextResponse.json({ error: 'Invalid or missing project_id' }, { status: 400 })
@@ -110,22 +96,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid or missing week_ending' }, { status: 400 })
   }
 
-  const cleanedHours = validateDailyHours(daily_hours)
-  if (cleanedHours === null) {
-    return NextResponse.json(
-      { error: 'daily_hours must be an object of date keys and hour values between 0 and 24' },
-      { status: 400 }
-    )
-  }
-
   const cleanedNote =
     typeof note === 'string' && note.trim().length > 0 ? note.trim().slice(0, 2000) : null
 
   const supabase = getSupabaseAdmin()
+  let daily: ReturnType<typeof cleanDailyEntry>
+  try {
+    const dates = weekDates(week_ending)
+    const { permitted } = await contractorTimesheetProjects(supabase, session.contractorId)
+    const assignment = permitted.get(project_id)
+    if (!assignment) return NextResponse.json({ error: 'Project is not assigned to you' }, { status: 403 })
+    daily = cleanDailyEntry(daily_hours, daily_descriptions, dates, assignment.required)
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Invalid timesheet' }, { status: 400 })
+  }
+  const cleanedHours = daily.daily_hours
 
   // If the draft has no hours and no note, treat the save as a delete
   // so empty rows never accumulate.
-  if (Object.keys(cleanedHours).length === 0 && !cleanedNote) {
+  if (Object.keys(cleanedHours).length === 0 && Object.keys(daily.daily_descriptions).length === 0 && !cleanedNote) {
     const { error } = await supabase
       .from('timesheet_drafts')
       .delete()
@@ -148,12 +137,13 @@ export async function POST(request: NextRequest) {
         project_id,
         week_ending,
         daily_hours: cleanedHours,
+        daily_descriptions: daily.daily_descriptions,
         note: cleanedNote,
         updated_at: new Date().toISOString()
       },
       { onConflict: 'team_member_id,project_id,week_ending' }
     )
-    .select('id, project_id, week_ending, daily_hours, note, updated_at')
+    .select('id, project_id, week_ending, daily_hours, daily_descriptions, note, updated_at')
     .single()
 
   if (error) {

@@ -26,6 +26,10 @@ const PUBLIC_PATHS = [
   '/auth/callback',
   '/contractor-portal',
   '/api/contractor-auth',
+  // These routes verify contractor_session themselves. A leftover non-admin
+  // Supabase session must not redirect their JSON requests to portal HTML.
+  '/api/contractor-timesheets',
+  '/api/timesheet-drafts',
   '/timesheet',
   '/favicon.ico',
   '/_next',
