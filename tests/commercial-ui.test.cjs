@@ -407,3 +407,80 @@ test('time tracking combines three employees, five projects and a custom date ra
     global.cancelAnimationFrame = cancel
   }
 })
+
+test('missing commercial access shows a recovery state without an upload invitation or false empty count', async () => {
+  const originalFetch = global.fetch
+  let allowed = false
+  global.fetch = async () => ({
+    ok: allowed,
+    json: async () =>
+      allowed
+        ? { documents: [], role: 'owner' }
+        : { error: 'You do not have commercial access for this client.' },
+  })
+  const module = load('src/components/commercial/CommercialDocuments.tsx', {
+    '@/lib/supabase': {
+      supabase: {
+        auth: {
+          getSession: async () => ({
+            data: { session: { access_token: 'verified-session' } },
+          }),
+        },
+      },
+    },
+    '@/lib/commercial': commercial,
+    './useCommercialDialog': dialog,
+  })
+  let renderer
+  try {
+    await act(async () => {
+      renderer = create(
+        React.createElement(module.default, {
+          clientId: 'client',
+          clientName: 'Meridian',
+          projects: [],
+        }),
+      )
+      await new Promise((r) => setImmediate(r))
+    })
+    const buttons = () => renderer.root.findAllByType('button')
+    assert.equal(
+      buttons().find((b) => text(b.children).trim() === 'Upload document').props
+        .disabled,
+      true,
+    )
+    assert.ok(
+      JSON.stringify(renderer.toJSON()).includes('Commercial access required'),
+    )
+    assert.equal(
+      renderer.root.findAllByProps({ className: 'commercial-list-caption' })
+        .length,
+      0,
+    )
+    assert.equal(
+      buttons().some(
+        (b) => text(b.children).trim() === 'Upload your first agreement',
+      ),
+      false,
+    )
+    allowed = true
+    await act(async () => {
+      await buttons()
+        .find((b) => text(b.children).trim() === 'Check access again')
+        .props.onClick()
+    })
+    assert.ok(
+      buttons().find((b) => text(b.children).trim() === 'Upload document') &&
+        !buttons().find((b) => text(b.children).trim() === 'Upload document')
+          .props.disabled,
+    )
+    assert.ok(
+      buttons().find(
+        (b) => text(b.children).trim() === 'Upload your first agreement',
+      ),
+    )
+  } finally {
+    renderer?.unmount()
+    global.fetch = originalFetch
+  }
+})

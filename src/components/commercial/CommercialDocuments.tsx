@@ -120,6 +120,7 @@ export default function CommercialDocuments({
 }) {
   const [documents, setDocuments] = useState<Document[]>([]),
     [role, setRole] = useState<CommercialRole>('viewer')
+  const [accessLoaded, setAccessLoaded] = useState(false)
   const [loading, setLoading] = useState(true),
     [error, setError] = useState(''),
     [message, setMessage] = useState('')
@@ -152,6 +153,7 @@ export default function CommercialDocuments({
   }, [clientId, initialScope, choices])
   const load = useCallback(async () => {
     setLoading(true)
+    setAccessLoaded(false)
     setError('')
     try {
       const data = await commercialRequest(
@@ -159,7 +161,9 @@ export default function CommercialDocuments({
       )
       setDocuments(data.documents || [])
       setRole(data.role)
+      setAccessLoaded(true)
     } catch (e) {
+      setDocuments([])
       setError((e as Error).message)
     } finally {
       setLoading(false)
@@ -431,7 +435,7 @@ export default function CommercialDocuments({
           <h2>Commercial documents</h2>
           <p>Executed agreements for {clientName} and its scopes.</p>
         </div>
-        {canManageCommercial(role) && (
+        {canManageCommercial(role) && accessLoaded ? (
           <button
             className="commercial-primary"
             onClick={() => {
@@ -442,125 +446,225 @@ export default function CommercialDocuments({
             <Plus size={16} />
             Upload document
           </button>
+        ) : !accessLoaded ? (
+          <button
+            className="commercial-primary"
+            disabled
+            title="Document management requires verified commercial access"
+          >
+            <Plus size={16} /> Upload document
+          </button>
+        ) : (
+          <span className="commercial-access-badge">View-only access</span>
         )}
       </div>
-      <div className="commercial-library-tabs">
-        <button aria-pressed={!archived} onClick={() => setArchived(false)}>
-          Active
-        </button>
-        <button aria-pressed={archived} onClick={() => setArchived(true)}>
-          Archived
-        </button>
-      </div>
-      <div className="commercial-filters">
-        <label className="commercial-search">
-          <Search size={16} />
-          <input
-            aria-label="Search documents"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name or tag"
-          />
-        </label>
-        <MultiSelect
-          label="Attached to"
-          choices={choices}
-          selected={scopes}
-          onChange={setScopes}
-        />
-        <MultiSelect
-          label="Category"
-          choices={DOCUMENT_CATEGORIES.map((v) => ({ id: v, label: v }))}
-          selected={categories}
-          onChange={setCategories}
-        />
-      </div>
-      <div className="commercial-grouping">
-        <span>Group by</span>
-        {groupings.map((g, i) => (
-          <span className="commercial-group-chip" key={g}>
-            {g === 'category' ? 'Category' : 'Scope'}
-            <button
-              disabled={i === 0}
-              aria-label={`Move ${g} earlier`}
-              onClick={() =>
-                setGroupings((v) => {
-                  const x = [...v]
-                  ;[x[i - 1], x[i]] = [x[i], x[i - 1]]
-                  return x
-                })
-              }
-            >
-              <ArrowUp size={12} />
-            </button>
-            <button
-              disabled={i === groupings.length - 1}
-              aria-label={`Move ${g} later`}
-              onClick={() =>
-                setGroupings((v) => {
-                  const x = [...v]
-                  ;[x[i + 1], x[i]] = [x[i], x[i + 1]]
-                  return x
-                })
-              }
-            >
-              <ArrowDown size={12} />
-            </button>
-            <button
-              aria-label={`Remove ${g} grouping`}
-              onClick={() => setGroupings((v) => v.filter((x) => x !== g))}
-            >
-              <X size={12} />
-            </button>
-          </span>
-        ))}
-        <MultiSelect
-          label="Choose levels"
-          choices={[
-            { id: 'category', label: 'Category' },
-            { id: 'scope', label: 'Scope' },
-          ]}
-          selected={groupings}
-          onChange={(v) => {
-            setGroupings(v)
-            setCollapsed([])
-          }}
-        />
-      </div>
-      {error && (
-        <p role="alert" className="commercial-error">
-          {error}
-        </p>
-      )}
-      {message && (
-        <p aria-live="polite" className="commercial-message">
-          {message}
-        </p>
-      )}
-      <div className="commercial-list-caption">
-        <span aria-live="polite">
-          {filtered.length} {archived ? 'archived' : 'active'} documents
-        </span>
-        <span>Private repository · Executed agreements</span>
-      </div>
-      <div className="commercial-columns" aria-hidden="true">
-        <span>Document / dates</span>
-        <span>Attached to</span>
-        <span>Actions</span>
-      </div>
-      {loading ? (
-        <div className="commercial-empty">
-          <Loader2 className="animate-spin" size={20} />
-          Loading documents
+      {!loading && !accessLoaded ? (
+        <div className="commercial-access-state" role="alert">
+          <FileText size={28} />
+          <h3>Commercial access required</h3>
+          <p>{error}</p>
+          <p>
+            Your account needs company commercial access to view agreements.
+            Owner and Administrator access includes uploads and document
+            management.
+          </p>
+          <button className="workspace-secondary" onClick={load}>
+            Check access again
+          </button>
         </div>
-      ) : filtered.length ? (
-        grouped(filtered)
       ) : (
-        <div className="commercial-empty">
-          {documents.length
-            ? 'No documents match these filters.'
-            : 'Upload the first executed agreement for this client.'}
-        </div>
+        <>
+          <div
+            className="commercial-document-types"
+            aria-label="Agreement categories"
+          >
+            {['NDA', 'MPSA', 'SOW'].map((category) => (
+              <button
+                key={category}
+                aria-pressed={
+                  categories.length === 1 && categories[0] === category
+                }
+                onClick={() =>
+                  setCategories(
+                    categories.length === 1 && categories[0] === category
+                      ? [...DOCUMENT_CATEGORIES]
+                      : [category],
+                  )
+                }
+              >
+                <FileText size={17} />
+                <span>
+                  {category}
+                  <small>
+                    {category === 'NDA'
+                      ? 'Confidentiality'
+                      : category === 'MPSA'
+                        ? 'Master agreements'
+                        : 'Scope of work'}
+                  </small>
+                </span>
+                <strong>
+                  {
+                    documents.filter(
+                      (d) =>
+                        d.category === category &&
+                        !!d.archived_at === archived &&
+                        scopes.includes(d.project_id || 'client'),
+                    ).length
+                  }
+                </strong>
+              </button>
+            ))}
+            <button onClick={() => setCategories([...DOCUMENT_CATEGORIES])}>
+              <span>
+                All agreements<small>Includes amendments & changes</small>
+              </span>
+              <strong>
+                {
+                  documents.filter(
+                    (d) =>
+                      !!d.archived_at === archived &&
+                      scopes.includes(d.project_id || 'client'),
+                  ).length
+                }
+              </strong>
+            </button>
+          </div>
+          <div className="commercial-library-tabs">
+            <button aria-pressed={!archived} onClick={() => setArchived(false)}>
+              Active
+            </button>
+            <button aria-pressed={archived} onClick={() => setArchived(true)}>
+              Archived
+            </button>
+          </div>
+          <div className="commercial-filters">
+            <label className="commercial-search">
+              <Search size={16} />
+              <input
+                aria-label="Search documents"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search name or tag"
+              />
+            </label>
+            <MultiSelect
+              label="Attached to"
+              choices={choices}
+              selected={scopes}
+              onChange={setScopes}
+            />
+            <MultiSelect
+              label="Category"
+              choices={DOCUMENT_CATEGORIES.map((v) => ({ id: v, label: v }))}
+              selected={categories}
+              onChange={setCategories}
+            />
+          </div>
+          <div className="commercial-grouping">
+            <span>Group by</span>
+            {groupings.map((g, i) => (
+              <span className="commercial-group-chip" key={g}>
+                {g === 'category' ? 'Category' : 'Scope'}
+                <button
+                  disabled={i === 0}
+                  aria-label={`Move ${g} earlier`}
+                  onClick={() =>
+                    setGroupings((v) => {
+                      const x = [...v]
+                      ;[x[i - 1], x[i]] = [x[i], x[i - 1]]
+                      return x
+                    })
+                  }
+                >
+                  <ArrowUp size={12} />
+                </button>
+                <button
+                  disabled={i === groupings.length - 1}
+                  aria-label={`Move ${g} later`}
+                  onClick={() =>
+                    setGroupings((v) => {
+                      const x = [...v]
+                      ;[x[i + 1], x[i]] = [x[i], x[i + 1]]
+                      return x
+                    })
+                  }
+                >
+                  <ArrowDown size={12} />
+                </button>
+                <button
+                  aria-label={`Remove ${g} grouping`}
+                  onClick={() => setGroupings((v) => v.filter((x) => x !== g))}
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+            <MultiSelect
+              label="Choose levels"
+              choices={[
+                { id: 'category', label: 'Category' },
+                { id: 'scope', label: 'Scope' },
+              ]}
+              selected={groupings}
+              onChange={(v) => {
+                setGroupings(v)
+                setCollapsed([])
+              }}
+            />
+          </div>
+          {error && (
+            <p role="alert" className="commercial-error">
+              {error}
+            </p>
+          )}
+          {message && (
+            <p aria-live="polite" className="commercial-message">
+              {message}
+            </p>
+          )}
+          <div className="commercial-list-caption">
+            <span aria-live="polite">
+              {filtered.length} {archived ? 'archived' : 'active'} documents
+            </span>
+            <span>Private repository · Executed agreements</span>
+          </div>
+          <div className="commercial-columns" aria-hidden="true">
+            <span>Document / dates</span>
+            <span>Attached to</span>
+            <span>Actions</span>
+          </div>
+          {loading ? (
+            <div className="commercial-empty">
+              <Loader2 className="animate-spin" size={20} />
+              Loading documents
+            </div>
+          ) : filtered.length ? (
+            grouped(filtered)
+          ) : (
+            <div className="commercial-empty">
+              <FileText size={28} />
+              <strong>
+                {documents.length
+                  ? 'No agreements match your filters'
+                  : 'Your agreements, organized in one place'}
+              </strong>
+              <p>
+                {documents.length
+                  ? 'Adjust the scope or category selections to see more documents.'
+                  : 'Keep client NDAs and master agreements here. Attach SOWs and amendments to the relevant scope.'}
+              </p>
+              {!documents.length && canManageCommercial(role) && (
+                <button
+                  className="commercial-primary"
+                  onClick={() => setUpload({})}
+                >
+                  <Plus size={16} /> Upload your first agreement
+                </button>
+              )}
+            </div>
+          )}
+        </>
       )}
       {upload && (
         <div className="commercial-overlay">

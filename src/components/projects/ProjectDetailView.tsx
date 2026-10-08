@@ -6,7 +6,7 @@
 // Removed: Financials/AR tab (dead QBO data), cost, margin, spent.
 
 import React, { useMemo, useState, useEffect, useCallback } from 'react'
-import { X, ArrowLeft, Clock, Users, BarChart3, Edit2, AlertTriangle, Layers, Plus, Trash2 } from 'lucide-react'
+import { X, ArrowLeft, Clock, Users, BarChart3, Edit2, AlertTriangle, Layers, Plus, Trash2, FileText } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import ScopeContacts from '@/components/commercial/ScopeContacts'
 import CommercialTerms from '@/components/commercial/CommercialTerms'
@@ -157,7 +157,7 @@ export default function ProjectDetailView({
 
   const tabs = [
     { id: 'overview' as const, label: 'Overview', icon: BarChart3 },
-    { id: 'terms' as const, label: 'Terms', icon: Layers },
+    { id: 'terms' as const, label: 'Commercial terms', icon: Layers },
     { id: 'hours' as const, label: 'Hours', icon: Clock },
     { id: 'resources' as const, label: 'Resources', icon: Users },
     { id: 'contacts' as const, label: 'Scope contacts', icon: Users },
@@ -212,6 +212,7 @@ export default function ProjectDetailView({
           </div>
         )}
 
+        {project.client_id && <div className="scope-context-navigation"><Link href={`/clients/${project.client_id}`}>← {client?.name || 'Parent client'}</Link><Link href={`/clients/${project.client_id}?tab=documents&scope=${project.id}`}><FileText size={15} /> Scope agreements · NDA / SOW / amendments <span>Open repository ↗</span></Link></div>}
         {/* KPI STRIP */}
         <div className="px-6 pt-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
           {kpi('Recognized to Date', formatCompactCurrency(rev.recognized), 'Hourly work + recognized monthly fees')}
@@ -221,7 +222,7 @@ export default function ProjectDetailView({
         </div>
 
         {/* TABS */}
-        <div className="px-6 mt-4 flex gap-1 border-b border-slate-200">
+        <div className="px-6 mt-4 flex gap-1 flex-wrap border-b border-slate-200">
           {tabs.map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)}
               className="flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-semibold border-b-2 -mb-px transition-colors"
