@@ -14,7 +14,7 @@ The broader Billing PDF redesign—including landscape work-detail appendices an
 
 ## Database and access
 
-The CLI-generated migration is `supabase/migrations/20261008170951_commercial_workspace.sql`. It was applied successfully to the existing linked Supabase project (`jmahfgpbtjeomuepfozf`) on October 8, 2026 under the owner’s publication/deployment authorization.
+The CLI-created migration (filename aligned to the hosted migration version) is `supabase/migrations/20261008175503_commercial_workspace.sql`. It was applied successfully to the existing linked Supabase project (`jmahfgpbtjeomuepfozf`) on October 8, 2026 under the owner’s publication/deployment authorization.
 
 It adds commercial metadata, version/contact/audit/access tables, a private `commercial-documents` PDF bucket, two project-term columns and revision/integrity triggers. It preserves existing contractor tables, timesheet submissions, existing Storage policies and schedules. Commercial APIs validate Supabase bearer tokens and a separate company-scoped access record before using the server's service role. New metadata has row security enabled and no anonymous/authenticated direct access. Signed PDF links expire after two minutes. Uploads bypass application request-body limits through signed Storage uploads, then complete only after server-side size/header validation.
 
