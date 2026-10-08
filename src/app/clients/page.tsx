@@ -21,11 +21,12 @@ import {
   Search, Plus, X, Loader2, MoreHorizontal, Pencil, Archive as ArchiveIcon,
   Trash2, ChevronRight, ChevronDown, ArrowUpDown, CheckCircle, AlertCircle, Download
 } from 'lucide-react'
+import { getProjectPhases, phaseForDate, getContractType } from '@/components/projects/shared'
 import { supabase, getCurrentUser } from '@/lib/supabase'
 
 // ============ TYPES ============
 interface Client { id: string; name: string; contact_name?: string; email?: string; phone?: string; payment_terms: string; status: string; created_at?: string; notes?: string }
-interface Project { id: string; client_id?: string; status: string; billing_model?: string }
+interface Project { id: string; client_id?: string; status: string; billing_model?: string; budget_type?: string }
 interface Assignment { team_member_id: string; project_id: string }
 interface Member { id: string; name: string }
 interface Toast { id: number; type: 'success' | 'error'; message: string }
@@ -66,6 +67,7 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [clients, setClients] = useState<Client[]>([])
+  const [terms,setTerms] = useState<any[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [members, setMembers] = useState<Member[]>([])
@@ -111,13 +113,15 @@ export default function ClientsPage() {
       if (!profile?.company_id) { setLoading(false); return }
       setCompanyId(profile.company_id)
 
-      const [{ data: c }, { data: p }, { data: m }] = await Promise.all([
+      const [{ data: c }, { data: p }, { data: m }, {data:pt}] = await Promise.all([
         supabase.from('clients').select('id, name, contact_name, email, phone, payment_terms, status, created_at, notes').eq('company_id', profile.company_id).order('name'),
-        supabase.from('projects').select('id, client_id, status, billing_model').eq('company_id', profile.company_id),
+        supabase.from('projects').select('*').eq('company_id', profile.company_id),
         supabase.from('team_members').select('id, name'),
+        supabase.from('project_terms').select('*').eq('company_id',profile.company_id),
       ])
       setClients(c || [])
       setProjects(p || [])
+      setTerms(pt||[])
       setMembers(m || [])
 
       const projIds = (p || []).map((x: any) => x.id)
@@ -160,7 +164,7 @@ export default function ClientsPage() {
       if (!map[p.client_id]) map[p.client_id] = { active: 0, tm: 0, ls: 0, resources: [] }
       if (p.status === 'active') {
         map[p.client_id].active++
-        if ((p.billing_model || 'per_resource') === 'per_resource') map[p.client_id].tm++
+        if ((phaseForDate(getProjectPhases(p,terms),localToday())?.terms || (getContractType(p)==='lump_sum'?'lump_sum':'tm_open')) !== 'lump_sum') map[p.client_id].tm++
         else map[p.client_id].ls++
       }
     })
@@ -174,7 +178,7 @@ export default function ClientsPage() {
     })
     Object.entries(resSets).forEach(([cid, set]) => { if (map[cid]) map[cid].resources = Array.from(set) })
     return map
-  }, [projects, assignments])
+  }, [projects, assignments, terms])
 
   const memberName = (id: string) => members.find(m => m.id === id)?.name || '?'
 
@@ -380,7 +384,7 @@ export default function ClientsPage() {
                       <td className="px-5 py-3.5 border-t border-slate-100 text-right"><span className="font-bold text-slate-900 tabular-nums" style={{ fontFamily: 'Archivo, sans-serif' }}>{pc.active}</span></td>
                       <td className="px-5 py-3.5 border-t border-slate-100 whitespace-nowrap">
                         {pc.tm > 0 && <span className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded border mr-1.5 tabular-nums" style={{ color: '#c2660c', background: 'rgba(234,138,47,0.07)', borderColor: '#f6d3b3' }}>T&M · {pc.tm}</span>}
-                        {pc.ls > 0 && <span className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded border tabular-nums" style={{ color: '#0369a1', background: 'rgba(14,165,233,0.06)', borderColor: '#bae6fd' }}>LS · {pc.ls}</span>}
+                        {pc.ls > 0 && <span className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded border tabular-nums" style={{ color: '#0369a1', background: 'rgba(14,165,233,0.06)', borderColor: '#bae6fd' }}>Fee · {pc.ls}</span>}
                         {pc.tm === 0 && pc.ls === 0 && <span className="text-slate-300 text-[11px]">—</span>}
                       </td>
                       <td className="px-5 py-3.5 border-t border-slate-100 text-right whitespace-nowrap">

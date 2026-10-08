@@ -35,12 +35,12 @@ export function getContractType(project: any): ContractType {
 }
 
 export function getContractLabel(type: ContractType): string {
-  return type === 'lump_sum' ? 'Lump Sum' : 'T&M'
+  return type === 'lump_sum' ? 'Monthly fee' : 'T&M'
 }
 
 export function getContractBadge(type: ContractType) {
   return type === 'lump_sum'
-    ? { label: 'LS', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' }
+    ? { label: 'Monthly fee', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' }
     : { label: 'T&M', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' }
 }
 
@@ -470,33 +470,22 @@ export function calcProjectRevenue(
   projectEntries: any[],
   rateCardLookup: Record<string, any>,
   assignmentLookup: Record<string, any>,
-  todayIso?: string
+  todayIso?: string,
+  termRows: any[] = []
 ): ProjectRevenue {
   const today = todayIso || todayISO()
   const curMonth = monthKeyOf(today)
-  const type = getContractType(project)
+  const phases = getProjectPhases(project, termRows, today)
+  const current = phaseForDate(phases, today)
+  const type = current ? current.terms === 'lump_sum' ? 'lump_sum' : 'time_and_materials' : getContractType(project)
   const hours = (projectEntries || []).reduce((s, e) => s + (e.hours || 0), 0)
+  const monthly = commercialRevenueByMonth(project, phases, projectEntries, rateCardLookup, assignmentLookup, today)
+  const basisLabel = current?.terms === 'lump_sum'
+    ? `${formatCompactCurrency(current.monthly_fee || project.fixed_amount || 0)} / mo`
+    : project.billing_model === 'per_scope' && project.bill_rate ? `$${project.bill_rate} / hr` : 'Resource rates'
+  const ls = current?.terms === 'lump_sum' ? calcLSRecognition({...project,start_date:current.effective_start,end_date:current.effective_end,fixed_amount:current.monthly_fee ?? project.fixed_amount},today) : null
+  return { type, recognized:Object.values(monthly).reduce((s,v)=>s+v,0), thisMonth:monthly[curMonth]||0, basisLabel, hours, ls }
 
-  if (type === 'lump_sum') {
-    const ls = calcLSRecognition(project, today)
-    return {
-      type, recognized: ls.recognized,
-      thisMonth: ls.recognizedMonths.includes(curMonth) ? ls.monthlyFee : 0,
-      basisLabel: ls.monthlyFee > 0 ? `${formatCompactCurrency(ls.monthlyFee)} / mo` : 'No fee set',
-      hours, ls,
-    }
-  }
-  // T&M
-  let recognized = 0, thisMonth = 0
-  ;(projectEntries || []).forEach(e => {
-    const rev = entryRevenue(e, project, rateCardLookup, assignmentLookup)
-    recognized += rev
-    if (monthKeyOf(e.date) === curMonth) thisMonth += rev
-  })
-  const basisLabel = project.billing_model === 'per_scope' && project.bill_rate
-    ? `$${project.bill_rate} / hr`
-    : 'Resource rates'
-  return { type, recognized, thisMonth, basisLabel, hours, ls: null }
 }
 
 // ============ RENEWAL WATCH ============
@@ -526,11 +515,13 @@ export interface ProjectPhase {
   nte_amount: number | null         // tm_nte: MONTHLY not-to-exceed
   monthly_fee: number | null        // lump_sum: monthly fee
   notes?: string | null
+  budget_cadence?: 'monthly' | 'overall'
+  supporting_document_id?: string | null
   auto?: boolean                    // synthesized auto-continue phase (not in DB)
 }
 
 export const PHASE_LABELS: Record<PhaseTerms, string> = {
-  tm_nte: 'T&M with NTE', tm_open: 'Open T&M', lump_sum: 'Lump Sum',
+  tm_nte: 'T&M · Budget', tm_open: 'T&M · Open budget', lump_sum: 'Monthly fee',
 }
 
 export function sortPhases(phases: ProjectPhase[]): ProjectPhase[] {
@@ -555,6 +546,8 @@ export function getProjectPhases(project: any, termRows: any[], todayIso?: strin
       nte_amount: t.nte_amount != null ? parseFloat(t.nte_amount) : null,
       monthly_fee: t.monthly_fee != null ? parseFloat(t.monthly_fee) : null,
       notes: t.notes || null,
+      budget_cadence: t.budget_cadence || 'monthly',
+      supporting_document_id: t.supporting_document_id || null,
     })))
   if (phases.length === 0) {
     const type = getContractType(project)
@@ -618,12 +611,14 @@ export function calcNteBurn(
   rangeStart: string,
   rangeEnd: string,
 ): NteBurn {
-  const months = phaseMonthsInRange(phase, rangeStart, rangeEnd)
+  // Overall caps use full-phase consumption through the selected end date.
+  const burnStart = phase.budget_cadence === 'overall' ? phase.effective_start : rangeStart
+  const months = phaseMonthsInRange(phase, burnStart, rangeEnd)
   const perMonth: Record<string, number> = {}
   months.forEach(mk => { perMonth[mk] = 0 })
   ;(entries || []).forEach(e => {
     const d = (e.date || '').slice(0, 10)
-    if (d < rangeStart || d > rangeEnd) return
+    if (d < burnStart || d > rangeEnd) return
     if (d < phase.effective_start || (phase.effective_end && d > phase.effective_end)) return
     const mk = monthKeyOf(d)
     if (!(mk in perMonth)) return
@@ -631,10 +626,10 @@ export function calcNteBurn(
   })
   const nte = phase.terms === 'tm_nte' && phase.nte_amount ? phase.nte_amount : null
   const billed = months.reduce((s, mk) => s + perMonth[mk], 0)
-  const denom = nte ? nte * months.length : 0
+  const denom = nte ? nte * (phase.budget_cadence === 'overall' ? 1 : months.length) : 0
   const monthRows = months.map(mk => ({
     mk, billed: perMonth[mk], nte,
-    pct: nte ? (perMonth[mk] / nte) * 100 : null,
+    pct: nte && phase.budget_cadence !== 'overall' ? (perMonth[mk] / nte) * 100 : null,
   }))
   let worst: { mk: string; pct: number } | null = null
   monthRows.forEach(m => { if (m.pct != null && (!worst || m.pct > worst.pct)) worst = { mk: m.mk, pct: m.pct } })
@@ -667,4 +662,23 @@ export function phaseLSRecognition(phases: ProjectPhase[], project: any, todayIs
     })
   })
   return { recognized, thisMonth, monthlyFee, recognizedMonths }
+}
+
+/** Revenue follows the terms in force on the work date, including mixed scopes. */
+export function commercialRevenueByMonth(project: any, phases: ProjectPhase[], entries: any[], rateCards: Record<string, any>, assignments: Record<string, any>, through = todayISO()): Record<string, number> {
+  const totals: Record<string, number> = {}
+  phases.filter(p => p.terms === 'lump_sum').forEach(phase => {
+    if (phase.effective_start > through) return
+    const end = phase.effective_end && phase.effective_end < through ? phase.effective_end : through
+    const fee = phase.monthly_fee ?? project.fixed_amount ?? 0
+    monthRange(monthKeyOf(phase.effective_start), monthKeyOf(end)).forEach(month => { totals[month] = (totals[month] || 0) + fee })
+  })
+  entries.forEach(entry => {
+    const date = (entry.date || '').slice(0, 10)
+    const phase = phaseForDate(phases, date)
+    if (!date || date > through || !phase || phase.terms === 'lump_sum') return
+    const month = monthKeyOf(date)
+    totals[month] = (totals[month] || 0) + entryRevenue(entry, project, rateCards, assignments)
+  })
+  return totals
 }
