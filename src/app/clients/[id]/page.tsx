@@ -27,6 +27,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import CommercialDocuments from '@/components/commercial/CommercialDocuments'
+import ClientWorkspaceHeader from '@/components/clients/ClientWorkspaceHeader'
 import ScopeContacts from '@/components/commercial/ScopeContacts'
 import { useSearchParams } from 'next/navigation'
 import { getContractType, getProjectPhases, phaseForDate, calcNteBurn, buildRateLookups, commercialRevenueByMonth } from '@/components/projects/shared'
@@ -98,7 +99,7 @@ export default function ClientDetailPage() {
   const [tab, setTab] = useState<'overview' | 'history' | 'documents' | 'contacts'>('overview')
   useEffect(() => {
     const requested = searchParams.get('tab')
-    if (requested === 'documents' || requested === 'contacts') setTab(requested)
+    if (requested === 'overview' || requested === 'history' || requested === 'documents' || requested === 'contacts') setTab(requested)
   }, [searchParams])
   const [typeFilter, setTypeFilter] = useState<'all' | 'tm' | 'ls'>('all')
   const [openProject, setOpenProject] = useState<string | null>(null)
@@ -294,52 +295,12 @@ export default function ClientDetailPage() {
   const soft = accent + '14'
 
   return (
-    <div className="min-h-screen bg-[#eef1f4] p-6" style={{ backgroundImage: 'linear-gradient(rgba(15,23,42,0.022) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.022) 1px, transparent 1px)', backgroundSize: '26px 26px' }}>
+    <div className="min-h-screen bg-[#eef1f4] p-6">
       <div className="max-w-[1080px] mx-auto flex flex-col gap-3.5">
 
-        {/* ============ HERO ============ */}
-        <div className="rounded-2xl relative overflow-hidden p-6" style={{ background: 'linear-gradient(135deg,#1b2431,#10151c)', animation: 'vfadeup .5s cubic-bezier(.22,1,.36,1) both' }}>
-          <div className="absolute inset-0" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 13px)' }} />
-          <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: accent }} />
-          <div className="relative z-10">
-            <Link href="/clients" className="text-[11px] text-slate-400 hover:text-slate-200 inline-flex items-center gap-1 mb-2.5">
-              <ChevronLeft size={12} /> Clients
-            </Link>
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-extrabold text-lg" style={{ background: accent, fontFamily: 'Archivo, sans-serif' }}>
-                  {client.name.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <h1 className="text-white text-2xl font-extrabold uppercase tracking-wide" style={{ fontFamily: 'Archivo, sans-serif' }}>{client.name}</h1>
-                  <div className="text-[11.5px] text-slate-400 mt-0.5">
-                    {client.payment_terms || '—'}
-                    {client.created_at ? ` · client since ${new Date(client.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : ''}
-                    {lastDays !== null ? ` · last activity ${lastDays === 0 ? 'today' : `${lastDays}d ago`}` : ''}
-                    <span className="ml-2 inline-flex items-center gap-1.5 text-[8.5px] font-bold uppercase tracking-[0.09em] px-2 py-0.5 rounded border align-middle" style={{ fontFamily: 'Archivo, sans-serif', color: client.status === 'active' ? '#34d399' : '#94a3b8', background: client.status === 'active' ? 'rgba(16,185,129,0.12)' : 'rgba(148,163,184,0.12)', borderColor: client.status === 'active' ? 'rgba(52,211,153,0.35)' : 'rgba(148,163,184,0.3)' }}>
-                      {client.status}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Link href="/clients" className="px-3.5 py-2 rounded-[10px] text-[12px] font-semibold text-slate-300 border border-white/10 bg-white/5 inline-flex items-center gap-1.5"><Pencil size={12} /> Edit</Link>
-                <button onClick={archiveClient} disabled={archiving} className="px-3.5 py-2 rounded-[10px] text-[12px] font-semibold text-slate-300 border border-white/10 bg-white/5 inline-flex items-center gap-1.5 disabled:opacity-50"><Archive size={12} /> Archive</button>
-                <Link href="/projects" className="px-4 py-2 rounded-[10px] text-[12px] font-semibold text-white inline-flex items-center gap-1.5" style={{ background: accent }}><Plus size={13} /> New project</Link>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ============ TABS ============ */}
-        <div className="flex flex-wrap gap-1 bg-white border border-slate-200/60 rounded-xl p-1 w-fit max-w-full">
-          {([['overview', 'Overview'], ['documents', 'Commercial documents'], ['contacts', 'Scope contacts'], ['history', 'History']] as const).map(([id, label]) => (
-            <button key={id} onClick={() => setTab(id)} className="px-4 py-2 rounded-[9px] text-[12.5px] font-semibold transition-colors"
-              style={tab === id ? { background: soft, color: accent } : { color: '#64748b' }}>
-              {label}
-            </button>
-          ))}
-        </div>
+        <ClientWorkspaceHeader client={client} projects={projects} tab={tab} archiving={archiving} onArchive={archiveClient}
+          onTab={next => { setTab(next); const params = new URLSearchParams(searchParams.toString()); params.set('tab', next); router.push(`/clients/${clientId}?${params}`, { scroll: false }) }}
+          onScope={id => router.push(`/projects?project=${id}`)} />
 
         {tab === 'documents' && <CommercialDocuments clientId={clientId} clientName={client.name} projects={projects} initialScope={searchParams.get('scope') || undefined} />}
         {tab === 'contacts' && <ScopeContacts clientId={clientId} projects={projects} />}
@@ -399,6 +360,7 @@ export default function ClientDetailPage() {
                 const nteHot = burn && burn.pct >= 80
                 return (
                   <div key={p.id} className="border-t first:border-t-0 border-slate-100">
+                    <div className="flex justify-end gap-4 px-5 pt-3 text-xs font-medium text-blue-600"><Link href={`/projects?project=${p.id}`}>Open scope profile ↗</Link><Link href={`/clients/${clientId}?tab=documents&scope=${p.id}`}>Scope agreements ↗</Link></div>
                     <button onClick={() => setOpenProject(open ? null : p.id)} className="w-full text-left px-5 py-3.5 grid grid-cols-1 md:grid-cols-[1fr_130px_190px_28px] gap-3 items-center hover:bg-slate-50/60 transition-colors"
                       style={{ borderLeft: `3px solid ${open ? accent : 'transparent'}` }}>
                       <div>

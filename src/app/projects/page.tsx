@@ -1,5 +1,6 @@
 'use client'
 
+import { useSearchParams } from 'next/navigation'
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Plus, Download, X, BarChart3, List, Target, Upload } from 'lucide-react'
@@ -16,6 +17,8 @@ const AR = { fontFamily: BLUEPRINT.fontDisplay }
 const inputCls = 'bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 outline-none w-full px-3 py-2'
 
 export default function ProjectsPage() {
+  const searchParams = useSearchParams()
+  const openedRequest = useRef('')
   const projectsSectionRef = useRef<ProjectsSectionHandle>(null)
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'pipeline' | 'import'>('dashboard')
@@ -98,6 +101,23 @@ export default function ProjectsPage() {
 
   const hasDatedTerms = !!editingProject && projectTerms.some(t => t.project_id === editingProject.id)
   const isLSForm = formData.budget_type === 'fixed' || formData.budget_type === 'retainer' || formData.billing_model === 'fixed'
+
+  useEffect(() => {
+    const request = searchParams.toString()
+    if (!request || openedRequest.current === request || loading) return
+    const projectId = searchParams.get('project')
+    if (projectId && projects.some(p => p.id === projectId)) {
+      openedRequest.current = request
+      setSelectedProjectId(projectId)
+    } else if (searchParams.get('new') === '1') {
+      const clientId = searchParams.get('client')
+      if (clientId && !clients.some(c => c.id === clientId)) return
+      openedRequest.current = request
+      resetForm()
+      setFormData({ ...emptyForm, client_id: clientId || '' })
+      setShowProjectModal(true)
+    }
+  }, [searchParams, projects, clients, loading])
 
   const handleSave = async () => {
     try {
