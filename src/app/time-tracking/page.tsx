@@ -13,7 +13,8 @@ import {
   PieChart as RechartsPie, Pie, LineChart, Line, Legend, Area, AreaChart, ComposedChart
 } from 'recharts'
 import { getCurrentUser } from '@/lib/supabase'
-import { getProjectPhases } from '@/components/projects/shared'
+import { MultiSelect } from '@/components/commercial/CommercialDocuments'
+import { getProjectPhases, phaseForDate } from '@/components/projects/shared'
 import type { ProjectPhase } from '@/components/projects/shared'
 import { createClient } from '@supabase/supabase-js'
 
@@ -690,6 +691,7 @@ export default function TimeTrackingPage() {
   const [entries, setEntries] = useState<TimeEntry[]>([])
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [projects, setProjects] = useState<Project[]>([])
+  const [projectTerms, setProjectTerms] = useState<any[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [assignments, setAssignments] = useState<ProjectAssignment[]>([])
   const [billRates, setBillRates] = useState<any[]>([])
@@ -699,8 +701,12 @@ export default function TimeTrackingPage() {
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
   const [selectedClient, setSelectedClient] = useState<string>('all')
-  const [selectedEmployee, setSelectedEmployee] = useState<string>('all')
-  const [selectedProject, setSelectedProject] = useState<string>('all')
+  const [selectedEmployeeIds,setSelectedEmployeeIds] = useState<string[]|null>(null)
+  const selectedEmployee = selectedEmployeeIds?.length===1?selectedEmployeeIds[0]:'all'
+  const setSelectedEmployee = (value:string)=>setSelectedEmployeeIds(value==='all'?null:[value])
+  const [selectedProjectIds,setSelectedProjectIds] = useState<string[]|null>(null)
+  const selectedProject = selectedProjectIds?.length===1?selectedProjectIds[0]:'all'
+  const setSelectedProject = (value:string)=>setSelectedProjectIds(value==='all'?null:[value])
   const [ttSearch, setTtSearch] = useState('')
   const [trendsMetric, setTrendsMetric] = useState<'both' | 'hours' | 'rev'>('both')
   const [hiddenTrendClients, setHiddenTrendClients] = useState<Set<string>>(new Set())
@@ -782,7 +788,7 @@ export default function TimeTrackingPage() {
           assignmentLookup[`${a.team_member_id}_${a.project_id}`] = a
         })
 
-        const transformedEntries = (entriesRes.data || []).map((e: any) => {
+        const transformedEntries = (entriesRes.data || []).filter((e:any)=>e.status!=='draft').map((e: any) => {
           const project = projectMap[e.project_id]
           const clientId = project?.client_id || ''
           const clientName = clientId ? clientMap[clientId]?.name || '' : ''
@@ -848,7 +854,7 @@ export default function TimeTrackingPage() {
         })
 
         setTeamMembers((teamRes.data || []).map((t: any) => ({ id: t.id, name: t.name || '', email: t.email || '', status: t.status || 'active', employment_type: t.employment_type || 'contractor', cost_type: t.cost_type || 'hourly', cost_amount: t.cost_amount || 0, baseline_hours: t.baseline_hours || 172 })))
-        setProjects((projRes.data || []).map((p: any) => ({ id: p.id, name: p.name || '', client: p.client || '', client_id: p.client_id || '', bill_rate: p.bill_rate || 0, budget_type: p.budget_type || p.contract_type || '', billing_model: p.billing_model || 'per_resource', fixed_amount: p.fixed_amount || 0 })))
+        setProjects((projRes.data || []).map((p: any) => ({ ...p, id: p.id, name: p.name || '', client: p.client || '', client_id: p.client_id || '', bill_rate: p.bill_rate || 0, budget_type: p.budget_type || p.contract_type || '', billing_model: p.billing_model || 'per_resource', fixed_amount: p.fixed_amount || 0 })))
         setClients((clientRes.data || []).map((c: any) => ({ id: c.id, name: c.name || '' })))
         setAssignments(assignRes.data || [])
         setBillRates(billRatesRes.data || [])
@@ -864,13 +870,17 @@ export default function TimeTrackingPage() {
   // ============ DATE-ONLY FILTERED ENTRIES (for cost allocation) ============
   // Cost allocation must see ALL entries in the date range to distribute LS costs proportionally.
   // Display filters (client/project/employee) are applied AFTER cost adjustment.
-  const dateOnlyEntries = useMemo(() => entries.filter(entry =>
+  const commercialPricedEntries = useMemo(() => {
+    const byProject = new Map(projects.map(p=>[p.id,getProjectPhases(p,projectTerms)]))
+    return entries.map(entry=>phaseForDate(byProject.get(entry.project_id)||[],entry.date)?.terms==='lump_sum'?{...entry,bill_rate:0}:entry)
+  },[entries,projects,projectTerms])
+  const dateOnlyEntries = useMemo(() => commercialPricedEntries.filter(entry =>
     entry.date >= dateRange.start && entry.date <= dateRange.end
-  ), [entries, dateRange])
+  ), [commercialPricedEntries, dateRange])
 
-  const dateOnlyPriorEntries = useMemo(() => entries.filter(entry =>
+  const dateOnlyPriorEntries = useMemo(() => commercialPricedEntries.filter(entry =>
     entry.date >= priorPeriod.start && entry.date <= priorPeriod.end
-  ), [entries, priorPeriod])
+  ), [commercialPricedEntries, priorPeriod])
 
   // ============ FIXED COST ADJUSTMENT (runs on ALL entries, unfiltered by client/project/employee) ============
   // Recalculate cost_rate for lump sum members so total cost = fixed monthly amount
@@ -888,19 +898,19 @@ export default function TimeTrackingPage() {
     const q = ttSearch.trim().toLowerCase()
     return allCostAdjustedEntries.filter(entry => {
       if (selectedClient !== 'all' && entry.client_id !== selectedClient) return false
-      if (selectedEmployee !== 'all' && entry.team_member_id !== selectedEmployee) return false
-      if (selectedProject !== 'all' && entry.project_id !== selectedProject) return false
+      if (selectedEmployeeIds !== null && !selectedEmployeeIds.includes(entry.team_member_id)) return false
+      if (selectedProjectIds !== null && !selectedProjectIds.includes(entry.project_id)) return false
       if (q && !`${entry.client_name || ''} ${entry.project_name || ''} ${entry.team_member_name || ''}`.toLowerCase().includes(q)) return false
       return true
     })
-  }, [allCostAdjustedEntries, selectedClient, selectedEmployee, selectedProject, ttSearch])
+  }, [allCostAdjustedEntries, selectedClient, selectedEmployeeIds, selectedProjectIds, ttSearch])
 
   const costAdjustedPriorEntries = useMemo(() => allCostAdjustedPriorEntries.filter(entry => {
     if (selectedClient !== 'all' && entry.client_id !== selectedClient) return false
-    if (selectedEmployee !== 'all' && entry.team_member_id !== selectedEmployee) return false
-    if (selectedProject !== 'all' && entry.project_id !== selectedProject) return false
+    if (selectedEmployeeIds !== null && !selectedEmployeeIds.includes(entry.team_member_id)) return false
+    if (selectedProjectIds !== null && !selectedProjectIds.includes(entry.project_id)) return false
     return true
-  }), [allCostAdjustedPriorEntries, selectedClient, selectedEmployee, selectedProject])
+  }), [allCostAdjustedPriorEntries, selectedClient, selectedEmployeeIds, selectedProjectIds])
 
   // ============ KPIs — DUAL LAYER ============
   const kpis = useMemo(() => {
@@ -938,10 +948,9 @@ export default function TimeTrackingPage() {
 
   // T&M-only trends: hours per client per week (stacked) + T&M revenue per week (line)
   const tmTrends = useMemo(() => {
-    const btById: Record<string, string> = {}
-    projects.forEach((p: { id: string; budget_type?: string; contract_type?: string }) => { btById[p.id] = (p.budget_type || p.contract_type || '') })
-    const isTM = (pid: string) => { const bt = (btById[pid] || '').toLowerCase(); return bt.includes('time') || bt.includes('t_m') || bt.includes('hourly') }
-    const tmEntries = costAdjustedEntries.filter(e => isTM(e.project_id))
+    const phasesById=new Map(projects.map(p=>[p.id,getProjectPhases(p,projectTerms)]))
+    const isTM=(pid:string)=>(phasesById.get(pid)||[]).some(phase=>phase.terms!=='lump_sum'&&phase.effective_start<=dateRange.end&&(!phase.effective_end||phase.effective_end>=dateRange.start))
+    const tmEntries=costAdjustedEntries.filter(e=>{const phase=phaseForDate(phasesById.get(e.project_id)||[],e.date);return phase&&phase.terms!=='lump_sum'})
     const clientNames = Array.from(new Set(tmEntries.map(e => e.client_name).filter(Boolean)))
     const rows = weekColumns.map(w => {
       const row: Record<string, number | string> = { week: w.label }
@@ -963,7 +972,7 @@ export default function TimeTrackingPage() {
     const blended = totalHours ? totalRevenue / totalHours : 0
     const tmProjectCount = projects.filter((p: { id: string }) => isTM(p.id)).length
     return { rows, clientNames, totalHours, totalRevenue, blended, tmProjectCount }
-  }, [costAdjustedEntries, weekColumns, projects])
+  }, [costAdjustedEntries, weekColumns, projects, projectTerms, dateRange])
 
   // Detailed ledger grouped Employee > Client > Project, entries newest-first
   const detailedGroups = useMemo(() => {
@@ -1236,7 +1245,6 @@ export default function TimeTrackingPage() {
   }
   const togglePdfScope = (id: string) => setPdfScopes(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const [pdfDescriptions, setPdfDescriptions] = useState(false)
-  const [projectTerms, setProjectTerms] = useState<any[]>([])
   // NTE / phase options: NTE + Delta + Burn % columns, phase split
   const [pdfNte, setPdfNte] = useState({ nteCol: true, deltaCol: true, burnCol: true, phaseSplit: true })
   // Client-facing descriptions: Sage-summarized from timesheet notes, editable before export.
@@ -1260,7 +1268,7 @@ export default function TimeTrackingPage() {
   const monthNameOf = (mk: string) => MONTH_NAMES[Number(mk.slice(5, 7)) - 1] || mk
 
   const scopePhaseInfo = useMemo(() => {
-    const info: Record<string, { phases: ProjectPhase[]; burn: { nte: number; months: string[]; billed: number; denom: number; pct: number; over: boolean; worst: { mk: string; pct: number } | null } | null }> = {}
+    const info: Record<string, { phases: ProjectPhase[]; burn: { cadence:'monthly'|'overall'; nte: number; months: string[]; billed: number; denom: number; pct: number; over: boolean; worst: { mk: string; pct: number } | null } | null }> = {}
     const todayIso = new Date().toLocaleDateString('en-CA')
     projects.forEach((p: any) => {
       const phases = getProjectPhases(p, projectTerms, todayIso)
@@ -1270,12 +1278,12 @@ export default function TimeTrackingPage() {
       let burn: any = null
       const ph = ntePhases[ntePhases.length - 1]
       if (ph) {
-        const s0 = ph.effective_start > dateRange.start ? ph.effective_start : dateRange.start
+        const s0 = ph.budget_cadence === 'overall' ? ph.effective_start : ph.effective_start > dateRange.start ? ph.effective_start : dateRange.start
         const e0 = ph.effective_end && ph.effective_end < dateRange.end ? ph.effective_end : dateRange.end
         const months = monthsBetween(s0, e0)
         if (months.length > 0) {
           const perMonth: Record<string, number> = {}; months.forEach(mk => { perMonth[mk] = 0 })
-          costAdjustedEntries.forEach(e => {
+          entries.forEach(e => {
             if (e.project_id !== p.id || !e.is_billable) return
             const d = (e.date || '').slice(0, 10)
             if (d < s0 || d > e0) return
@@ -1283,16 +1291,16 @@ export default function TimeTrackingPage() {
             if (mk in perMonth) perMonth[mk] += (e.billable_hours || 0) * (e.bill_rate || 0)
           })
           const billed = months.reduce((t, mk) => t + perMonth[mk], 0)
-          const denom = (ph.nte_amount || 0) * months.length
+          const denom = (ph.nte_amount || 0) * (ph.budget_cadence === 'overall' ? 1 : months.length)
           let worst: { mk: string; pct: number } | null = null
-          months.forEach(mk => { const pct = (perMonth[mk] / (ph.nte_amount || 1)) * 100; if (!worst || pct > worst.pct) worst = { mk, pct } })
-          burn = { nte: ph.nte_amount, months, billed, denom, pct: denom > 0 ? (billed / denom) * 100 : 0, over: billed > denom, worst }
+          if (ph.budget_cadence !== 'overall') months.forEach(mk => { const pct = (perMonth[mk] / (ph.nte_amount || 1)) * 100; if (!worst || pct > worst.pct) worst = { mk, pct } })
+          burn = { cadence:ph.budget_cadence||'monthly', nte: ph.nte_amount, months, billed, denom, pct: denom > 0 ? (billed / denom) * 100 : 0, over: billed > denom, worst }
         }
       }
       info[p.id] = { phases, burn }
     })
     return info
-  }, [projects, projectTerms, costAdjustedEntries, dateRange])
+  }, [projects, projectTerms, entries, dateRange])
 
   // Lines from a set of entries. Descriptions come straight from the notes
   // contractors submit with their timesheets — never manually re-entered.
@@ -1393,13 +1401,12 @@ export default function TimeTrackingPage() {
   const billingCmp = (a: { name: string; totalRevenue: number }, b: { name: string; totalRevenue: number }) => billingSort === 'az' ? a.name.localeCompare(b.name) : b.totalRevenue - a.totalRevenue
 
   const exportToCSV = () => {
-    const headers = ['Date', 'Employee', 'Client', 'Project', 'Actual Hours', 'Billable Hours', 'Cost Rate', 'Bill Rate', 'Cost', 'Revenue', 'Margin', 'Notes']
+    const headers = ['Date', 'Employee', 'Client', 'Project', 'Actual Hours', 'Billable Hours', 'Bill Rate', 'Hourly Revenue', 'Notes']
     const rows = costAdjustedEntries.map(e => [
       e.date, e.team_member_name, e.client_name, e.project_name, e.hours, e.billable_hours,
-      e.display_cost_rate, e.bill_rate, (e.hours * e.display_cost_rate).toFixed(2), (e.billable_hours * e.bill_rate).toFixed(2),
-      ((e.billable_hours * e.bill_rate) - (e.hours * e.display_cost_rate)).toFixed(2), e.notes || ''
+      e.bill_rate, (e.is_billable ? e.billable_hours * e.bill_rate : 0).toFixed(2), e.notes || ''
     ])
-    const csv = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n')
+    const csv = [headers.join(','), ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a'); link.href = URL.createObjectURL(blob)
     link.download = `time-analytics-${dateRange.start}-to-${dateRange.end}.csv`; link.click()
@@ -1524,7 +1531,7 @@ ${parts.join('')}
     const showDeltaCol = pdfNte.deltaCol
     const showBurnCol = pdfNte.burnCol
     const colH = (t: string) => `<th>${t}</th>`
-    const headCols = `<th class="l">Line</th>${pdfCols.hours ? colH('Hours') : ''}${pdfCols.rate ? colH('Rate') : ''}${pdfCols.amount ? colH('Amount') : ''}${showNteCol ? colH('NTE') : ''}${showDeltaCol ? colH('Δ vs NTE') : ''}${showBurnCol ? colH('Burn %') : ''}`
+    const headCols = `<th class="l">Line</th>${pdfCols.hours ? colH('Hours') : ''}${pdfCols.rate ? colH('Rate') : ''}${pdfCols.amount ? colH('Amount') : ''}${showNteCol ? colH('Budget') : ''}${showDeltaCol ? colH('Δ vs Budget') : ''}${showBurnCol ? colH('Burn %') : ''}`
     const blankTail = `${showNteCol ? '<td></td>' : ''}${showDeltaCol ? '<td></td>' : ''}${showBurnCol ? '<td>—</td>' : ''}`
 
     // Ordered selected scopes with their entries in range
@@ -1543,15 +1550,15 @@ ${parts.join('')}
       const scEntries = entriesInRange(sc.id)
       const phasesTouched = (info?.phases || []).filter(ph =>
         ph.effective_start <= dateRange.end && (!ph.effective_end || ph.effective_end >= dateRange.start))
-      const multiPhase = pdfNte.phaseSplit && phasesTouched.length > 1
+      const multiPhase = (pdfNte.phaseSplit && phasesTouched.length > 1) || phasesTouched.some(ph=>ph.terms==='lump_sum')
 
       // Burn chip + worst-month note on the scope header
       let chip = ''
       let wnote = ''
       if (b) {
         chip = b.over
-          ? `<span class="schip over">NTE ${b.pct.toFixed(1)}% · OVER by ${fmt(b.billed - b.denom)}</span>`
-          : `<span class="schip">NTE ${b.pct.toFixed(1)}% burned</span>`
+          ? `<span class="schip over">Budget ${b.pct.toFixed(1)}% · OVER by ${fmt(b.billed - b.denom)}</span>`
+          : `<span class="schip">Budget ${b.pct.toFixed(1)}% burned</span>`
         if (b.months.length > 1 && b.worst && b.worst.pct > 100)
           wnote = `<div class="wnote">Worst month: ${monthNameOf(b.worst.mk)} · ${b.worst.pct.toFixed(1)}% of monthly cap</div>`
       }
@@ -1576,7 +1583,7 @@ ${parts.join('')}
         phasesTouched.forEach(ph => {
           const s0 = ph.effective_start > dateRange.start ? ph.effective_start : dateRange.start
           const e0 = ph.effective_end && ph.effective_end < dateRange.end ? ph.effective_end : dateRange.end
-          const phLabel = ph.terms === 'tm_nte' ? `T&M · NTE ${fmt(ph.nte_amount || 0)}/mo` : ph.terms === 'lump_sum' ? `Lump Sum · ${fmt(ph.monthly_fee || 0)}/mo` : 'Open T&M'
+          const phLabel = ph.terms === 'tm_nte' ? `T&M · Budget ${fmt(ph.nte_amount || 0)}${ph.budget_cadence==='overall'?' overall':'/mo'}` : ph.terms === 'lump_sum' ? `Monthly fee · ${fmt(ph.monthly_fee || 0)}/mo` : 'Open T&M'
           const range = `${formatDate(s0)} – ${formatDate(e0)}`
           if (ph.terms === 'lump_sum') {
             const feeMonths = monthsBetween(s0, e0).filter(mk => mk <= curMk)
@@ -1610,7 +1617,7 @@ ${parts.join('')}
       }
 
       // Subtotal: NTE cap for the range, signed delta vs cap, cumulative burn
-      const nteCell = showNteCol ? `<td>${b ? (b.months.length > 1 ? `${fmt(b.denom)} (${b.months.length} mo)` : fmt(b.denom)) : ''}</td>` : ''
+      const nteCell = showNteCol ? `<td>${b ? (b.cadence==='overall'?`${fmt(b.denom)} overall`:b.months.length > 1 ? `${fmt(b.denom)} (${b.months.length} mo)` : fmt(b.denom)) : ''}</td>` : ''
       const delta = b ? b.billed - b.denom : 0
       const deltaCell = showDeltaCol ? `<td>${b ? (delta > 0 ? `<span style="color:#dc2626;font-weight:700">+${fmt(delta)}</span>` : `−${fmt(Math.abs(delta))}`) : ''}</td>` : ''
       const burnCell = showBurnCol ? `<td>${b ? `<span style="${b.over ? 'color:#dc2626;font-weight:700' : ''}">${b.pct.toFixed(1)}%</span>` : ''}</td>` : ''
@@ -1638,7 +1645,7 @@ ${parts.join('')}
 
   const getFilterTitle = () => {
     if (selectedClient !== 'all') return clients.find(c => c.id === selectedClient)?.name || ''
-    if (selectedEmployee !== 'all') return teamMembers.find(t => t.id === selectedEmployee)?.name || ''
+    if (selectedEmployeeIds !== null) return teamMembers.filter(t=>selectedEmployeeIds.includes(t.id)).map(t=>t.name).join(', ')
     return 'All Clients'
   }
 
@@ -1704,25 +1711,13 @@ ${parts.join('')}
             </select>
             <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
-          <div className="relative">
-            <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)} className={`appearance-none pl-3.5 pr-8 py-2 bg-white border rounded-xl text-sm hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-colors cursor-pointer ${selectedEmployee !== 'all' ? 'border-blue-400 text-gray-900' : 'border-gray-200 text-gray-700'}`}>
-              <option value="all">All Employees</option>
-              {teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          </div>
-          <div className="relative">
-            <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className={`appearance-none pl-3.5 pr-8 py-2 bg-white border rounded-xl text-sm hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-colors cursor-pointer ${selectedProject !== 'all' ? 'border-blue-400 text-gray-900' : 'border-gray-200 text-gray-700'}`}>
-              <option value="all">All Projects</option>
-              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          </div>
-          {(selectedClient !== 'all' || selectedEmployee !== 'all' || selectedProject !== 'all' || ttSearch) && (
+          <MultiSelect label="Employees" choices={teamMembers.map(t=>({id:t.id,label:t.name}))} selected={selectedEmployeeIds??teamMembers.map(t=>t.id)} onChange={setSelectedEmployeeIds}/>
+          <MultiSelect label="Projects" choices={projects.map(p=>({id:p.id,label:p.name}))} selected={selectedProjectIds??projects.map(p=>p.id)} onChange={setSelectedProjectIds}/>
+          {(selectedClient !== 'all' || selectedEmployeeIds !== null || selectedProjectIds !== null || ttSearch) && (
             <button onClick={() => { setSelectedClient('all'); setSelectedEmployee('all'); setSelectedProject('all'); setTtSearch('') }} className={`flex items-center gap-1 px-3 py-2 text-sm ${THEME.textMuted} hover:text-gray-900 transition-colors`}><X size={14} />Clear</button>
           )}
         </div>
-        <span className={`block mt-2 px-1 text-xs ${THEME.textMuted} tabular-nums`}>{formatDate(dateRange.start)} — {formatDate(dateRange.end)}</span>
+        <span className={`block mt-2 px-1 text-xs ${THEME.textMuted} tabular-nums`}>{formatDate(dateRange.start)} — {formatDate(dateRange.end)} · {selectedEmployeeIds===null?'All employees':`${selectedEmployeeIds.length} employees`} · {selectedProjectIds===null?'All projects':`${selectedProjectIds.length} projects`}</span>
       </div>
 
       {/* KPI Cards — 3 operational metrics */}
@@ -1770,7 +1765,7 @@ ${parts.join('')}
           {/* Summary: dark to-bill card + compact utilization / burn-up sparkline */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="rounded-2xl p-5 text-white relative overflow-hidden" style={{ background: 'linear-gradient(135deg,#1b2431 0%,#141b24 55%,#10151c 100%)' }}>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-white/70">To bill this period</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-white/70">Hourly revenue this period</p>
               <div className="flex items-baseline gap-2.5 mt-2 flex-wrap">
                 <p className="text-4xl font-bold tracking-tight">{formatCurrency(billingTotals.toBill)}</p>
                 {kpis.priorRevenue > 0 && (
@@ -1800,7 +1795,7 @@ ${parts.join('')}
                 <ResponsiveContainer width="100%" height={56}>
                   <AreaChart data={billingBurnUp} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                     <defs><linearGradient id="billFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2563eb" stopOpacity={0.22} /><stop offset="100%" stopColor="#2563eb" stopOpacity={0} /></linearGradient></defs>
-                    <Area type="monotone" dataKey="cumulative" stroke="#2563eb" strokeWidth={2} fill="url(#billFill)" />
+                    <Tooltip formatter={(value:number)=>formatCurrency(value)} labelFormatter={label=>`Week ${label}`} /><Area type="monotone" dataKey="cumulative" stroke="#2563eb" strokeWidth={2} fill="url(#billFill)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -2177,13 +2172,8 @@ ${parts.join('')}
                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${employee.empType === 'employee' ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}>
                     {employee.empType === 'employee' ? 'W-2' : '1099'}
                   </span>
-                  <span className="text-gray-500 text-sm tabular-nums">{formatCurrency(employee.totalCost)}</span>
                   <span className="text-gray-900 font-medium text-sm tabular-nums">{formatCurrency(employee.totalRevenue)}</span>
-                  {(() => { const mp = calcMarginPct(employee.totalRevenue, employee.totalCost); return (
-                    <span className={`text-xs font-medium ${marginColor(mp)}`}>
-                      {mp.toFixed(1)}%
-                    </span>
-                  ) })()}
+                  <span className="text-xs text-gray-400">Cost · Coming soon</span>
                 </div>
               }
               defaultExpanded={index === 0}
@@ -2198,7 +2188,6 @@ ${parts.join('')}
                         <div className="flex items-center gap-3 text-xs tabular-nums">
                           <span className="text-gray-600">{data.actualHours.toFixed(1)} hrs</span>
                           {data.billableHours !== data.actualHours && <span className="text-amber-600">({data.billableHours.toFixed(1)} billed)</span>}
-                          <span className="text-gray-500">{formatCurrency(data.cost)}</span>
                           <span className="text-gray-900">{formatCurrency(data.revenue)}</span>
                         </div>
                       </div>
@@ -2232,22 +2221,10 @@ ${parts.join('')}
               <Filter size={13} />
               <span className="font-medium text-gray-500">Filter:</span>
             </div>
-            <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)}
-              className={`px-3 py-1.5 bg-white border ${selectedEmployee !== 'all' ? 'border-blue-400 ring-1 ring-blue-500/20' : THEME.border} rounded-lg text-xs text-gray-900 transition-colors hover:bg-gray-100`}>
-              <option value="all">All Employees</option>
-              {teamMembers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-            <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)}
-              className={`px-3 py-1.5 bg-white border ${selectedClient !== 'all' ? 'border-blue-400 ring-1 ring-blue-500/20' : THEME.border} rounded-lg text-xs text-gray-900 transition-colors hover:bg-gray-100`}>
-              <option value="all">All Clients</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)}
-              className={`px-3 py-1.5 bg-white border ${selectedProject !== 'all' ? 'border-blue-400 ring-1 ring-blue-500/20' : THEME.border} rounded-lg text-xs text-gray-900 transition-colors hover:bg-gray-100`}>
-              <option value="all">All Projects</option>
-              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            {(selectedClient !== 'all' || selectedEmployee !== 'all' || selectedProject !== 'all') && (
+            <MultiSelect label="Employees" choices={teamMembers.map(t=>({id:t.id,label:t.name}))} selected={selectedEmployeeIds??teamMembers.map(t=>t.id)} onChange={setSelectedEmployeeIds}/>
+            <select value={selectedClient} onChange={e=>setSelectedClient(e.target.value)} className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs"><option value="all">All clients</option>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
+            <MultiSelect label="Projects" choices={projects.map(p=>({id:p.id,label:p.name}))} selected={selectedProjectIds??projects.map(p=>p.id)} onChange={setSelectedProjectIds}/>
+            {(selectedClient !== 'all' || selectedEmployeeIds!==null || selectedProjectIds!==null) && (
               <>
                 <button onClick={() => { setSelectedClient('all'); setSelectedEmployee('all'); setSelectedProject('all') }} className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-900 transition-colors">
                   <X size={12} />Clear all
@@ -2511,9 +2488,9 @@ ${parts.join('')}
                 </div>
               </div>
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">NTE & Phases <span className="normal-case font-semibold text-[10px]" style={{ color: '#ea8a2f' }}>new</span></p>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">Budget & Phases <span className="normal-case font-semibold text-[10px]" style={{ color: '#ea8a2f' }}>new</span></p>
                 <div className="space-y-1">
-                  {([['nteCol', 'NTE column'], ['deltaCol', 'Δ vs NTE column'], ['burnCol', 'Burn % column'], ['phaseSplit', 'Split by phase']] as const).map(([key, label]) => (
+                  {([['nteCol', 'Budget column'], ['deltaCol', 'Δ vs Budget column'], ['burnCol', 'Burn % column'], ['phaseSplit', 'Split by phase']] as const).map(([key, label]) => (
                     <div key={key} className="flex items-center justify-between py-1.5 text-sm">
                       <span className="text-slate-700">{label}</span>
                       <button onClick={() => setPdfNte(prev => ({ ...prev, [key]: !prev[key] }))} className={`relative w-9 h-5 rounded-full transition-colors ${pdfNte[key] ? 'bg-blue-600' : 'bg-gray-300'}`}>
@@ -2521,7 +2498,7 @@ ${parts.join('')}
                       </button>
                     </div>
                   ))}
-                  <p className="text-[10.5px] text-slate-400 leading-relaxed pt-1">Burn is range-aware: monthly NTE × months in the selected period. Phase labels only appear when the period crosses a terms change. Scopes without an NTE are unaffected.</p>
+                  <p className="text-[10.5px] text-slate-400 leading-relaxed pt-1">Monthly budgets use the months in the selected period. Overall budgets use cumulative scope consumption through the period end. Budget usage covers the full scope, including employees omitted from this report.</p>
                 </div>
               </div>
               <div>

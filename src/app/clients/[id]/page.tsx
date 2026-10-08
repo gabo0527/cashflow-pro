@@ -10,7 +10,7 @@
 //
 // Tabs:
 //   Overview — KPIs (sparkline, last activity), projects ledger
-//              with T&M/LS chips, burn-vs-NTE / schedule bars,
+//              with T&M/LS chips, burn-vs-Budget / schedule bars,
 //              expandable resources with admin-only rates
 //   History  — completed projects grouped by end-date year as an
 //              accordion of dark bands; pick two years to compare
@@ -26,6 +26,10 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
+import CommercialDocuments from '@/components/commercial/CommercialDocuments'
+import ScopeContacts from '@/components/commercial/ScopeContacts'
+import { useSearchParams } from 'next/navigation'
+import { getContractType, getProjectPhases, phaseForDate, calcNteBurn, buildRateLookups, commercialRevenueByMonth } from '@/components/projects/shared'
 
 // ============ TYPES ============
 interface Client { id: string; name: string; contact_name?: string; email?: string; phone?: string; payment_terms: string; status: string; created_at?: string; notes?: string }
@@ -38,7 +42,6 @@ interface TimeEntry { id: string; team_member_id: string; project_id?: string; c
 // ============ HELPERS ============
 const fmt$ = (v: number) => '$' + Math.round(v).toLocaleString('en-US')
 const fmtH = (v: number) => v.toLocaleString('en-US', { maximumFractionDigits: 1 })
-const isTM = (p: Project) => (p.billing_model || 'per_resource') === 'per_resource'
 
 // Deterministic identity color per client (stable across pages)
 const IDENTITY = ['#4f46e5', '#0e7490', '#b45309', '#166534', '#9d174d', '#1d4ed8', '#7c2d12', '#0f766e']
@@ -79,6 +82,7 @@ function useCountUp(target: number, duration = 700) {
 export default function ClientDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const clientId = String(params?.id || '')
 
   const [loading, setLoading] = useState(true)
@@ -89,8 +93,13 @@ export default function ClientDetailPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [members, setMembers] = useState<Member[]>([])
   const [entries, setEntries] = useState<TimeEntry[]>([])
+  const [termRows, setTermRows] = useState<any[]>([])
 
-  const [tab, setTab] = useState<'overview' | 'history'>('overview')
+  const [tab, setTab] = useState<'overview' | 'history' | 'documents' | 'contacts'>('overview')
+  useEffect(() => {
+    const requested = searchParams.get('tab')
+    if (requested === 'documents' || requested === 'contacts') setTab(requested)
+  }, [searchParams])
   const [typeFilter, setTypeFilter] = useState<'all' | 'tm' | 'ls'>('all')
   const [openProject, setOpenProject] = useState<string | null>(null)
   const [openYears, setOpenYears] = useState<Set<number>>(new Set())
@@ -116,13 +125,15 @@ export default function ClientDetailPage() {
 
         const projectIds = (p || []).map((x: Project) => x.id)
         if (projectIds.length > 0) {
-          const [{ data: a }, { data: te }] = await Promise.all([
-            supabase.from('team_project_assignments').select('team_member_id, project_id').in('project_id', projectIds),
-            supabase.from('time_entries').select('id, team_member_id, project_id, client_id, date, hours, billable_hours, status')
+          const [{ data: a }, { data: te }, { data: terms }] = await Promise.all([
+            supabase.from('team_project_assignments').select('*').in('project_id', projectIds),
+            supabase.from('time_entries').select('*')
               .in('project_id', projectIds).neq('status', 'draft'),
+            supabase.from('project_terms').select('*').in('project_id', projectIds),
           ])
           setAssignments(a || [])
           setEntries(te || [])
+          setTermRows(terms || [])
         }
       } catch (err: any) {
         console.error('client detail load error:', err)
@@ -132,8 +143,10 @@ export default function ClientDetailPage() {
     load()
   }, [clientId])
 
+  const isTM = (p: Project) => { const phase=phaseForDate(getProjectPhases(p,termRows),localToday()); return phase ? phase.terms!=='lump_sum' : getContractType(p)==='time_and_materials' }
+
   // ============ DERIVED ============
-  const accent = useMemo(() => clientColor(clientId), [clientId])
+  const accent = '#2563eb'
   const memberName = (id: string) => members.find(m => m.id === id)?.name || 'Unknown'
   const memberRole = (id: string) => members.find(m => m.id === id)?.role || ''
   const rateFor = (memberId: string) => rates.find(r => r.team_member_id === memberId)?.rate || 0
@@ -171,7 +184,7 @@ export default function ClientDetailPage() {
       if (weeksBack >= 0 && weeksBack < 8) buckets[7 - weeksBack] += e.hours || 0
     })
     const max = Math.max(...buckets, 1)
-    return buckets.map(b => Math.round((b / max) * 100))
+    return buckets.map(b => ({ height: Math.round((b / max) * 100), hours: b }))
   }, [entries])
 
   // Project revenue basis: T&M = Σ member hours × member's client rate; LS = fixed_amount || budget
@@ -186,17 +199,15 @@ export default function ClientDetailPage() {
     return map
   }, [entries])
 
-  const projectRevenue = (p: Project) => {
-    if (!isTM(p)) return p.fixed_amount || p.budget || 0
-    const byMember = projectHoursAll[p.id] || {}
-    return Object.entries(byMember).reduce((s, [mid, h]) => s + h * rateFor(mid), 0)
-  }
+  const lookups = useMemo(() => buildRateLookups(rates, assignments), [rates, assignments])
+  const commercialEntries = useMemo(() => entries.map((e: any) => ({...e, contractor_id:e.contractor_id || e.team_member_id})), [entries])
+  const projectRevenue = (p: Project) => Object.values(commercialRevenueByMonth(p, getProjectPhases(p, termRows), commercialEntries.filter(e => e.project_id === p.id), lookups.rateCardLookup, lookups.assignmentLookup)).reduce((sum, value) => sum + value, 0)
   const projectHours = (p: Project) => Object.values(projectHoursAll[p.id] || {}).reduce((s, h) => s + h, 0)
   const projectBurn = (p: Project) => {
-    const cap = p.budget || 0
-    if (!cap) return null
-    const spent = projectRevenue(p)
-    return { spent, cap, pct: Math.min(100, Math.round((spent / cap) * 100)) }
+    const phase = phaseForDate(getProjectPhases(p, termRows), localToday())
+    if (!phase || phase.terms !== 'tm_nte' || !phase.nte_amount) return null
+    const burn = calcNteBurn(phase, p, commercialEntries.filter(e => e.project_id === p.id), lookups.rateCardLookup, lookups.assignmentLookup, monthStart(), localToday())
+    return {spent:burn.billed, cap:burn.denom, pct:Math.round(burn.pct || 0)}
   }
   const schedulePct = (p: Project) => {
     if (!p.start_date || !p.end_date) return null
@@ -222,7 +233,7 @@ export default function ClientDetailPage() {
       })
       .sort((a, b) => b.year - a.year)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [completedProjects, projectHoursAll, rates])
+  }, [completedProjects, projectHoursAll, rates, termRows, commercialEntries, lookups])
 
   useEffect(() => { if (years.length > 0 && openYears.size === 0) setOpenYears(new Set([years[0].year])) }, [years]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -321,15 +332,17 @@ export default function ClientDetailPage() {
         </div>
 
         {/* ============ TABS ============ */}
-        <div className="flex gap-1 bg-white border border-slate-200/60 rounded-xl p-1 w-fit">
-          {([['overview', 'Overview'], ['history', 'History']] as const).map(([id, label]) => (
+        <div className="flex flex-wrap gap-1 bg-white border border-slate-200/60 rounded-xl p-1 w-fit max-w-full">
+          {([['overview', 'Overview'], ['documents', 'Commercial documents'], ['contacts', 'Scope contacts'], ['history', 'History']] as const).map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} className="px-4 py-2 rounded-[9px] text-[12.5px] font-semibold transition-colors"
               style={tab === id ? { background: soft, color: accent } : { color: '#64748b' }}>
               {label}
             </button>
           ))}
-          <span className="px-4 py-2 text-[12.5px] font-semibold text-slate-300 inline-flex items-center gap-1.5"><FileText size={12} /> Documents · soon</span>
         </div>
+
+        {tab === 'documents' && <CommercialDocuments clientId={clientId} clientName={client.name} projects={projects} initialScope={searchParams.get('scope') || undefined} />}
+        {tab === 'contacts' && <ScopeContacts clientId={clientId} projects={projects} />}
 
         {tab === 'overview' && (
           <>
@@ -338,7 +351,7 @@ export default function ClientDetailPage() {
               <div className="bg-white border border-slate-200/60 rounded-xl p-4 shadow-sm">
                 <div className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-400">Active projects</div>
                 <div className="text-2xl font-extrabold text-slate-900 mt-1 tabular-nums" style={{ fontFamily: 'Archivo, sans-serif' }}>{Math.round(cActive)}</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">{tmCount} T&M · {lsCount} Lump Sum</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">{tmCount} T&M · {lsCount} Monthly fee</div>
               </div>
               <div className="bg-white border border-slate-200/60 rounded-xl p-4 shadow-sm">
                 <div className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-400">Resources on client</div>
@@ -350,7 +363,7 @@ export default function ClientDetailPage() {
                 <div className="text-2xl font-extrabold text-slate-900 mt-1 tabular-nums" style={{ fontFamily: 'Archivo, sans-serif' }}>{fmtH(cHours)}</div>
                 <div className="flex items-end gap-[2px] h-5 mt-1.5">
                   {spark.map((h, i) => (
-                    <div key={i} className="flex-1 rounded-t-sm" style={{ height: `${Math.max(8, h)}%`, background: i === spark.length - 1 ? accent : soft }} />
+                    <div key={i} title={`Week ${i + 1}: ${fmtH(h.hours)} hours`} className="flex-1 rounded-t-sm" style={{ height: `${Math.max(8, h.height)}%`, background: i === spark.length - 1 ? accent : soft }} />
                   ))}
                 </div>
               </div>
@@ -365,7 +378,7 @@ export default function ClientDetailPage() {
             <div className="flex items-center justify-between px-1">
               <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Projects — {activeProjects.length} active</span>
               <div className="flex gap-1.5">
-                {([['all', `All · ${activeProjects.length}`, '#2563eb'], ['tm', `T&M · ${tmCount}`, '#c2660c'], ['ls', `LS · ${lsCount}`, '#0369a1']] as const).map(([id, label, color]) => (
+                {([['all', `All · ${activeProjects.length}`, '#2563eb'], ['tm', `T&M · ${tmCount}`, '#c2660c'], ['ls', `Fee · ${lsCount}`, '#0369a1']] as const).map(([id, label, color]) => (
                   <button key={id} onClick={() => setTypeFilter(id)} className="text-[9.5px] font-semibold px-2 py-1 rounded-md border tabular-nums transition-all"
                     style={typeFilter === id ? { color: '#fff', background: color, borderColor: color } : { color, background: `${color}0d`, borderColor: `${color}40` }}>
                     {label}
@@ -392,9 +405,9 @@ export default function ClientDetailPage() {
                         <div className="text-[13px] font-semibold text-slate-900 flex items-center gap-2 flex-wrap">
                           {p.name}
                           <span className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded border" style={isTM(p) ? { color: '#c2660c', background: 'rgba(234,138,47,0.07)', borderColor: '#f6d3b3' } : { color: '#0369a1', background: 'rgba(14,165,233,0.06)', borderColor: '#bae6fd' }}>
-                            {isTM(p) ? 'T&M' : 'Lump Sum'}
+                            {isTM(p) ? 'T&M' : 'Monthly fee'}
                           </span>
-                          {nteHot && <span className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5"><AlertTriangle size={9} /> NTE {burn!.pct}%</span>}
+                          {nteHot && <span className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5"><AlertTriangle size={9} /> Budget {burn!.pct}%</span>}
                         </div>
                         <div className="text-[10.5px] text-slate-400 mt-0.5">
                           {p.start_date ? new Date(p.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}
@@ -412,18 +425,18 @@ export default function ClientDetailPage() {
                       <div>
                         {burn ? (
                           <>
-                            <div className="text-[8.5px] font-semibold uppercase tracking-[0.08em] text-slate-400">Burn vs NTE · {burn.pct}%</div>
-                            <div className="h-[5px] bg-slate-100 rounded-full overflow-hidden mt-1"><div className="h-full rounded-full" style={{ width: `${burn.pct}%`, background: nteHot ? '#ea8a2f' : accent }} /></div>
+                            <div className="text-[8.5px] font-semibold uppercase tracking-[0.08em] text-slate-400">Burn vs Budget · {burn.pct}%</div>
+                            <div className="h-[5px] bg-slate-100 rounded-full overflow-hidden mt-1"><div className="h-full rounded-full" style={{ width: `${Math.min(100,burn.pct)}%`, background: nteHot ? '#ea8a2f' : accent }} /></div>
                             <div className="text-[10px] text-slate-400 mt-0.5 tabular-nums">{fmt$(burn.spent)} / {fmt$(burn.cap)}</div>
                           </>
                         ) : sched !== null ? (
                           <>
                             <div className="text-[8.5px] font-semibold uppercase tracking-[0.08em] text-slate-400">Schedule · {sched}% elapsed</div>
                             <div className="h-[5px] bg-slate-100 rounded-full overflow-hidden mt-1"><div className="h-full rounded-full" style={{ width: `${sched}%`, background: accent }} /></div>
-                            <div className="text-[10px] text-slate-400 mt-0.5 tabular-nums">{!isTM(p) ? `contract ${fmt$(p.fixed_amount || p.budget || 0)}` : ''}</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5 tabular-nums">{!isTM(p) ? `monthly fee ${fmt$(phaseForDate(getProjectPhases(p,termRows),localToday())?.monthly_fee || p.fixed_amount || 0)}` : ''}</div>
                           </>
                         ) : (
-                          <div className="text-[10px] text-slate-300">{!isTM(p) ? `contract ${fmt$(p.fixed_amount || p.budget || 0)}` : 'no cap set'}</div>
+                          <div className="text-[10px] text-slate-300">{!isTM(p) ? `monthly fee ${fmt$(phaseForDate(getProjectPhases(p,termRows),localToday())?.monthly_fee || p.fixed_amount || 0)}` : 'no cap set'}</div>
                         )}
                       </div>
                       <ChevronRight size={15} className="text-slate-300 transition-transform justify-self-end" style={open ? { transform: 'rotate(90deg)', color: accent } : undefined} />
@@ -445,7 +458,7 @@ export default function ClientDetailPage() {
                         <div>
                           <div className="text-[8.5px] font-semibold uppercase tracking-[0.08em] text-slate-400 mb-1">Project basis</div>
                           <div className="flex items-center justify-between py-1.5 border-b border-slate-100 text-[11.5px] text-slate-600"><span>Hours to date (billable basis)</span><span className="font-bold text-slate-900 tabular-nums" style={{ fontFamily: 'Archivo, sans-serif' }}>{fmtH(projectHours(p))} h</span></div>
-                          <div className="flex items-center justify-between py-1.5 text-[11.5px] text-slate-600"><span>{isTM(p) ? 'Revenue basis (hours × rates)' : 'Contract amount'}</span><span className="font-bold text-slate-900 tabular-nums" style={{ fontFamily: 'Archivo, sans-serif' }}>{fmt$(projectRevenue(p))}</span></div>
+                          <div className="flex items-center justify-between py-1.5 text-[11.5px] text-slate-600"><span>{isTM(p) ? 'Revenue basis (hours × rates)' : 'Recognized monthly fees'}</span><span className="font-bold text-slate-900 tabular-nums" style={{ fontFamily: 'Archivo, sans-serif' }}>{fmt$(projectRevenue(p))}</span></div>
                         </div>
                       </div>
                     )}
@@ -493,7 +506,7 @@ export default function ClientDetailPage() {
                   </div>
                   {open && y.projects.map(p => (
                     <div key={p.id} className="grid grid-cols-[1fr_80px_110px] gap-3 px-5 py-2.5 border-t border-slate-100 text-[12px] text-slate-600 items-center">
-                      <span>{p.name} <span className="text-[10px] text-slate-400">· {isTM(p) ? 'T&M' : 'Lump Sum'}{p.start_date ? ` · ${new Date(p.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' })}` : ''}{p.end_date ? `–${new Date(p.end_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' })}` : ''}</span></span>
+                      <span>{p.name} <span className="text-[10px] text-slate-400">· {isTM(p) ? 'T&M' : 'Monthly fee'}{p.start_date ? ` · ${new Date(p.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' })}` : ''}{p.end_date ? `–${new Date(p.end_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' })}` : ''}</span></span>
                       <span className="text-right text-[10.5px] text-slate-400 tabular-nums">{isTM(p) ? `${fmtH(projectHours(p))} h` : '—'}</span>
                       <span className="text-right font-bold text-slate-900 tabular-nums" style={{ fontFamily: 'Archivo, sans-serif' }}>{fmt$(projectRevenue(p))}</span>
                     </div>

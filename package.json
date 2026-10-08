@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:timesheets": "node --test tests/contractor-timesheet.test.cjs"
+    "test:timesheets": "node --test tests/contractor-timesheet.test.cjs",
+    "test:commercial": "node --test tests/commercial-workspace.test.cjs tests/commercial-ui.test.cjs",
+    "test:commercial:database": "node --test tests/commercial-database.test.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",

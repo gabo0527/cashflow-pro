@@ -96,6 +96,7 @@ export default function ProjectsPage() {
     setShowProjectModal(true)
   }
 
+  const hasDatedTerms = !!editingProject && projectTerms.some(t => t.project_id === editingProject.id)
   const isLSForm = formData.budget_type === 'fixed' || formData.budget_type === 'retainer' || formData.billing_model === 'fixed'
 
   const handleSave = async () => {
@@ -109,9 +110,9 @@ export default function ProjectsPage() {
         }
         formData.end_date = todayStr
       }
-      // Lump sum recognition can't reconcile without an end date — warn, allow override
-      if (isLSForm && parseFloat(formData.fixed_amount) > 0 && !formData.end_date) {
-        if (!confirm('This lump-sum scope has a monthly fee but no End Date.\n\nWithout one, revenue recognition runs open-ended and the scope will be flagged on the dashboard.\n\nSave anyway?')) return
+      // Monthly fee recognition can't reconcile without an end date — warn, allow override
+      if (!hasDatedTerms && isLSForm && parseFloat(formData.fixed_amount) > 0 && !formData.end_date) {
+        if (!confirm('This monthly-fee scope has a monthly fee but no End Date.\n\nWithout one, revenue recognition runs open-ended and the scope will be flagged on the dashboard.\n\nSave anyway?')) return
       }
       const payload: any = {
         name: formData.name, client_id: formData.client_id || null,
@@ -124,6 +125,9 @@ export default function ProjectsPage() {
       }
       if (isAddingCO && coParentId) { payload.parent_id = coParentId; payload.is_change_order = true }
       if (editingProject) {
+        if (hasDatedTerms) {
+          for (const key of ['client_id', 'budget', 'budget_type', 'billing_model', 'bill_rate', 'fixed_amount', 'start_date']) delete payload[key]
+        }
         const { error } = await supabase.from('projects').update(payload).eq('id', editingProject.id)
         if (error) { console.error('Update error:', error); alert(`Error: ${error.message}`); return }
       } else {
@@ -158,7 +162,7 @@ export default function ProjectsPage() {
     const csv = ['Name,Client,Status,Type,Basis,Recognized,Hours,Start,End',
       ...projects.filter(p => !p.is_change_order).map(p => {
         const client = clients.find(c => c.id === p.client_id)?.name || ''
-        const rev = calcProjectRevenue(p, entriesByProject[p.id] || [], rateCardLookup, assignmentLookup)
+        const rev = calcProjectRevenue(p, entriesByProject[p.id] || [], rateCardLookup, assignmentLookup, todayISO(), projectTerms)
         return `"${p.name}","${client}",${p.status},${getContractLabel(rev.type)},"${rev.basisLabel}",${rev.recognized.toFixed(2)},${rev.hours.toFixed(1)},${p.start_date || ''},${p.end_date || ''}`
       })
     ].join('\n')
@@ -215,8 +219,8 @@ export default function ProjectsPage() {
           ))}
         </div>
 
-        {/* TAB CONTENT */}
-        {activeTab === 'dashboard' && <DashboardSection projects={projects} clients={clients} timesheets={timesheets} billRates={billRates} assignments={assignments} onDrillDown={handleDrillDown} />}
+        {/* TAB COBudgetNT */}
+        {activeTab === 'dashboard' && <DashboardSection projects={projects} clients={clients} timesheets={timesheets} billRates={billRates} assignments={assignments} projectTerms={projectTerms} onDrillDown={handleDrillDown} />}
         {activeTab === 'projects' && <ProjectsSection ref={projectsSectionRef} projects={projects} clients={clients} timesheets={timesheets} billRates={billRates} assignments={assignments} projectTerms={projectTerms} onAddProject={openAddProject} onEditProject={openEditProject} onDeleteProject={handleDeleteProject} onAddChangeOrder={openAddChangeOrder} onViewProject={handleViewProject} />}
         {activeTab === 'pipeline' && <ProjectsSection ref={projectsSectionRef} projects={projects.filter(p => p.status === 'prospect')} clients={clients} timesheets={timesheets} billRates={billRates} assignments={assignments} projectTerms={projectTerms} onAddProject={() => { resetForm(); setFormData(prev => ({ ...prev, status: 'prospect' })); setShowProjectModal(true) }} onEditProject={openEditProject} onDeleteProject={handleDeleteProject} onAddChangeOrder={openAddChangeOrder} onViewProject={handleViewProject} />}
         {activeTab === 'import' && <ImportSection projects={projects} clients={clients} teamMembers={teamMembers} onImportProjects={handleImportProjects} onImportBudgets={handleImportBudgets} onImportResources={handleImportResources} />}
@@ -230,7 +234,7 @@ export default function ProjectsPage() {
           return (
             <ProjectDetailView project={project} client={client} timesheets={timesheets}
               teamMembers={teamMembers} changeOrders={cos} billRates={billRates} assignments={assignments}
-              onClose={() => setSelectedProjectId(null)}
+              onClose={() => { setSelectedProjectId(null); loadData() }}
               onEdit={() => { setSelectedProjectId(null); openEditProject(project) }}
             />
           )
@@ -254,16 +258,18 @@ export default function ProjectsPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">Client</label>
-                <select value={formData.client_id} onChange={e => setFormData(prev => ({ ...prev, client_id: e.target.value }))} className={inputCls}>
+                <select disabled={hasDatedTerms} value={formData.client_id} onChange={e => setFormData(prev => ({ ...prev, client_id: e.target.value }))} className={inputCls}>
                   <option value="">Select client</option>
                   {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
+              {hasDatedTerms && <p className="text-xs text-slate-600 bg-blue-50 border border-blue-100 rounded-lg p-3">Commercial terms are managed in the project’s Commercial terms tab. Add a dated change there to preserve agreement history.</p>}
+              <fieldset disabled={hasDatedTerms} className="space-y-4 disabled:opacity-60">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">Contract Type</label>
                   <select value={formData.budget_type} onChange={e => setFormData(prev => ({ ...prev, budget_type: e.target.value }))} className={inputCls}>
-                    <option value="fixed">Lump Sum</option>
+                    <option value="fixed">Monthly fee</option>
                     <option value="time_and_materials">Time & Materials</option>
                     <option value="retainer">Retainer</option>
                   </select>
@@ -291,20 +297,21 @@ export default function ProjectsPage() {
                   <p className="text-[11px] text-slate-400 mt-1">Enter the <b>monthly</b> fee, not the total contract. Recognized in full each month once the month starts; recognition stops at the End Date.</p>
                 </div>
               )}
+              </fieldset>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">Start Date</label>
-                  <input type="date" value={formData.start_date} onChange={e => setFormData(prev => ({ ...prev, start_date: e.target.value }))} className={inputCls} />
+                  <input disabled={hasDatedTerms} type="date" value={formData.start_date} onChange={e => setFormData(prev => ({ ...prev, start_date: e.target.value }))} className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">End Date {isLSForm && <span className="text-amber-600 font-semibold">· required for LS to reconcile</span>}</label>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">End Date {isLSForm && <span className="text-amber-600 font-semibold">· required for monthly fee to reconcile</span>}</label>
                   <input type="date" value={formData.end_date} onChange={e => setFormData(prev => ({ ...prev, end_date: e.target.value }))} className={inputCls} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">Contract Value / NTE (optional)</label>
-                  <input type="number" value={formData.budget} onChange={e => setFormData(prev => ({ ...prev, budget: e.target.value }))} className={inputCls} placeholder="0" />
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Contract Value / Budget (optional)</label>
+                  <input disabled={hasDatedTerms} type="number" value={formData.budget} onChange={e => setFormData(prev => ({ ...prev, budget: e.target.value }))} className={inputCls} placeholder="0" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">Budgeted Hours (optional)</label>

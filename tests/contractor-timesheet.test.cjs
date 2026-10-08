@@ -260,7 +260,8 @@ test('actual Time Tracking Detailed view displays the correct daily descriptions
   const Page = loadTS('src/app/time-tracking/page.tsx', {
     '@supabase/supabase-js': { createClient: () => supabase },
     '@/lib/supabase': { getCurrentUser: async () => ({ user: { id: 'admin' } }) },
-    '@/components/projects/shared': { getProjectPhases: () => [] },
+    '@/components/projects/shared': loadTS('src/components/projects/shared.tsx'),
+    '@/components/commercial/CommercialDocuments': loadTS('src/components/commercial/CommercialDocuments.tsx', { '@/lib/supabase': {supabase:{}}, '@/lib/commercial': loadTS('src/lib/commercial.ts'), './useCommercialDialog': {__esModule:true,default:()=>{}} }),
     'lucide-react': icons, recharts: icons,
   }).default
   let renderer

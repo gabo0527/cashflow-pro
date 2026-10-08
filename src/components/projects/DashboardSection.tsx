@@ -12,7 +12,7 @@ import {
   getContractType, getServiceLine, SERVICE_LINE_COLORS,
   formatCurrency, formatCompactCurrency,
   calcLSRecognition, entryRevenue, buildRateLookups,
-  getRenewalWatch, todayISO, monthKeyOf, monthLabel, monthRange, formatDateShort,
+  getProjectPhases, phaseForDate, commercialRevenueByMonth, getRenewalWatch, todayISO, monthKeyOf, monthLabel, monthRange, formatDateShort,
 } from './shared'
 
 const AR = { fontFamily: BLUEPRINT.fontDisplay }
@@ -47,6 +47,7 @@ interface Props {
   timesheets: any[]
   billRates?: any[]
   assignments?: any[]
+  projectTerms?: any[]
   expenses?: any[]   // legacy prop — unused (cost hidden)
   invoices?: any[]   // legacy prop — unused (dead QBO data)
   onDrillDown: (type: string, id: string) => void
@@ -55,7 +56,7 @@ interface Props {
 type Period = 'this_month' | 'qtd' | 'ytd' | 'all'
 const PERIOD_LABELS: Record<Period, string> = { this_month: 'This Month', qtd: 'Quarter to Date', ytd: 'Year to Date', all: 'All Time' }
 
-export default function DashboardSection({ projects, clients, timesheets, billRates = [], assignments = [], onDrillDown }: Props) {
+export default function DashboardSection({ projects, clients, timesheets, billRates = [], assignments = [], projectTerms = [], onDrillDown }: Props) {
   const [selectedClient, setSelectedClient] = useState('all')
   const [period, setPeriod] = useState<Period>('ytd')
 
@@ -96,47 +97,37 @@ export default function DashboardSection({ projects, clients, timesheets, billRa
     const inPeriod = (mk: string) => !periodMonths || periodMonths.includes(mk)
     const map: Record<string, { project: any; type: string; recognized: number; thisMonth: number; hours: number }> = {}
     revenueProjects.forEach(p => {
-      map[p.id] = { project: p, type: getContractType(p), recognized: 0, thisMonth: 0, hours: 0 }
-      if (getContractType(p) === 'lump_sum') {
-        const ls = calcLSRecognition(p, today)
-        const counted = ls.recognizedMonths.filter(inPeriod)
-        map[p.id].recognized = counted.length * ls.monthlyFee
-        map[p.id].thisMonth = ls.recognizedMonths.includes(curMonth) ? ls.monthlyFee : 0
-      }
-    })
-    scopedEntries.forEach(e => {
-      const row = map[e.project_id]
-      if (!row) return
-      row.hours += e.hours || 0
-      if (row.type !== 'lump_sum') {
-        const mk = monthKeyOf(e.date)
-        const rev = entryRevenue(e, row.project, rateCardLookup, assignmentLookup)
-        if (inPeriod(mk)) row.recognized += rev
-        if (mk === curMonth) row.thisMonth += rev
-      }
+      const phases = getProjectPhases(p, projectTerms, today)
+      const entries = scopedEntries.filter(e => e.project_id === p.id)
+      const totals = commercialRevenueByMonth(p, phases, entries, rateCardLookup, assignmentLookup, today)
+      const current = phaseForDate(phases,today)
+      map[p.id] = { project:p, type:current?.terms==='lump_sum'?'lump_sum':'time_and_materials', recognized:Object.entries(totals).reduce((sum,[month,value])=>sum+(inPeriod(month)?value:0),0), thisMonth:totals[curMonth]||0, hours:entries.reduce((sum,e)=>sum+(e.hours||0),0) }
     })
     return Object.values(map)
-  }, [revenueProjects, scopedEntries, periodMonths, rateCardLookup, assignmentLookup, today, curMonth])
+  }, [revenueProjects, scopedEntries, periodMonths, rateCardLookup, assignmentLookup, projectTerms, today, curMonth])
 
   // ============ KPIS ============
   const kpis = useMemo(() => {
     const active = revenueProjects.filter(p => p.status === 'active' && !p.is_change_order)
-    const lsCount = active.filter(p => getContractType(p) === 'lump_sum').length
+    const lsCount = active.filter(p => phaseForDate(getProjectPhases(p,projectTerms,today),today)?.terms === 'lump_sum').length
     const recognized = perProject.reduce((s, r) => s + r.recognized, 0)
     const monthLS = perProject.filter(r => r.type === 'lump_sum').reduce((s, r) => s + r.thisMonth, 0)
     const monthTM = perProject.filter(r => r.type !== 'lump_sum').reduce((s, r) => s + r.thisMonth, 0)
     // Run rate: sum of monthly fees on active, unexpired LS scopes
-    const runningLS = revenueProjects.filter(p => p.status === 'active' && getContractType(p) === 'lump_sum')
-      .map(p => calcLSRecognition(p, today)).filter(ls => !ls.ended)
-    const runRate = runningLS.reduce((s, ls) => s + ls.monthlyFee, 0)
+    const runningLS = revenueProjects.filter(p=>p.status==='active').map(p=>phaseForDate(getProjectPhases(p,projectTerms,today),today)).filter(p=>p?.terms==='lump_sum')
+    const runRate = runningLS.reduce((s, phase) => s + (phase?.monthly_fee||0), 0)
     return { activeCount: active.length, lsCount, tmCount: active.length - lsCount, recognized, monthLS, monthTM, runRate }
-  }, [revenueProjects, perProject, today])
+  }, [revenueProjects, perProject, projectTerms, today])
 
   // Renewal watch + data-quality flags
-  const renewals = useMemo(() => getRenewalWatch(scopedProjects, today, 60), [scopedProjects, today])
-  const missingEnd = useMemo(() => revenueProjects.filter(p =>
-    p.status === 'active' && getContractType(p) === 'lump_sum' && !p.end_date && (p.fixed_amount || 0) > 0
-  ), [revenueProjects, today])
+  const currentFeeProjects = useMemo(() => revenueProjects.flatMap(p => {
+    const phase = phaseForDate(getProjectPhases(p, projectTerms, today), today)
+    return phase?.terms === 'lump_sum' ? [{ ...p, budget_type: 'lump_sum', fixed_amount: phase.monthly_fee || 0, end_date: phase.effective_end }] : []
+  }), [revenueProjects, projectTerms, today])
+  const renewals = useMemo(() => getRenewalWatch(currentFeeProjects, today, 60), [currentFeeProjects, today])
+  const missingEnd = useMemo(() => currentFeeProjects.filter(p =>
+    p.status === 'active' && !p.end_date && (p.fixed_amount || 0) > 0
+  ), [currentFeeProjects])
   const runRateAfter = useMemo(() => {
     if (renewals.length === 0) return null
     const expiring = renewals.reduce((s, r) => s + (r.project.fixed_amount || 0), 0)
@@ -150,20 +141,16 @@ export default function DashboardSection({ projects, clients, timesheets, billRa
       let ls = 0, tm = 0
       if (mk <= curMonth) {
         revenueProjects.forEach(p => {
-          if (getContractType(p) === 'lump_sum') {
-            const rec = calcLSRecognition(p, today)
-            if (rec.recognizedMonths.includes(mk)) ls += rec.monthlyFee
-          }
-        })
-        scopedEntries.forEach(e => {
-          const p = projectById[e.project_id]
-          if (p && getContractType(p) !== 'lump_sum' && monthKeyOf(e.date) === mk)
-            tm += entryRevenue(e, p, rateCardLookup, assignmentLookup)
+          const phases = getProjectPhases(p,projectTerms,today)
+          const entries = scopedEntries.filter(e=>e.project_id===p.id)
+          const fees = commercialRevenueByMonth(p,phases,[],rateCardLookup,assignmentLookup,today)[mk]||0
+          const total = commercialRevenueByMonth(p,phases,entries,rateCardLookup,assignmentLookup,today)[mk]||0
+          ls += fees; tm += total-fees
         })
       }
       return { mk, label: monthLabel(mk), ls, tm, total: ls + tm, future: mk > curMonth, current: mk === curMonth }
     })
-  }, [curYear, curMonth, revenueProjects, scopedEntries, projectById, rateCardLookup, assignmentLookup, today])
+  }, [curYear, curMonth, revenueProjects, scopedEntries, projectById, rateCardLookup, assignmentLookup, projectTerms, today])
   const chartMax = Math.max(...monthly.map(m => m.total), 1)
 
   // ============ SERVICE LINE + CLIENT BREAKDOWNS ============
@@ -192,10 +179,10 @@ export default function DashboardSection({ projects, clients, timesheets, billRa
   const periodOptions = (Object.keys(PERIOD_LABELS) as Period[]).map(p => ({ id: p, label: PERIOD_LABELS[p] }))
 
   const kpiCards = [
-    { label: 'Active Projects', color: BLUEPRINT.midnight, node: <span className="tabular-nums">{kpis.activeCount}</span>, detail: <><b className="text-slate-600">{kpis.lsCount}</b> Lump Sum · <b className="text-slate-600">{kpis.tmCount}</b> T&M</> },
+    { label: 'Active Projects', color: BLUEPRINT.midnight, node: <span className="tabular-nums">{kpis.activeCount}</span>, detail: <><b className="text-slate-600">{kpis.lsCount}</b> Monthly fee · <b className="text-slate-600">{kpis.tmCount}</b> T&M</> },
     { label: `Recognized · ${PERIOD_LABELS[period]}`, color: BLUEPRINT.blue, node: <KpiValue amount={kpis.recognized} />, detail: <>Earned to date only — no future months</> },
-    { label: `This Month · ${monthLabel(curMonth)}`, color: BLUEPRINT.blue, node: <KpiValue amount={kpis.monthLS + kpis.monthTM} />, detail: <><b className="text-slate-600">{formatCompactCurrency(kpis.monthLS)}</b> LS · <b className="text-slate-600">{formatCompactCurrency(kpis.monthTM)}</b> T&M so far</> },
-    { label: 'LS Run Rate', color: BLUEPRINT.copper, node: <><KpiValue amount={kpis.runRate} /><span className="text-base text-slate-400 font-semibold">/mo</span></>, detail: runRateAfter ? <>Drops to <b className="text-slate-600">{formatCompactCurrency(runRateAfter.drop)}</b> after {formatDateShort(runRateAfter.firstDate)} unless renewed</> : <>Active lump-sum scopes</> },
+    { label: `This Month · ${monthLabel(curMonth)}`, color: BLUEPRINT.blue, node: <KpiValue amount={kpis.monthLS + kpis.monthTM} />, detail: <><b className="text-slate-600">{formatCompactCurrency(kpis.monthLS)}</b> Fee · <b className="text-slate-600">{formatCompactCurrency(kpis.monthTM)}</b> T&M so far</> },
+    { label: 'Monthly fee run rate', color: BLUEPRINT.copper, node: <><KpiValue amount={kpis.runRate} /><span className="text-base text-slate-400 font-semibold">/mo</span></>, detail: runRateAfter ? <>Drops to <b className="text-slate-600">{formatCompactCurrency(runRateAfter.drop)}</b> after {formatDateShort(runRateAfter.firstDate)} unless renewed</> : <>Active monthly-fee scopes</> },
   ]
 
   return (
@@ -207,10 +194,10 @@ export default function DashboardSection({ projects, clients, timesheets, billRa
           <AlertTriangle size={16} className="mt-0.5 shrink-0" style={{ color: BLUEPRINT.copper }} />
           <div className="text-[#9a3412] leading-relaxed">
             {renewals.length > 0 && (
-              <div><b>{renewals.length} lump-sum scope{renewals.length > 1 ? 's' : ''} end{renewals.length === 1 ? 's' : ''} within 60 days</b> — {renewals.map(r => `${r.project.name} (${formatDateShort(r.project.end_date)} · ${r.days}d)`).join(', ')}. Revenue stops accruing at end date.</div>
+              <div><b>{renewals.length} monthly-fee scope{renewals.length > 1 ? 's' : ''} end{renewals.length === 1 ? 's' : ''} within 60 days</b> — {renewals.map(r => `${r.project.name} (${formatDateShort(r.project.end_date)} · ${r.days}d)`).join(', ')}. Revenue stops accruing at end date.</div>
             )}
             {missingEnd.length > 0 && (
-              <div className="mt-0.5"><b>{missingEnd.length} lump-sum scope{missingEnd.length > 1 ? 's have' : ' has'} no end date</b> — {missingEnd.map(p => p.name).join(', ')}. LS can't reconcile without one; recognition runs open-ended until set.</div>
+              <div className="mt-0.5"><b>{missingEnd.length} monthly-fee scope{missingEnd.length > 1 ? 's have' : ' has'} no end date</b> — {missingEnd.map(p => p.name).join(', ')}. Monthly fees need an end date to reconcile without one; recognition runs open-ended until set.</div>
             )}
           </div>
           <span className="ml-auto shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap"
@@ -251,7 +238,7 @@ export default function DashboardSection({ projects, clients, timesheets, billRa
                 ) : (
                   <div className="w-full max-w-[34px] rounded-t-md overflow-hidden flex flex-col justify-end transition-all hover:brightness-110"
                     style={{ height: `${Math.max((m.total / chartMax) * 100, m.total > 0 ? 3 : 0)}%`, outline: m.current ? `2px solid ${BLUEPRINT.emerald}` : 'none', outlineOffset: 2 }}
-                    title={`${m.label}: ${formatCurrency(m.total)} (LS ${formatCurrency(m.ls)} · T&M ${formatCurrency(m.tm)})`}>
+                    tabIndex={0} aria-label={`${m.label}: ${formatCurrency(m.total)}`} title={`${m.label}: ${formatCurrency(m.total)} (Monthly fee ${formatCurrency(m.ls)} · T&M ${formatCurrency(m.tm)})`}>
                     {m.tm > 0 && <div style={{ height: `${(m.tm / m.total) * 100}%`, background: BLUEPRINT.copper }} />}
                     {m.ls > 0 && <div style={{ height: `${(m.ls / m.total) * 100}%`, background: BLUEPRINT.blue }} />}
                   </div>
@@ -261,7 +248,7 @@ export default function DashboardSection({ projects, clients, timesheets, billRa
             ))}
           </div>
           <div className="flex items-center gap-4 mt-3.5 text-[12px] text-slate-500">
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: BLUEPRINT.blue }} />Lump Sum (monthly fee)</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: BLUEPRINT.blue }} />Monthly fee</span>
             <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: BLUEPRINT.copper }} />T&M (hours × rate)</span>
             <span className="ml-auto text-[10px] font-bold" style={{ color: BLUEPRINT.emerald, letterSpacing: '0.1em', ...AR }}>● CURRENT MONTH</span>
           </div>
@@ -313,7 +300,7 @@ export default function DashboardSection({ projects, clients, timesheets, billRa
                   <td className="py-3 px-3 border-b border-slate-50 font-semibold text-slate-900">{c.name}</td>
                   <td className="py-3 px-3 border-b border-slate-50 text-right tabular-nums">{c.count}</td>
                   <td className="py-3 px-3 border-b border-slate-50 text-right whitespace-nowrap">
-                    {c.ls > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full mr-1" style={{ background: BLUEPRINT.blueSoft, color: BLUEPRINT.blue }}>{c.ls} LS</span>}
+                    {c.ls > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full mr-1" style={{ background: BLUEPRINT.blueSoft, color: BLUEPRINT.blue }}>{c.ls} Fee</span>}
                     {c.tm > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: BLUEPRINT.copperSoft, color: BLUEPRINT.copper }}>{c.tm} TM</span>}
                   </td>
                   <td className="py-3 px-3 border-b border-slate-50 text-right tabular-nums">{formatCompactCurrency(c.thisMonth)}</td>
