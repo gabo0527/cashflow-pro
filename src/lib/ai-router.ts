@@ -200,7 +200,8 @@ async function callOpenAI(options: AIRequestOptions): Promise<AIResponse> {
 
   const body: any = {
     model: OPENAI_MODEL,
-    max_tokens: options.maxTokens || 2048,
+    // Current Chat Completions models reject the deprecated max_tokens field.
+    max_completion_tokens: options.maxTokens || 2048,
     messages,
   }
 
@@ -312,7 +313,8 @@ export async function aiStructured<T = any>(
     systemPrompt: (systemPrompt || '') + '\n\nRespond with valid JSON only. No markdown, no backticks, no preamble.',
     taskType: 'structured',
     jsonMode: true,
-    temperature: 0.1,
+    // Use provider defaults: current Claude and reasoning models reject
+    // non-default temperature values, including during provider failover.
   })
 
   if (result.parsedJson) {
