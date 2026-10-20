@@ -594,19 +594,49 @@ export default function ResourceReportBuilder({
                 Actual submitted hours · Monday–Sunday weeks
               </p>
               {rows.length > 0 && (
-                <div className="mt-5 rounded-xl bg-slate-50 border border-slate-200 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">
-                    Selected reporting period
-                  </p>
-                  <p className="text-2xl font-bold text-[#24333b] mt-1">
-                    {hoursLabel(rows.reduce((sum, row) => sum + row.hours, 0))}{" "}
-                    hrs
-                  </p>
+                <div
+                  className={`mt-6 grid gap-3 ${mtd.length === 1 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
+                >
+                  <div className="rounded-xl bg-[#24333b] p-4 text-white">
+                    <p className="text-[10px] uppercase tracking-widest text-slate-300">
+                      Reporting period
+                    </p>
+                    <p className="text-3xl font-bold mt-2 tabular-nums">
+                      {hoursLabel(
+                        rows.reduce((sum, row) => sum + row.hours, 0),
+                      )}
+                      <span className="text-base font-normal ml-1">hrs</span>
+                    </p>
+                  </div>
+                  {mtd.length === 1 && (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-[10px] uppercase tracking-widest text-slate-500">
+                        Month to date
+                      </p>
+                      <p className="text-3xl font-bold mt-2 tabular-nums">
+                        {hoursLabel(mtd[0].hours)}
+                        <span className="text-base font-normal ml-1">hrs</span>
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Through {reportDate(mtd[0].end)}
+                      </p>
+                    </div>
+                  )}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-[10px] uppercase tracking-widest text-slate-500">
+                      Resources
+                    </p>
+                    <p className="text-3xl font-bold mt-2 tabular-nums">
+                      {new Set(rows.map((row) => row.resource)).size}
+                    </p>
+                  </div>
                 </div>
               )}
               {mtd.length > 0 && (
-                <section aria-label="Month-to-date hours" className="mt-5">
-                  <h3 className="font-semibold text-sm">Month-to-date hours</h3>
+                <section aria-label="Month-to-date hours" className="mt-7">
+                  <h3 className="text-base font-bold border-l-4 border-[#c2660c] pl-3">
+                    Month-to-date hours
+                  </h3>
                   <p className="text-xs text-slate-500 mt-1">
                     Includes earlier submissions in each month for the same
                     selected projects and resources. These hours provide context
@@ -617,20 +647,19 @@ export default function ResourceReportBuilder({
                       key={month.start}
                       className="mt-3 rounded-xl border border-slate-200 overflow-hidden"
                     >
-                      <div className="flex justify-between gap-3 bg-slate-50 px-3 py-3 text-sm">
+                      <div className="flex justify-between gap-3 bg-[#24333b] text-white px-4 py-3 text-sm">
                         <span>
                           {reportDate(month.start)} – {reportDate(month.end)}
                         </span>
-                        <strong className="shrink-0 text-[#c2660c]">
+                        <strong className="shrink-0 text-white">
                           {hoursLabel(month.hours)} hrs MTD
                         </strong>
                       </div>
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="text-left text-slate-500">
-                            <th className="px-3 py-2 font-medium">
-                              Resource / project
-                            </th>
+                            <th className="px-3 py-2 font-medium">Project</th>
+                            <th className="px-3 py-2 font-medium">Resource</th>
                             <th className="px-3 py-2 text-right font-medium">
                               MTD hours
                             </th>
@@ -642,14 +671,12 @@ export default function ResourceReportBuilder({
                               key={resource.key}
                               className="border-t border-slate-100"
                             >
-                              <td className="px-3 py-2">
+                              <td className="px-3 py-3 text-slate-500">
+                                {resource.client ? `${resource.client} / ` : ""}
+                                {resource.project}
+                              </td>
+                              <td className="px-3 py-3 font-semibold">
                                 {resource.resource}
-                                <span className="block text-slate-500">
-                                  {resource.client
-                                    ? `${resource.client} / `
-                                    : ""}
-                                  {resource.project}
-                                </span>
                               </td>
                               <td className="px-3 py-2 text-right tabular-nums">
                                 {hoursLabel(resource.hours)}
@@ -668,8 +695,25 @@ export default function ResourceReportBuilder({
                 </p>
               )}
               <BudgetUtilizationPreview rows={utilization} />
+              {rows.length > 0 && (
+                <div className="mt-9 mb-4 border-t-2 border-slate-200 pt-6">
+                  <h3 className="text-lg font-bold border-l-4 border-[#c2660c] pl-3">
+                    Weekly work detail
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-2">
+                    Submitted hours and reviewed work summaries, grouped by
+                    project and resource.
+                  </p>
+                </div>
+              )}
               {rows.map((row, index) => {
                 const previous = rows[index - 1],
+                  next = rows[index + 1],
+                  lastInProject =
+                    !next ||
+                    next.week !== row.week ||
+                    next.project !== row.project ||
+                    next.client !== row.client,
                   section =
                     !previous ||
                     previous.week !== row.week ||
@@ -678,23 +722,25 @@ export default function ResourceReportBuilder({
                 return (
                   <React.Fragment key={row.key}>
                     {section && (
-                      <div className="mt-7 mb-2 border-b pb-2">
-                        <p className="text-[11px] uppercase tracking-wide font-semibold text-[#c2660c]">
+                      <div className="mt-5 bg-[#24333b] text-white rounded-t-xl px-5 py-4">
+                        <p className="text-[10px] uppercase tracking-widest font-semibold text-slate-300">
                           Week of {reportDate(row.week)} –{" "}
                           {reportDate(shiftDate(row.week, 6))}
                         </p>
-                        <h3 className="font-semibold text-sm mt-1">
+                        <h3 className="font-bold text-base mt-2">
                           {row.client ? `${row.client} / ` : ""}
                           {row.project}
                         </h3>
                       </div>
                     )}
-                    <section className="py-4 border-b border-slate-100">
+                    <section
+                      className={`p-5 border-x border-b border-slate-200 bg-white ${lastInProject ? "rounded-b-xl mb-5" : ""}`}
+                    >
                       <div className="flex justify-between gap-4">
                         <h4 className="font-semibold text-sm">
                           {row.resource}
                         </h4>
-                        <span className="shrink-0 tabular-nums font-semibold text-sm">
+                        <span className="shrink-0 tabular-nums font-bold text-sm text-[#c2660c] bg-orange-50 px-3 py-1 rounded-lg">
                           {hoursLabel(row.hours)} hrs
                         </span>
                       </div>
@@ -716,7 +762,7 @@ export default function ResourceReportBuilder({
                             : "No description submitted."
                         }
                         rows={3}
-                        className="w-full text-sm leading-relaxed text-slate-600 mt-2 p-2 -ml-2 rounded-md border border-transparent hover:border-slate-200 focus:border-blue-400 focus:outline-none resize-y"
+                        className="w-full text-sm leading-relaxed text-slate-600 mt-3 p-3 rounded-lg bg-slate-50 border border-slate-100 hover:border-slate-300 focus:border-blue-400 focus:outline-none resize-y"
                       />
                       {row.missingDescriptions > 0 && (
                         <p className="text-xs text-amber-700">
