@@ -7,6 +7,7 @@ import {
   mondayOf,
   reportDate,
   reportRows,
+  reportMonthTotals,
   ResourceSubmission,
   shiftDate,
 } from "@/lib/resource-report";
@@ -99,6 +100,7 @@ export default function ResourceReportBuilder({
   const [month, setMonth] = useState(today().slice(0, 7));
   const [from, setFrom] = useState(shiftDate(mondayOf(today()), -7)),
     [to, setTo] = useState(shiftDate(mondayOf(today()), -1));
+  const [includeMtd, setIncludeMtd] = useState(true);
   const [title, setTitle] = useState("Weekly Resource Report");
   const [summaries, setSummaries] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false),
@@ -146,6 +148,28 @@ export default function ResourceReportBuilder({
           }))
         : [],
     [entries, start, end, selectedProjects, selectedResources, validRange],
+  );
+  const mtd = useMemo(
+    () =>
+      validRange && includeMtd
+        ? reportMonthTotals(
+            entries,
+            start,
+            end,
+            selectedProjects,
+            selectedResources,
+            today(),
+          )
+        : [],
+    [
+      entries,
+      start,
+      end,
+      selectedProjects,
+      selectedResources,
+      validRange,
+      includeMtd,
+    ],
   );
   const missing = rows.filter(
     (row) => row.notes.length && !summaries[row.key]?.trim(),
@@ -232,6 +256,7 @@ export default function ResourceReportBuilder({
         end,
         title.trim() || "Weekly Resource Report",
         png,
+        mtd,
       );
       const url = URL.createObjectURL(
         new Blob([new Uint8Array(bytes)], { type: "application/pdf" }),
@@ -391,6 +416,22 @@ export default function ResourceReportBuilder({
                   selected to report on a resource across their projects.
                 </p>
               </div>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  aria-label="Include month-to-date hours"
+                  checked={includeMtd}
+                  onChange={(e) => setIncludeMtd(e.target.checked)}
+                  className="mt-1"
+                />
+                <span>
+                  Include month-to-date hours
+                  <span className="block text-xs text-slate-500 mt-1">
+                    From the first of each month through the report cutoff,
+                    capped at today. Uses your selected projects and resources.
+                  </span>
+                </span>
+              </label>
               <div className="border-t pt-4">
                 <button
                   onClick={generate}
@@ -448,6 +489,75 @@ export default function ResourceReportBuilder({
               <p className="text-xs text-slate-500 mt-1">
                 Actual submitted hours · Monday–Sunday weeks
               </p>
+              {rows.length > 0 && (
+                <div className="mt-5 rounded-xl bg-slate-50 border border-slate-200 p-4">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">
+                    Selected reporting period
+                  </p>
+                  <p className="text-2xl font-bold text-[#24333b] mt-1">
+                    {hoursLabel(rows.reduce((sum, row) => sum + row.hours, 0))}{" "}
+                    hrs
+                  </p>
+                </div>
+              )}
+              {mtd.length > 0 && (
+                <section aria-label="Month-to-date hours" className="mt-5">
+                  <h3 className="font-semibold text-sm">Month-to-date hours</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Includes earlier submissions in each month for the same
+                    selected projects and resources. These hours provide context
+                    and are not added to the reporting-period total.
+                  </p>
+                  {mtd.map((month) => (
+                    <div
+                      key={month.start}
+                      className="mt-3 rounded-xl border border-slate-200 overflow-hidden"
+                    >
+                      <div className="flex justify-between gap-3 bg-slate-50 px-3 py-3 text-sm">
+                        <span>
+                          {reportDate(month.start)} – {reportDate(month.end)}
+                        </span>
+                        <strong className="shrink-0 text-[#c2660c]">
+                          {hoursLabel(month.hours)} hrs MTD
+                        </strong>
+                      </div>
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-left text-slate-500">
+                            <th className="px-3 py-2 font-medium">
+                              Resource / project
+                            </th>
+                            <th className="px-3 py-2 text-right font-medium">
+                              MTD hours
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {month.resources.map((resource) => (
+                            <tr
+                              key={resource.key}
+                              className="border-t border-slate-100"
+                            >
+                              <td className="px-3 py-2">
+                                {resource.resource}
+                                <span className="block text-slate-500">
+                                  {resource.client
+                                    ? `${resource.client} / `
+                                    : ""}
+                                  {resource.project}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-right tabular-nums">
+                                {hoursLabel(resource.hours)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                </section>
+              )}
               {!rows.length && (
                 <p className="my-12 text-center text-slate-500">
                   No submitted hours match this period and selection.

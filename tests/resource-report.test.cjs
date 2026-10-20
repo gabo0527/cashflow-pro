@@ -74,9 +74,29 @@ test('builder applies project and resource choices and preserves edited summarie
     await act(async()=>button('Full month').props.onClick());
     await act(async()=>tree.root.findByProps({'aria-label':'Report month'}).props.onChange({target:{value:'2026-10'}}));
     let boxes=tree.root.findAllByType('textarea'); assert.equal(boxes.length,3);
+    assert.equal(tree.root.findAllByProps({'aria-label':'Month-to-date hours'}).length,1);
+    await act(async()=>tree.root.findByProps({'aria-label':'Include month-to-date hours'}).props.onChange({target:{checked:false}}));
+    assert.equal(tree.root.findAllByProps({'aria-label':'Month-to-date hours'}).length,0);
     await act(async()=>boxes[0].props.onChange({target:{value:'Reviewed and approved summary.'}}));
     await act(async()=>button('Draft work summaries').props.onClick());
     boxes=tree.root.findAllByType('textarea'); assert.equal(boxes[0].props.value,'Reviewed and approved summary.'); assert.equal(boxes[2].props.value,'Drafted weekly summary.'); assert.equal(requests.flatMap(r=>r.lines).length,1);
     await act(async()=>tree.unmount());
   } finally { global.fetch = original }
+});
+
+test('MTD includes earlier monthly submissions outside the selected week and respects both filters', () => {
+  const weekly = lib.reportRows(fixture,'2026-10-05','2026-10-11',['p','q'],['a']);
+  const mtd = lib.reportMonthTotals(fixture,'2026-10-05','2026-10-11',['p','q'],['a']);
+  assert.equal(weekly.reduce((sum,row)=>sum+row.hours,0),3);
+  assert.equal(mtd.length,1);assert.equal(mtd[0].start,'2026-10-01');assert.equal(mtd[0].end,'2026-10-11');assert.equal(mtd[0].hours,15.5);
+  assert.deepEqual(mtd[0].resources.map(row=>row.hours).sort((a,b)=>a-b),[3,12.5]);
+  assert.equal(lib.reportMonthTotals(fixture,'2026-10-05','2026-10-11',['p'],['a'])[0].hours,12.5);
+  assert.equal(lib.reportMonthTotals(fixture,'2026-10-05','2026-10-11',['p'],['b'])[0].hours,2);
+  assert.ok(!JSON.stringify(mtd).includes('bill_rate'));
+});
+test('MTD keeps months separate, caps current totals at today, and never double counts weekly cumulative values', () => {
+  const mtd=lib.reportMonthTotals(fixture,'2026-09-29','2026-10-31',['p','q'],['a','b'],'2026-10-02');
+  assert.deepEqual(mtd.map(month=>[month.start,month.end,month.hours]),[['2026-09-01','2026-09-30',7],['2026-10-01','2026-10-02',12.5]]);
+  assert.deepEqual(lib.reportMonthTotals(fixture,'2026-11-01','2026-11-30',['p'],['a'],'2026-10-20'),[]);
+  assert.equal(lib.reportMonthTotals(fixture,'2026-10-01','2026-10-31',['p','q'],['a','b'])[0].hours,17.5);
 });

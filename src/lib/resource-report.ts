@@ -93,3 +93,76 @@ export const reportDate = (iso: string) =>
     year: "numeric",
     timeZone: "UTC",
   });
+
+export interface ReportMonthTotal {
+  start: string;
+  end: string;
+  hours: number;
+  resources: {
+    key: string;
+    resource: string;
+    project: string;
+    client: string;
+    hours: number;
+  }[];
+}
+// MTD starts on the first of the month, even when the weekly report starts later.
+// Each month has its own cutoff; totals are never summed across weekly rows.
+export function reportMonthTotals(
+  entries: ResourceSubmission[],
+  start: string,
+  end: string,
+  projects: string[],
+  resources: string[],
+  asOf = end,
+): ReportMonthTotal[] {
+  const cutoff = end < asOf ? end : asOf;
+  if (!start || !end || start > cutoff) return [];
+  const results: ReportMonthTotal[] = [];
+  let month = `${start.slice(0, 7)}-01`;
+  while (month <= cutoff) {
+    const next = new Date(`${month}T12:00:00Z`);
+    next.setUTCMonth(next.getUTCMonth() + 1);
+    const nextMonth = next.toISOString().slice(0, 10);
+    const monthEnd = shiftDate(nextMonth, -1);
+    const through = monthEnd < cutoff ? monthEnd : cutoff;
+    const totals = new Map<string, ReportMonthTotal["resources"][number]>();
+    for (const entry of entries) {
+      const date = entry.date.slice(0, 10),
+        hours = Number(entry.hours);
+      if (
+        date < month ||
+        date > through ||
+        !projects.includes(entry.project_id) ||
+        !resources.includes(entry.team_member_id) ||
+        !Number.isFinite(hours) ||
+        hours <= 0
+      )
+        continue;
+      const key = JSON.stringify([entry.project_id, entry.team_member_id]);
+      const row = totals.get(key) || {
+        key,
+        resource: entry.team_member_name,
+        project: entry.project_name,
+        client: entry.client_name,
+        hours: 0,
+      };
+      row.hours += hours;
+      totals.set(key, row);
+    }
+    const people = Array.from(totals.values()).sort(
+      (a, b) =>
+        a.client.localeCompare(b.client) ||
+        a.project.localeCompare(b.project) ||
+        a.resource.localeCompare(b.resource),
+    );
+    results.push({
+      start: month,
+      end: through,
+      hours: people.reduce((sum, row) => sum + row.hours, 0),
+      resources: people,
+    });
+    month = nextMonth;
+  }
+  return results;
+}
