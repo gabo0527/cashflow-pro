@@ -3,6 +3,7 @@ import {
   hoursLabel,
   reportDate,
   ResourceReportRow,
+  ReportMonthTotal,
   shiftDate,
 } from "./resource-report";
 // This public document receives only report fields, never full time entries.
@@ -13,6 +14,7 @@ export async function createResourceReportPDF(
   end: string,
   title: string,
   logo?: Uint8Array,
+  mtd: ReportMonthTotal[] = [],
 ) {
   const pdf = await PDFDocument.create();
   pdf.setTitle(title);
@@ -121,6 +123,55 @@ export async function createResourceReportPDF(
     if (y - height < 65) nextPage();
   };
   header();
+  if (mtd.length) {
+    text(
+      `REPORTING PERIOD: ${hoursLabel(rows.reduce((sum, row) => sum + row.hours, 0))} hrs`,
+      42,
+      y,
+      11,
+      true,
+    );
+    y -= 24;
+    text("MONTH-TO-DATE HOURS", 42, y, 10, true, accent);
+    y -= 17;
+    for (const line of wrap(
+      "Same selected projects and resources; includes earlier submissions in each month. MTD hours are context and are not added to the reporting-period total.",
+      500,
+      9,
+    )) {
+      text(line, 42, y, 9, false, muted);
+      y -= 12;
+    }
+    y -= 8;
+    for (const month of mtd) {
+      ensure(60);
+      text(
+        `${reportDate(month.start)} - ${reportDate(month.end)}`,
+        42,
+        y,
+        10,
+        true,
+      );
+      text(`${hoursLabel(month.hours)} hrs MTD`, 445, y, 10, true, accent);
+      y -= 20;
+      for (const resource of month.resources) {
+        const lines = wrap(
+          `${resource.resource} / ${resource.client ? resource.client + " / " : ""}${resource.project}`,
+          390,
+          9,
+        );
+        ensure(lines.length * 13 + 8);
+        for (let i = 0; i < lines.length; i++) {
+          text(lines[i], 42, y, 9);
+          if (i === 0) text(`${hoursLabel(resource.hours)} hrs`, 479, y, 9);
+          y -= 13;
+        }
+        y -= 5;
+      }
+      y -= 10;
+    }
+    y -= 8;
+  }
   for (const row of rows) {
     const key = JSON.stringify([row.week, row.client, row.project]);
     const label = `${row.client ? row.client + " / " : ""}${row.project}`;
