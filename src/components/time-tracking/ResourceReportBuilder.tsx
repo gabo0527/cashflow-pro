@@ -2,6 +2,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Download, RefreshCw, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import ReportBudgetControls, {
+  ReportBudgetState,
+} from "./ReportBudgetControls";
+import BudgetUtilizationPreview from "./BudgetUtilizationPreview";
+import {
+  budgetUtilization,
+  BudgetUsageEntry,
+  BudgetProject,
+} from "@/lib/resource-report-budget";
 import {
   hoursLabel,
   mondayOf,
@@ -84,8 +93,12 @@ export default function ResourceReportBuilder({
   initialResources,
   logo,
   onClose,
+  budgetEntries = [],
+  budgetProjects = [],
 }: {
   entries: ResourceSubmission[];
+  budgetEntries?: BudgetUsageEntry[];
+  budgetProjects?: BudgetProject[];
   projects: Choice[];
   resources: Choice[];
   initialProjects: string[];
@@ -101,6 +114,15 @@ export default function ResourceReportBuilder({
   const [from, setFrom] = useState(shiftDate(mondayOf(today()), -7)),
     [to, setTo] = useState(shiftDate(mondayOf(today()), -1));
   const [includeMtd, setIncludeMtd] = useState(true);
+  const [includeBudget, setIncludeBudget] = useState(false);
+  const [showProjectBudget, setShowProjectBudget] = useState(true),
+    [showClientBudget, setShowClientBudget] = useState(true);
+  const [budgetState, setBudgetState] = useState<ReportBudgetState>({
+    budgets: [],
+    ready: false,
+    dirty: false,
+    error: false,
+  });
   const [title, setTitle] = useState("Weekly Resource Report");
   const [summaries, setSummaries] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false),
@@ -171,6 +193,42 @@ export default function ResourceReportBuilder({
       includeMtd,
     ],
   );
+  const utilization = useMemo(
+    () =>
+      includeBudget && budgetState.ready && !budgetState.dirty
+        ? budgetUtilization(
+            budgetEntries,
+            budgetProjects,
+            budgetState.budgets,
+            selectedProjects,
+            start,
+            end,
+            today(),
+          ).filter((row) =>
+            row.level === "project" ? showProjectBudget : showClientBudget,
+          )
+        : [],
+    [
+      includeBudget,
+      budgetState,
+      budgetEntries,
+      budgetProjects,
+      selectedProjects,
+      start,
+      end,
+      showProjectBudget,
+      showClientBudget,
+    ],
+  );
+  const budgetBlocked =
+    includeBudget &&
+    (!budgetState.ready ||
+      budgetState.dirty ||
+      budgetState.error ||
+      !utilization.length ||
+      utilization.some(
+        (row) => row.weekPercent === null || row.mtdPercent === null,
+      ));
   const missing = rows.filter(
     (row) => row.notes.length && !summaries[row.key]?.trim(),
   );
@@ -232,6 +290,7 @@ export default function ResourceReportBuilder({
     }
   };
   const download = async () => {
+    if (budgetBlocked) return;
     setDownloading(true);
     setError("");
     try {
@@ -257,6 +316,7 @@ export default function ResourceReportBuilder({
         title.trim() || "Weekly Resource Report",
         png,
         mtd,
+        utilization,
       );
       const url = URL.createObjectURL(
         new Blob([new Uint8Array(bytes)], { type: "application/pdf" }),
@@ -298,7 +358,11 @@ export default function ResourceReportBuilder({
             <button
               onClick={download}
               disabled={
-                !rows.length || missing.length > 0 || busy || downloading
+                !rows.length ||
+                missing.length > 0 ||
+                busy ||
+                downloading ||
+                budgetBlocked
               }
               className="flex gap-2 items-center rounded-lg bg-white text-slate-900 px-4 py-2 font-semibold disabled:opacity-40"
             >
@@ -432,6 +496,46 @@ export default function ResourceReportBuilder({
                   </span>
                 </span>
               </label>
+              <ReportBudgetControls
+                enabled={includeBudget}
+                onToggle={setIncludeBudget}
+                start={start}
+                end={end}
+                projects={budgetProjects.filter((p) =>
+                  selectedProjects.includes(p.id),
+                )}
+                onState={setBudgetState}
+              />
+              {includeBudget && (
+                <div className="space-y-2 text-xs">
+                  <label className="flex gap-2">
+                    <input
+                      aria-label="Show project utilization"
+                      type="checkbox"
+                      checked={showProjectBudget}
+                      onChange={(e) => setShowProjectBudget(e.target.checked)}
+                    />
+                    Project utilization
+                  </label>
+                  <label className="flex gap-2">
+                    <input
+                      aria-label="Show client utilization"
+                      type="checkbox"
+                      checked={showClientBudget}
+                      onChange={(e) => setShowClientBudget(e.target.checked)}
+                    />
+                    Client summary
+                  </label>
+                  {budgetBlocked && (
+                    <p className="text-amber-700">
+                      Save an included monthly budget for the selected projects
+                      to share utilization. Missing bill rates must be completed
+                      in project setup. You can also turn budget utilization
+                      off.
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="border-t pt-4">
                 <button
                   onClick={generate}
@@ -563,6 +667,7 @@ export default function ResourceReportBuilder({
                   No submitted hours match this period and selection.
                 </p>
               )}
+              <BudgetUtilizationPreview rows={utilization} />
               {rows.map((row, index) => {
                 const previous = rows[index - 1],
                   section =

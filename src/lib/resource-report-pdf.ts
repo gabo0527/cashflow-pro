@@ -1,3 +1,4 @@
+import { BudgetUtilization, percentLabel } from "./resource-report-budget";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
   hoursLabel,
@@ -15,6 +16,7 @@ export async function createResourceReportPDF(
   title: string,
   logo?: Uint8Array,
   mtd: ReportMonthTotal[] = [],
+  utilization: BudgetUtilization[] = [],
 ) {
   const pdf = await PDFDocument.create();
   pdf.setTitle(title);
@@ -171,6 +173,65 @@ export async function createResourceReportPDF(
       y -= 10;
     }
     y -= 8;
+  }
+  if (utilization.length) {
+    ensure(95);
+    text("MONTHLY BUDGET UTILIZATION", 42, y, 10, true, accent);
+    y -= 18;
+    for (const line of wrap(
+      "Full project usage across all resources. Both percentages use the monthly allocation. Client totals combine configured selected projects only. Submitted billable hours are shown.",
+      500,
+      9,
+    )) {
+      text(line, 42, y, 9, false, muted);
+      y -= 12;
+    }
+    y -= 10;
+    for (const row of utilization) {
+      const lines = wrap(
+        `${row.level === "client" ? "Client: " : ""}${row.name}${row.level === "project" && row.client ? " / " + row.client : ""}`,
+        500,
+        10,
+        true,
+      );
+      ensure(lines.length * 14 + 72);
+      for (const line of lines) {
+        text(line, 42, y, 10, true);
+        y -= 14;
+      }
+      text(
+        `Week: ${reportDate(row.weekStart)} - ${reportDate(row.weekEnd)}`,
+        42,
+        y,
+        9,
+        false,
+        muted,
+      );
+      y -= 13;
+      text(
+        `MTD: ${reportDate(row.month)} - ${reportDate(row.mtdEnd)}${row.level === "client" ? ` | ${row.projectCount} configured project(s)` : ""}`,
+        42,
+        y,
+        9,
+        false,
+        muted,
+      );
+      y -= 16;
+      text(
+        `Week: ${hoursLabel(row.weekHours)} hrs | ${percentLabel(row.weekPercent)} used`,
+        42,
+        y,
+        10,
+      );
+      text(
+        `MTD: ${hoursLabel(row.mtdHours)} hrs | ${percentLabel(row.mtdPercent)} used`,
+        300,
+        y,
+        10,
+      );
+      y -= 25;
+    }
+    y -= 10;
   }
   for (const row of rows) {
     const key = JSON.stringify([row.week, row.client, row.project]);
