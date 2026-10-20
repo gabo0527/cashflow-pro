@@ -2,7 +2,7 @@ const test = require('node:test'), assert = require('node:assert/strict'), fs = 
 function load(file, mocks = {}) {
   const module = { exports: {} }, filename = path.join(__dirname, '..', file);
   const source = ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React, esModuleInterop: true } }).outputText;
-  vm.runInThisContext(`(function(require,module,exports){${source}\n})`, { filename })((name) => Object.hasOwn(mocks, name) ? mocks[name] : require(name), module, module.exports);
+  vm.runInThisContext(`(function(require,module,exports){${source}\n})`, { filename })((name) => Object.hasOwn(mocks, name) ? mocks[name] : name === './resource-report-budget' || name === '@/lib/resource-report-budget' ? load('src/lib/resource-report-budget.ts', {'./resource-report':load('src/lib/resource-report.ts')}) : name === './ReportBudgetControls' || name === './BudgetUtilizationPreview' ? {__esModule:true, default:()=>null} : require(name), module, module.exports);
   return module.exports;
 }
 const lib = load('src/lib/resource-report.ts');
