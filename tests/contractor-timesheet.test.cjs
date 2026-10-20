@@ -258,6 +258,7 @@ test('actual Time Tracking Detailed view displays the correct daily descriptions
   } }
   const icons = new Proxy({ __esModule: true }, { get: (target, name) => name === '__esModule' ? true : () => null })
   const Page = loadTS('src/app/time-tracking/page.tsx', {
+    '@/components/time-tracking/ResourceReportBuilder': { __esModule: true, default: () => null },
     '@supabase/supabase-js': { createClient: () => supabase },
     '@/lib/supabase': { getCurrentUser: async () => ({ user: { id: 'admin' } }) },
     '@/components/projects/shared': loadTS('src/components/projects/shared.tsx'),

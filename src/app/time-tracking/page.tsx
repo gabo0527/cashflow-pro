@@ -13,6 +13,8 @@ import {
   PieChart as RechartsPie, Pie, LineChart, Line, Legend, Area, AreaChart, ComposedChart
 } from 'recharts'
 import { getCurrentUser } from '@/lib/supabase'
+import ResourceReportBuilder from '@/components/time-tracking/ResourceReportBuilder'
+import type { ResourceSubmission } from '@/lib/resource-report'
 import { MultiSelect } from '@/components/commercial/CommercialDocuments'
 import { getProjectPhases, phaseForDate } from '@/components/projects/shared'
 import type { ProjectPhase } from '@/components/projects/shared'
@@ -687,6 +689,7 @@ function EditableDateCell({ date, onSave }: { date: string; onSave: (newDate: st
 
 // ============ MAIN PAGE ============
 export default function TimeTrackingPage() {
+  const [showResourceReport, setShowResourceReport] = useState(false)
   const [loading, setLoading] = useState(true)
   const [entries, setEntries] = useState<TimeEntry[]>([])
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
@@ -1655,6 +1658,15 @@ ${parts.join('')}
     <div className="space-y-5">
       <ToastContainer toasts={toasts} onDismiss={id => setToasts(prev => prev.filter(t => t.id !== id))} />
 
+      {showResourceReport && <ResourceReportBuilder
+        entries={entries.map((e): ResourceSubmission => ({ date: e.date, hours: e.hours, team_member_id: e.team_member_id, team_member_name: e.team_member_name, project_id: e.project_id, project_name: e.project_name, client_name: e.client_name, notes: e.notes }))}
+        projects={projects.map(p => ({ id: p.id, label: p.name }))}
+        resources={teamMembers.map(m => ({ id: m.id, label: m.name }))}
+        initialProjects={selectedProjectIds ?? projects.filter(p => selectedClient === 'all' || p.client_id === selectedClient).map(p => p.id)}
+        initialResources={selectedEmployeeIds ?? teamMembers.map(m => m.id)}
+        logo={MANO_LOGO}
+        onClose={() => setShowResourceReport(false)}
+      />}
       {/* Header — dark page banner */}
       <div className="relative overflow-hidden rounded-2xl px-7 py-6 flex items-start justify-between gap-4" style={{ background: 'linear-gradient(135deg,#1b2431 0%,#141b24 55%,#10151c 100%)', boxShadow: '0 20px 46px -26px rgba(15,23,42,0.6)' }}>
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 13px)' }} />
@@ -1664,7 +1676,8 @@ ${parts.join('')}
           <h1 className="text-3xl font-extrabold uppercase tracking-tight text-white mt-1 leading-none" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>Time Tracking</h1>
           <p className="text-sm mt-2" style={{ color: '#8b97a7' }}>{getFilterTitle()}</p>
         </div>
-        <div className="relative flex items-center gap-2 shrink-0">
+        <div className="relative flex items-center gap-2 flex-wrap justify-end">
+          <button onClick={() => setShowResourceReport(true)} className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold bg-white text-slate-900"><FileText size={15} />Resource report</button>
           <button onClick={openPdfReport} className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.16)', color: '#e2e8f0' }}><Download size={15} />Export PDF</button>
           <button onClick={exportToCSV} className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.16)', color: '#e2e8f0' }}><FileText size={15} />Export CSV</button>
           <button onClick={() => setShowEntryModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:shadow-[0_10px_22px_-8px_rgba(37,99,235,0.75)]" style={{ background: 'linear-gradient(135deg,#2563eb,#1e3a8a)' }}><Plus size={16} />Add Entry</button>

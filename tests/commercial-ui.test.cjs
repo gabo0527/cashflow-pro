@@ -318,6 +318,7 @@ test("time tracking combines three employees, five projects and a custom date ra
     { get: (target, name) => (name === "__esModule" ? true : () => null) },
   );
   const Page = load("src/app/time-tracking/page.tsx", {
+    "@/components/time-tracking/ResourceReportBuilder": { __esModule: true, default: () => null },
     "@supabase/supabase-js": { createClient: () => supabase },
     "@/lib/supabase": {
       getCurrentUser: async () => ({ user: { id: "admin" } }),
