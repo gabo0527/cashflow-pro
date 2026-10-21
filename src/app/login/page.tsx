@@ -2,15 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowRight,
-  Building2,
-  Check,
-  Clock3,
-  FolderKanban,
-  LockKeyhole,
-  Users,
-} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import VantageLogo from "@/components/brand/VantageLogo";
 import styles from "./login.module.css";
@@ -90,55 +81,16 @@ export default function LoginPage() {
           className={styles.story}
           aria-labelledby="vantage-story-heading"
         >
-          <svg
-            className={styles.horizon}
-            viewBox="0 0 800 800"
-            fill="none"
-            aria-hidden="true"
-          >
-            <path
-              d="M-190 -90L390 900L970 -90"
-              stroke="#93c5fd"
-              strokeOpacity=".08"
-              strokeWidth="1"
-            />
-            <path
-              d="M-110 -90L390 760L890 -90"
-              stroke="#93c5fd"
-              strokeOpacity=".13"
-              strokeWidth="1"
-            />
-            <path
-              d="M-30 -90L390 620L810 -90"
-              stroke="#93c5fd"
-              strokeOpacity=".18"
-              strokeWidth="1"
-            />
-            <path
-              d="M50 -90L390 480L730 -90"
-              stroke="#ea8a2f"
-              strokeOpacity=".20"
-              strokeWidth="1"
-            />
-            <circle cx="390" cy="480" r="5" fill="#ea8a2f" />
-            <circle
-              cx="390"
-              cy="480"
-              r="13"
-              stroke="#ea8a2f"
-              strokeOpacity=".2"
-            />
-          </svg>
           <div className={styles.storyCopy}>
             <p className={styles.eyebrow}>
               <span />
               Your business, connected
             </p>
-            <h1 id="vantage-story-heading">
+            <h2 id="vantage-story-heading">
               See the
               <br />
               whole <span>picture.</span>
-            </h1>
+            </h2>
             <p className={styles.storyDescription}>
               Clients, projects, people, and time.
               <br />
@@ -146,45 +98,91 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <div className={styles.overview}>
-            <div className={styles.overviewHeading}>
-              <span className={styles.overviewSymbol}>
-                <FolderKanban size={16} aria-hidden="true" />
-              </span>
-              <span>From the big picture to the details.</span>
-            </div>
-            <div
-              className={styles.connectedWork}
-              aria-label="Clients and projects connected to people and time"
-            >
-              <div className={styles.workColumn}>
-                <span className={styles.workLabel}>The foundation</span>
-                <div>
-                  <Building2 size={17} aria-hidden="true" />
-                  <span>Clients & projects</span>
-                </div>
-              </div>
-              <ArrowRight
-                size={18}
-                className={styles.workArrow}
-                aria-hidden="true"
+          <div className={styles.brandArtwork} aria-hidden="true">
+            <svg viewBox="0 0 600 270" fill="none">
+              <defs>
+                <linearGradient
+                  id="vantage-plane-blue"
+                  x1="155"
+                  y1="25"
+                  x2="320"
+                  y2="250"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#82b8ff" />
+                  <stop offset=".45" stopColor="#3b82f6" />
+                  <stop offset="1" stopColor="#1e3a66" />
+                </linearGradient>
+                <linearGradient
+                  id="vantage-plane-copper"
+                  x1="432"
+                  y1="25"
+                  x2="270"
+                  y2="250"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#f2bc8a" />
+                  <stop offset=".48" stopColor="#df9556" />
+                  <stop offset="1" stopColor="#a75e30" />
+                </linearGradient>
+                <linearGradient
+                  id="vantage-edge"
+                  x1="0"
+                  y1="0"
+                  x2="600"
+                  y2="0"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop stopColor="#93c5fd" stopOpacity="0" />
+                  <stop offset=".5" stopColor="#93c5fd" stopOpacity=".4" />
+                  <stop offset="1" stopColor="#93c5fd" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <path d="M25 40H575M25 250H575" stroke="url(#vantage-edge)" />
+              <path
+                d="M104 20L254 260M146 20L296 260M454 20L304 260M496 20L346 260"
+                stroke="#8daacb"
+                strokeOpacity=".12"
               />
-              <div className={styles.workColumn}>
-                <span className={styles.workLabel}>The work</span>
-                <div>
-                  <Users size={17} aria-hidden="true" />
-                  <span>People & time</span>
-                </div>
-              </div>
-            </div>
-            <div className={styles.overviewFooter}>
-              <Check size={14} aria-hidden="true" />
-              <span>Connected work. Clearer decisions.</span>
-              <Clock3
-                size={14}
-                className={styles.footerClock}
-                aria-hidden="true"
+              <path
+                d="M148 33H219L324 221L286 258Z"
+                fill="url(#vantage-plane-blue)"
               />
+              <path
+                d="M381 33H452L324 258H248Z"
+                fill="url(#vantage-plane-copper)"
+              />
+              <path
+                d="M148 33H219L324 221"
+                stroke="#bad6ff"
+                strokeOpacity=".65"
+              />
+              <path
+                d="M381 33H452L324 258H248"
+                stroke="#ffd3ac"
+                strokeOpacity=".5"
+              />
+              <path
+                d="M219 33L324 221L286 258"
+                fill="#101b2b"
+                fillOpacity=".15"
+              />
+              <path
+                d="M452 33L324 258H312L440 33Z"
+                fill="#ffe3ca"
+                fillOpacity=".12"
+              />
+              <path
+                d="M48 145H124M476 145H552"
+                stroke="#849bb8"
+                strokeOpacity=".3"
+              />
+              <circle cx="48" cy="145" r="2" fill="#96b4d9" />
+              <circle cx="552" cy="145" r="2" fill="#eaaa72" />
+            </svg>
+            <div className={styles.artworkCaption}>
+              <span>Clarity through connection</span>
+              <span>VantageFP</span>
             </div>
           </div>
           <div className={styles.storyFooter}>
@@ -195,14 +193,13 @@ export default function LoginPage() {
 
         <section className={styles.signIn} aria-labelledby="sign-in-heading">
           <div className={styles.signInContent}>
-            <span className={styles.welcomeIcon}>
-              <LockKeyhole size={22} strokeWidth={1.6} aria-hidden="true" />
-            </span>
+            <div className={styles.entranceRule} aria-hidden="true">
+              <span />
+              <span />
+            </div>
             <p className={styles.formEyebrow}>Your Vantage workspace</p>
-            <h2 id="sign-in-heading">Welcome back.</h2>
-            <p className={styles.formDescription}>
-              Your next clear view starts here.
-            </p>
+            <h1 id="sign-in-heading">Welcome back.</h1>
+            <p className={styles.formDescription}>Sign in to your workspace.</p>
             <div className={styles.form}>
               {error && (
                 <div role="alert" className={styles.error}>
@@ -226,36 +223,21 @@ export default function LoginPage() {
                   {loading ? "Connecting to Google…" : "Continue with Google"}
                 </span>
                 {!loading && (
-                  <ArrowRight
-                    size={17}
-                    className={styles.buttonArrow}
-                    aria-hidden="true"
-                  />
+                  <span className={styles.buttonArrow} aria-hidden="true" />
                 )}
               </button>
               <p id="workspace-sign-in-help" className={styles.accountHelp}>
                 Use your company Google Workspace account.
               </p>
               <div className={styles.accessNote}>
-                <LockKeyhole size={15} aria-hidden="true" />
-                <p>
-                  One account. Secure access.
-                  <span>
-                    Sign in with the account connected to your organization.
-                  </span>
-                </p>
+                <span>Google Workspace</span>
+                <p>Access managed by your organization.</p>
               </div>
             </div>
             <p className={styles.legal}>
               By signing in, you agree to our <a href="/terms">Terms</a> and{" "}
               <a href="/privacy">Privacy Policy</a>.
             </p>
-          </div>
-          <div className={styles.signInFooter}>
-            <span className={styles.smallMark} aria-hidden="true">
-              V
-            </span>
-            <span>Clarity in every connection.</span>
           </div>
         </section>
       </div>
