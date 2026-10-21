@@ -1,0 +1,522 @@
+.page {
+  --login-ink: #182434;
+  --login-muted: #697586;
+  --login-line: #e1e6ec;
+  min-height: 100svh;
+  padding: 0 clamp(20px, 3.5vw, 60px);
+  background: #f7f8fa;
+  color: var(--login-ink);
+  display: flex;
+  flex-direction: column;
+}
+.header,
+.pageFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+  max-width: 1480px;
+  margin: 0 auto;
+}
+.header {
+  min-height: 102px;
+  flex-shrink: 0;
+}
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "Archivo", system-ui, sans-serif;
+  font-size: 24px;
+  letter-spacing: -0.9px;
+  font-weight: 800;
+}
+.logo svg {
+  flex-shrink: 0;
+}
+.headerCaption {
+  color: #677487;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+.workspace {
+  display: grid;
+  grid-template-columns: 1.12fr 1fr;
+  width: 100%;
+  max-width: 1480px;
+  margin: auto;
+  flex: 1;
+  min-height: 620px;
+  border: 1px solid #e1e6ed;
+  border-radius: 24px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 16px 60px -36px #18243435;
+}
+.story {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(36px, 4.5vw, 76px);
+  background: #172332;
+  color: #fff;
+}
+.story::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(ellipse at 105% 10%, #2a4e7c75, transparent 67%);
+}
+.horizon {
+  position: absolute;
+  z-index: -1;
+  width: 110%;
+  height: 110%;
+  top: -16%;
+  left: 15%;
+  pointer-events: none;
+}
+.storyCopy {
+  position: relative;
+}
+.eyebrow,
+.formEyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.17em;
+}
+.eyebrow {
+  color: #c1ccdb;
+  margin-bottom: 26px;
+}
+.eyebrow > span {
+  width: 6px;
+  height: 6px;
+  background: #ea8a2f;
+  border-radius: 50%;
+}
+.story h1 {
+  font-family: "Archivo", system-ui, sans-serif;
+  font-size: clamp(44px, 4.5vw, 74px);
+  line-height: 1.06;
+  letter-spacing: -0.055em;
+  font-weight: 700;
+}
+.story h1 > span {
+  color: #eaaa72;
+}
+.storyDescription {
+  font-size: 15px;
+  color: #b8c5d6;
+  line-height: 1.8;
+  margin-top: 25px;
+}
+.overview {
+  margin-top: 44px;
+  border: 1px solid #4b627c80;
+  background: #1e2d3e;
+  border-radius: 14px;
+  position: relative;
+  max-width: 510px;
+  box-shadow: 0 12px 28px #0c17212b;
+}
+.overviewHeading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 19px;
+  font-size: 11px;
+  color: #d2dbe7;
+  border-bottom: 1px solid #4b627c66;
+}
+.overviewSymbol {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  color: #a7c7f6;
+  background: #344e6c;
+  border: 1px solid #4d6a8e;
+  border-radius: 7px;
+}
+.connectedWork {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 22px 20px 25px;
+}
+.workColumn {
+  min-width: 0;
+}
+.workLabel {
+  display: block;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+  color: #9cacc0;
+  margin-bottom: 11px;
+}
+.workColumn > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #f4f7fc;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.workColumn svg {
+  color: #a7c7f6;
+  flex-shrink: 0;
+}
+.workArrow {
+  color: #d99e6b;
+  flex-shrink: 0;
+}
+.overviewFooter {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border-top: 1px solid #4b627c66;
+  padding: 13px 20px;
+  color: #b6c5d6;
+  font-size: 10px;
+}
+.overviewFooter > svg:first-child {
+  color: #eaaa72;
+}
+.footerClock {
+  margin-left: auto;
+  color: #8fa1b7;
+}
+.storyFooter {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-top: 36px;
+  color: #98aabd;
+  font-size: 10px;
+  letter-spacing: 0.015em;
+}
+.storyFooter > span:first-child {
+  white-space: nowrap;
+}
+.storyRule {
+  display: block;
+  flex: 1;
+  height: 1px;
+  background: #49607980;
+  max-width: 105px;
+}
+.signIn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 68px clamp(32px, 4.5vw, 76px) 95px;
+  background: #fff;
+}
+.signInContent {
+  width: 100%;
+  max-width: 360px;
+}
+.welcomeIcon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid #dce6f6;
+  background: #f4f7fc;
+  color: #396599;
+  border-radius: 13px;
+  margin-bottom: 31px;
+}
+.formEyebrow {
+  color: #a15b28;
+  margin-bottom: 13px;
+}
+.signIn h2 {
+  font-family: "Archivo", system-ui, sans-serif;
+  font-size: clamp(30px, 2.8vw, 42px);
+  line-height: 1.18;
+  font-weight: 600;
+  letter-spacing: -0.045em;
+}
+.formDescription {
+  color: var(--login-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-top: 13px;
+}
+.form {
+  margin-top: 35px;
+}
+.googleButton {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 15px 18px;
+  border: 1px solid #d5dde7;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #fff;
+  color: #1b2c43;
+  box-shadow: 0 2px 3px #18243404;
+  transition:
+    border-color 0.18s,
+    background 0.18s,
+    box-shadow 0.18s;
+}
+.googleButton:hover:not(:disabled) {
+  border-color: #8da9d1;
+  background: #f8faff;
+  box-shadow: 0 3px 12px #1d4f9512;
+}
+.googleButton:active:not(:disabled) {
+  background: #f0f5fe;
+}
+.googleButton > svg {
+  flex-shrink: 0;
+}
+.googleButton:disabled {
+  cursor: wait;
+  color: #697586;
+  background: #f7f9fc;
+}
+.buttonArrow {
+  margin-left: auto;
+  color: #637b9c;
+}
+.accountHelp {
+  text-align: center;
+  color: #697586;
+  font-size: 11px;
+  margin-top: 13px;
+  line-height: 1.7;
+}
+.accessNote {
+  display: flex;
+  gap: 11px;
+  padding-top: 25px;
+  border-top: 1px solid #e6ebf1;
+  margin-top: 31px;
+  color: #62758d;
+  align-items: flex-start;
+}
+.accessNote > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.accessNote p {
+  font-size: 11px;
+  line-height: 1.65;
+  font-weight: 600;
+  color: #52647a;
+}
+.accessNote p > span {
+  display: block;
+  color: #778397;
+  font-weight: 400;
+  font-size: 11px;
+  max-width: 260px;
+  margin-top: 3px;
+}
+.legal {
+  color: #657285;
+  font-size: 11px;
+  line-height: 1.9;
+  margin-top: 31px;
+  max-width: 310px;
+}
+.legal a {
+  color: #526782;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: #bcc7d5;
+}
+.legal a:hover,
+.pageFooter a:hover {
+  color: #2563eb;
+}
+.signInFooter {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  position: absolute;
+  bottom: 26px;
+  color: #657285;
+  font-size: 11px;
+}
+.smallMark {
+  font-family: "Archivo", sans-serif;
+  color: #bc7942;
+  font-size: 13px;
+  font-weight: 700;
+}
+.pageFooter {
+  min-height: 75px;
+  color: #657285;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.pageFooter > div {
+  display: flex;
+  gap: 15px;
+}
+.pageFooter a {
+  color: #657488;
+}
+.page :is(button, a):focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 4px;
+}
+.error {
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #a32929;
+  font-size: 12px;
+  padding: 13px 15px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+  border-radius: 9px;
+}
+.spinner {
+  width: 19px;
+  height: 19px;
+  border: 2px solid #d5dfe9;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (min-width: 1700px) {
+  .workspace {
+    flex: 0 1 800px;
+  }
+}
+@media (max-width: 1100px) {
+  .story {
+    padding: 40px 32px;
+  }
+  .signIn {
+    padding-left: 36px;
+    padding-right: 36px;
+  }
+  .connectedWork {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .workColumn > div {
+    font-size: 11px;
+    gap: 6px;
+  }
+  .workArrow {
+    width: 14px;
+  }
+  .story h1 {
+    font-size: 52px;
+  }
+}
+@media (max-width: 850px) {
+  .header {
+    min-height: 82px;
+  }
+  .logo {
+    font-size: 22px;
+  }
+  .headerCaption {
+    font-size: 11px;
+  }
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    flex: 0;
+    margin: auto;
+  }
+  .story {
+    display: none;
+  }
+  .signIn {
+    min-height: 585px;
+    padding: 48px 32px 78px;
+  }
+  .signInContent {
+    max-width: 380px;
+  }
+  .signIn h2 {
+    font-size: 36px;
+  }
+  .pageFooter {
+    min-height: 70px;
+  }
+}
+@media (max-width: 480px) {
+  .page {
+    padding: 0 20px;
+  }
+  .headerCaption {
+    display: none;
+  }
+  .header {
+    min-height: 84px;
+  }
+  .workspace {
+    border-radius: 18px;
+  }
+  .signIn {
+    min-height: 550px;
+    padding: 36px 24px 70px;
+  }
+  .welcomeIcon {
+    margin-bottom: 25px;
+  }
+  .signIn h2 {
+    font-size: 32px;
+  }
+  .googleButton {
+    font-size: 12px;
+    gap: 9px;
+    padding: 15px 13px;
+  }
+  .accountHelp {
+    font-size: 10px;
+  }
+  .form {
+    margin-top: 29px;
+  }
+  .pageFooter {
+    gap: 15px;
+    font-size: 9px;
+    min-height: 72px;
+  }
+  .pageFooter > div {
+    gap: 9px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page *,
+  .page *::before,
+  .page *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
