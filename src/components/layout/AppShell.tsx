@@ -169,7 +169,7 @@ export default function AppShell({ children }: AppShellProps) {
     });
 
     return () => subscription.unsubscribe();
-  }, [router]);
+  }, [router, pathname]);
 
   // Listen for company name updates from Settings page
   useEffect(() => {
@@ -239,6 +239,7 @@ export default function AppShell({ children }: AppShellProps) {
         sidebarCollapsed={sidebarCollapsed}
         onSignOut={handleSignOut}
         onOpenNavigation={() => setMobileOpen(true)}
+        navigationOpen={mobileOpen}
       />
 
       {/* Main Content */}

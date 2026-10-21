@@ -1268,10 +1268,10 @@ export default function ReportsPage() {
             const preview = reportPreviews[report.id]
             return (
               <button key={report.id} onClick={() => setSelectedReport(report.id)}
-                className="text-left bg-white border border-gray-200 rounded-xl p-4 hover:border-gray-300 hover:shadow-sm transition-all group">
+                className="workspace-report-card text-left bg-white border border-gray-200 rounded-xl p-4 hover:border-gray-300 hover:shadow-sm transition-all group">
                 <div className="flex items-start gap-3">
-                  <div className={`w-9 h-9 ${report.accent} rounded-lg flex items-center justify-center shrink-0`}>
-                    <Icon size={18} className="text-white" />
+                  <div className="w-9 h-9 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg flex items-center justify-center shrink-0">
+                    <Icon size={18} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">{report.name}</h3>
