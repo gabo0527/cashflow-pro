@@ -1395,7 +1395,7 @@ export default function TeamPage() {
             const utilOf = (m: TeamMember) => teamCapacity > 0 ? Math.round(((memberBillable[m.id] || 0) / teamCapacity) * 100) : 0
             const uColor = (u: number) => u === 0 ? '#cbd5e1' : u < 50 ? '#d97706' : '#2563eb'
             const uText = (u: number) => u === 0 ? '#94a3b8' : u < 50 ? '#b45309' : '#1e293b'
-            const cols = 'grid grid-cols-[2.3fr_1.5fr_1.3fr_1fr_0.9fr_40px] gap-3'
+            const cols = 'grid min-w-[760px] grid-cols-[2.3fr_1.5fr_1.3fr_1fr_0.9fr_40px] gap-3'
             const groups: [string, boolean, string][] = [['W-2 Employees', true, '#2563eb'], ['1099 Contractors', false, '#c2660c']]
             return (
               <div className="space-y-3">
@@ -1406,7 +1406,7 @@ export default function TeamPage() {
                   const avgU = utils.length ? Math.round(utils.reduce((a, b) => a + b, 0) / utils.length) : 0
                   const activeN = list.filter(m => m.status === 'active').length
                   return (
-                    <div key={label} className="bg-white border border-[#e2e8f0] rounded-2xl overflow-hidden shadow-sm">
+                    <div key={label} className="bg-white border border-[#e2e8f0] rounded-2xl overflow-x-auto shadow-sm">
                       <div className="flex items-center gap-3 px-4 py-3 border-b border-[#e2e8f0]" style={{ background: 'linear-gradient(90deg,#f8fafc,#fff)' }}>
                         <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-900" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{label}</span>
                         <span className="text-[11px] font-bold text-white rounded-full px-2 py-0.5" style={{ background: badge }}>{list.length}</span>

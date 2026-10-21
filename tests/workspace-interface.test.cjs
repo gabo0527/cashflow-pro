@@ -19,6 +19,7 @@ test('command search opens with the keyboard, navigates a matching result and cl
  const router={push:href=>navigationCalls.push(href)};
  try{const Component=load('src/components/layout/Header.tsx',{'next/navigation':{usePathname:()=>'/clients',useRouter:()=>router},'@/lib/workspace-navigation':navigation}).default;
  let tree;await act(async()=>{tree=create(React.createElement(Component,{sidebarCollapsed:false,onOpenChat:()=>{},userName:'Alex Example'}),{createNodeMock:el=>el.type==='dialog'?{open:false,showModal(){this.open=true;opened++},close(){this.open=false;closed++}}:el.type==='input'?{focus(){focused++}}:{contains:()=>true}})});
+ assert.equal(tree.root.findByProps({"aria-label":"Find a page"}).type,"button");assert.equal(tree.root.findByProps({"aria-label":"Ask Sage"}).type,"button");assert.equal(tree.root.findByProps({"aria-label":"Open navigation"}).props["aria-expanded"],false);
  let prevented=false;await act(async()=>events.keydown({metaKey:true,key:'k',preventDefault:()=>prevented=true}));assert.equal(opened,1);assert.equal(focused,1);assert.equal(prevented,true);
  const input=tree.root.findByProps({id:'workspace-page-search'});await act(async()=>input.props.onChange({target:{value:'hours'}}));
  await act(async()=>input.props.onKeyDown({key:'Enter',preventDefault(){}}));assert.deepEqual(navigationCalls,['/time-tracking']);assert.ok(closed>=1);

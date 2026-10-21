@@ -24,6 +24,7 @@ interface HeaderProps {
   sidebarCollapsed: boolean;
   onSignOut?: () => void;
   onOpenNavigation?: () => void;
+  navigationOpen?: boolean;
 }
 export default function Header({
   userEmail,
@@ -32,6 +33,7 @@ export default function Header({
   sidebarCollapsed,
   onSignOut,
   onOpenNavigation,
+  navigationOpen = false,
 }: HeaderProps) {
   const pathname = usePathname(),
     router = useRouter(),
@@ -87,6 +89,7 @@ export default function Header({
             className="workspace-menu-button ui-icon-button"
             aria-label="Open navigation"
             aria-controls="workspace-navigation"
+            aria-expanded={navigationOpen}
             onClick={onOpenNavigation}
           >
             <Menu size={20} />
@@ -98,12 +101,12 @@ export default function Header({
           </div>
         </div>
         <div className="workspace-topbar-actions">
-          <button className="workspace-search-trigger" onClick={openSearch}>
+          <button className="workspace-search-trigger" aria-label="Find a page" onClick={openSearch}>
             <Search size={16} aria-hidden />
             <span>Find a page</span>
             <kbd>⌘ K</kbd>
           </button>
-          <button className="workspace-sage-trigger" onClick={onOpenChat}>
+          <button className="workspace-sage-trigger" aria-label="Ask Sage" onClick={onOpenChat}>
             <MessageSquare size={16} aria-hidden />
             <span>Ask Sage</span>
           </button>

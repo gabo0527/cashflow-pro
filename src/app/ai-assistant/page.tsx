@@ -1010,6 +1010,13 @@ export default function SageAssistantPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  useEffect(() => {
+    const narrow = window.matchMedia("(max-width: 680px)")
+    const sync = () => setSidebarOpen(!narrow.matches)
+    sync()
+    narrow.addEventListener("change", sync)
+    return () => narrow.removeEventListener("change", sync)
+  }, [])
   const [isDragging, setIsDragging] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -1364,12 +1371,13 @@ AI Summary: ${d.summary || result.summary}`
     <div className="sage-workspace" style={{ display: 'flex', height: 'calc(100vh - 80px)', background: '#fff' }}>
 
       {/* ── SIDEBAR ── */}
-      <div className="sage-history" style={{ width: sidebarOpen ? '260px' : '0', background: '#fafaf9', borderRight: '1px solid #e8e8e4', display: 'flex', flexDirection: 'column', transition: 'width 0.2s', overflow: 'hidden', flexShrink: 0 }}>
+      <div className="sage-history" aria-hidden={!sidebarOpen} style={{ width: sidebarOpen ? '260px' : '0', background: '#fafaf9', borderRight: '1px solid #e8e8e4', display: sidebarOpen ? 'flex' : 'none', flexDirection: 'column', transition: 'width 0.2s', overflow: 'hidden', flexShrink: 0 }}>
 
         {/* Brand + new button */}
         <div style={{ padding: '16px 14px 10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
             <OwlAvatar size={32} />
+            <button aria-label="Close conversation history" onClick={() => setSidebarOpen(false)} className="ui-icon-button" style={{ marginLeft: 'auto', order: 1 }}><PanelLeftClose size={16} /></button>
             <div>
               <div style={{ fontSize: '14px', fontWeight: 500, color: '#111827' }}>Sage</div>
               <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '1px' }}>Business intelligence · VantageFP</div>
@@ -1438,10 +1446,10 @@ AI Summary: ${d.summary || result.summary}`
         onDrop={handleDrop}>
 
         {/* Top bar */}
-        <div style={{ height: '52px', borderBottom: '1px solid #f0f0ec', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', flexShrink: 0 }}>
+        <div className="sage-conversation-header" style={{ height: '52px', borderBottom: '1px solid #f0f0ec', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {!sidebarOpen && (
-              <button onClick={() => setSidebarOpen(true)}
+              <button aria-label="Open conversation history" onClick={() => setSidebarOpen(true)}
                 style={{ padding: '6px', background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', display: 'flex', marginRight: '4px' }}>
                 <PanelLeft size={16} />
               </button>
@@ -1543,6 +1551,7 @@ AI Summary: ${d.summary || result.summary}`
               {loading && (
                 <div style={{ display: 'flex', gap: '14px', marginBottom: '28px' }}>
                   <OwlAvatar size={32} />
+            <button aria-label="Close conversation history" onClick={() => setSidebarOpen(false)} className="ui-icon-button" style={{ marginLeft: 'auto', order: 1 }}><PanelLeftClose size={16} /></button>
                   <div style={{ paddingTop: '4px' }}>
                     <div style={{ fontSize: '12px', fontWeight: 500, color: '#37679d', marginBottom: '10px' }}>Sage</div>
                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>

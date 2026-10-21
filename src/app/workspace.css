@@ -1189,3 +1189,9 @@
 
 @media(max-width:1023px){.workspace-sidebar{z-index:60}}
 @media(max-width:680px){.workspace-page .ui-metrics>div:last-child:nth-child(odd){grid-column:1 / -1}}
+
+@media (max-width: 680px) {
+  .sage-conversation-header { padding: 0 12px !important; gap: 12px; overflow-x: auto; }
+  .sage-conversation-header > div { flex-shrink: 0; }
+  .sage-history { max-width: calc(100% - 40px); }
+}
