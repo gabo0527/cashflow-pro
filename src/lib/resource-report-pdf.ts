@@ -1,5 +1,11 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import { BudgetUtilization, percentLabel } from "./resource-report-budget";
+import {
+  BudgetUtilization,
+  percentLabel,
+  utilizationTitle,
+  utilizationCaption,
+  utilizationScope,
+} from "./resource-report-budget";
 import {
   hoursLabel,
   reportDate,
@@ -18,6 +24,7 @@ export async function createResourceReportPDF(
   logo?: Uint8Array,
   mtd: ReportMonthTotal[] = [],
   utilization: BudgetUtilization[] = [],
+  peopleMode: "resource" | "role" = "resource",
 ) {
   const pdf = await PDFDocument.create();
   pdf.setTitle(title);
@@ -214,7 +221,7 @@ export async function createResourceReportPDF(
         ]
       : []),
     {
-      label: "RESOURCES",
+      label: peopleMode === "role" ? "ROLES" : "RESOURCES",
       value: String(new Set(rows.map((r) => r.resource)).size),
       detail: "In the selected reporting period",
     },
@@ -265,7 +272,14 @@ export async function createResourceReportPDF(
         y += 26;
         box(X, y, W, 22, pale);
         text("PROJECT", X + 12, y + 7, 7, true, muted);
-        text("RESOURCE", X + 163, y + 7, 7, true, muted);
+        text(
+          peopleMode === "role" ? "ROLE" : "RESOURCE",
+          X + 163,
+          y + 7,
+          7,
+          true,
+          muted,
+        );
         right("MTD HOURS", X + W - 12, y + 7, 7, true, muted);
         y += 22;
       };
@@ -294,8 +308,8 @@ export async function createResourceReportPDF(
   if (utilization.length) {
     section(
       mtd.length ? "02" : "01",
-      "Monthly budget utilization",
-      "Full project usage across all resources. Both percentages use the monthly allocation. Client totals cover configured selected projects.",
+      utilizationTitle(utilization),
+      utilizationCaption(utilization),
     );
     const groups = new Map<string, BudgetUtilization[]>();
     for (const r of utilization) {
@@ -312,7 +326,16 @@ export async function createResourceReportPDF(
       const r = group[0];
       const tableHead = () => {
         box(X, y, W, 36, pale);
-        text(r.client || "Selected projects", X + 12, y + 6, 9, true);
+        text(
+          (r.client || "Selected projects") +
+            (r.basis === "program"
+              ? ` | by ${r.breakdown === "project" ? "site" : r.breakdown === "role" ? "role" : "resource"}`
+              : ""),
+          X + 12,
+          y + 6,
+          9,
+          true,
+        );
         text(
           `Week: ${reportDate(r.weekStart)} - ${reportDate(r.weekEnd)} | MTD: ${reportDate(r.month)} - ${reportDate(r.mtdEnd)}`,
           X + 12,
@@ -332,13 +355,15 @@ export async function createResourceReportPDF(
       ensure(100);
       tableHead();
       const sorted = [
-        ...group.filter((r) => r.level === "project"),
+        ...group.filter((r) => r.level !== "client"),
         ...group.filter((r) => r.level === "client"),
       ];
       for (const row of sorted) {
         const isClient = row.level === "client",
           names = wrap(
-            isClient ? `${row.name} - client total` : row.name,
+            isClient
+              ? `${row.name} - ${row.basis === "program" ? "program" : "client"} total`
+              : row.name,
             192,
             9,
             true,
@@ -352,7 +377,7 @@ export async function createResourceReportPDF(
         );
         if (isClient) {
           text(
-            `${row.projectCount} configured project(s)`,
+            utilizationScope(row),
             X + 12,
             y + height - 12,
             6.7,
@@ -403,7 +428,7 @@ export async function createResourceReportPDF(
         ? "02"
         : "01",
     "Weekly work detail",
-    "Submitted hours and reviewed work summaries, grouped by project and resource.",
+    `Submitted hours and reviewed work summaries, grouped by project and ${peopleMode === "role" ? "reporting role" : "resource"}.`,
   );
   const groups = new Map<string, ResourceReportRow[]>();
   for (const r of rows) {

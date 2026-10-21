@@ -1,5 +1,11 @@
 import React from "react";
-import { BudgetUtilization, percentLabel } from "@/lib/resource-report-budget";
+import {
+  BudgetUtilization,
+  percentLabel,
+  utilizationTitle,
+  utilizationCaption,
+  utilizationScope,
+} from "@/lib/resource-report-budget";
 import { hoursLabel, reportDate } from "@/lib/resource-report";
 export default function BudgetUtilizationPreview({
   rows,
@@ -22,17 +28,16 @@ export default function BudgetUtilizationPreview({
     <section aria-label="Budget utilization" className="mt-7">
       <div className="border-l-4 border-[#c2660c] pl-3">
         <h3 className="text-base font-bold text-[#24333b]">
-          Monthly budget utilization
+          {utilizationTitle(rows)}
         </h3>
         <p className="text-xs text-slate-500 mt-1">
-          Full project usage across all resources. Both percentages use the
-          monthly allocation; client totals cover configured selected projects.
+          {utilizationCaption(rows)}
         </p>
       </div>
       {Array.from(groups.values()).map((group) => {
         const first = group[0],
           sorted = [
-            ...group.filter((row) => row.level === "project"),
+            ...group.filter((row) => row.level !== "client"),
             ...group.filter((row) => row.level === "client"),
           ];
         return (
@@ -43,6 +48,9 @@ export default function BudgetUtilizationPreview({
             <div className="bg-slate-50 px-4 py-3">
               <p className="font-bold text-sm">
                 {first.client || "Selected projects"}
+                {first.basis === "program"
+                  ? ` · by ${first.breakdown === "project" ? "site" : first.breakdown === "role" ? "role" : "resource"}`
+                  : ""}
               </p>
               <p className="text-[11px] text-slate-500 mt-1">
                 Week: {reportDate(first.weekStart)} –{" "}
@@ -71,8 +79,10 @@ export default function BudgetUtilizationPreview({
                         {row.name}
                         {row.level === "client" && (
                           <span className="block text-[10px] font-normal text-slate-300 mt-1">
-                            Client total · {row.projectCount} configured
-                            project(s)
+                            {row.basis === "program"
+                              ? "Program total"
+                              : "Client total"}{" "}
+                            · {utilizationScope(row)}
                           </span>
                         )}
                       </td>
