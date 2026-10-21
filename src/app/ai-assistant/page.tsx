@@ -30,8 +30,8 @@ function SageLogo({ size = 32, className = "" }: { size?: number, className?: st
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" className={className}>
       <defs>
         <linearGradient id={id} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#6ee7b7"/>
-          <stop offset="100%" stopColor="#10b981"/>
+          <stop offset="0%" stopColor="#60a5fa"/>
+          <stop offset="100%" stopColor="#d38a4d"/>
         </linearGradient>
       </defs>
       <path d="M10 10L24 40L38 10" stroke={`url(#${id})`} strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -909,7 +909,7 @@ function ChatMessage({ message }: { message: Message }) {
     <div style={{ display: 'flex', gap: '14px', marginBottom: '28px', maxWidth: '720px', margin: '0 auto 28px', width: '100%' }}>
       <div style={{ flexShrink: 0, marginTop: '2px' }}><SageLogo size={32} /></div>
       <div style={{ flex: 1, minWidth: 0, paddingTop: '4px' }}>
-        <div style={{ fontSize: '12px', fontWeight: 500, color: '#10b981', marginBottom: '8px' }}>Sage</div>
+        <div style={{ fontSize: '12px', fontWeight: 500, color: '#37679d', marginBottom: '8px' }}>Sage</div>
         {message.attachments && message.attachments.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '12px' }}>
             {message.attachments.map(att => (
@@ -1361,10 +1361,10 @@ AI Summary: ${d.summary || result.summary}`
   )
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 80px)', background: '#fff' }}>
+    <div className="sage-workspace" style={{ display: 'flex', height: 'calc(100vh - 80px)', background: '#fff' }}>
 
       {/* ── SIDEBAR ── */}
-      <div style={{ width: sidebarOpen ? '260px' : '0', background: '#fafaf9', borderRight: '1px solid #e8e8e4', display: 'flex', flexDirection: 'column', transition: 'width 0.2s', overflow: 'hidden', flexShrink: 0 }}>
+      <div className="sage-history" style={{ width: sidebarOpen ? '260px' : '0', background: '#fafaf9', borderRight: '1px solid #e8e8e4', display: 'flex', flexDirection: 'column', transition: 'width 0.2s', overflow: 'hidden', flexShrink: 0 }}>
 
         {/* Brand + new button */}
         <div style={{ padding: '16px 14px 10px' }}>
@@ -1372,7 +1372,7 @@ AI Summary: ${d.summary || result.summary}`
             <OwlAvatar size={32} />
             <div>
               <div style={{ fontSize: '14px', fontWeight: 500, color: '#111827' }}>Sage</div>
-              <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '1px' }}>Financial AI · Vantage</div>
+              <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '1px' }}>Business intelligence · VantageFP</div>
             </div>
           </div>
           <button onClick={startNewConversation}
@@ -1448,7 +1448,7 @@ AI Summary: ${d.summary || result.summary}`
             )}
             <OwlAvatar size={28} />
             <span style={{ fontSize: '14px', fontWeight: 500, color: '#111827' }}>Sage</span>
-            <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', letterSpacing: '0.03em' }}>Financial AI</span>
+            <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: '#eff5fe', color: '#345f99', border: '1px solid #d8e6fa', letterSpacing: '0.03em' }}>Financial AI</span>
           </div>
           {kpis && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '12px' }}>
@@ -1544,7 +1544,7 @@ AI Summary: ${d.summary || result.summary}`
                 <div style={{ display: 'flex', gap: '14px', marginBottom: '28px' }}>
                   <OwlAvatar size={32} />
                   <div style={{ paddingTop: '4px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 500, color: '#10b981', marginBottom: '10px' }}>Sage</div>
+                    <div style={{ fontSize: '12px', fontWeight: 500, color: '#37679d', marginBottom: '10px' }}>Sage</div>
                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                       {[0, 150, 300].map(d => (
                         <span key={d} style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#9ca3af', display: 'inline-block', animation: 'bounce 1s infinite', animationDelay: `${d}ms` }} />

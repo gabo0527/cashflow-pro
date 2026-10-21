@@ -13,7 +13,7 @@ function loadTS(file, mocks = {}) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React, esModuleInterop: true },
   }).outputText
   const module = { exports: {} }
-  const requireMock = name => Object.hasOwn(mocks, name) ? mocks[name] : require(name)
+  const requireMock = name => Object.hasOwn(mocks, name) ? mocks[name] : name === '@/components/workspace/PageHeader' ? {__esModule:true,default:loadTS('src/components/workspace/PageHeader.tsx').default} : require(name)
   vm.runInThisContext(`(function(require,module,exports){${source}\n})`, { filename })(requireMock, module, module.exports)
   return module.exports
 }

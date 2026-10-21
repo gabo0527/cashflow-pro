@@ -1,5 +1,6 @@
 "use client";
 
+import PageHeader from '@/components/workspace/PageHeader'
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -236,29 +237,10 @@ export default function ClientPortfolio({
 
   return (
     <div className="client-portfolio">
-      <header className="cp-header">
-        <div>
-          <div className="cp-eyebrow">Portfolio / Relationships</div>
-          <h1>
-            Clients<span>.</span>
-          </h1>
-          <p>
-            Your clients, scopes and commercial agreements. One connected
-            workspace.
-          </p>
-        </div>
-        <div className="cp-header-actions">
-          <button
-            onClick={onExport}
-            title="Export the entire client portfolio to CSV"
-          >
-            <Download size={15} /> Export CSV
-          </button>
-          <button className="cp-primary" onClick={onAdd}>
-            <Plus size={16} /> Add client
-          </button>
-        </div>
-      </header>
+      <PageHeader eyebrow="Portfolio / Relationships" title="Clients" description="Relationships, scopes, and agreements. One connected view." actions={<>
+        <button onClick={onExport} title="Export the entire client portfolio to CSV" className="ui-button ui-button-secondary"><Download size={15}/>Export CSV</button>
+        <button onClick={onAdd} className="ui-button ui-button-primary"><Plus size={16}/>Add client</button>
+      </>} />
       <section className="cp-totals" aria-label="Entire portfolio totals">
         {[
           [

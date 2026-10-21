@@ -1,5 +1,6 @@
 'use client'
 
+import PageHeader from '@/components/workspace/PageHeader'
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   FileText, Download, Calendar, ChevronRight, ChevronDown,
@@ -303,9 +304,9 @@ function PnLReport({ invoices, bills, expenses, teamMembers, timeEntries, projec
               }
               const delta = row.prior !== 0 ? ((row.current - row.prior) / Math.abs(row.prior)) * 100 : 0
               const valColor = (v: number) => {
-                if (row.isPct) return v >= 40 ? 'text-emerald-600' : v >= 20 ? 'text-amber-600' : v > 0 ? 'text-rose-600' : 'text-gray-500'
+                if (row.isPct) return v >= 40 ? 'text-blue-600' : v >= 20 ? 'text-amber-600' : v > 0 ? 'text-rose-600' : 'text-gray-500'
                 if (row.isNeg) return v > 0 ? 'text-rose-600' : 'text-gray-500'
-                return v > 0 ? 'text-emerald-600' : v < 0 ? 'text-rose-600' : 'text-gray-500'
+                return v > 0 ? 'text-blue-600' : v < 0 ? 'text-rose-600' : 'text-gray-500'
               }
 
               return (
@@ -318,7 +319,7 @@ function PnLReport({ invoices, bills, expenses, teamMembers, timeEntries, projec
                   <td className={`px-5 py-2 text-right tabular-nums text-gray-500`}>
                     {row.isPct ? fmtPct(row.prior) : row.isNeg && row.prior > 0 ? `(${fmtCurrency(row.prior)})` : fmtCurrency(row.prior)}
                   </td>
-                  <td className={`px-5 py-2 text-right text-[11px] tabular-nums ${delta > 0 ? 'text-emerald-600' : delta < 0 ? 'text-rose-600' : 'text-gray-400'}`}>
+                  <td className={`px-5 py-2 text-right text-[11px] tabular-nums ${delta > 0 ? 'text-blue-600' : delta < 0 ? 'text-rose-600' : 'text-gray-400'}`}>
                     {row.current === 0 && row.prior === 0 ? '—' : `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`}
                   </td>
                 </tr>
@@ -367,7 +368,7 @@ function ARAgingReport({ invoices, clients, dateRange }: { invoices: any[]; clie
     return { buckets, totalAR, clientRows }
   }, [invoices, clientMap, dateRange])
 
-  const bucketColors = ['text-emerald-600', 'text-amber-600', 'text-orange-600', 'text-rose-600', 'text-red-600']
+  const bucketColors = ['text-blue-600', 'text-amber-600', 'text-orange-600', 'text-rose-600', 'text-red-600']
   const barColors = [CHART.emerald, CHART.amber, '#f97316', CHART.rose, '#dc2626']
 
   return (
@@ -487,13 +488,13 @@ function ClientProfitReport({ invoices, timeEntries, teamMembers, clients, proje
           {data.map((c, i) => (
             <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
               <td className="px-4 py-2.5 font-medium text-gray-700">{c.name}</td>
-              <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600">{fmtCurrency(c.revenue)}</td>
+              <td className="px-4 py-2.5 text-right tabular-nums text-blue-600">{fmtCurrency(c.revenue)}</td>
               <td className="px-4 py-2.5 text-right tabular-nums text-rose-600">{fmtCurrency(c.cost)}</td>
               <td className="px-4 py-2.5 text-right tabular-nums font-medium text-gray-900">{fmtCurrency(c.profit)}</td>
               <td className="px-4 py-2.5">
                 <div className="flex items-center gap-2 justify-center">
                   <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full rounded-full transition-all" style={{ width: `${Math.min(Math.max(c.margin, 0), 100)}%`, backgroundColor: c.margin >= 40 ? CHART.emerald : c.margin >= 20 ? CHART.amber : CHART.rose }} /></div>
-                  <span className={`text-[11px] font-semibold tabular-nums w-10 ${c.margin >= 40 ? 'text-emerald-600' : c.margin >= 20 ? 'text-amber-600' : 'text-rose-600'}`}>{fmtPct(c.margin)}</span>
+                  <span className={`text-[11px] font-semibold tabular-nums w-10 ${c.margin >= 40 ? 'text-blue-600' : c.margin >= 20 ? 'text-amber-600' : 'text-rose-600'}`}>{fmtPct(c.margin)}</span>
                 </div>
               </td>
               <td className="px-4 py-2.5 text-right tabular-nums text-gray-500">{fmtNum(c.hours)}</td>
@@ -503,13 +504,13 @@ function ClientProfitReport({ invoices, timeEntries, teamMembers, clients, proje
         </tbody>
         <tfoot><tr className="border-t-2 border-gray-300 bg-gray-50">
           <td className="px-4 py-2.5 font-semibold text-gray-900">Total</td>
-          <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-emerald-600">{fmtCurrency(totals.revenue)}</td>
+          <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-blue-600">{fmtCurrency(totals.revenue)}</td>
           <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-rose-600">{fmtCurrency(totals.cost)}</td>
           <td className="px-4 py-2.5 text-right tabular-nums font-bold text-gray-900">{fmtCurrency(totals.profit)}</td>
           <td className="px-4 py-2.5 text-center">
             <div className="flex items-center gap-2 justify-center">
               <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: `${Math.min(Math.max(totals.margin, 0), 100)}%`, backgroundColor: totals.margin >= 40 ? CHART.emerald : totals.margin >= 20 ? CHART.amber : CHART.rose }} /></div>
-              <span className={`text-[11px] font-bold tabular-nums w-10 ${totals.margin >= 40 ? 'text-emerald-600' : 'text-amber-600'}`}>{fmtPct(totals.margin)}</span>
+              <span className={`text-[11px] font-bold tabular-nums w-10 ${totals.margin >= 40 ? 'text-blue-600' : 'text-amber-600'}`}>{fmtPct(totals.margin)}</span>
             </div>
           </td>
           <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-gray-600">{fmtNum(totals.hours)}</td>
@@ -566,14 +567,14 @@ function ProjectProfitReport({ projects, timeEntries, teamMembers, expenses, inv
               <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
                 <td className="px-4 py-2.5 font-medium text-gray-700 max-w-[200px] truncate">{p.name}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-gray-500">{fmtCurrency(p.budget)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600">{fmtCurrency(p.revenue)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-blue-600">{fmtCurrency(p.revenue)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-rose-600">{fmtCurrency(p.laborCost)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-rose-600">{fmtCurrency(p.expenseCost)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums font-medium text-gray-900">{fmtCurrency(p.profit)}</td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-2 justify-center">
                     <div className="w-14 h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full rounded-full transition-all" style={{ width: `${Math.min(Math.max(p.margin, 0), 100)}%`, backgroundColor: p.margin >= 40 ? CHART.emerald : p.margin >= 20 ? CHART.amber : CHART.rose }} /></div>
-                    <span className={`text-[11px] font-semibold tabular-nums ${p.margin >= 40 ? 'text-emerald-600' : p.margin >= 20 ? 'text-amber-600' : 'text-rose-600'}`}>{fmtPct(p.margin)}</span>
+                    <span className={`text-[11px] font-semibold tabular-nums ${p.margin >= 40 ? 'text-blue-600' : p.margin >= 20 ? 'text-amber-600' : 'text-rose-600'}`}>{fmtPct(p.margin)}</span>
                   </div>
                 </td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-gray-500">{fmtNum(p.hours)}</td>
@@ -650,7 +651,7 @@ function UtilizationReport({ timeEntries, teamMembers, dateRange }: { timeEntrie
             {data.members.map((m, i) => (
               <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
                 <td className="px-4 py-2.5 font-medium text-gray-700">{m.name}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600">{fmtNum(m.billable)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-blue-600">{fmtNum(m.billable)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-amber-600">{fmtNum(m.nonBillable)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">{fmtNum(m.total)}</td>
                 <td className="px-4 py-2.5 text-center">
@@ -660,7 +661,7 @@ function UtilizationReport({ timeEntries, teamMembers, dateRange }: { timeEntrie
                       {/* 70% target tick */}
                       <div className="absolute top-0 bottom-0 w-px bg-gray-400/60" style={{ left: '70%' }} />
                     </div>
-                    <span className={`text-[11px] font-medium tabular-nums ${m.billableUtil >= 70 ? 'text-emerald-600' : m.billableUtil >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>{fmtPct(m.billableUtil)}</span>
+                    <span className={`text-[11px] font-medium tabular-nums ${m.billableUtil >= 70 ? 'text-blue-600' : m.billableUtil >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>{fmtPct(m.billableUtil)}</span>
                   </div>
                 </td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-gray-900">{fmtCurrency(m.amount)}</td>
@@ -741,7 +742,7 @@ function CashFlowReport({ invoices, bills, expenses, dateRange }: { invoices: an
 
   const rows = [
     { label: 'OPERATING ACTIVITIES', header: true },
-    { label: 'Client Payments Received', value: data.cashIn, color: 'text-emerald-600' },
+    { label: 'Client Payments Received', value: data.cashIn, color: 'text-blue-600' },
     { label: 'Bills Paid', value: -data.billsPaid, color: 'text-rose-600' },
     { label: 'Expenses Paid', value: -data.expensesPaid, color: 'text-rose-600' },
     { label: 'Net Cash from Operations', value: data.net, bold: true, border: true },
@@ -754,7 +755,7 @@ function CashFlowReport({ invoices, bills, expenses, dateRange }: { invoices: an
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div className="flex"><div className="w-1 bg-emerald-500 shrink-0" /><div className="p-3 flex-1">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Cash In</p>
-            <p className="text-lg font-bold text-emerald-600 mt-1 tabular-nums">{fmtCurrency(data.cashIn)}</p>
+            <p className="text-lg font-bold text-blue-600 mt-1 tabular-nums">{fmtCurrency(data.cashIn)}</p>
           </div></div>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -766,7 +767,7 @@ function CashFlowReport({ invoices, bills, expenses, dateRange }: { invoices: an
         <div className={`bg-white border rounded-xl overflow-hidden ${data.net >= 0 ? 'border-emerald-200' : 'border-rose-200'}`}>
           <div className="flex"><div className={`w-1 ${data.net >= 0 ? 'bg-emerald-500' : 'bg-rose-500'} shrink-0`} /><div className="p-3 flex-1">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Net Cash</p>
-            <p className={`text-lg font-bold mt-1 tabular-nums ${data.net >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{fmtCurrency(data.net)}</p>
+            <p className={`text-lg font-bold mt-1 tabular-nums ${data.net >= 0 ? 'text-blue-600' : 'text-rose-600'}`}>{fmtCurrency(data.net)}</p>
           </div></div>
         </div>
       </div>
@@ -779,7 +780,7 @@ function CashFlowReport({ invoices, bills, expenses, dateRange }: { invoices: an
             <tr key={i} className={`${row.border ? 'border-t border-gray-300' : ''} ${row.header ? 'bg-gray-50/50' : ''}`}>
               <td className={`px-5 py-2.5 ${row.bold ? 'font-semibold text-gray-900' : row.header ? 'text-[10px] font-bold uppercase tracking-wider text-gray-500' : 'text-gray-600 pl-10'}`}>{row.label}</td>
               {!row.header && (
-                <td className={`px-5 py-2.5 text-right tabular-nums ${row.bold ? 'font-bold' : ''} ${row.color || ((row.value || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600')}`}>
+                <td className={`px-5 py-2.5 text-right tabular-nums ${row.bold ? 'font-bold' : ''} ${row.color || ((row.value || 0) >= 0 ? 'text-blue-600' : 'text-rose-600')}`}>
                   {fmtCurrency(row.value || 0)}
                 </td>
               )}
@@ -926,9 +927,9 @@ function ReportBuilder({ allData, dateRange, onSave, editingTemplate }: {
                 return (
                   <button key={b.type} onClick={() => addBlock(b.type)}
                     className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left bg-gray-50/50 hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all group">
-                    <Icon size={14} className="text-gray-500 group-hover:text-emerald-600 transition-colors" />
+                    <Icon size={14} className="text-gray-500 group-hover:text-blue-600 transition-colors" />
                     <span className="text-xs font-medium text-gray-600 group-hover:text-gray-900 transition-colors">{b.label}</span>
-                    <Plus size={12} className="ml-auto text-gray-400 group-hover:text-emerald-600 transition-colors" />
+                    <Plus size={12} className="ml-auto text-gray-400 group-hover:text-blue-600 transition-colors" />
                   </button>
                 )
               })}
@@ -1222,13 +1223,7 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Header + Date Controls — single row */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-gray-900">Reports</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Financial statements, profitability, and custom reports</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader eyebrow="Insights" title="Reports" description="Turn financial and operational detail into a clear view of your business." actions={<div className="flex items-center gap-2">
           <Calendar size={15} className="text-gray-400" />
           <select value={datePreset} onChange={e => setDatePreset(e.target.value as DatePreset)} className={`${inputClass} text-xs py-1.5`}>
             <option value="this_month">This Month</option>
@@ -1246,21 +1241,20 @@ export default function ReportsPage() {
               <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className={`${inputClass} text-xs py-1.5`} />
             </>
           )}
-        </div>
-      </div>
+        </div>} />
 
       {/* Tabs */}
       <div className="border-b border-gray-200">
-        <div className="flex gap-0">
+        <div className="ui-tabs">
           {([
             { id: 'reports' as const, label: 'Quick Reports' },
             { id: 'builder' as const, label: 'Report Builder' },
             { id: 'saved' as const, label: `Saved${savedTemplates.length > 0 ? ` (${savedTemplates.length})` : ''}` },
           ]).map(tab => (
             <button key={tab.id} onClick={() => { setActiveTab(tab.id); setSelectedReport(null) }}
-              className={`relative px-5 py-3 text-sm font-medium transition-colors ${activeTab === tab.id ? 'text-emerald-600' : 'text-gray-500 hover:text-gray-600'}`}>
+              className={`relative px-5 py-3 text-sm font-medium transition-colors ${activeTab === tab.id ? 'text-blue-600' : 'text-gray-500 hover:text-gray-600'}`}>
               {tab.label}
-              {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t" />}
+              {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 rounded-t" />}
             </button>
           ))}
         </div>
@@ -1280,7 +1274,7 @@ export default function ReportsPage() {
                     <Icon size={18} className="text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-gray-900 group-hover:text-emerald-600 transition-colors">{report.name}</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">{report.name}</h3>
                     <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">{report.description}</p>
                     {preview && (
                       <p className="text-sm font-bold text-gray-900 mt-2 tabular-nums">{preview}</p>
@@ -1340,7 +1334,7 @@ export default function ReportsPage() {
                         {tpl.blocks.length} block{tpl.blocks.length !== 1 ? 's' : ''} · Updated {tpl.updated_at ? fmtDate(tpl.updated_at) : '—'}
                       </p>
                     </div>
-                    <Bookmark size={14} className="text-emerald-600 shrink-0 mt-0.5" />
+                    <Bookmark size={14} className="text-blue-600 shrink-0 mt-0.5" />
                   </div>
 
                   {/* Block summary */}
@@ -1358,7 +1352,7 @@ export default function ReportsPage() {
                   {/* Actions */}
                   <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
                     <button onClick={() => { setEditingTemplate(tpl); setActiveTab('builder') }}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-medium text-emerald-600 hover:bg-emerald-100 transition-colors">
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-medium text-blue-600 hover:bg-emerald-100 transition-colors">
                       <Eye size={12} /> Open
                     </button>
                     <button onClick={() => duplicateTemplate(tpl)}

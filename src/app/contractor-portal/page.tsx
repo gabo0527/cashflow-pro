@@ -1256,7 +1256,7 @@ export default function ContractorPortal() {
   }
 
   return (
-    <div className="min-h-screen text-gray-900" style={{ background: '#eef1f4', colorScheme: 'light', backgroundImage: 'radial-gradient(1000px 460px at 12% 0%, rgba(37,99,235,0.05), transparent 60%), linear-gradient(rgba(15,23,42,0.022) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.022) 1px, transparent 1px)', backgroundSize: '100% 100%, 26px 26px, 26px 26px', backgroundAttachment: 'fixed' }}>
+    <div className="vantage-personal contractor-workspace min-h-screen text-gray-900" style={{ background: '#eef1f4', colorScheme: 'light', backgroundImage: 'radial-gradient(1000px 460px at 12% 0%, rgba(37,99,235,0.05), transparent 60%), linear-gradient(rgba(15,23,42,0.022) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.022) 1px, transparent 1px)', backgroundSize: '100% 100%, 26px 26px, 26px 26px', backgroundAttachment: 'fixed' }}>
       <style dangerouslySetInnerHTML={{ __html: PORTAL_CSS }} />
       {/* Privacy: auto sign-out after 10 min of inactivity (60s warning) */}
       {member && <IdleLogout onLogout={handleSignOut} />}
@@ -1272,7 +1272,7 @@ export default function ContractorPortal() {
                 <path d="M13 12 L24 35" stroke="#3b82f6" strokeWidth="5.5" strokeLinecap="round" />
                 <path d="M24 35 L35 12" stroke="#ea8a2f" strokeWidth="5.5" strokeLinecap="round" />
               </svg>
-              <span className="hidden md:inline" style={{ fontFamily: 'Archivo, sans-serif', fontWeight: 800, fontSize: '13px', letterSpacing: '0.14em', color: '#ffffff', textTransform: 'uppercase' }}>Vantage</span>
+              <span className="hidden md:inline" style={{ fontFamily: 'Archivo, sans-serif', fontWeight: 800, fontSize: '14px', letterSpacing: '-.3px', color: '#ffffff', textTransform: 'none' }}>Vantage<span style={{color:'#eaaa72'}}>FP</span></span>
               <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.12)' }} />
               <span className="text-[12.5px] font-medium" style={{ color: '#cbd5e1', whiteSpace: 'nowrap' }}>{member?.name}</span>
             </div>

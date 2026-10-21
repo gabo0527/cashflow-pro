@@ -1,152 +1,223 @@
-'use client'
+"use client";
 
-import React, { useState, useEffect, useCallback } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
-import Sidebar from './Sidebar'
-import IdleLogout from '@/components/IdleLogout'
-import Header from './Header'
-import ChatPanel from '@/components/ai/ChatPanel'
-import { cn } from '@/lib/utils'
-import { 
-  supabase, 
-  signOut, 
-  getCurrentUser, 
+import React, { useState, useEffect, useCallback } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import Sidebar from "./Sidebar";
+import IdleLogout from "@/components/IdleLogout";
+import Header from "./Header";
+import ChatPanel from "@/components/ai/ChatPanel";
+import VantageLogo from "@/components/brand/VantageLogo";
+import { cn } from "@/lib/utils";
+import {
+  supabase,
+  signOut,
+  getCurrentUser,
   getCurrentProfile,
-  fetchCompanySettings 
-} from '@/lib/supabase'
+  fetchCompanySettings,
+} from "@/lib/supabase";
 
 interface AppShellProps {
-  children: React.ReactNode
+  children: React.ReactNode;
 }
 
 export default function AppShell({ children }: AppShellProps) {
-  const router = useRouter()
-  const pathname = usePathname()
-  
+  const router = useRouter();
+  const pathname = usePathname();
+
   // Auth state
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
-  const [companyId, setCompanyId] = useState<string | null>(null)
-  const [companyName, setCompanyName] = useState<string>('')
-  const [loading, setLoading] = useState(true)
-  
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+
   // UI state
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [chatOpen, setChatOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const panel = document.getElementById("workspace-navigation");
+    const focusables = () =>
+      Array.from(
+        panel?.querySelectorAll<HTMLElement>(
+          "a[href],button:not([disabled])",
+        ) || [],
+      ).filter((e) => e.getClientRects().length);
+    focusables()[0]?.focus();
+    const key = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileOpen(false);
+      }
+      if (event.key !== "Tab") return;
+      const items = focusables(),
+        first = items[0],
+        last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    const resize = () => {
+      if (window.innerWidth >= 1024) setMobileOpen(false);
+    };
+    window.addEventListener("keydown", key);
+    window.addEventListener("resize", resize);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", key);
+      window.removeEventListener("resize", resize);
+      previousFocus?.focus();
+    };
+  }, [mobileOpen]);
 
   // Load sidebar state from localStorage
   useEffect(() => {
-    const savedCollapsed = localStorage.getItem('vantage-sidebar-collapsed')
-    if (savedCollapsed === 'true') {
-      setSidebarCollapsed(true)
+    const savedCollapsed = localStorage.getItem("vantage-sidebar-collapsed");
+    if (savedCollapsed === "true") {
+      setSidebarCollapsed(true);
     }
-  }, [])
+  }, []);
 
   // Save sidebar state
   const handleSidebarToggle = useCallback(() => {
-    const newCollapsed = !sidebarCollapsed
-    setSidebarCollapsed(newCollapsed)
-    localStorage.setItem('vantage-sidebar-collapsed', String(newCollapsed))
-  }, [sidebarCollapsed])
+    const newCollapsed = !sidebarCollapsed;
+    setSidebarCollapsed(newCollapsed);
+    localStorage.setItem("vantage-sidebar-collapsed", String(newCollapsed));
+  }, [sidebarCollapsed]);
 
   // Public routes that skip auth entirely
-  const PUBLIC_PATHS = ['/login', '/portal', '/timesheet', '/contractor-portal', '/expense-report', '/terms', '/privacy']
+  const PUBLIC_PATHS = [
+    "/login",
+    "/portal",
+    "/timesheet",
+    "/contractor-portal",
+    "/expense-report",
+    "/terms",
+    "/privacy",
+  ];
 
   // Auth check
   useEffect(() => {
     const checkAuth = async () => {
       try {
         // Skip auth for public/portal routes
-        if (PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))) {
-          setLoading(false)
-          return
+        if (
+          PUBLIC_PATHS.some(
+            (p) => pathname === p || pathname.startsWith(p + "/"),
+          )
+        ) {
+          setLoading(false);
+          return;
         }
 
-        const { user } = await getCurrentUser()
-        
+        const { user } = await getCurrentUser();
+
         if (!user) {
-          router.push('/login')
-          return
+          router.push("/login");
+          return;
         }
-        
-        setUser(user)
-        
-        const { profile } = await getCurrentProfile()
-        setProfile(profile)
-        
+
+        setUser(user);
+
+        const { profile } = await getCurrentProfile();
+        setProfile(profile);
+
         if (profile?.company_id) {
-          setCompanyId(profile.company_id)
-          
-          const { data: settings } = await fetchCompanySettings(profile.company_id)
+          setCompanyId(profile.company_id);
+
+          const { data: settings } = await fetchCompanySettings(
+            profile.company_id,
+          );
           if (settings?.company_name) {
-            setCompanyName(settings.company_name)
+            setCompanyName(settings.company_name);
           } else {
-            const { data: co } = await supabase.from('companies').select('name').eq('id', profile.company_id).single()
-            if (co?.name) setCompanyName(co.name)
+            const { data: co } = await supabase
+              .from("companies")
+              .select("name")
+              .eq("id", profile.company_id)
+              .single();
+            if (co?.name) setCompanyName(co.name);
           }
         }
-        
-        setLoading(false)
+
+        setLoading(false);
       } catch (error) {
-        console.error('Auth error:', error)
-        router.push('/login')
+        console.error("Auth error:", error);
+        router.push("/login");
       }
-    }
-    
-    checkAuth()
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
-        router.push('/login')
+    };
+
+    checkAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
+        router.push("/login");
       }
-    })
-    
-    return () => subscription.unsubscribe()
-  }, [router])
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router]);
 
   // Listen for company name updates from Settings page
   useEffect(() => {
     const handler = (e: any) => {
-      if (e.detail?.name) setCompanyName(e.detail.name)
-    }
-    window.addEventListener('company-updated', handler)
-    return () => window.removeEventListener('company-updated', handler)
-  }, [])
+      if (e.detail?.name) setCompanyName(e.detail.name);
+    };
+    window.addEventListener("company-updated", handler);
+    return () => window.removeEventListener("company-updated", handler);
+  }, []);
 
   // Handle sign out
   const handleSignOut = async () => {
-    await signOut()
-    router.push('/login')
-  }
+    await signOut();
+    router.push("/login");
+  };
 
   // Skip shell for public/portal pages
-  if (PUBLIC_PATHS.includes(pathname)) {
-    return <>{children}</>
+  if (
+    PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))
+  ) {
+    return <>{children}</>;
   }
 
   // Loading state
-  if (loading) {
+  if (loading)
     return (
-      <div className="v-app min-h-screen bg-[#f4f5f7] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4 vUp">
-          <svg width={40} height={40} viewBox="0 0 40 40" fill="none" className="animate-pulse">
-            <path 
-              d="M8 8L20 32L32 8" 
-              stroke="#10b981" 
-              strokeWidth="3.5" 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              fill="none"
-            />
-          </svg>
-          <p className="text-sm text-gray-400 font-medium">Loading VantageFP...</p>
-        </div>
+      <div className="workspace-loading" role="status">
+        <VantageLogo className="workspace-loading-logo" />
+        <span>Opening your workspace…</span>
+        <div />
       </div>
-    )
-  }
+    );
 
   return (
-    <div className="v-app min-h-screen bg-[#f4f5f7]">
+    <div
+      className={`v-app workspace-app ${sidebarCollapsed ? "navigation-collapsed" : ""}`}
+    >
+      <a className="workspace-skip-link" href="#workspace-content">
+        Skip to content
+      </a>
+      {mobileOpen && (
+        <button
+          tabIndex={-1}
+          aria-label="Close navigation backdrop"
+          className="workspace-navigation-scrim"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
       {/* Privacy: auto sign-out after 10 min of inactivity (60s warning) */}
       {user && <IdleLogout onLogout={handleSignOut} />}
 
@@ -156,8 +227,10 @@ export default function AppShell({ children }: AppShellProps) {
         onToggle={handleSidebarToggle}
         companyName={companyName}
         onSignOut={handleSignOut}
+        mobileOpen={mobileOpen}
+        onMobileClose={() => setMobileOpen(false)}
       />
-      
+
       {/* Header */}
       <Header
         userEmail={user?.email}
@@ -165,26 +238,25 @@ export default function AppShell({ children }: AppShellProps) {
         onOpenChat={() => setChatOpen(true)}
         sidebarCollapsed={sidebarCollapsed}
         onSignOut={handleSignOut}
+        onOpenNavigation={() => setMobileOpen(true)}
       />
-      
+
       {/* Main Content */}
-      <main
-        className={cn(
-          'pt-16 min-h-screen transition-all duration-300',
-          sidebarCollapsed ? 'pl-16' : 'pl-60'
-        )}
-      >
-        <div className="p-6">
-          {React.Children.map(children, child => {
+      <main id="workspace-content" tabIndex={-1} className="workspace-main">
+        <div
+          className="workspace-page"
+          data-workspace-page={pathname.split("/")[1] || "dashboard"}
+        >
+          {React.Children.map(children, (child) => {
             if (React.isValidElement(child)) {
               return React.cloneElement(child, {
                 // @ts-ignore
                 companyId,
                 user,
-                profile
-              })
+                profile,
+              });
             }
-            return child
+            return child;
           })}
         </div>
       </main>
@@ -193,9 +265,9 @@ export default function AppShell({ children }: AppShellProps) {
       <ChatPanel
         isOpen={chatOpen}
         onClose={() => setChatOpen(false)}
-        theme="dark"
+        theme="light"
         companyId={companyId}
       />
     </div>
-  )
+  );
 }

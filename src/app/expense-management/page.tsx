@@ -1,5 +1,6 @@
 'use client'
 
+import PageHeader from '@/components/workspace/PageHeader'
 import React, { useState, useEffect } from 'react'
 import ExpenseManagement from '@/components/ExpenseManagement'
 import { getCurrentUser } from '@/lib/supabase'
@@ -58,6 +59,7 @@ export default function ExpenseManagementPage() {
 
   return (
     <div className="space-y-4">
+      <PageHeader eyebrow="Operations" title="Expenses" description="Review expenses and reimbursements in one place." />
       <ExpenseManagement
         supabase={supabase}
         companyId={companyId}

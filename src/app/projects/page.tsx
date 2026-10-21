@@ -1,5 +1,6 @@
 'use client'
 
+import PageHeader from '@/components/workspace/PageHeader'
 import { useSearchParams } from 'next/navigation'
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -204,28 +205,15 @@ export default function ProjectsPage() {
   if (loading) return <div className={`min-h-screen ${THEME.bgAlt} flex items-center justify-center`}><div className="animate-pulse text-slate-400">Loading projects...</div></div>
 
   return (
-    <div className={`min-h-screen ${THEME.bgAlt}`}>
-      <div className="max-w-[1440px] mx-auto px-6 py-6">
-        {/* HEADER — Blueprint banner */}
-        <div className="rounded-2xl px-6 py-5 mb-6 relative overflow-hidden flex items-center justify-between" style={{ background: BLUEPRINT.midnight }}>
-          <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 8px)' }} />
-          <div className="relative">
-            <div className="text-[10px] font-bold uppercase" style={{ ...AR, letterSpacing: '0.16em', color: '#93c5fd' }}>Portfolio</div>
-            <h1 className="text-white text-[26px] font-extrabold uppercase tracking-wide mt-1" style={AR}>Projects</h1>
-            <p className="text-[13px] text-slate-400 mt-0.5">Revenue recognized monthly, as earned — never before</p>
-          </div>
-          <div className="relative flex items-center gap-2.5">
-            <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-white transition-colors hover:bg-white/20" style={{ background: 'rgba(255,255,255,0.1)' }}>
-              <Download size={15} /> Export
-            </button>
-            <button onClick={openAddProject} className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-white transition-all hover:-translate-y-px" style={{ background: BLUEPRINT.blue }}>
-              <Plus size={15} /> Add Project
-            </button>
-          </div>
-        </div>
+    <div className={`ui-page-surface ${THEME.bgAlt}`}>
+      <div className="ui-page-inner">
+        <PageHeader eyebrow="Portfolio" title="Projects" description="Track delivery, scopes, and commercial terms. Revenue is recognized monthly, as earned." actions={<>
+          <button onClick={handleExport} className="ui-button ui-button-secondary"><Download size={15}/>Export</button>
+          <button onClick={openAddProject} className="ui-button ui-button-primary"><Plus size={15}/>Add Project</button>
+        </>} />
 
-        {/* TABS */}
-        <div className="flex items-center gap-0 border-b border-slate-200 mb-6">
+                {/* TABS */}
+        <div className="ui-tabs">
           {tabs.map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className="relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-all"

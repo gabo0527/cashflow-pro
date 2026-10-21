@@ -198,7 +198,7 @@ export default function ClientsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#eef1f4] p-4 md:p-6">
+    <div className="ui-page-surface">
       <ClientPortfolio
         clients={clients.map(c => ({ ...c,
           ...(perClient[c.id] || { active: 0, tm: 0, ls: 0, resources: [] }),

@@ -1,5 +1,6 @@
 'use client'
 
+import PageHeader from '@/components/workspace/PageHeader'
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   TrendingUp, TrendingDown, DollarSign, Users, Clock,
@@ -541,10 +542,7 @@ export default function ForecastPage() {
       {/* Header + Controls — merged */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-gray-900">Forecast</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Build named assumptions, project P&L, stress-test scenarios</p>
-          </div>
+          <PageHeader eyebrow="Planning" title="Forecast" description="Plan ahead with a connected view of financial performance." />
           <div className="flex items-center gap-2">
             <button onClick={() => { saveModel(); setDirty(false) }} disabled={saving}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 ${dirty ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'bg-gray-100 border border-gray-200 text-gray-500'}`}>

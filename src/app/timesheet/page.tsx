@@ -72,10 +72,10 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 const T = {
   card: "bg-white border border-gray-200 rounded-xl shadow-sm",
   cardHover: "bg-white border border-gray-200 rounded-xl shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md",
-  input: "w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all duration-200",
-  select: "w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all duration-200 cursor-pointer appearance-none",
+  input: "w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all duration-200",
+  select: "w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all duration-200 cursor-pointer appearance-none",
   label: "block text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2",
-  btnPrimary: "px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm shadow-emerald-500/20",
+  btnPrimary: "px-5 py-2.5 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm shadow-blue-500/20",
   btnGhost: "px-4 py-2 rounded-lg text-sm text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200",
   sectionTitle: "text-[11px] font-bold uppercase tracking-[0.08em] text-gray-400",
 }
@@ -877,10 +877,10 @@ export default function ContractorPortal() {
           <div className="text-center mb-10">
             <div className="inline-flex items-center justify-center mb-5">
               <svg width={52} height={52} viewBox="0 0 40 40" fill="none">
-                <path d="M8 8L20 32L32 8" stroke="#10b981" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                <path d="M9 9L20 32" stroke="#3b82f6" strokeWidth="4.5" strokeLinecap="round"/><path d="M20 32L31 9" stroke="#d38a4d" strokeWidth="4.5" strokeLinecap="round"/>
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Vantage</h1>
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Vantage<span className="text-[#b87943]">FP</span></h1>
             <p className="text-gray-400 text-sm mt-1.5 tracking-wide">Contractor Portal</p>
           </div>
 
@@ -910,7 +910,7 @@ export default function ContractorPortal() {
 
   // ============ PORTAL ============
   return (
-    <div className="min-h-screen bg-[#f4f5f7] text-gray-900" style={{ colorScheme: 'light' }}>
+    <div className="vantage-personal min-h-screen bg-[#f7f8fa] text-gray-900" style={{ colorScheme: 'light' }}>
       {/* Top Bar */}
       <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/95 backdrop-blur-xl">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
@@ -918,7 +918,7 @@ export default function ContractorPortal() {
             {/* Logo + Name */}
             <div className="flex items-center gap-3">
               <svg width={20} height={20} viewBox="0 0 40 40" fill="none">
-                <path d="M8 8L20 32L32 8" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                <path d="M9 9L20 32" stroke="#3b82f6" strokeWidth="4" strokeLinecap="round"/><path d="M20 32L31 9" stroke="#d38a4d" strokeWidth="4" strokeLinecap="round"/>
               </svg>
               <div className="h-4 w-px bg-gray-200" />
               <span className="text-[13px] font-medium text-gray-500">{member?.name}</span>
@@ -933,10 +933,10 @@ export default function ContractorPortal() {
                       ? 'text-gray-900' 
                       : 'text-gray-400 hover:text-gray-600'
                   }`}>
-                  <item.icon size={14} className={activeTab === item.id ? 'text-emerald-500' : ''} />
+                  <item.icon size={14} className={activeTab === item.id ? 'text-blue-500' : ''} />
                   <span className="hidden sm:inline">{item.label}</span>
                   {activeTab === item.id && (
-                    <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-emerald-500 rounded-full" />
+                    <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-blue-500 rounded-full" />
                   )}
                 </button>
               ))}
@@ -1871,7 +1871,7 @@ export default function ContractorPortal() {
                           <Bar dataKey="total" name="Total Hours" fill="#10b981" radius={[4, 4, 0, 0]} />
                         )}
                         {/* Trend line overlay */}
-                        <Area type="monotone" dataKey="total" stroke="#10b981" strokeWidth={2} fill="none"
+                        <Area type="monotone" dataKey="total" stroke="#3b82f6" strokeWidth={2} fill="none"
                           dot={false} strokeDasharray="4 2" opacity={hoursChartMode === 'total' ? 0 : 0.6} />
                       </RechartsBarChart>
                     </ResponsiveContainer>

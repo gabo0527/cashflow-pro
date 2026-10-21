@@ -1,5 +1,6 @@
 'use client'
 
+import PageHeader from '@/components/workspace/PageHeader'
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { 
   Search, Filter, Download, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
@@ -1669,25 +1670,15 @@ ${parts.join('')}
         logo={MANO_LOGO}
         onClose={() => setShowResourceReport(false)}
       />}
-      {/* Header — dark page banner */}
-      <div className="relative overflow-hidden rounded-2xl px-7 py-6 flex items-start justify-between gap-4" style={{ background: 'linear-gradient(135deg,#1b2431 0%,#141b24 55%,#10151c 100%)', boxShadow: '0 20px 46px -26px rgba(15,23,42,0.6)' }}>
-        <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 13px)' }} />
-        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(80% 130% at 0% 0%, rgba(59,130,246,0.14), transparent 55%)' }} />
-        <div className="relative">
-          <p className="text-[11px] font-extrabold uppercase tracking-[0.16em]" style={{ fontFamily: "'Archivo', system-ui, sans-serif", color: '#93c5fd' }}>Operations</p>
-          <h1 className="text-3xl font-extrabold uppercase tracking-tight text-white mt-1 leading-none" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>Time Tracking</h1>
-          <p className="text-sm mt-2" style={{ color: '#8b97a7' }}>{getFilterTitle()}</p>
-        </div>
-        <div className="relative flex items-center gap-2 flex-wrap justify-end">
-          <button onClick={() => setShowResourceReport(true)} className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold bg-white text-slate-900"><FileText size={15} />Resource report</button>
-          <button onClick={openPdfReport} className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.16)', color: '#e2e8f0' }}><Download size={15} />Export PDF</button>
-          <button onClick={exportToCSV} className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.16)', color: '#e2e8f0' }}><FileText size={15} />Export CSV</button>
-          <button onClick={() => setShowEntryModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:shadow-[0_10px_22px_-8px_rgba(37,99,235,0.75)]" style={{ background: 'linear-gradient(135deg,#2563eb,#1e3a8a)' }}><Plus size={16} />Add Entry</button>
-        </div>
-      </div>
+      <PageHeader eyebrow="Operations" title="Time tracking" description={<>Submitted hours, resource activity, and utilization.<span className="block mt-1 text-slate-500">{getFilterTitle()}</span></>} actions={<>
+        <button onClick={() => setShowResourceReport(true)} className="ui-button ui-button-secondary"><FileText size={15}/>Resource report</button>
+        <button onClick={openPdfReport} className="ui-button ui-button-secondary"><Download size={15}/>Export PDF</button>
+        <button onClick={exportToCSV} className="ui-button ui-button-secondary"><FileText size={15}/>Export CSV</button>
+        <button onClick={() => setShowEntryModal(true)} className="ui-button ui-button-primary"><Plus size={15}/>Add Entry</button>
+      </>} />
 
-      {/* Search + Filters */}
-      <div className={`p-2.5 rounded-2xl bg-white border ${THEME.border} shadow-sm relative z-20`}>
+              {/* Search + Filters */}
+      <div className="ui-filter-panel relative z-20">
         <div className="flex flex-wrap items-center gap-2">
           {/* Search */}
           <div className="relative flex-1 min-w-[220px]">
@@ -1736,14 +1727,14 @@ ${parts.join('')}
       </div>
 
       {/* KPI Cards — 3 operational metrics */}
-      <div className="grid grid-cols-3 gap-3 relative z-10">
+      <div className="ui-metrics grid grid-cols-3 gap-3 relative z-10">
         <KPICard title="Actual Hours" value={kpis.totalActualHours} format="hours" trend={kpis.hoursTrend} trendLabel="vs prior" icon={<Clock size={15} />} accentColor="#2563eb" />
         <KPICard title="Billable Hours" value={kpis.totalBillableHours} format="hours" icon={<BadgeCheck size={15} />} accentColor="#c2660c" />
         <KPICard title="Utilization" value={kpis.utilization} format="percent" icon={<Gauge size={15} />} accentColor="#2563eb" />
       </div>
 
       {/* View Tabs */}
-      <div className={`flex items-center gap-1 border-b ${THEME.border} pb-0 relative z-10`}>
+      <div className="ui-tabs relative z-10">
         {VIEW_TABS.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
             activeTab === tab.id 
@@ -2002,7 +1993,7 @@ ${parts.join('')}
                         </div>
                       </button>
                       {expandedProjects.has(project.id) && (
-                        <div className="px-6 pb-3 overflow-x-auto">
+                        <div className="ui-ledger px-6 pb-3 overflow-x-auto">
                           <table className="w-full text-sm">
                             <thead><tr className={`border-b ${THEME.border}`} style={{ background: HEADER_GRADIENT }}>
                               <th className={`px-2 py-2 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-32`}>Name</th>
@@ -2108,7 +2099,7 @@ ${parts.join('')}
                         </div>
                       </button>
                       {expandedProjects.has(project.id) && (
-                        <div className="px-6 pb-3 overflow-x-auto">
+                        <div className="ui-ledger px-6 pb-3 overflow-x-auto">
                           <table className="w-full text-sm">
                             <thead><tr className={`border-b ${THEME.border}`} style={{ background: HEADER_GRADIENT }}>
                               <th className={`px-2 py-2 text-left text-xs font-medium ${THEME.textDim} uppercase tracking-wider w-32`}>Name</th>
@@ -2335,7 +2326,7 @@ ${parts.join('')}
                               </button>
 
                               {prjOpen && (
-                                <div className="pl-[52px] pr-4 pb-3 pt-1 bg-gray-50/30 overflow-x-auto">
+                                <div className="ui-ledger pl-[52px] pr-4 pb-3 pt-1 bg-gray-50/30 overflow-x-auto">
                                   <table className="w-full text-sm">
                                     <thead><tr style={{ background: HEADER_GRADIENT }}>
                                       <th className={`px-3 py-2 text-left text-[10px] font-semibold ${THEME.textDim} uppercase tracking-wider`}>Date</th>
