@@ -1,5 +1,6 @@
 'use client'
 
+import PageHeader from '@/components/workspace/PageHeader'
 import React, { useState, useEffect } from 'react'
 import { Building2, Users, Shield, Link2, CreditCard, Database, Bell, ChevronRight, Check, X, Trash2, Edit2, Eye, EyeOff, RefreshCw, Copy, ExternalLink, Key, Lock, Mail, Smartphone, FileText, Download, UserPlus, CheckCircle2, Info, Loader2, Save, Plus, Scale, AlertTriangle } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
@@ -66,14 +67,14 @@ function FormField({ label, children, hint }: { label: string; children: React.R
 function Input({ value, onChange, placeholder, type = 'text', disabled = false }: { value: string; onChange: (v: string) => void; placeholder?: string; type?: string; disabled?: boolean }) {
   return (
     <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} disabled={disabled}
-      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-500/20 disabled:opacity-50 transition-colors" />
+      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-500/20 disabled:opacity-50 transition-colors" />
   )
 }
 
 function Sel({ value, onChange, options, placeholder }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; placeholder?: string }) {
   return (
     <select value={value} onChange={e => onChange(e.target.value)}
-      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-emerald-400 appearance-none cursor-pointer">
+      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-blue-400 appearance-none cursor-pointer">
       {placeholder && <option value="">{placeholder}</option>}
       {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
@@ -82,7 +83,7 @@ function Sel({ value, onChange, options, placeholder }: { value: string; onChang
 
 function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean) => void }) {
   return (
-    <button onClick={() => onChange(!enabled)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? 'bg-emerald-500' : 'bg-slate-200'}`}>
+    <button onClick={() => onChange(!enabled)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? 'bg-blue-500' : 'bg-slate-200'}`}>
       <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
     </button>
   )
@@ -90,8 +91,8 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
 
 function StatusBadge({ status }: { status: string }) {
   const s: Record<string, string> = {
-    connected: 'bg-emerald-50 text-emerald-600 border-emerald-500/20',
-    active: 'bg-emerald-50 text-emerald-600 border-emerald-500/20',
+    connected: 'bg-blue-50 text-blue-600 border-blue-500/20',
+    active: 'bg-blue-50 text-blue-600 border-blue-500/20',
     inactive: 'bg-red-500/10 text-red-400 border-red-500/20',
     invited: 'bg-amber-50 text-amber-600 border-amber-200',
   }
@@ -148,7 +149,7 @@ function CompanyProfileSection({ company, onSave }: { company: Company | null; o
         </div></div>
       </SectionCard>
       <div className="flex justify-end">
-        <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-500 disabled:bg-slate-300 text-slate-900 text-sm font-medium rounded-lg flex items-center gap-2 transition-colors">
+        <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 bg-blue-500 hover:bg-blue-500 disabled:bg-slate-300 text-slate-900 text-sm font-medium rounded-lg flex items-center gap-2 transition-colors">
           {saving ? <RefreshCw size={14} className="animate-spin" /> : saved ? <CheckCircle2 size={14} /> : <Save size={14} />}{saved ? 'Saved!' : 'Save Changes'}
         </button>
       </div>
@@ -169,33 +170,33 @@ function TeamSection({ companyId }: { companyId: string }) {
   const removeMember = async (id: string) => { const m = members.find(x => x.id === id); if (!confirm(`Remove ${m?.name}? This cannot be undone.`)) return; setProcessing(id); const { error } = await supabase.from('team_members').delete().eq('id', id); if (!error) setMembers(p => p.filter(x => x.id !== id)); else alert(`Error: ${error.message}`); setProcessing(null) }
   const handleInvite = async () => { if (!inviteForm.name || !inviteForm.email) return; setProcessing('invite'); const { data, error } = await supabase.from('team_members').insert({ company_id: companyId, name: inviteForm.name, email: inviteForm.email, permission_role: inviteForm.permission_role, status: 'active' }).select().single(); if (!error && data) { setMembers(p => [...p, { ...data, permission_role: data.permission_role || 'employee' }]); setInviteForm({ name: '', email: '', permission_role: 'employee' }); setShowInvite(false) } else alert(`Error: ${error?.message}`); setProcessing(null) }
 
-  if (loading) return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 text-emerald-600 animate-spin" /></div>
+  if (loading) return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 text-blue-600 animate-spin" /></div>
   return (
     <div className="space-y-6">
       <SectionCard>
         <SectionHeader title="Team Members" description={`${members.length} members`} action={
-          <button onClick={() => setShowInvite(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-50 text-emerald-600 text-xs font-medium rounded-lg border border-emerald-200 transition-colors"><UserPlus size={12} /> Add Member</button>
+          <button onClick={() => setShowInvite(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-50 text-blue-600 text-xs font-medium rounded-lg border border-blue-200 transition-colors"><UserPlus size={12} /> Add Member</button>
         } />
         <div className="divide-y divide-white/[0.04]">{members.map(member => { const perm = PERMISSION_MATRIX[member.permission_role] || PERMISSION_MATRIX.employee; return (
           <div key={member.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-white/[0.015] transition-colors group">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-xs font-semibold text-emerald-600">{member.name.split(' ').map(n => n[0]).join('').substring(0, 2)}</div>
+              <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-xs font-semibold text-blue-600">{member.name.split(' ').map(n => n[0]).join('').substring(0, 2)}</div>
               <div><div className="flex items-center gap-2"><span className="text-sm text-slate-900 font-medium">{member.name}</span>{member.role && <span className="text-[11px] text-slate-400">({member.role})</span>}</div><p className="text-xs text-slate-400">{member.email}</p></div>
             </div>
             <div className="flex items-center gap-3">
               {editingRole === member.id ? (
-                <select value={member.permission_role} onChange={e => updatePermRole(member.id, e.target.value)} className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:ring-1 focus:ring-emerald-500/40" autoFocus onBlur={() => setEditingRole(null)}>
+                <select value={member.permission_role} onChange={e => updatePermRole(member.id, e.target.value)} className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:ring-1 focus:ring-blue-500/40" autoFocus onBlur={() => setEditingRole(null)}>
                   {member.permission_role === 'owner' && <option value="owner">Owner</option>}
                   <option value="admin">Admin</option><option value="member">Member</option><option value="viewer">Viewer</option><option value="employee">Employee</option>
                 </select>
               ) : (
                 <button onClick={() => member.permission_role !== 'owner' ? setEditingRole(member.id) : null}
-                  className={`px-2 py-0.5 rounded text-[10px] font-medium flex items-center gap-1 uppercase tracking-wide border transition-colors ${member.permission_role === 'owner' ? 'bg-purple-50 text-purple-600 border-purple-200 cursor-default' : member.permission_role === 'admin' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-50 cursor-pointer' : member.permission_role === 'member' ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-50 cursor-pointer' : member.permission_role === 'viewer' ? 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100 cursor-pointer' : 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-50 cursor-pointer'}`}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium flex items-center gap-1 uppercase tracking-wide border transition-colors ${member.permission_role === 'owner' ? 'bg-purple-50 text-purple-600 border-purple-200 cursor-default' : member.permission_role === 'admin' ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-50 cursor-pointer' : member.permission_role === 'member' ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-50 cursor-pointer' : member.permission_role === 'viewer' ? 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100 cursor-pointer' : 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-50 cursor-pointer'}`}
                   title={member.permission_role !== 'owner' ? 'Click to change role' : ''}>{perm.label}{member.permission_role !== 'owner' && <Edit2 size={9} />}</button>
               )}
               <StatusBadge status={member.status} />
               {member.permission_role !== 'owner' && <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                {member.status === 'active' ? <button onClick={() => updateStatus(member.id, 'inactive')} className="p-1.5 text-slate-400 hover:text-amber-600 rounded transition-colors" title="Deactivate"><EyeOff size={13} /></button> : <button onClick={() => updateStatus(member.id, 'active')} className="p-1.5 text-slate-400 hover:text-emerald-600 rounded transition-colors" title="Activate"><Eye size={13} /></button>}
+                {member.status === 'active' ? <button onClick={() => updateStatus(member.id, 'inactive')} className="p-1.5 text-slate-400 hover:text-amber-600 rounded transition-colors" title="Deactivate"><EyeOff size={13} /></button> : <button onClick={() => updateStatus(member.id, 'active')} className="p-1.5 text-slate-400 hover:text-blue-600 rounded transition-colors" title="Activate"><Eye size={13} /></button>}
                 <button onClick={() => removeMember(member.id)} className="p-1.5 text-slate-400 hover:text-red-400 rounded transition-colors" title="Remove">{processing === member.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}</button>
               </div>}
             </div>
@@ -209,14 +210,14 @@ function TeamSection({ companyId }: { companyId: string }) {
           <FormField label="Email"><Input value={inviteForm.email} onChange={v => setInviteForm(p => ({ ...p, email: v }))} placeholder="john@company.com" type="email" /></FormField>
           <FormField label="Permission Role" hint="Controls which pages this person can access"><Sel value={inviteForm.permission_role} onChange={v => setInviteForm(p => ({ ...p, permission_role: v }))} options={[{ value: 'admin', label: 'Admin — Full access except billing' }, { value: 'member', label: 'Member — Edit data, view reports' }, { value: 'viewer', label: 'Viewer — Read-only dashboards' }, { value: 'employee', label: 'Employee — Timesheet & expenses only' }]} /></FormField>
         </div>
-        <div className="flex justify-end gap-3 mt-6"><button onClick={() => setShowInvite(false)} className="px-4 py-2 text-sm text-slate-500 hover:text-slate-900 transition-colors">Cancel</button><button onClick={handleInvite} disabled={!inviteForm.name || !inviteForm.email || processing === 'invite'} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-500 disabled:opacity-50 text-slate-900 text-sm font-medium rounded-lg flex items-center gap-2 transition-colors">{processing === 'invite' ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add Member</button></div>
+        <div className="flex justify-end gap-3 mt-6"><button onClick={() => setShowInvite(false)} className="px-4 py-2 text-sm text-slate-500 hover:text-slate-900 transition-colors">Cancel</button><button onClick={handleInvite} disabled={!inviteForm.name || !inviteForm.email || processing === 'invite'} className="px-4 py-2 bg-blue-500 hover:bg-blue-500 disabled:opacity-50 text-slate-900 text-sm font-medium rounded-lg flex items-center gap-2 transition-colors">{processing === 'invite' ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add Member</button></div>
       </div></div>}
 
       <SectionCard>
         <SectionHeader title="Role Permissions" description="What each role can access throughout the app" />
         <div className="p-5 overflow-x-auto">
           <table className="w-full text-sm"><thead><tr className="border-b border-slate-200"><th className="text-left py-2 pr-4 text-xs text-slate-400 font-medium">Role</th>{ALL_FEATURES.map(f => <th key={f.id} className="text-center px-1 py-2 text-[10px] text-slate-400 font-medium">{f.label}</th>)}</tr></thead>
-          <tbody>{Object.entries(PERMISSION_MATRIX).map(([k, p]) => <tr key={k} className="border-b border-slate-100"><td className="py-2.5 pr-4"><span className={`text-xs font-medium ${p.color}`}>{p.label}</span><p className="text-[10px] text-slate-400 mt-0.5">{p.description}</p></td>{ALL_FEATURES.map(f => <td key={f.id} className="text-center px-1 py-2.5">{p.access.includes(f.id) ? <Check size={12} className="text-emerald-600 mx-auto" /> : <X size={12} className="text-slate-300 mx-auto" />}</td>)}</tr>)}</tbody></table>
+          <tbody>{Object.entries(PERMISSION_MATRIX).map(([k, p]) => <tr key={k} className="border-b border-slate-100"><td className="py-2.5 pr-4"><span className={`text-xs font-medium ${p.color}`}>{p.label}</span><p className="text-[10px] text-slate-400 mt-0.5">{p.description}</p></td>{ALL_FEATURES.map(f => <td key={f.id} className="text-center px-1 py-2.5">{p.access.includes(f.id) ? <Check size={12} className="text-blue-600 mx-auto" /> : <X size={12} className="text-slate-300 mx-auto" />}</td>)}</tr>)}</tbody></table>
           <p className="text-[11px] text-slate-400 mt-3 flex items-center gap-1"><Info size={10} /> Employees access /timesheet only — no admin interface.</p>
         </div>
       </SectionCard>
@@ -259,7 +260,7 @@ function SecuritySection({ companyId }: { companyId: string }) {
           <div className="flex items-center justify-between py-3"><div><p className="text-sm text-slate-900 font-medium">IP Whitelist</p><p className="text-xs text-slate-400">Restrict access to specific IPs</p></div><Toggle enabled={ipWhitelist} onChange={setIpWhitelist} /></div>
         </div>
       </SectionCard>
-      <div className="flex justify-end"><button onClick={saveSettings} disabled={saving} className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-500 disabled:bg-slate-300 text-slate-900 text-sm font-medium rounded-lg flex items-center gap-2 transition-colors">{saving ? <RefreshCw size={14} className="animate-spin" /> : saved ? <CheckCircle2 size={14} /> : <Save size={14} />}{saved ? 'Saved!' : 'Save Security Settings'}</button></div>
+      <div className="flex justify-end"><button onClick={saveSettings} disabled={saving} className="px-5 py-2.5 bg-blue-500 hover:bg-blue-500 disabled:bg-slate-300 text-slate-900 text-sm font-medium rounded-lg flex items-center gap-2 transition-colors">{saving ? <RefreshCw size={14} className="animate-spin" /> : saved ? <CheckCircle2 size={14} /> : <Save size={14} />}{saved ? 'Saved!' : 'Save Security Settings'}</button></div>
 
       <SectionCard>
         <SectionHeader title="SSO / SAML" description="Enterprise authentication" />
@@ -271,7 +272,7 @@ function SecuritySection({ companyId }: { companyId: string }) {
 
       <SectionCard>
         <SectionHeader title="Audit Log" description={auditLogs.length > 0 ? `${auditLogs.length} recent events` : 'Activity tracking'} />
-        {loadingLogs ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 text-emerald-600 animate-spin" /></div> : auditLogs.length > 0 ? (
+        {loadingLogs ? <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 text-blue-600 animate-spin" /></div> : auditLogs.length > 0 ? (
           <div className="divide-y divide-white/[0.04]">{auditLogs.map((l: any) => (
             <div key={l.id} className="px-5 py-3 flex items-center justify-between hover:bg-white/[0.015] transition-colors">
               <div className="flex items-center gap-3"><div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center">{l.action === 'login' ? <Lock size={12} className="text-slate-500" /> : <FileText size={12} className="text-slate-500" />}</div><div><p className="text-xs text-slate-900">{l.action}</p><p className="text-[11px] text-slate-400">{l.user_name}{l.details ? ` · ${l.details}` : ''}</p></div></div>
@@ -298,7 +299,7 @@ function IntegrationsSection({ companyId }: { companyId: string }) {
         <div className="p-5 space-y-3">{integrations.map(a => (
           <div key={a.type} className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-lg">
             <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-lg">{a.icon}</div><div><p className="text-sm text-slate-900 font-medium">{a.name}</p><p className="text-xs text-slate-400">{a.desc}</p></div></div>
-            {a.connected ? <span className="flex items-center gap-1 text-xs text-emerald-600"><CheckCircle2 size={12} /> Connected</span> : <ComingSoonBadge />}
+            {a.connected ? <span className="flex items-center gap-1 text-xs text-blue-600"><CheckCircle2 size={12} /> Connected</span> : <ComingSoonBadge />}
           </div>
         ))}</div>
       </SectionCard>
@@ -316,7 +317,7 @@ function BillingSection() {
     <div className="space-y-6">
       <SectionCard>
         <SectionHeader title="Current Plan" />
-        <div className="p-5"><div className="flex items-center justify-between"><div><h4 className="text-lg font-semibold text-slate-900">Founder Access</h4><p className="text-xs text-slate-400 mt-0.5">Full platform access during development</p></div><span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded text-[10px] font-medium uppercase tracking-wide">Active</span></div></div>
+        <div className="p-5"><div className="flex items-center justify-between"><div><h4 className="text-lg font-semibold text-slate-900">Founder Access</h4><p className="text-xs text-slate-400 mt-0.5">Full platform access during development</p></div><span className="px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded text-[10px] font-medium uppercase tracking-wide">Active</span></div></div>
       </SectionCard>
       <SectionCard>
         <SectionHeader title="Plans & Pricing" description="Subscription tiers will be available at public launch" />
@@ -329,7 +330,7 @@ function BillingSection() {
             <div key={p.name} className="p-5 bg-slate-50 border border-slate-200 rounded-lg">
               <h4 className="text-sm font-semibold text-slate-900">{p.name}</h4>
               <div className="mt-2"><span className="text-2xl font-bold text-slate-900">${p.price}</span><span className="text-xs text-slate-400">/mo</span></div>
-              <ul className="mt-3 space-y-1.5">{p.features.map(f => <li key={f} className="flex items-center gap-2 text-xs text-slate-500"><Check size={11} className="text-emerald-600/60" />{f}</li>)}</ul>
+              <ul className="mt-3 space-y-1.5">{p.features.map(f => <li key={f} className="flex items-center gap-2 text-xs text-slate-500"><Check size={11} className="text-blue-600/60" />{f}</li>)}</ul>
             </div>
           ))}</div>
           <p className="text-[11px] text-slate-400 mt-4 flex items-center gap-1"><Info size={10} /> Billing will be enabled at public launch. You currently have full access.</p>
@@ -376,10 +377,10 @@ function DataPrivacySection({ companyId }: { companyId: string }) {
           {EXPORT_TABLES.map(t => (
             <div key={t.key} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg">
               <div className="flex items-center gap-2.5"><Database size={13} className="text-slate-400" /><span className="text-sm text-slate-900">{t.label}</span></div>
-              <button onClick={() => exportTable(t.key)} disabled={exporting !== null} className="flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 disabled:opacity-50 transition-colors">{exporting === t.key ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />} Export CSV</button>
+              <button onClick={() => exportTable(t.key)} disabled={exporting !== null} className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 disabled:opacity-50 transition-colors">{exporting === t.key ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />} Export CSV</button>
             </div>
           ))}
-          <button onClick={exportAll} disabled={exporting !== null} className="w-full py-2.5 border border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50"><Download size={14} /> Export All Tables</button>
+          <button onClick={exportAll} disabled={exporting !== null} className="w-full py-2.5 border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50"><Download size={14} /> Export All Tables</button>
         </div>
       </SectionCard>
       <SectionCard>
@@ -427,11 +428,11 @@ function NotificationsSection({ companyId }: { companyId: string }) {
         <div key={o.key} className="px-5 py-3.5 flex items-center justify-between"><div><p className="text-sm text-slate-900 font-medium">{o.label}</p><p className="text-xs text-slate-400">{o.desc}</p></div><Toggle enabled={notifs[o.key as keyof typeof notifs]} onChange={v => setNotifs(p => ({ ...p, [o.key]: v }))} /></div>
       ))}</div></SectionCard>
       <SectionCard><SectionHeader title="Channels" description="Where to receive notifications" /><div className="p-5 space-y-3">
-        <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-lg"><div className="flex items-center gap-3"><Mail size={16} className="text-emerald-600" /><div><p className="text-sm text-slate-900">Email</p><p className="text-xs text-slate-400">{email || 'Your login email'}</p></div></div><Toggle enabled={channels.email} onChange={v => setChannels(p => ({ ...p, email: v }))} /></div>
+        <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-lg"><div className="flex items-center gap-3"><Mail size={16} className="text-blue-600" /><div><p className="text-sm text-slate-900">Email</p><p className="text-xs text-slate-400">{email || 'Your login email'}</p></div></div><Toggle enabled={channels.email} onChange={v => setChannels(p => ({ ...p, email: v }))} /></div>
         <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-lg"><div className="flex items-center gap-3"><Smartphone size={16} className="text-slate-500" /><div><p className="text-sm text-slate-900">Push Notifications</p><p className="text-xs text-slate-400">Mobile app</p></div></div><ComingSoonBadge /></div>
         <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-lg"><div className="flex items-center gap-3"><span className="text-base">💬</span><div><p className="text-sm text-slate-900">Slack</p><p className="text-xs text-slate-400">Get alerts in Slack</p></div></div><ComingSoonBadge /></div>
       </div></SectionCard>
-      <div className="flex justify-end"><button onClick={savePrefs} disabled={saving} className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-500 disabled:bg-slate-300 text-slate-900 text-sm font-medium rounded-lg flex items-center gap-2 transition-colors">{saving ? <RefreshCw size={14} className="animate-spin" /> : saved ? <CheckCircle2 size={14} /> : <Save size={14} />}{saved ? 'Saved!' : 'Save Preferences'}</button></div>
+      <div className="flex justify-end"><button onClick={savePrefs} disabled={saving} className="px-5 py-2.5 bg-blue-500 hover:bg-blue-500 disabled:bg-slate-300 text-slate-900 text-sm font-medium rounded-lg flex items-center gap-2 transition-colors">{saving ? <RefreshCw size={14} className="animate-spin" /> : saved ? <CheckCircle2 size={14} /> : <Save size={14} />}{saved ? 'Saved!' : 'Save Preferences'}</button></div>
     </div>
   )
 }
@@ -443,18 +444,18 @@ function LegalSection() {
     <div className="space-y-6">
       <SectionCard><SectionHeader title="Legal Documents" description="Review our terms and policies" /><div className="divide-y divide-white/[0.04]">{docs.map(d => (
         <a key={d.href} href={d.href} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between px-5 py-4 hover:bg-white/[0.015] transition-colors group">
-          <div className="flex items-center gap-3"><div className="w-9 h-9 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center"><FileText size={15} className="text-slate-400 group-hover:text-emerald-600 transition-colors" /></div><div><p className="text-sm text-slate-900 font-medium">{d.title}</p><p className="text-xs text-slate-400">{d.desc}</p></div></div>
-          <div className="flex items-center gap-3"><span className="text-[11px] text-slate-400">Updated {d.updated}</span><ExternalLink size={13} className="text-slate-400 group-hover:text-emerald-600 transition-colors" /></div>
+          <div className="flex items-center gap-3"><div className="w-9 h-9 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center"><FileText size={15} className="text-slate-400 group-hover:text-blue-600 transition-colors" /></div><div><p className="text-sm text-slate-900 font-medium">{d.title}</p><p className="text-xs text-slate-400">{d.desc}</p></div></div>
+          <div className="flex items-center gap-3"><span className="text-[11px] text-slate-400">Updated {d.updated}</span><ExternalLink size={13} className="text-slate-400 group-hover:text-blue-600 transition-colors" /></div>
         </a>))}</div></SectionCard>
       <SectionCard><SectionHeader title="Contact" description="Reach our legal and privacy teams" /><div className="p-5 space-y-3">
-        <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-lg"><div className="flex items-center gap-3"><Mail size={15} className="text-slate-500" /><div><p className="text-sm text-slate-900">Legal Inquiries</p><p className="text-xs text-slate-400">Terms, compliance, and general legal questions</p></div></div><a href="mailto:legal@vantagefp.co" className="text-emerald-600 text-xs font-medium hover:underline">legal@vantagefp.co</a></div>
-        <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-lg"><div className="flex items-center gap-3"><Shield size={15} className="text-slate-500" /><div><p className="text-sm text-slate-900">Privacy & Data Requests</p><p className="text-xs text-slate-400">Data access, deletion, and privacy concerns</p></div></div><a href="mailto:privacy@vantagefp.co" className="text-emerald-600 text-xs font-medium hover:underline">privacy@vantagefp.co</a></div>
+        <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-lg"><div className="flex items-center gap-3"><Mail size={15} className="text-slate-500" /><div><p className="text-sm text-slate-900">Legal Inquiries</p><p className="text-xs text-slate-400">Terms, compliance, and general legal questions</p></div></div><a href="mailto:legal@vantagefp.co" className="text-blue-600 text-xs font-medium hover:underline">legal@vantagefp.co</a></div>
+        <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-lg"><div className="flex items-center gap-3"><Shield size={15} className="text-slate-500" /><div><p className="text-sm text-slate-900">Privacy & Data Requests</p><p className="text-xs text-slate-400">Data access, deletion, and privacy concerns</p></div></div><a href="mailto:privacy@vantagefp.co" className="text-blue-600 text-xs font-medium hover:underline">privacy@vantagefp.co</a></div>
       </div></SectionCard>
       <SectionCard><SectionHeader title="Data Processing" description="Infrastructure and compliance" /><div className="p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-center"><p className="text-emerald-600 font-semibold text-base">TLS 1.2+</p><p className="text-[11px] text-slate-400 mt-1">Encryption in Transit</p></div>
-          <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-center"><p className="text-emerald-600 font-semibold text-base">AES-256</p><p className="text-[11px] text-slate-400 mt-1">Encryption at Rest</p></div>
-          <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-center"><p className="text-emerald-600 font-semibold text-base">RLS</p><p className="text-[11px] text-slate-400 mt-1">Row-Level Isolation</p></div>
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-center"><p className="text-blue-600 font-semibold text-base">TLS 1.2+</p><p className="text-[11px] text-slate-400 mt-1">Encryption in Transit</p></div>
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-center"><p className="text-blue-600 font-semibold text-base">AES-256</p><p className="text-[11px] text-slate-400 mt-1">Encryption at Rest</p></div>
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-center"><p className="text-blue-600 font-semibold text-base">RLS</p><p className="text-[11px] text-slate-400 mt-1">Row-Level Isolation</p></div>
         </div>
         <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg"><p className="text-xs text-slate-500 leading-relaxed">Your financial data is stored on Supabase (PostgreSQL) with Row Level Security ensuring complete data isolation between organizations. Application hosted on Vercel. Authentication handled via Google OAuth 2.0 — we never store passwords. All connections are HTTPS-only.</p></div>
       </div></SectionCard>
@@ -487,14 +488,14 @@ export default function SettingsPage() {
     default: return null
   }}
 
-  if (loading) return <div className="flex items-center justify-center h-[calc(100vh-120px)]"><Loader2 className="w-6 h-6 text-emerald-600 animate-spin" /></div>
+  if (loading) return <div className="flex items-center justify-center h-[calc(100vh-120px)]"><Loader2 className="w-6 h-6 text-blue-600 animate-spin" /></div>
 
   return (
     <div className="space-y-6">
-      <div><h1 className="text-xl font-bold text-slate-900">Settings</h1><p className="text-xs text-slate-400 mt-1">Configure your account and preferences</p></div>
-      <div className="flex gap-6">
-        <div className="w-56 flex-shrink-0"><nav className="bg-white rounded-xl border border-slate-200 overflow-hidden sticky top-6">
-          {SETTINGS_SECTIONS.map(s => <button key={s.id} onClick={() => setSection(s.id)} className={`w-full flex items-center gap-2.5 px-4 py-3 text-left text-sm transition-all ${section === s.id ? 'bg-emerald-50 text-emerald-600 border-l-2 border-emerald-500' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-l-2 border-transparent'}`}><s.icon size={15} /><span className="font-medium">{s.label}</span></button>)}
+      <PageHeader eyebrow="Organization" title="Settings" description="Make this workspace work for your business." />
+      <div className="settings-layout">
+        <div className="settings-navigation"><nav className="bg-white rounded-xl border border-slate-200 overflow-hidden sticky top-6">
+          {SETTINGS_SECTIONS.map(s => <button key={s.id} aria-current={section === s.id ? 'page' : undefined} onClick={() => setSection(s.id)} className={`w-full flex items-center gap-2.5 px-4 py-3 text-left text-sm transition-all ${section === s.id ? 'bg-blue-50 text-blue-600 border-l-2 border-blue-500' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-l-2 border-transparent'}`}><s.icon size={15} /><span className="font-medium">{s.label}</span></button>)}
         </nav></div>
         <div className="flex-1 min-w-0">{render()}</div>
       </div>

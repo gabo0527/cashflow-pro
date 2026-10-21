@@ -5,6 +5,7 @@
 // Projects), live hours, and an Action Items queue. All dead-source data
 // removed: QBO invoices, AR, expenses, margins, cash forecast.
 
+import PageHeader from '@/components/workspace/PageHeader'
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { AlertTriangle, ArrowRight } from 'lucide-react'
@@ -229,24 +230,12 @@ export default function DashboardPage() {
   if (loading) return <div className={`min-h-screen ${THEME.bgAlt} flex items-center justify-center`}><div className="animate-pulse text-slate-400">Loading dashboard...</div></div>
 
   return (
-    <div className={`min-h-screen ${THEME.bgAlt}`}>
-      <div className="max-w-[1320px] mx-auto px-6 py-6">
-        {/* BANNER */}
-        <div className="rounded-2xl px-6 py-5 mb-5 relative overflow-hidden flex items-center" style={{ background: BLUEPRINT.midnight }}>
-          <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 8px)' }} />
-          <div className="relative">
-            <div className="text-[10px] font-bold uppercase" style={{ ...AR, letterSpacing: '0.16em', color: '#93c5fd' }}>Command</div>
-            <h1 className="text-white text-[26px] font-extrabold uppercase tracking-wide mt-1" style={AR}>Dashboard</h1>
-            <p className="text-[13px] text-slate-400 mt-0.5">What lives in Vantage right now — recognized revenue, hours, and what needs you</p>
-          </div>
-          <div className="relative ml-auto text-right">
-            <div className="text-white font-bold text-[15px]" style={AR}>{todayNice.day}</div>
-            <div className="text-[12px] text-slate-400">{todayNice.week}</div>
-          </div>
-        </div>
+    <div className={`ui-page-surface ${THEME.bgAlt}`}>
+      <div className="ui-page-inner">
+        <PageHeader eyebrow="Your workspace" title="Overview" description="A clear view of performance, delivery, and what needs your attention." context={<><div>{todayNice.day}</div><div>{todayNice.week}</div></>} />
 
-        {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-5">
+                {/* KPIs */}
+        <div className="ui-metrics grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-5">
           {[
             { color: BLUEPRINT.blue, label: 'Recognized Revenue · YTD', node: <Money v={rev.ytd} />, detail: <>Jan–{monthLabel(curMonth)} · earned only, no future months</> },
             { color: BLUEPRINT.blue, label: `This Month · ${monthLabel(curMonth)}`, node: <Money v={rev.monthLS + rev.monthTM} />, detail: <><b className="text-slate-600">{formatCompactCurrency(rev.monthLS)}</b> LS · <b className="text-slate-600">{formatCompactCurrency(rev.monthTM)}</b> T&M so far</> },

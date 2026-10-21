@@ -1,172 +1,228 @@
-'use client'
-
-import React, { useState, useRef, useEffect } from 'react'
-import { Search, Bell, MessageSquare, ChevronDown, Settings, LogOut } from 'lucide-react'
-import { cn } from '@/lib/utils'
-
+"use client";
+import React, { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  Search,
+  MessageSquare,
+  ChevronDown,
+  Settings,
+  LogOut,
+  Menu,
+  ChevronRight,
+  X,
+  ArrowUpRight,
+} from "lucide-react";
+import {
+  workspaceContext,
+  findDestinations,
+  workspaceDestinations,
+} from "@/lib/workspace-navigation";
 interface HeaderProps {
-  userEmail?: string
-  userName?: string
-  onOpenChat: () => void
-  sidebarCollapsed: boolean
-  onSignOut?: () => void
+  userEmail?: string;
+  userName?: string;
+  onOpenChat: () => void;
+  sidebarCollapsed: boolean;
+  onSignOut?: () => void;
+  onOpenNavigation?: () => void;
 }
-
-export default function Header({ 
-  userEmail, 
+export default function Header({
+  userEmail,
   userName,
   onOpenChat,
   sidebarCollapsed,
-  onSignOut
+  onSignOut,
+  onOpenNavigation,
 }: HeaderProps) {
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const [searchFocused, setSearchFocused] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-  
+  const pathname = usePathname(),
+    router = useRouter(),
+    context = workspaceContext(pathname);
+  const [menuOpen, setMenuOpen] = useState(false),
+    [query, setQuery] = useState(""),
+    [index, setIndex] = useState(0);
+  const menuRef = useRef<HTMLDivElement>(null),
+    searchDialog = useRef<HTMLDialogElement>(null),
+    input = useRef<HTMLInputElement>(null);
+  const results = findDestinations(query),
+    displayName = userName || userEmail?.split("@")[0] || "Your account";
+  const openSearch = () => {
+    setQuery("");
+    setIndex(0);
+    if (!searchDialog.current?.open) searchDialog.current?.showModal();
+    input.current?.focus();
+  };
+  const closeSearch = () => searchDialog.current?.close();
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setUserMenuOpen(false)
+    const click = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const key = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        openSearch();
       }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  const displayName = userName || userEmail?.split('@')[0] || 'User'
-  const initials = displayName.slice(0, 2).toUpperCase()
-
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", click);
+    window.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("mousedown", click);
+      window.removeEventListener("keydown", key);
+    };
+  }, []);
+  useEffect(() => {
+    setMenuOpen(false);
+    closeSearch();
+  }, [pathname]);
+  const navigate = (href: string) => {
+    closeSearch();
+    router.push(href);
+  };
   return (
-    <header
-      className={cn(
-        'fixed top-0 right-0 h-16 z-30 flex items-center justify-between px-6 transition-all duration-300',
-        'bg-white/95 backdrop-blur-xl border-b border-gray-200',
-        sidebarCollapsed ? 'left-16' : 'left-60'
-      )}
-    >
-      {/* Left section - Search */}
-      <div className="flex items-center gap-4 flex-1 max-w-md">
-        <div className={cn(
-          'relative flex-1 rounded-xl border transition-all',
-          searchFocused ? 'bg-white border-blue-300 ring-2 ring-blue-500/15' : 'bg-gray-50 border-gray-200'
-        )}>
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search..."
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
-            className={cn(
-              'w-full pl-10 pr-4 py-2 rounded-xl text-sm',
-              'bg-transparent text-gray-900',
-              'placeholder:text-gray-400',
-              'focus:outline-none',
-              'border-0'
-            )}
-          />
-        </div>
-      </div>
-
-      {/* Right section */}
-      <div className="flex items-center gap-1">
-        {/* AI Chat - Sage */}
-        <button
-          onClick={onOpenChat}
-          className={cn(
-            'vBtn p-2.5 rounded-xl',
-            'text-gray-400 hover:text-blue-600',
-            'hover:bg-blue-50'
-          )}
-          title="Open Sage AI"
-        >
-          <MessageSquare size={18} />
-        </button>
-
-        {/* Notifications */}
-        <button
-          className={cn(
-            'vBtn p-2.5 rounded-xl relative',
-            'text-gray-400 hover:text-gray-600',
-            'hover:bg-gray-50'
-          )}
-          title="Notifications"
-        >
-          <Bell size={18} />
-        </button>
-
-        {/* Divider */}
-        <div className="w-px h-7 bg-gray-200 mx-2" />
-
-        {/* User Menu */}
-        <div className="relative" ref={menuRef}>
+    <>
+      <header
+        className={`workspace-topbar ${sidebarCollapsed ? "is-collapsed" : ""}`}
+      >
+        <div className="workspace-topbar-left">
           <button
-            onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className={cn(
-              'vBtn flex items-center gap-2.5 pl-1 pr-3 py-1.5 rounded-lg',
-              'hover:bg-gray-50',
-              userMenuOpen && 'bg-gray-50'
-            )}
+            className="workspace-menu-button ui-icon-button"
+            aria-label="Open navigation"
+            aria-controls="workspace-navigation"
+            onClick={onOpenNavigation}
           >
-            {/* Avatar */}
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg,#3b82f6,#1e3a8a)' }}>
-              {initials}
-            </div>
-            <span className="text-sm font-medium text-gray-700 hidden sm:block">
-              {displayName}
-            </span>
-            <ChevronDown 
-              size={14} 
-              className={cn(
-                'text-gray-400 transition-transform duration-200',
-                userMenuOpen && 'rotate-180'
-              )} 
-            />
+            <Menu size={20} />
           </button>
-
-          {/* Dropdown Menu */}
-          {userMenuOpen && (
-            <div className={cn(
-              'vScale absolute right-0 top-full mt-2 w-56 rounded-xl overflow-hidden',
-              'bg-white border border-gray-200',
-              'shadow-lg shadow-black/8'
-            )}>
-              {/* User info */}
-              <div className="px-4 py-3 border-b border-gray-100">
-                <p className="text-sm font-semibold text-gray-900">{displayName}</p>
-                {userEmail && (
-                  <p className="text-xs text-gray-400 mt-0.5">{userEmail}</p>
-                )}
-              </div>
-              
-              {/* Menu items */}
-              <div className="py-1">
-                <a
-                  href="/settings"
-                  className={cn(
-                    'vBtn flex items-center gap-3 px-4 py-2.5 text-sm',
-                    'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                  )}
-                >
-                  <Settings size={15} className="text-gray-400" />
-                  Account Settings
+          <div className="workspace-breadcrumb">
+            <span>{context.section}</span>
+            <ChevronRight size={13} aria-hidden />
+            <strong>{context.label}</strong>
+          </div>
+        </div>
+        <div className="workspace-topbar-actions">
+          <button className="workspace-search-trigger" onClick={openSearch}>
+            <Search size={16} aria-hidden />
+            <span>Find a page</span>
+            <kbd>⌘ K</kbd>
+          </button>
+          <button className="workspace-sage-trigger" onClick={onOpenChat}>
+            <MessageSquare size={16} aria-hidden />
+            <span>Ask Sage</span>
+          </button>
+          <div className="workspace-account" ref={menuRef}>
+            <button
+              className="workspace-account-trigger"
+              onClick={() => setMenuOpen(!menuOpen)}
+              aria-expanded={menuOpen}
+              aria-label="Account menu"
+            >
+              <span className="workspace-user-avatar">
+                {displayName
+                  .split(/\s+/)
+                  .map((w) => w[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </span>
+              <ChevronDown size={13} />
+            </button>
+            {menuOpen && (
+              <div className="workspace-account-menu">
+                <div>
+                  <strong>{displayName}</strong>
+                  {userEmail && <span>{userEmail}</span>}
+                </div>
+                <a href="/settings">
+                  <Settings size={15} />
+                  Account settings
                 </a>
                 {onSignOut && (
-                  <button
-                    onClick={onSignOut}
-                    className={cn(
-                      'vBtn w-full flex items-center gap-3 px-4 py-2.5 text-sm',
-                      'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                    )}
-                  >
-                    <LogOut size={15} className="text-gray-400" />
-                    Sign Out
+                  <button onClick={onSignOut}>
+                    <LogOut size={15} />
+                    Sign out
                   </button>
                 )}
               </div>
+            )}
+          </div>
+        </div>
+      </header>
+      <dialog
+        className="workspace-command"
+        ref={searchDialog}
+        aria-labelledby="workspace-command-title"
+        onClick={(e) => {
+          if (e.target === searchDialog.current) closeSearch();
+        }}
+      >
+        <div className="workspace-command-search">
+          <Search size={19} aria-hidden />
+          <label
+            className="sr-only"
+            id="workspace-command-title"
+            htmlFor="workspace-page-search"
+          >
+            Find a workspace page
+          </label>
+          <input
+            id="workspace-page-search"
+            ref={input}
+            placeholder="Where would you like to go?"
+            value={query}
+            autoComplete="off"
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setIndex(0);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setIndex((i) => Math.min(i + 1, results.length - 1));
+              }
+              if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setIndex((i) => Math.max(0, i - 1));
+              }
+              if (e.key === "Enter" && results[index]) {
+                e.preventDefault();
+                navigate(results[index].href);
+              }
+            }}
+          />
+          <button
+            className="ui-icon-button"
+            aria-label="Close page search"
+            onClick={closeSearch}
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="workspace-command-results">
+          <p>{query ? "Matching pages" : "Your workspace"}</p>
+          {results.map((d, i) => (
+            <button
+              key={d.href}
+              className={i === index ? "is-selected" : ""}
+              onMouseEnter={() => setIndex(i)}
+              onClick={() => navigate(d.href)}
+            >
+              <span>
+                <strong>{d.label}</strong>
+                <small>{d.description}</small>
+              </span>
+              <ArrowUpRight size={17} aria-hidden />
+            </button>
+          ))}
+          {!results.length && (
+            <div className="workspace-command-empty">
+              No pages match “{query}”. Try clients, hours, reports, or
+              settings.
             </div>
           )}
         </div>
-      </div>
-    </header>
-  )
+        <footer>
+          <span>Search pages and destinations</span>
+          <span>↑ ↓ Navigate · Enter Open</span>
+        </footer>
+      </dialog>
+    </>
+  );
 }

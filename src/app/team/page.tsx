@@ -1,5 +1,6 @@
 "use client"
 
+import PageHeader from '@/components/workspace/PageHeader'
 import React, { useState, useEffect, useMemo, useCallback } from "react"
 import {
   Search, Download, Plus, Edit2, X, Users, Mail, Phone,
@@ -1293,39 +1294,15 @@ export default function TeamPage() {
     <div className="space-y-8">
       <ToastContainer toasts={toasts} onDismiss={id => setToasts(prev => prev.filter(t => t.id !== id))} />
 
-      {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl px-7 py-6 flex items-center justify-between vUp" style={{ background: 'linear-gradient(135deg,#1b2431 0%,#141b24 55%,#10151c 100%)', boxShadow: '0 20px 46px -26px rgba(15,23,42,0.6)' }}>
-        <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 13px)' }} />
-        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(80% 130% at 0% 0%, rgba(59,130,246,0.14), transparent 55%)' }} />
-        <div className="relative">
-          <p className="text-[11px] font-extrabold uppercase tracking-[0.16em]" style={{ fontFamily: "'Archivo', system-ui, sans-serif", color: '#93c5fd' }}>Operations</p>
-          <h1 className="text-3xl font-extrabold uppercase tracking-tight text-white mt-1 leading-none" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>Team</h1>
-          <p className="text-sm mt-2" style={{ color: '#8b97a7' }}>Manage team members, rates, and profitability</p>
-        </div>
-        <div className="relative flex items-center gap-2.5 vUp vD1">
-          <button onClick={exportToCSV} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.16)', color: '#e2e8f0' }}>
-            <Download size={14} /> Export
-          </button>
-          {activeTab === "directory" && (
-            <button onClick={() => { setEditingMember(null); setShowMemberModal(true) }} className="flex items-center gap-2 px-4 py-2 vBtn vPri bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
-              <Plus size={14} /> Add Member
-            </button>
-          )}
-          {activeTab === "rates" && (
-            <button onClick={() => { setEditingRate(null); setShowRateModal(true) }} className="flex items-center gap-2 px-4 py-2 vBtn vPri bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
-              <Plus size={14} /> Add Rate Card
-            </button>
-          )}
-          {activeTab === "profitability" && (
-            <button onClick={() => setShowOverrideModal(true)} className="flex items-center gap-2 px-4 py-2 vBtn bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-500 shadow-sm">
-              <Edit2 size={14} /> Cost Override
-            </button>
-          )}
-        </div>
-      </div>
+      <PageHeader eyebrow="People" title="Team" description="Your people, their work, and the commercial detail behind it." actions={<>
+        <button onClick={exportToCSV} className="ui-button ui-button-secondary"><Download size={14}/>Export</button>
+        {activeTab === "directory" && <button onClick={() => { setEditingMember(null); setShowMemberModal(true) }} className="ui-button ui-button-primary"><Plus size={14}/>Add Member</button>}
+        {activeTab === "rates" && <button onClick={() => { setEditingRate(null); setShowRateModal(true) }} className="ui-button ui-button-primary"><Plus size={14}/>Add Rate Card</button>}
+        {activeTab === "profitability" && <button onClick={() => setShowOverrideModal(true)} className="ui-button ui-button-copper"><Edit2 size={14}/>Cost Override</button>}
+      </>} />
 
-      {/* Tabs */}
-      <div className={`flex items-center gap-1 border-b ${THEME.border} vUp vD2`}>
+              {/* Tabs */}
+      <div className="ui-tabs">
         {([
           { id: "directory" as const, label: "Directory", icon: Users },
           { id: "rates" as const, label: "Rates", icon: DollarSign },
@@ -1341,7 +1318,7 @@ export default function TeamPage() {
       </div>
 
       {/* Summary Cards — Blueprint textured (top accent) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 vUp vD3">
+      <div className="ui-metrics grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="relative bg-white border border-[#e2e8f0] rounded-2xl p-5 overflow-hidden shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_-22px_rgba(15,23,42,0.4)]">
           <div className="absolute top-0 left-0 right-0 h-[2px] z-10" style={{ background: 'linear-gradient(90deg,#2563eb,transparent)' }} />
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(15,23,42,0.022) 0 1px, transparent 1px 12px)' }} />
@@ -1569,7 +1546,7 @@ export default function TeamPage() {
 
                       {/* Expanded Rate Cards */}
                       {isExpanded && (
-                        <div className="bg-gray-50 vExp">
+                        <div className="ui-ledger bg-gray-50 vExp">
                           <table className="w-full text-sm">
                             <thead>
                               <tr className={`border-b ${THEME.border}`}>
@@ -1824,7 +1801,7 @@ export default function TeamPage() {
                 <div className="vDot bg-blue-400" />
                 <h3 className={`text-[13px] font-bold ${THEME.textPrimary}`}>Revenue by Client &mdash; {formatPeriodLabel(selectedPeriod, periodType)}</h3>
               </div>
-              <div className="overflow-x-auto">
+              <div className="ui-ledger overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className={`bg-gray-50 border-b ${THEME.border}`}>
@@ -1867,7 +1844,7 @@ export default function TeamPage() {
                 <div className="vDot bg-orange-400" />
                 <h3 className={`text-[13px] font-bold ${THEME.textPrimary}`}>Cost by Client &mdash; {formatPeriodLabel(selectedPeriod, periodType)}</h3>
               </div>
-              <div className="overflow-x-auto">
+              <div className="ui-ledger overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className={`bg-gray-50 border-b ${THEME.border}`}>

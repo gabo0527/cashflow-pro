@@ -1,196 +1,144 @@
-'use client'
-
-import React from 'react'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+"use client";
+import React from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  Wallet,
-  FileText,
-  Receipt,
-  FolderKanban,
   Users,
-  Clock,
-  UserCog,
+  FolderKanban,
+  Clock3,
+  ClipboardList,
+  UserRound,
   BarChart3,
-  Calculator,
   MessageSquare,
   Settings,
-  ChevronLeft,
-  ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
   LogOut,
-  ClipboardList
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
-
+  X,
+} from "lucide-react";
+import VantageLogo from "@/components/brand/VantageLogo";
+import {
+  workspaceDestinations,
+  personalDestinations,
+} from "@/lib/workspace-navigation";
 interface SidebarProps {
-  collapsed: boolean
-  onToggle: () => void
-  companyName?: string
-  onSignOut: () => void
-  userRole?: 'owner' | 'admin' | 'member' | 'viewer' | 'employee' | string
+  collapsed: boolean;
+  onToggle: () => void;
+  companyName?: string;
+  onSignOut: () => void;
+  userRole?: "owner" | "admin" | "member" | "viewer" | "employee" | string;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
-
-interface NavItem {
-  label: string
-  href: string
-  icon: React.ReactNode
-  section?: string
-  adminOnly?: boolean
-}
-
-const navItems: NavItem[] = [
-  // Financial nav commented out per operations repositioning (reversible)
-  // { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={18} />, adminOnly: true },
-  // { label: 'Cash Flow', href: '/cash-flow', icon: <Wallet size={18} />, adminOnly: true },
-  // { label: 'Invoices', href: '/invoices', icon: <FileText size={18} />, adminOnly: true },
-  // { label: 'Cash Management', href: '/expenses', icon: <Receipt size={18} />, adminOnly: true },
-  { label: 'Clients', href: '/clients', icon: <Users size={18} />, adminOnly: true },
-  { label: 'Projects', href: '/projects', icon: <FolderKanban size={18} />, adminOnly: true },
-  { label: 'Time Tracking', href: '/time-tracking', icon: <Clock size={18} />, section: 'Operations', adminOnly: true },
-  { label: 'Contractor Mgmt', href: '/contractor-management', icon: <ClipboardList size={18} />, adminOnly: true },
-  { label: 'Team', href: '/team', icon: <UserCog size={18} />, adminOnly: true },
-  { label: 'Reports', href: '/reports', icon: <BarChart3 size={18} />, section: 'Analysis', adminOnly: true },
-  // { label: 'Forecast', href: '/forecast', icon: <Calculator size={18} />, adminOnly: true },
-  { label: 'Sage', href: '/ai-assistant', icon: <MessageSquare size={18} />, section: 'Intelligence', adminOnly: true },
-  { label: 'Settings', href: '/settings', icon: <Settings size={18} />, section: 'System', adminOnly: true },
-  { label: 'My Timesheet', href: '/timesheet', icon: <Clock size={18} /> },
-  { label: 'My Expenses', href: '/expense-report', icon: <Receipt size={18} /> },
-]
-
-const MONO = "'JetBrains Mono', monospace"
-const DISPLAY = "'Archivo', system-ui, sans-serif"
-
-export default function Sidebar({ collapsed, onToggle, companyName, onSignOut, userRole = 'owner' }: SidebarProps) {
-  const pathname = usePathname()
-
-  const isLeadership = userRole === 'owner' || userRole === 'admin'
-
-  const visibleItems = navItems.filter(item => {
-    if (isLeadership) return item.adminOnly === true
-    return !item.adminOnly
-  })
-
-  let currentSection = ''
-
+const icons: Record<string, typeof LayoutDashboard> = {
+  overview: LayoutDashboard,
+  clients: Users,
+  projects: FolderKanban,
+  time: Clock3,
+  contractors: ClipboardList,
+  team: UserRound,
+  reports: BarChart3,
+  sage: MessageSquare,
+  settings: Settings,
+};
+export default function Sidebar({
+  collapsed,
+  onToggle,
+  companyName,
+  onSignOut,
+  userRole = "owner",
+  mobileOpen = false,
+  onMobileClose,
+}: SidebarProps) {
+  const pathname = usePathname();
+  const destinations =
+    userRole === "owner" || userRole === "admin"
+      ? workspaceDestinations
+      : personalDestinations;
   return (
     <aside
-      className={cn(
-        'fixed left-0 top-0 h-full z-40 flex flex-col overflow-hidden transition-all duration-300',
-        collapsed ? 'w-16' : 'w-60'
-      )}
-      style={{ background: 'linear-gradient(165deg,#1b232e 0%,#141b24 55%,#0f151c 100%)' }}
+      id="workspace-navigation"
+      aria-label="Workspace navigation"
+      role={mobileOpen ? "dialog" : undefined}
+      aria-modal={mobileOpen ? true : undefined}
+      className={`workspace-sidebar ${collapsed ? "is-collapsed" : ""} ${mobileOpen ? "is-mobile-open" : ""}`}
     >
-      {/* Texture overlays */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 13px)' }} />
-      <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)', backgroundSize: '17px 17px', opacity: 0.6 }} />
-      <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(100% 40% at 100% 0%, rgba(59,130,246,0.12), transparent 60%)' }} />
-
-      {/* Brand */}
-      <div className={cn('relative flex items-center h-16 border-b border-white/[0.07]', collapsed ? 'justify-center px-2' : 'px-4')}>
-        <div className="flex items-center gap-3">
-          <svg width={collapsed ? 26 : 28} height={collapsed ? 26 : 28} viewBox="0 0 48 48" fill="none" className="flex-shrink-0">
-            <path d="M13 12 L24 35" stroke="#3b82f6" strokeWidth="5.5" strokeLinecap="round" style={{ filter: 'drop-shadow(0 0 4px rgba(59,130,246,0.5))' }} />
-            <path d="M24 35 L35 12" stroke="#ea8a2f" strokeWidth="5.5" strokeLinecap="round" />
-          </svg>
-          {!collapsed && (
-            <div>
-              <h1 className="text-base font-extrabold tracking-tight text-white" style={{ fontFamily: DISPLAY }}>Vantage<span style={{ color: '#ea8a2f' }}>FP</span></h1>
-              {companyName && (
-                <p className="text-[9px] -mt-0.5 truncate max-w-32" style={{ fontFamily: MONO, color: 'rgba(96,165,250,0.55)' }}>{companyName}</p>
-              )}
-            </div>
-          )}
+      <div className="workspace-sidebar-brand">
+        <Link href="/" aria-label="VantageFP home" onClick={onMobileClose}>
+          <VantageLogo className="workspace-logo" />
+        </Link>
+        <button
+          className="workspace-mobile-close"
+          aria-label="Close navigation"
+          onClick={onMobileClose}
+        >
+          <X size={19} />
+        </button>
+      </div>
+      <div className="workspace-company">
+        <span className="workspace-company-avatar">
+          {(companyName || "Workspace").slice(0, 1).toUpperCase()}
+        </span>
+        <div>
+          <span>Organization</span>
+          <strong title={companyName}>{companyName || "Your workspace"}</strong>
         </div>
       </div>
-
-      {/* Navigation */}
-      <nav className="relative flex-1 overflow-y-auto py-3 px-2">
-        <ul className="space-y-0.5">
-          {visibleItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-            const showSection = item.section && item.section !== currentSection
-
-            if (item.section) {
-              currentSection = item.section
-            }
-
-            return (
-              <React.Fragment key={item.href}>
-                {showSection && !collapsed && (
-                  <li className="pt-4 pb-1.5 px-3">
-                    <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em]" style={{ fontFamily: MONO, color: 'rgba(96,165,250,0.42)' }}>
-                      // {item.section}
-                    </span>
-                  </li>
-                )}
-                {showSection && collapsed && (
-                  <li className="pt-3 pb-1">
-                    <div className="mx-3 border-t border-white/[0.06]" />
-                  </li>
-                )}
-
-                <li>
-                  <Link
-                    href={item.href}
-                    title={collapsed ? item.label : undefined}
-                    className={cn(
-                      'group relative flex items-center gap-3 px-3 py-2 rounded-lg transition-all',
-                      collapsed && 'justify-center',
-                      isActive ? 'text-white font-semibold' : 'text-white/60 hover:text-white hover:bg-white/[0.05]'
-                    )}
-                    style={isActive ? { background: 'linear-gradient(90deg, rgba(37,99,235,0.26), rgba(37,99,235,0.05))', boxShadow: '0 0 20px -4px rgba(59,130,246,0.35) inset' } : undefined}
-                  >
-                    {isActive && (
-                      <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full" style={{ background: '#3b82f6', boxShadow: '0 0 9px rgba(59,130,246,0.75)' }} />
-                    )}
-                    <span className="flex-shrink-0" style={{ color: isActive ? '#60a5fa' : 'rgba(255,255,255,0.5)' }}>
-                      {item.icon}
-                    </span>
-                    {!collapsed && (
-                      <span className="text-[13px]">{item.label}</span>
-                    )}
-                  </Link>
-                </li>
-              </React.Fragment>
-            )
-          })}
-        </ul>
-      </nav>
-
-      {/* Bottom section */}
-      <div className="relative border-t border-white/[0.07] p-2">
-        {!collapsed && (
-          <div className="flex items-center gap-2 px-3 pb-2 pt-1">
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#ea8a2f', boxShadow: '0 0 6px rgba(234,138,47,0.8)' }} />
-            <span className="text-[9.5px]" style={{ fontFamily: MONO, color: 'rgba(234,138,47,0.65)' }}>online</span>
-          </div>
+      <nav aria-label="Main navigation">
+        {Array.from(new Set(destinations.map((d) => d.section))).map(
+          (section) => (
+            <div className="workspace-nav-group" key={section}>
+              <p>{section}</p>
+              {destinations
+                .filter((d) => d.section === section)
+                .map((item) => {
+                  const Icon = icons[item.icon],
+                    active =
+                      pathname === item.href ||
+                      pathname.startsWith(item.href + "/");
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={onMobileClose}
+                      aria-current={active ? "page" : undefined}
+                      title={collapsed ? item.label : undefined}
+                      className="workspace-nav-link"
+                    >
+                      <Icon size={18} strokeWidth={1.65} aria-hidden />
+                      <span>{item.label}</span>
+                      {active && <i aria-hidden />}
+                    </Link>
+                  );
+                })}
+            </div>
+          ),
         )}
-
-        <button
-          onClick={onSignOut}
-          className={cn(
-            'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-white/45 hover:text-white/80 hover:bg-white/[0.05] transition-colors',
-            collapsed && 'justify-center'
-          )}
-          title={collapsed ? 'Sign Out' : undefined}
-        >
-          <LogOut size={18} />
-          {!collapsed && <span className="text-[13px] font-medium">Sign Out</span>}
+      </nav>
+      <div className="workspace-sidebar-bottom">
+        <button onClick={onSignOut} title={collapsed ? "Sign out" : undefined}>
+          <LogOut size={17} strokeWidth={1.6} aria-hidden />
+          <span>Sign out</span>
         </button>
-
         <button
+          className="workspace-collapse"
           onClick={onToggle}
-          className={cn(
-            'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-white/45 hover:text-white/80 hover:bg-white/[0.05] transition-colors mt-0.5',
-            collapsed && 'justify-center'
-          )}
-          title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+          aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
+          aria-expanded={!collapsed}
         >
-          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          {!collapsed && <span className="text-[13px] font-medium">Collapse</span>}
+          {collapsed ? (
+            <PanelLeftOpen size={17} />
+          ) : (
+            <PanelLeftClose size={17} />
+          )}
+          <span>Collapse navigation</span>
         </button>
+        <div className="workspace-sidebar-signature">
+          <span />
+          <span>Business operations, in focus.</span>
+        </div>
       </div>
     </aside>
-  )
+  );
 }

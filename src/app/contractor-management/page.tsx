@@ -1,5 +1,6 @@
 'use client'
 
+import PageHeader from '@/components/workspace/PageHeader'
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   FileText, Receipt, Search, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
@@ -1053,7 +1054,7 @@ export default function ContractorManagement() {
               </div>
             </div>
             {isExp && lines.length > 0 && (
-              <div className="bg-gray-50 px-6 py-3 border-t border-gray-200">
+              <div className="ui-ledger bg-gray-50 px-6 py-3 border-t border-gray-200">
                 <p className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase mb-2`}>Line Items</p>
                 <table className="w-full text-sm">
                   <thead><tr className="text-gray-400 text-xs">
@@ -1157,23 +1158,10 @@ export default function ContractorManagement() {
 
   return (
     <div className="space-y-5">
-      {/* Header — dark page banner */}
-      <div className="relative overflow-hidden rounded-2xl px-7 py-6 flex items-center justify-between gap-4" style={{ background: 'linear-gradient(135deg,#1b2431 0%,#141b24 55%,#10151c 100%)', boxShadow: '0 20px 46px -26px rgba(15,23,42,0.6)' }}>
-        <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 13px)' }} />
-        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(80% 130% at 0% 0%, rgba(59,130,246,0.14), transparent 55%)' }} />
-        <div className="relative">
-          <p className="text-[11px] font-extrabold uppercase tracking-[0.16em]" style={{ fontFamily: "'Archivo', system-ui, sans-serif", color: '#93c5fd' }}>Operations</p>
-          <h1 className="text-3xl font-extrabold uppercase tracking-tight text-white mt-1 leading-none" style={{ fontFamily: "'Archivo', system-ui, sans-serif" }}>Contractor Management</h1>
-          <p className="text-sm mt-2" style={{ color: '#8b97a7' }}>AP invoices and expenses from your team</p>
-        </div>
-        <a href="/contractor-portal" target="_blank" rel="noopener noreferrer"
-          className="relative flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.16)', color: '#e2e8f0' }}>
-          <ExternalLink size={14} /> Contractor Portal
-        </a>
-      </div>
+      <PageHeader eyebrow="Operations" title="Contractors" description="Review invoices, manage expenses, and keep your contractor records connected." actions={<a href="/contractor-portal" target="_blank" rel="noopener noreferrer" className="ui-button ui-button-secondary"><ExternalLink size={14}/>Contractor Portal</a>} />
 
-      {/* Tabs */}
-      <div className={`flex items-center gap-0 border-b ${THEME.border}`}>
+              {/* Tabs */}
+      <div className="ui-tabs">
         {[
           { id: 'invoices' as const, label: 'AP Invoices', icon: FileText, count: invMetrics.pendingCount },
           { id: 'expenses' as const, label: 'Expenses', icon: Receipt, count: expMetrics.pendingCount },
@@ -1198,7 +1186,7 @@ export default function ContractorManagement() {
               <Plus size={13} /> Add Invoice <span className="font-normal opacity-75">· on behalf of contractor</span>
             </button>
           </div>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="ui-metrics grid grid-cols-2 xl:grid-cols-4 gap-3">
             <MetricCard label="Total AP" value={fmt$(invMetrics.total)} icon={DollarSign} accentColor="#2563eb" sub={`${filteredInvoices.length} invoices`} />
             <MetricCard label="Pending" value={fmt$(invMetrics.pendingAmt)} icon={Clock} accentColor="#d97706" sub={`${invMetrics.pendingCount} awaiting`} highlight={invMetrics.pendingCount > 0} />
             <MetricCard label="Approved" value={fmt$(invMetrics.approvedAmt)} icon={CheckCircle} accentColor="#3b82f6" sub={`${invMetrics.approvedCount} approved`} />

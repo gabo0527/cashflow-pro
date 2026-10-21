@@ -20,7 +20,7 @@ function load(file, mocks = {}) {
   vm.runInThisContext(`(function(require,module,exports){${source}\n})`, {
     filename,
   })(
-    (name) => (Object.hasOwn(mocks, name) ? mocks[name] : require(name)),
+    (name) => (Object.hasOwn(mocks, name) ? mocks[name] : name === "@/components/workspace/PageHeader" ? {__esModule:true,default:load("src/components/workspace/PageHeader.tsx").default} : require(name)),
     module,
     module.exports,
   );

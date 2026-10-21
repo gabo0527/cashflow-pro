@@ -295,8 +295,8 @@ export default function ClientDetailPage() {
   const soft = accent + '14'
 
   return (
-    <div className="min-h-screen bg-[#eef1f4] p-6">
-      <div className="max-w-[1080px] mx-auto flex flex-col gap-3.5">
+    <div className="ui-page-surface">
+      <div className="ui-page-inner flex flex-col gap-5">
 
         <ClientWorkspaceHeader client={client} projects={projects} tab={tab} archiving={archiving} onArchive={archiveClient}
           onTab={next => { setTab(next); const params = new URLSearchParams(searchParams.toString()); params.set('tab', next); router.push(`/clients/${clientId}?${params}`, { scroll: false }) }}
@@ -308,7 +308,7 @@ export default function ClientDetailPage() {
         {tab === 'overview' && (
           <>
             {/* ============ KPIs ============ */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="ui-metrics grid grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="bg-white border border-slate-200/60 rounded-xl p-4 shadow-sm">
                 <div className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-400">Active projects</div>
                 <div className="text-2xl font-extrabold text-slate-900 mt-1 tabular-nums" style={{ fontFamily: 'Archivo, sans-serif' }}>{Math.round(cActive)}</div>

@@ -8,31 +8,31 @@ import { cn } from '@/lib/utils'
 // ============ THEME CONSTANTS ============
 export const THEME = {
   // Backgrounds
-  cardBg: 'bg-slate-900/70 backdrop-blur-xl',
-  cardBorder: 'border-white/[0.08]',
-  cardBorderHover: 'hover:border-white/[0.12]',
-  cardHoverBg: 'hover:bg-white/[0.05]',
+  cardBg: 'bg-white',
+  cardBorder: 'border-slate-200',
+  cardBorderHover: 'hover:border-slate-300',
+  cardHoverBg: 'hover:bg-slate-50',
   
   // Text
   text: {
-    primary: 'text-white',
-    secondary: 'text-slate-300',
-    muted: 'text-slate-400',
-    dim: 'text-slate-500',
+    primary: 'text-slate-900',
+    secondary: 'text-slate-600',
+    muted: 'text-slate-500',
+    dim: 'text-slate-400',
   },
   
   // Accent
-  accent: '#10b981',
-  accentLight: '#34d399',
+  accent: '#2563eb',
+  accentLight: '#60a5fa',
   
   // Status
-  positive: 'text-emerald-400',
-  negative: 'text-rose-400',
-  warning: 'text-amber-400',
-  info: 'text-blue-400',
+  positive: 'text-emerald-700',
+  negative: 'text-rose-700',
+  warning: 'text-amber-700',
+  info: 'text-blue-700',
   
   // Chart colors (monochrome + emerald)
-  chartColors: ['#10b981', '#64748b', '#94a3b8', '#cbd5e1', '#475569'],
+  chartColors: ['#2563eb', '#b87943', '#64748b', '#93b4df', '#cbd5e1'],
 }
 
 // ============ GLASS CARD ============
@@ -92,7 +92,7 @@ export function Section({
         className={cn(
           'flex items-center justify-between px-5 py-4 border-b',
           THEME.cardBorder,
-          collapsible && 'cursor-pointer hover:bg-white/[0.02] transition-colors'
+          collapsible && 'cursor-pointer hover:bg-slate-50 transition-colors'
         )}
         onClick={collapsible ? () => setExpanded(!expanded) : undefined}
       >
@@ -106,7 +106,7 @@ export function Section({
             <div className="flex items-center gap-2">
               <h3 className={cn('text-sm font-semibold', THEME.text.primary)}>{title}</h3>
               {badge !== undefined && (
-                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-white/[0.08] text-slate-300">
+                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">
                   {badge}
                 </span>
               )}
@@ -119,11 +119,11 @@ export function Section({
           {headerRight}
           {action && !collapsible && (
             action.onClick ? (
-              <button onClick={action.onClick} className={cn('text-xs font-medium flex items-center gap-0.5 transition-colors', THEME.text.muted, 'hover:text-white')}>
+              <button onClick={action.onClick} className={cn('text-xs font-medium flex items-center gap-0.5 transition-colors', THEME.text.muted, 'hover:text-blue-600')}>
                 {action.label}<ChevronRight size={14} />
               </button>
             ) : (
-              <Link href={action.href || '#'} className={cn('text-xs font-medium flex items-center gap-0.5 transition-colors', THEME.text.muted, 'hover:text-white')}>
+              <Link href={action.href || '#'} className={cn('text-xs font-medium flex items-center gap-0.5 transition-colors', THEME.text.muted, 'hover:text-blue-600')}>
                 {action.label}<ChevronRight size={14} />
               </Link>
             )
@@ -168,8 +168,8 @@ export function MetricCard({ label, value, subValue, trend, trendLabel, icon: Ic
           {subValue && <p className={cn('text-xs', THEME.text.dim)}>{subValue}</p>}
           {trend !== undefined && (
             <div className="flex items-center gap-1.5 pt-1">
-              {trend >= 0 ? <ArrowUpRight size={14} className="text-emerald-400" /> : <ArrowDownRight size={14} className="text-rose-400" />}
-              <span className={cn('text-xs font-medium', trend >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+              {trend >= 0 ? <ArrowUpRight size={14} className="text-emerald-700" /> : <ArrowDownRight size={14} className="text-rose-700" />}
+              <span className={cn('text-xs font-medium', trend >= 0 ? 'text-emerald-700' : 'text-rose-700')}>
                 {Math.abs(trend).toFixed(1)}%
               </span>
               {trendLabel && <span className={cn('text-xs', THEME.text.dim)}>{trendLabel}</span>}
@@ -177,7 +177,7 @@ export function MetricCard({ label, value, subValue, trend, trendLabel, icon: Ic
           )}
         </div>
         {Icon && (
-          <div className="p-2.5 rounded-lg bg-white/[0.05]">
+          <div className="p-2.5 rounded-lg bg-slate-50">
             <Icon size={20} className={THEME.text.muted} strokeWidth={1.5} />
           </div>
         )}
@@ -197,11 +197,11 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ status, children, size = 'md' }: StatusBadgeProps) {
   const statusMap = {
-    success: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-    warning: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-    error: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
-    info: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-    default: 'bg-white/[0.05] text-slate-400 border-white/[0.1]',
+    success: 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30',
+    warning: 'bg-amber-500/15 text-amber-700 border-amber-500/30',
+    error: 'bg-rose-500/15 text-rose-700 border-rose-500/30',
+    info: 'bg-blue-500/15 text-blue-700 border-blue-500/30',
+    default: 'bg-slate-50 text-slate-500 border-slate-200',
   }
   const sizeMap = { sm: 'px-1.5 py-0.5 text-[10px]', md: 'px-2 py-1 text-xs' }
 
@@ -234,7 +234,7 @@ export function ProgressBar({ value, max = 100, color = THEME.accent, size = 'md
           {showLabel && <span className={cn('text-xs font-medium', THEME.text.secondary)}>{pct.toFixed(0)}%</span>}
         </div>
       )}
-      <div className={cn('w-full rounded-full overflow-hidden bg-white/[0.08]', heightMap[size])}>
+      <div className={cn('w-full rounded-full overflow-hidden bg-slate-100', heightMap[size])}>
         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
     </div>
@@ -254,9 +254,9 @@ interface GlassButtonProps {
 
 export function GlassButton({ children, variant = 'default', size = 'md', onClick, disabled, className, icon: Icon }: GlassButtonProps) {
   const variantMap = {
-    default: 'bg-white/[0.05] border border-white/[0.1] text-slate-200 hover:bg-white/[0.1] hover:border-white/[0.15]',
-    primary: 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white border-0 hover:from-emerald-400 hover:to-emerald-500 shadow-lg shadow-emerald-500/25',
-    ghost: 'bg-transparent text-slate-400 hover:bg-white/[0.05] hover:text-white',
+    default: 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300',
+    primary: 'bg-blue-600 text-white border border-blue-600 hover:bg-blue-700',
+    ghost: 'bg-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900',
   }
   const sizeMap = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm', lg: 'px-5 py-2.5 text-sm' }
 
@@ -293,13 +293,13 @@ export function GlassSelect({ value, onChange, options, className }: GlassSelect
         onChange={(e) => onChange(e.target.value)}
         className={cn(
           'appearance-none w-full px-3 py-2 pr-8 rounded-lg text-sm font-medium cursor-pointer',
-          'bg-white/[0.05] border border-white/[0.1] text-slate-200',
-          'hover:bg-white/[0.08] hover:border-white/[0.15]',
-          'focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50'
+          'bg-white border border-slate-200 text-slate-800',
+          'hover:bg-slate-50 hover:border-slate-300',
+          'focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50'
         )}
       >
         {options.map((o) => (
-          <option key={o.value} value={o.value} className="bg-slate-900 text-slate-200">{o.label}</option>
+          <option key={o.value} value={o.value} className="bg-white text-slate-800">{o.label}</option>
         ))}
       </select>
       <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
@@ -328,10 +328,10 @@ export function GlassInput({ type = 'text', value, onChange, placeholder, icon: 
         placeholder={placeholder}
         className={cn(
           'w-full px-3 py-2 rounded-lg text-sm',
-          'bg-white/[0.05] border border-white/[0.1] text-slate-200',
+          'bg-white border border-slate-200 text-slate-800',
           'placeholder:text-slate-500',
-          'hover:bg-white/[0.08] hover:border-white/[0.15]',
-          'focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50',
+          'hover:bg-slate-50 hover:border-slate-300',
+          'focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50',
           Icon && 'pl-9'
         )}
       />
@@ -374,9 +374,9 @@ export function TableRow({ children, onClick, selected, className }: TableRowPro
     <div 
       onClick={onClick}
       className={cn(
-        'flex items-center gap-3 px-4 py-3 border-b border-white/[0.05] transition-colors',
+        'flex items-center gap-3 px-4 py-3 border-b border-slate-100 transition-colors',
         onClick && 'cursor-pointer',
-        selected ? 'bg-emerald-500/10' : 'hover:bg-white/[0.03]',
+        selected ? 'bg-blue-50' : 'hover:bg-slate-50',
         className
       )}
     >
