@@ -5,9 +5,19 @@ import { supabase } from "@/lib/supabase";
 import ReportBudgetControls, {
   ReportBudgetState,
 } from "./ReportBudgetControls";
+import ProgramReportControls, {
+  ProgramReportState,
+} from "./ProgramReportControls";
+import {
+  programUtilization,
+  ProgramBreakdown,
+  submissionsByRole,
+  roleRowRevision,
+} from "@/lib/resource-report-program";
 import BudgetUtilizationPreview from "./BudgetUtilizationPreview";
 import {
   budgetUtilization,
+  budgetMonths,
   BudgetUsageEntry,
   BudgetProject,
 } from "@/lib/resource-report-budget";
@@ -115,6 +125,25 @@ export default function ResourceReportBuilder({
     [to, setTo] = useState(shiftDate(mondayOf(today()), -1));
   const [includeMtd, setIncludeMtd] = useState(true);
   const [includeBudget, setIncludeBudget] = useState(false);
+  const [budgetBasis, setBudgetBasis] = useState<"project" | "program">(
+    "project",
+  );
+  const [peopleMode, setPeopleMode] = useState<"resource" | "role">("resource");
+  const [programBreakdown, setProgramBreakdown] =
+    useState<ProgramBreakdown>("project");
+  const [programOpened, setProgramOpened] = useState(false);
+  useEffect(() => {
+    if (budgetBasis === "program" || peopleMode === "role")
+      setProgramOpened(true);
+  }, [budgetBasis, peopleMode]);
+  const [programState, setProgramState] = useState<ProgramReportState>({
+    projections: [],
+    roles: [],
+    ready: false,
+    projectionDirty: false,
+    rolesDirty: false,
+    error: false,
+  });
   const [showProjectBudget, setShowProjectBudget] = useState(true),
     [showClientBudget, setShowClientBudget] = useState(true);
   const [budgetState, setBudgetState] = useState<ReportBudgetState>({
@@ -155,47 +184,102 @@ export default function ResourceReportBuilder({
     start <= end &&
     (Date.parse(end) - Date.parse(start)) / 86400000 <= 366,
   );
+  const reportEntries = useMemo(() => {
+    const selected = entries.filter((e) =>
+      selectedResources.includes(e.team_member_id),
+    );
+    return peopleMode === "role"
+      ? submissionsByRole(selected, budgetProjects, programState.roles)
+      : selected;
+  }, [
+    entries,
+    selectedResources,
+    peopleMode,
+    budgetProjects,
+    programState.roles,
+  ]);
+  const reportResourceIds = useMemo(
+    () => Array.from(new Set(reportEntries.map((e) => e.team_member_id))),
+    [reportEntries],
+  );
+  const roleResources = useMemo(
+    () =>
+      resources.map((r) => ({
+        ...r,
+        clientIds: Array.from(
+          new Set(
+            entries
+              .filter((e) => e.team_member_id === r.id)
+              .map(
+                (e) =>
+                  budgetProjects.find((p) => p.id === e.project_id)?.clientId ||
+                  "",
+              ),
+          ),
+        ),
+      })),
+    [entries, resources, budgetProjects],
+  );
   const rows = useMemo(
     () =>
       validRange
         ? reportRows(
-            entries,
+            reportEntries,
             start,
             end,
             selectedProjects,
-            selectedResources,
+            reportResourceIds,
           ).map((row) => ({
             ...row,
-            key: JSON.stringify([row.key, start, end]),
+            key:
+              peopleMode === "role"
+                ? JSON.stringify([
+                    "role",
+                    roleRowRevision([row.key, row.hours, row.notes]),
+                    start,
+                    end,
+                  ])
+                : JSON.stringify([row.key, start, end]),
           }))
         : [],
-    [entries, start, end, selectedProjects, selectedResources, validRange],
+    [
+      reportEntries,
+      start,
+      end,
+      selectedProjects,
+      reportResourceIds,
+      validRange,
+      peopleMode,
+    ],
   );
   const mtd = useMemo(
     () =>
       validRange && includeMtd
         ? reportMonthTotals(
-            entries,
+            reportEntries,
             start,
             end,
             selectedProjects,
-            selectedResources,
+            reportResourceIds,
             today(),
           )
         : [],
     [
-      entries,
+      reportEntries,
       start,
       end,
       selectedProjects,
-      selectedResources,
+      reportResourceIds,
       validRange,
       includeMtd,
     ],
   );
   const utilization = useMemo(
     () =>
-      includeBudget && budgetState.ready && !budgetState.dirty
+      includeBudget &&
+      budgetBasis === "project" &&
+      budgetState.ready &&
+      !budgetState.dirty
         ? budgetUtilization(
             budgetEntries,
             budgetProjects,
@@ -207,9 +291,30 @@ export default function ResourceReportBuilder({
           ).filter((row) =>
             row.level === "project" ? showProjectBudget : showClientBudget,
           )
-        : [],
+        : includeBudget &&
+            budgetBasis === "program" &&
+            programState.ready &&
+            !programState.projectionDirty &&
+            !(programBreakdown === "role" && programState.rolesDirty)
+          ? programUtilization(
+              budgetEntries,
+              budgetProjects,
+              programState.projections,
+              selectedProjects,
+              start,
+              end,
+              today(),
+              programBreakdown,
+              programState.roles,
+              resources,
+            )
+          : [],
     [
       includeBudget,
+      budgetBasis,
+      programState,
+      programBreakdown,
+      resources,
       budgetState,
       budgetEntries,
       budgetProjects,
@@ -220,15 +325,39 @@ export default function ResourceReportBuilder({
       showClientBudget,
     ],
   );
+  const rolesBlocked =
+    peopleMode === "role" &&
+    (!programState.ready || programState.rolesDirty || programState.error);
+  const programCoverageMissing =
+    budgetBasis === "program" &&
+    budgetMonths(start, end < today() ? end : today()).some((month) =>
+      budgetProjects
+        .filter((p) => selectedProjects.includes(p.id))
+        .some(
+          (p) =>
+            !programState.projections.some(
+              (b) =>
+                b.client_id === p.clientId &&
+                b.month === month &&
+                b.enabled &&
+                Number(b.amount) > 0,
+            ),
+        ),
+    );
   const budgetBlocked =
-    includeBudget &&
-    (!budgetState.ready ||
-      budgetState.dirty ||
-      budgetState.error ||
-      !utilization.length ||
-      utilization.some(
-        (row) => row.weekPercent === null || row.mtdPercent === null,
-      ));
+    rolesBlocked ||
+    (includeBudget &&
+      ((budgetBasis === "project"
+        ? !budgetState.ready || budgetState.dirty || budgetState.error
+        : !programState.ready ||
+          programState.projectionDirty ||
+          programState.error ||
+          (programBreakdown === "role" && programState.rolesDirty)) ||
+        programCoverageMissing ||
+        !utilization.length ||
+        utilization.some(
+          (row) => row.weekPercent === null || row.mtdPercent === null,
+        )));
   const missing = rows.filter(
     (row) => row.notes.length && !summaries[row.key]?.trim(),
   );
@@ -317,6 +446,7 @@ export default function ResourceReportBuilder({
         png,
         mtd,
         utilization,
+        peopleMode,
       );
       const url = URL.createObjectURL(
         new Blob([new Uint8Array(bytes)], { type: "application/pdf" }),
@@ -496,17 +626,89 @@ export default function ResourceReportBuilder({
                   </span>
                 </span>
               </label>
-              <ReportBudgetControls
-                enabled={includeBudget}
-                onToggle={setIncludeBudget}
-                start={start}
-                end={end}
-                projects={budgetProjects.filter((p) =>
-                  selectedProjects.includes(p.id),
-                )}
-                onState={setBudgetState}
-              />
-              {includeBudget && (
+              <label className="block text-sm font-semibold">
+                Show work details by
+                <select
+                  aria-label="Work detail grouping"
+                  value={peopleMode}
+                  onChange={(e) =>
+                    setPeopleMode(e.target.value as "resource" | "role")
+                  }
+                  className="block w-full border rounded-lg p-2 mt-2 text-xs font-normal"
+                >
+                  <option value="resource">Resource name</option>
+                  <option value="role">Reporting role</option>
+                </select>
+              </label>
+              <label className="block text-sm font-semibold">
+                Budget reference
+                <select
+                  aria-label="Budget reference"
+                  value={budgetBasis}
+                  onChange={(e) =>
+                    setBudgetBasis(e.target.value as "project" | "program")
+                  }
+                  className="block w-full border rounded-lg p-2 mt-2 text-xs font-normal"
+                >
+                  <option value="project">Individual project budgets</option>
+                  <option value="program">Overall program projection</option>
+                </select>
+              </label>
+              {budgetBasis === "project" && (
+                <ReportBudgetControls
+                  enabled={includeBudget}
+                  onToggle={setIncludeBudget}
+                  start={start}
+                  end={end}
+                  projects={budgetProjects.filter((p) =>
+                    selectedProjects.includes(p.id),
+                  )}
+                  onState={setBudgetState}
+                />
+              )}
+              {(programOpened ||
+                budgetBasis === "program" ||
+                peopleMode === "role") && (
+                <div
+                  hidden={budgetBasis !== "program" && peopleMode !== "role"}
+                >
+                  <ProgramReportControls
+                    enabled={includeBudget}
+                    onToggle={setIncludeBudget}
+                    showProjection={budgetBasis === "program"}
+                    start={start}
+                    end={end}
+                    projects={budgetProjects.filter((p) =>
+                      selectedProjects.includes(p.id),
+                    )}
+                    resources={roleResources}
+                    onState={setProgramState}
+                  />
+                </div>
+              )}
+              {budgetBasis === "program" && includeBudget && (
+                <label className="block text-xs font-semibold">
+                  Program percentage breakdown
+                  <select
+                    aria-label="Program percentage breakdown"
+                    value={programBreakdown}
+                    onChange={(e) =>
+                      setProgramBreakdown(e.target.value as ProgramBreakdown)
+                    }
+                    className="block w-full border rounded-lg p-2 mt-1 font-normal"
+                  >
+                    <option value="project">Site / project</option>
+                    <option value="role">Reporting role</option>
+                    <option value="resource">Resource name</option>
+                  </select>
+                  <span className="block text-xs font-normal text-slate-500 mt-2">
+                    Includes every site and resource for each selected client.
+                    Every percentage is a share of the same monthly program
+                    projection.
+                  </span>
+                </label>
+              )}
+              {includeBudget && budgetBasis === "project" && (
                 <div className="space-y-2 text-xs">
                   <label className="flex gap-2">
                     <input
@@ -526,20 +728,20 @@ export default function ResourceReportBuilder({
                     />
                     Client summary
                   </label>
-                  {budgetBlocked && (
-                    <p className="text-amber-700">
-                      Save an included monthly budget for the selected projects
-                      to share utilization. Missing bill rates must be completed
-                      in project setup. You can also turn budget utilization
-                      off.
-                    </p>
-                  )}
                 </div>
+              )}
+              {budgetBlocked && (
+                <p className="text-xs text-amber-700">
+                  Save or discard changed settings before exporting. To include
+                  utilization, save and enable a reference for each client and
+                  month you want shown. Missing bill rates must be completed in
+                  project setup; you can also hide utilization.
+                </p>
               )}
               <div className="border-t pt-4">
                 <button
                   onClick={generate}
-                  disabled={!missing.length || busy}
+                  disabled={!missing.length || busy || rolesBlocked}
                   className="flex gap-2 items-center justify-center w-full bg-[#24333b] text-white rounded-lg px-3 py-2.5 text-sm disabled:opacity-40"
                 >
                   <RefreshCw size={15} className={busy ? "animate-spin" : ""} />
@@ -624,7 +826,7 @@ export default function ResourceReportBuilder({
                   )}
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <p className="text-[10px] uppercase tracking-widest text-slate-500">
-                      Resources
+                      {peopleMode === "role" ? "Roles" : "Resources"}
                     </p>
                     <p className="text-3xl font-bold mt-2 tabular-nums">
                       {new Set(rows.map((row) => row.resource)).size}
@@ -659,7 +861,9 @@ export default function ResourceReportBuilder({
                         <thead>
                           <tr className="text-left text-slate-500">
                             <th className="px-3 py-2 font-medium">Project</th>
-                            <th className="px-3 py-2 font-medium">Resource</th>
+                            <th className="px-3 py-2 font-medium">
+                              {peopleMode === "role" ? "Role" : "Resource"}
+                            </th>
                             <th className="px-3 py-2 text-right font-medium">
                               MTD hours
                             </th>
@@ -702,7 +906,8 @@ export default function ResourceReportBuilder({
                   </h3>
                   <p className="text-xs text-slate-500 mt-2">
                     Submitted hours and reviewed work summaries, grouped by
-                    project and resource.
+                    project and{" "}
+                    {peopleMode === "role" ? "reporting role" : "resource"}.
                   </p>
                 </div>
               )}

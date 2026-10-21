@@ -12,6 +12,7 @@ export interface BudgetProject {
   client: string;
 }
 export interface BudgetUsageEntry {
+  resourceId?: string;
   date: string;
   projectId: string;
   hours: number;
@@ -21,7 +22,9 @@ export interface BudgetUsageEntry {
 // Only this projection may be passed to the report preview or PDF exporter.
 export interface BudgetUtilization {
   key: string;
-  level: "project" | "client";
+  level: "project" | "client" | "role" | "resource";
+  basis?: "program";
+  breakdown?: "project" | "role" | "resource";
   name: string;
   client: string;
   month: string;
@@ -172,3 +175,16 @@ export function budgetUtilization(
   }
   return output;
 }
+
+export const utilizationTitle = (rows: BudgetUtilization[]) =>
+  rows.some((r) => r.basis === "program")
+    ? "Monthly program utilization"
+    : "Monthly budget utilization";
+export const utilizationCaption = (rows: BudgetUtilization[]) =>
+  rows.some((r) => r.basis === "program")
+    ? "Whole-client billable usage across all sites and resources. Each percentage is a share of one monthly program projection."
+    : "Full project usage across all resources. Both percentages use the monthly allocation; client totals cover configured selected projects.";
+export const utilizationScope = (row: BudgetUtilization) =>
+  row.basis === "program"
+    ? `${row.projectCount} program site(s) · all resources`
+    : `${row.projectCount} configured project(s)`;

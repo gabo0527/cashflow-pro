@@ -1664,7 +1664,7 @@ ${parts.join('')}
         resources={teamMembers.map(m => ({ id: m.id, label: m.name }))}
         initialProjects={selectedProjectIds ?? projects.filter(p => selectedClient === 'all' || p.client_id === selectedClient).map(p => p.id)}
         initialResources={selectedEmployeeIds ?? teamMembers.map(m => m.id)}
-        budgetEntries={entries.map(e => ({ date: e.date, projectId: e.project_id, hours: e.hours, rate: e.bill_rate, billable: e.is_billable }))}
+        budgetEntries={entries.map(e => ({ resourceId: e.team_member_id, date: e.date, projectId: e.project_id, hours: e.hours, rate: e.bill_rate, billable: e.is_billable }))}
         budgetProjects={projects.map(p => ({ id: p.id, name: p.name, clientId: p.client_id, client: clients.find(c => c.id === p.client_id)?.name || '' }))}
         logo={MANO_LOGO}
         onClose={() => setShowResourceReport(false)}
