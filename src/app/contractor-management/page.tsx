@@ -1208,9 +1208,9 @@ export default function ContractorManagement() {
 
           {/* Filters + Date + Group By */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 flex-1">
-                <div className="relative flex-1 max-w-xs">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+                <div className="relative flex-1 basis-48 min-w-[160px] max-w-xs">
                   <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input type="text" placeholder="Search invoices..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
@@ -1230,7 +1230,7 @@ export default function ContractorManagement() {
                 </select>
                 {hasActiveFilters && <button onClick={clearFilters} className="px-2.5 py-2 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 vBtn flex items-center gap-1"><X size={12} /> Clear</button>}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
                 <div className="flex items-center gap-0.5 p-0.5 bg-gray-100 rounded-lg border border-gray-200">
                   {(['month', 'quarter', 'year', 'all'] as const).map(r => (
                     <button key={r} onClick={() => setDateRange(r)}
@@ -1444,9 +1444,9 @@ export default function ContractorManagement() {
           )}
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 flex-1">
-                <div className="relative flex-1 max-w-xs">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+                <div className="relative flex-1 basis-48 min-w-[160px] max-w-xs">
                   <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input type="text" placeholder="Search expenses..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
@@ -1466,7 +1466,7 @@ export default function ContractorManagement() {
                 </select>
                 {hasActiveFilters && <button onClick={clearFilters} className="px-2.5 py-2 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 vBtn flex items-center gap-1"><X size={12} /> Clear</button>}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
                 <div className="flex items-center gap-0.5 p-0.5 bg-gray-100 rounded-lg border border-gray-200">
                   {(['month', 'quarter', 'year', 'all'] as const).map(r => (
                     <button key={r} onClick={() => setDateRange(r)}
