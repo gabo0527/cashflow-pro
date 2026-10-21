@@ -1208,7 +1208,7 @@ export default function ContractorManagement() {
 
           {/* Filters + Date + Group By */}
           <div className="space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
                 <div className="relative flex-1 basis-48 min-w-[160px] max-w-xs">
                   <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -1444,7 +1444,7 @@ export default function ContractorManagement() {
           )}
 
           <div className="space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
                 <div className="relative flex-1 basis-48 min-w-[160px] max-w-xs">
                   <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
