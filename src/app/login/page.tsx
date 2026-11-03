@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { loginErrorMessage } from "@/lib/login-error";
 import VantageLogo from "@/components/brand/VantageLogo";
 import styles from "./login.module.css";
 
@@ -36,6 +37,8 @@ export default function LoginPage() {
 
   useEffect(() => {
     let active = true;
+    const signInError = loginErrorMessage(window.location.search, window.location.hash);
+    if (signInError) setError(signInError);
     supabase.auth
       .getUser()
       .then(({ data: { user } }) => {
