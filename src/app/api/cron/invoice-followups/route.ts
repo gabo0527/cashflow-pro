@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/contractor-auth'
 import { invoiceObligations } from '@/lib/invoice-obligations'
-import { previousBillingMonth } from '@/lib/payables'
+import { INVOICE_FOLLOWUP_START_MONTH, previousBillingMonth } from '@/lib/payables'
 import { sendMissingInvoiceReminder } from '@/lib/email'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -15,9 +15,9 @@ export async function GET(request: Request) {
     let sent=0,failed=0
     for (const companyId of Array.from(new Set((companies || []).map(c=>c.company_id)))) {
       // Retain outstanding follow-ups from earlier months after rollout.
-      const {data:older,error:oldError} = await db.from('contractor_invoice_obligations').select('period_start').eq('company_id',companyId).eq('reminder_state','pending')
+      const {data:older,error:oldError} = await db.from('contractor_invoice_obligations').select('period_start').eq('company_id',companyId).eq('reminder_state','pending').gte('period_start',INVOICE_FOLLOWUP_START_MONTH)
       if (oldError) throw oldError
-      const months = Array.from(new Set([previousBillingMonth().start,...(older || []).map(o=>o.period_start)]))
+      const months = Array.from(new Set([previousBillingMonth().start,...(older || []).map(o=>o.period_start)])).filter(month=>month>=INVOICE_FOLLOWUP_START_MONTH)
       for (const month of months) {
         const rows = await invoiceObligations(db,companyId,month)
         for (const row of rows) {

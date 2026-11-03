@@ -1,3 +1,5 @@
+// October invoices due October 31 are the first period tracked in Vantage.
+export const INVOICE_FOLLOWUP_START_MONTH = '2026-10-01'
 export const PAYABLES_TIME_ZONE = 'America/Puerto_Rico'
 export function localToday(now = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: PAYABLES_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)

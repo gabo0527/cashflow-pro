@@ -1,8 +1,10 @@
 import { getSupabaseAdmin } from './contractor-auth'
-import { localToday, previousBillingMonth, thirdBusinessDayAfterMonth } from './payables'
+import { INVOICE_FOLLOWUP_START_MONTH, localToday, previousBillingMonth, thirdBusinessDayAfterMonth } from './payables'
 
 export async function invoiceObligations(db: ReturnType<typeof getSupabaseAdmin>, companyId: string, month = previousBillingMonth().start) {
   if (!/^\d{4}-\d{2}-01$/.test(month) || new Date(`${month}T12:00:00Z`).toISOString().slice(0,10) !== month || month >= localToday().slice(0,7) + '-01') throw new Error('Choose a completed billing month.')
+  // Earlier billing periods belong to the previous system. Do not flag or seed them.
+  if (month < INVOICE_FOLLOWUP_START_MONTH) return []
   const end = new Date(`${month}T12:00:00Z`)
   end.setUTCMonth(end.getUTCMonth() + 1); end.setUTCDate(0)
   const periodEnd = end.toISOString().slice(0,10)
