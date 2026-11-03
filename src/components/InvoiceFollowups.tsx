@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { previousBillingMonth, statusTimestamp } from '@/lib/payables'
+import { INVOICE_FOLLOWUP_START_MONTH, previousBillingMonth, statusTimestamp } from '@/lib/payables'
 
 export default function InvoiceFollowups({ request }: { request: (url: string, init?: RequestInit) => Promise<Response> }) {
   const [month,setMonth] = useState(previousBillingMonth().start.slice(0,7))
@@ -37,10 +37,10 @@ export default function InvoiceFollowups({ request }: { request: (url: string, i
     <div className="flex flex-wrap items-center justify-between gap-3">
       <button onClick={()=>setOpen(!open)} aria-expanded={open} className="text-left">
         <span className="text-sm font-semibold text-slate-900">Missing invoices <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">{loading ? '…' : missing.length}</span></span>
-        <span className="block text-xs text-slate-500 mt-1">Active contractors · due at month-end · reminders after the third business day</span>
+        <span className="block text-xs text-slate-500 mt-1">From October 2026 · due at month-end · reminders after the third business day</span>
       </button>
       <div className="flex items-center gap-2">
-        <input aria-label="Invoice submission month" type="month" max={previousBillingMonth().start.slice(0,7)} value={month} onChange={e=>e.target.value && setMonth(e.target.value)} className="rounded-lg border border-gray-200 bg-white p-2 text-sm" />
+        <input aria-label="Invoice submission month" type="month" min={INVOICE_FOLLOWUP_START_MONTH.slice(0,7)} max={previousBillingMonth().start.slice(0,7)} value={month} onChange={e=>e.target.value >= INVOICE_FOLLOWUP_START_MONTH.slice(0,7) && setMonth(e.target.value)} className="rounded-lg border border-gray-200 bg-white p-2 text-sm" />
         <button onClick={()=>load()} disabled={loading} className="text-xs font-medium text-blue-700 disabled:opacity-50">Refresh</button>
         <button onClick={()=>setOpen(!open)} className="text-xs font-medium text-blue-700">{open?'Hide':'Review'}</button>
       </div>

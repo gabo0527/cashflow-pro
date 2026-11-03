@@ -15,6 +15,11 @@ two administrators cannot silently overwrite each other's decisions.
 
 ## Monthly missing-invoice follow-up
 
+Tracking starts with October 2026 invoices due October 31, 2026. Earlier periods
+are excluded from missing-invoice flags, obligation creation and automatic
+reminders, including previously stored pending obligations. The outstanding
+payment queue still includes real unpaid invoices from all months.
+
 Active contractors whose start date precedes month-end are expected to submit an
 invoice. Employees are excluded. A non-draft, non-rejected invoice overlapping the
 month counts as received. This is a person/month check, not a check that every

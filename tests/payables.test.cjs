@@ -81,8 +81,8 @@ test('parallel reminder runners can only claim each monthly reminder once',async
   const old=process.env.CRON_SECRET;process.env.CRON_SECRET='test-secret'
   let state='pending',sent=0
   const row={id:'obligation',name:'Alex',email:'alex@example.com',period_start:'2026-10-01',period_end:'2026-10-31',required:true,received:false,overdue:true}
-  const db={from(table){let patch,claimed=false;const q={select(){return q},eq(k,v){if(k==='reminder_state'&&v==='pending')claimed=true;return q},update(p){patch=p;return q},async maybeSingle(){if(state!=='pending')return {data:null};state=patch.reminder_state;return {data:{id:row.id}}},then(resolve){if(patch){state=patch.reminder_state;resolve({error:null})}else resolve({data:table==='commercial_access'?[{company_id:'company'}]:[],error:null})}};return q}}
-  const route=load('src/app/api/cron/invoice-followups/route.ts',{'next/server':next,'@/lib/contractor-auth':{getSupabaseAdmin:()=>db},'@/lib/invoice-obligations':{invoiceObligations:async()=>[{...row,reminder_state:state}]},'@/lib/payables':payables,'@/lib/email':{sendMissingInvoiceReminder:async()=>{sent++;return {success:true,id:'email'}}}})
+  const db={from(table){let patch,claimed=false;const q={select(){return q},gte(){return q},eq(k,v){if(k==='reminder_state'&&v==='pending')claimed=true;return q},update(p){patch=p;return q},async maybeSingle(){if(state!=='pending')return {data:null};state=patch.reminder_state;return {data:{id:row.id}}},then(resolve){if(patch){state=patch.reminder_state;resolve({error:null})}else resolve({data:table==='commercial_access'?[{company_id:'company'}]:[{period_start:'2026-09-01'}],error:null})}};return q}}
+  const route=load('src/app/api/cron/invoice-followups/route.ts',{'next/server':next,'@/lib/contractor-auth':{getSupabaseAdmin:()=>db},'@/lib/invoice-obligations':{invoiceObligations:async(db,company,month)=>{assert.ok(month>='2026-10-01');return [{...row,reminder_state:state}]}},'@/lib/payables':payables,'@/lib/email':{sendMissingInvoiceReminder:async()=>{sent++;return {success:true,id:'email'}}}})
   try {
     const request={headers:new Headers({authorization:'Bearer test-secret'})}
     const results=await Promise.all([route.GET(request),route.GET(request)])
@@ -120,4 +120,18 @@ test('real payables screen keeps old approved/scheduled invoices visible and exp
     await act(async()=>renderer.root.findAllByType('button').find(n=>n.children.includes('Invoice history')).props.onClick())
     assert.match(text(),/PAID-CURRENT/);assert.doesNotMatch(text(),/OLD-SCHEDULED/)
   }finally{if(renderer)await act(async()=>renderer.unmount());global.fetch=oldFetch}
+})
+
+
+test('pre-October missing invoices are excluded without reading or writing the database',async()=>{
+  const {invoiceObligations}=load('src/lib/invoice-obligations.ts',{'./payables':payables})
+  const db={from(){throw new Error('Historical billing periods must not access the database')}}
+  for(const month of ['2026-01-01','2026-03-01','2026-09-01']) assert.deepEqual(await invoiceObligations(db,'company',month),[])
+})
+test('October invoices due October 31 remain eligible for follow-up',async()=>{
+  const {invoiceObligations}=load('src/lib/invoice-obligations.ts',{'./payables':payables})
+  const tables=[]
+  const db={from(table){tables.push(table);const q={then(resolve){resolve({data:[],error:null})}};for(const method of ['select','eq','gte','lte'])q[method]=()=>q;return q}}
+  assert.deepEqual(await invoiceObligations(db,'company','2026-10-01'),[])
+  assert.ok(tables.includes('team_members'));assert.ok(tables.includes('contractor_invoices'));assert.ok(tables.includes('contractor_invoice_obligations'))
 })
