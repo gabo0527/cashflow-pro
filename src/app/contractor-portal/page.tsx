@@ -39,7 +39,7 @@ interface Assignment { project_id: string; project_name: string; client_id: stri
 interface RateCard { team_member_id: string; client_id: string; client_name: string; cost_type: string; cost_amount: number; rate: number }
 type TimeEntryForm = DailyTimeForm
 interface Expense { id: string; date: string; category: string; description: string; amount: number; project_id?: string; client_id?: string; status: string; receipt_url?: string; submitted_at: string }
-interface ContractorInvoice { id: string; invoice_number: string; invoice_date: string; due_date: string; period_start: string; period_end: string; total_amount: number; status: string; payment_terms: string; receipt_url?: string; submitted_at: string; notes?: string; client_id?: string; lines?: any[]; contractor_invoice_lines?: any[] }
+interface ContractorInvoice { payment_group?:string; id: string; invoice_number: string; invoice_date: string; due_date: string; period_start: string; period_end: string; total_amount: number; status: string; payment_terms: string; receipt_url?: string; submitted_at: string; notes?: string; client_id?: string; lines?: any[]; contractor_invoice_lines?: any[] }
 interface InvoiceLine { client_id: string; client_name: string; project_id?: string; project_name?: string; hours?: number; rate?: number; amount: number; allocation_pct?: number }
 
 // ============ HELPERS ============
@@ -415,9 +415,10 @@ export default function ContractorPortal() {
   const [hoursChartMode, setHoursChartMode] = useState<'total' | 'byProject'>('byProject')
 
   const week = useMemo(() => getWeekRange(weekDate), [weekDate])
-  const invoicePolicy = billingPolicy(billingPolicies, invoiceForm.client_id, invoiceProject)
+  const pooledInvoice=invoiceForm.client_id==='all'
+  const invoicePolicy = pooledInvoice?{client_id:'',project_id:null,cycle_start_day:1 as const,net_days:60,contractor_payment_basis:'invoice_date' as const,effective_start:'2000-01-01'}:billingPolicy(billingPolicies, invoiceForm.client_id, invoiceProject)
   const billingMonth = useMemo(() => billingPeriod(`${invoiceMonth.getFullYear()}-${String(invoiceMonth.getMonth()+1).padStart(2,'0')}`, invoicePolicy.cycle_start_day), [invoiceMonth, invoicePolicy.cycle_start_day])
-  const chooseInvoiceClient = (clientId: string) => { setInvoiceForm(p=>({...p,client_id:clientId,amount:''})); setInvoiceProject(''); const policy=billingPolicy(billingPolicies,clientId); setInvoiceMonth(new Date(lastClosedBillingPeriod(localToday(),policy.cycle_start_day).end+'T12:00:00')) }
+  const chooseInvoiceClient = (clientId: string) => { setInvoiceForm(p=>({...p,client_id:clientId,amount:''})); setInvoiceProject(''); const policy=clientId==='all'?{cycle_start_day:1 as const}:billingPolicy(billingPolicies,clientId); setInvoiceMonth(new Date(lastClosedBillingPeriod(localToday(),policy.cycle_start_day).end+'T12:00:00')) }
   const needsInvoiceProject = billingPolicies.some(p=>p.client_id===invoiceForm.client_id && !!p.project_id)
 
   const assignmentsByClient = useMemo(() => {
@@ -462,6 +463,7 @@ export default function ContractorPortal() {
     if (allTM) return 'tm'
     return 'mixed'
   }, [rateCards, member])
+  const pooledEligible=contractorType==='pure_ls' && new Set(assignments.map(a=>a.client_id).filter(Boolean)).size>1
 
   // ============ AUTH: GOOGLE SSO ============
   // The login button calls /api/contractor-auth/start. The server validates
@@ -844,7 +846,7 @@ export default function ContractorPortal() {
     if (!member) return; setSubmittingInvoice(true); setError(null)
     try {
       if (billingLoading || billingError) throw new Error(billingError || 'Wait for billing settings to load.')
-      if (!invoiceForm.client_id || invoiceForm.client_id==='all' || needsInvoiceProject && !invoiceProject) throw new Error('Choose the client and project for this invoice.')
+      if (!invoiceForm.client_id || (invoiceForm.client_id==='all' && !pooledEligible) || needsInvoiceProject && !invoiceProject) throw new Error('Choose the client and project for this invoice.')
       const enteredAmount = parseFloat(invoiceForm.amount || '0')
       if (enteredAmount + includedExpensesTotal <= 0) { setError('Please enter a valid amount'); setSubmittingInvoice(false); return }
 
@@ -853,9 +855,9 @@ export default function ContractorPortal() {
 
       const { data: inv, error: ie } = await invoiceStore.from('contractor_invoices').insert({
         team_member_id: member.id, invoice_number: invoiceForm.invoice_number,
-        invoice_date: invoiceIssuedOn, due_date: invoicePolicy.contractor_payment_basis==='client_payment' ? null : invoiceDueDate(invoiceIssuedOn, Number(invoiceForm.payment_terms.match(/\d+/)?.[0] || 30)),
-        period_start: billingMonth.start, period_end: billingMonth.end, billing_project_id: invoiceProject || null,
-        total_amount: Math.round((enteredAmount + includedExpensesTotal) * 100) / 100, payment_terms: invoiceForm.payment_terms, receipt_url: receiptUrl, notes: invoiceForm.notes || null, status: 'submitted',
+        invoice_date: invoiceIssuedOn, due_date: invoicePolicy.contractor_payment_basis==='client_payment' ? null : invoiceDueDate(invoiceIssuedOn, pooledInvoice?60:Number(invoiceForm.payment_terms.match(/\d+/)?.[0] || 30)),
+        period_start: billingMonth.start, period_end: billingMonth.end, billing_project_id: invoiceProject || null, payment_group:pooledInvoice?'pooled_lump_sum':'client',
+        total_amount: Math.round((enteredAmount + includedExpensesTotal) * 100) / 100, payment_terms: pooledInvoice?'NET60':invoiceForm.payment_terms, receipt_url: receiptUrl, notes: invoiceForm.notes || null, status: 'submitted',
         company_id: 'a1b2c3d4-0000-4000-a000-000000000001',
         client_id: invoiceForm.client_id && invoiceForm.client_id !== 'all' ? invoiceForm.client_id : null
       }).select().single()
@@ -1655,8 +1657,8 @@ export default function ContractorPortal() {
             {/* New Invoice Button */}
             {!showInvoiceForm && (
               <button onClick={() => { 
-                const defaultClient = contractorType === 'pure_ls' ? 'all' : ''
-                const defaultAmount = ''
+                const defaultClient = pooledEligible ? 'all' : ''
+                const defaultAmount = pooledEligible && member?.cost_amount?String(member.cost_amount):''
                 setInvoiceForm(p => ({ ...p, client_id: defaultClient, amount: defaultAmount })); setInvoiceProject(''); setInvoiceIssuedOn(localToday())
                 setShowInvoiceForm(true) 
               }} className={`w-full ${T.btnPrimary} py-2.5`}>
@@ -1684,10 +1686,10 @@ export default function ContractorPortal() {
                   <div>
                     <label className={T.label}>Invoice For</label>
                     <select value={invoiceForm.client_id} onChange={e => chooseInvoiceClient(e.target.value)} className={T.select}>
-                      <option value="all">Select a client</option>
+                      <option value="">Select a client</option>{pooledEligible && <option value="all">All clients · lump sum · Net 60</option>}
                       {Object.entries(assignmentsByClient).map(([cid, { clientName }]) => <option key={cid} value={cid}>{clientName}</option>)}
                     </select>
-                    <p className="text-[11px] text-gray-400 mt-1.5">One client per invoice. Enter the amount for this client and period.</p>
+                    <p className="text-[11px] text-gray-400 mt-1.5">{pooledInvoice?'Combined lump sum across clients. Net 60 from this invoice date.':'One client per invoice. Enter the amount for this client and period.'}</p>
                     {needsInvoiceProject && <select aria-label="Invoice project" value={invoiceProject} onChange={e=>{const projectId=e.target.value;setInvoiceProject(projectId);setInvoiceMonth(new Date(lastClosedBillingPeriod(localToday(),billingPolicy(billingPolicies,invoiceForm.client_id,projectId).cycle_start_day).end+'T12:00:00'))}} className={T.select}><option value="">Select a project</option>{assignments.filter(a=>a.client_id===invoiceForm.client_id).map(a=><option key={a.project_id} value={a.project_id}>{a.project_name}</option>)}</select>}
                   </div>
                 </div>
@@ -1713,7 +1715,7 @@ export default function ContractorPortal() {
 
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <label className={T.label}>Invoice date<input type="date" value={invoiceIssuedOn} onChange={e=>setInvoiceIssuedOn(e.target.value)} className={T.input}/></label>
-                  <div className="text-xs text-gray-500">{invoicePolicy.contractor_payment_basis==='client_payment'?'Payment after client funds are received; your administrator schedules payout.':`Contractor terms: ${invoiceForm.payment_terms} from invoice date.`}<span className="block mt-1">Client terms: Net {invoicePolicy.net_days} from the client invoice date.</span></div>
+                  <div className="text-xs text-gray-500">{invoicePolicy.contractor_payment_basis==='client_payment'?'Payment after client funds are received; your administrator schedules payout.':`Contractor terms: ${pooledInvoice?'NET60':invoiceForm.payment_terms} from invoice date.`}{!pooledInvoice && <span className="block mt-1">Client terms: Net {invoicePolicy.net_days} from the client invoice date.</span>}</div>
                 </div>
                 {billingError && <p role="alert" className="text-sm text-red-700">{billingError}</p>}
                 {/* Distribution Reference */}
@@ -1744,7 +1746,7 @@ export default function ContractorPortal() {
                       </table>
                     </div>
                   </div>
-                ) : (!invoiceForm.client_id || invoiceForm.client_id==='all' || needsInvoiceProject && !invoiceProject) || billingLoading || !!billingError ? (
+                ) : (!invoiceForm.client_id || (invoiceForm.client_id==='all' && !pooledEligible) || needsInvoiceProject && !invoiceProject) || billingLoading || !!billingError ? (
                   <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded text-center text-gray-400 text-[13px]">Select a client above to see your timesheet hours.</div>
                 ) : null}
 
@@ -1764,7 +1766,7 @@ export default function ContractorPortal() {
                     <span className="font-semibold text-gray-900 tabular-nums" style={{ fontFamily: 'Archivo, sans-serif' }}>Total {formatCurrency((parseFloat(invoiceForm.amount || '0') || 0) + includedExpensesTotal)}</span>
                   </div>
                 )}
-                <button onClick={submitInvoice} disabled={submittingInvoice || !invoiceForm.invoice_number || (parseFloat(invoiceForm.amount || '0') + includedExpensesTotal) <= 0 || (!invoiceForm.client_id || invoiceForm.client_id==='all' || needsInvoiceProject && !invoiceProject) || billingLoading || !!billingError} className={`w-full ${T.btnPrimary} py-3`}>
+                <button onClick={submitInvoice} disabled={submittingInvoice || !invoiceForm.invoice_number || (parseFloat(invoiceForm.amount || '0') + includedExpensesTotal) <= 0 || (!invoiceForm.client_id || (invoiceForm.client_id==='all' && !pooledEligible) || needsInvoiceProject && !invoiceProject) || billingLoading || !!billingError} className={`w-full ${T.btnPrimary} py-3`}>
                   {submittingInvoice ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <><Send size={16} /> Submit Invoice</>}
                 </button>
               </div>
@@ -1776,10 +1778,10 @@ export default function ContractorPortal() {
               const byClient: Record<string, { clientName: string; color: string; total: number; invoices: ContractorInvoice[] }> = {}
               invoices.forEach(inv => {
                 const lines = inv.contractor_invoice_lines || inv.lines || []
-                const clientName = inv.client_id
+                const clientName = inv.payment_group==='pooled_lump_sum'?'Lump sum · multiple clients':inv.client_id
                   ? (assignmentsByClient[inv.client_id]?.clientName || 'Unknown')
                   : (lines[0]?.description?.split(' - ')[0] || 'General')
-                const key = inv.client_id || 'general'
+                const key = inv.payment_group==='pooled_lump_sum'?'pooled_lump_sum':inv.client_id || 'general'
                 const color = key !== 'general' ? (clientColorMap[key] || '#6b7280') : '#6b7280'
                 if (!byClient[key]) byClient[key] = { clientName, color, total: 0, invoices: [] }
                 byClient[key].invoices.push(inv)
@@ -1792,8 +1794,8 @@ export default function ContractorPortal() {
                 const d = new Date((inv.period_start || inv.invoice_date) + 'T00:00:00')
                 const monthKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
                 const monthLabel = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-                const clientName = inv.client_id ? (assignmentsByClient[inv.client_id]?.clientName || 'Unknown') : 'General'
-                const clientKey = inv.client_id || 'general'
+                const clientName = inv.payment_group==='pooled_lump_sum'?'Lump sum · multiple clients':inv.client_id ? (assignmentsByClient[inv.client_id]?.clientName || 'Unknown') : 'General'
+                const clientKey = inv.payment_group==='pooled_lump_sum'?'pooled_lump_sum':inv.client_id || 'general'
                 const color = clientKey !== 'general' ? (clientColorMap[clientKey] || '#6b7280') : '#6b7280'
                 if (!byMonth[monthKey]) byMonth[monthKey] = { monthLabel, total: 0, clients: [] }
                 byMonth[monthKey].total += inv.total_amount || 0
@@ -2139,7 +2141,7 @@ export default function ContractorPortal() {
                         {historyInvoices.map(inv => {
                           const lines = inv.contractor_invoice_lines || inv.lines || []
                           const isExpanded = expandedHistoryInvoices.has(inv.id)
-                          const clientName = inv.client_id
+                          const clientName = inv.payment_group==='pooled_lump_sum'?'Lump sum · multiple clients':inv.client_id
                             ? (assignmentsByClient[inv.client_id]?.clientName || lines[0]?.description?.split(' - ')[0] || 'Unknown')
                             : (lines[0]?.description?.split(' - ')[0] || 'General')
                           const billingMonthLabel = `${inv.period_start} – ${inv.period_end}`

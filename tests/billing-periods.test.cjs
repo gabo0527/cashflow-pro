@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),ts=require('typescript')
-function load(file,mocks={}){const m={exports:{}};const js=ts.transpileModule(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;vm.runInThisContext(`(function(require,module,exports){${js}\n})`)(n=>Object.hasOwn(mocks,n)?mocks[n]:require(n),m,m.exports);return m.exports}
+function load(file,mocks={}){const m={exports:{}};const js=ts.transpileModule(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;vm.runInThisContext(`(function(require,module,exports){${js}\n})`)(n=>Object.hasOwn(mocks,n)?mocks[n]:['@/lib/pooled-invoices','./pooled-invoices'].includes(n)?load('src/lib/pooled-invoices.ts'):require(n),m,m.exports);return m.exports}
 const billing=load('src/lib/billing-periods.ts'),payables=load('src/lib/payables.ts')
 const policy={client_id:'client',project_id:null,cycle_start_day:26,net_days:45,contractor_payment_basis:'client_payment',effective_start:'2026-10-01'}
 test('26th–25th closes in the selected month, including January and leap years',()=>{
@@ -90,4 +90,17 @@ test('contractors cannot inject a confirmed client schedule through invoice subm
  const result=await route.POST({json:async()=>({portal:true,table:'contractor_invoices',operation:'insert',values})})
  assert.equal(result.status,200)
  assert.equal(f.saved[0].client_invoice_date,undefined);assert.equal(f.saved[0].client_net_days,45);assert.equal(f.saved[0].client_payment_received_on,undefined)
+})
+
+test('eligible lump-sum contractors can submit one combined calendar-month Net 60 invoice',async()=>{
+ const f=invoiceFixture();f.team_members[0].cost_type='lump_sum';f.team_project_assignments[0].company_id='company'
+ f.projects.push({id:'second-project',client_id:'second-client',company_id:'company'});f.team_project_assignments.push({team_member_id:ids.member,project_id:'second-project',company_id:'company'})
+ const route=invoiceRoute(f),values={...newInvoice,payment_group:'pooled_lump_sum',client_id:null,period_start:'2026-11-01',period_end:'2026-11-30'}
+ const result=await route.POST({json:async()=>({portal:true,table:'contractor_invoices',operation:'insert',values})})
+ assert.equal(result.status,200);assert.equal(f.saved[0].payment_terms,'NET60');assert.equal(f.saved[0].due_date,'2027-01-29');assert.equal(f.saved[0].client_id,null);assert.equal(f.saved[0].billing_snapshot.pooled_client_ids.length,2)
+})
+test('an hourly contractor cannot designate an invoice as the lump-sum Net 60 exception',async()=>{
+ const f=invoiceFixture();f.team_members[0].cost_type='hourly'
+ const result=await invoiceRoute(f).POST({json:async()=>({portal:true,table:'contractor_invoices',operation:'insert',values:{...newInvoice,payment_group:'pooled_lump_sum',client_id:null}})})
+ assert.equal(result.status,400);assert.equal(f.saved,undefined)
 })

@@ -1,3 +1,4 @@
+import { pooledInvoiceEligibility } from '@/lib/pooled-invoices'
 import { billingPolicy, billingPeriod, invoiceDueDate } from '@/lib/billing-periods'
 import { readBillingPolicies } from '@/lib/billing-policy-server'
 import { localToday } from '@/lib/payables'
@@ -83,7 +84,14 @@ export async function POST(request: Request) {
         if (memberId) { values.team_member_id = memberId; values.status = 'submitted'; values.entered_by = 'contractor' }
         if (!uuid(values.team_member_id) || !String(values.invoice_number || '').trim() || !values.period_start || !values.period_end || !(Number(values.total_amount) > 0)) throw new Error('Invoice number, period, contractor and amount are required.')
       }
-      if (!isLine && body.operation === 'insert') {
+      if(!isLine && body.operation==='insert' && input.payment_group==='pooled_lump_sum') {
+        const eligible=await pooledInvoiceEligibility(service,companyId!,values.team_member_id)
+        if(memberId){const period=billingPeriod(values.period_end.slice(0,7));if(values.period_start!==period.start || values.period_end!==period.end) throw new Error('Choose a calendar month for the combined lump-sum invoice.')}
+        values.payment_group='pooled_lump_sum';values.client_id=null;values.payment_basis='invoice_date';values.payment_terms='NET60';values.client_net_days=60
+        values.invoice_date=values.invoice_date || localToday();values.due_date=invoiceDueDate(values.invoice_date,60)
+        values.billing_snapshot={payment_group:'pooled_lump_sum',net_days:60,cycle_start_day:1,pooled_client_ids:eligible.clientIds,pooled_project_ids:eligible.projectIds,captured_at:new Date().toISOString()}
+      }
+      if (!isLine && body.operation === 'insert' && values.payment_group!=='pooled_lump_sum') {
         const policies=await readBillingPolicies(service,companyId!)
         if(memberId && !uuid(values.client_id)) throw new Error('Choose a client for this invoice.')
         let projectId=input.billing_project_id || null
@@ -114,7 +122,7 @@ export async function POST(request: Request) {
         else if(memberId) values.due_date=invoiceDueDate(values.invoice_date,Number(String(values.payment_terms).match(/\d+/)?.[0] || 30))
       }
       if(!isLine && body.operation==='update') {
-        const {data:existing,error}=await service.from('contractor_invoices').select('payment_basis,status,due_date,client_payment_received_on,client_payment_recorded_at,client_invoice_date,client_net_days').eq('id',id).eq('company_id',companyId).single()
+        const {data:existing,error}=await service.from('contractor_invoices').select('payment_basis,status,due_date,client_payment_received_on,client_payment_recorded_at,client_invoice_date,client_net_days,payment_group,invoice_date').eq('id',id).eq('company_id',companyId).single()
         if(error || !existing) throw new Error('Invoice not found.')
         if(Object.hasOwn(values,'client_payment_received_on') && values.client_payment_received_on!==existing.client_payment_received_on) {
           if(!admin) throw new Error('Only an administrator can record client payment.')
@@ -129,6 +137,7 @@ export async function POST(request: Request) {
           if(date!==existing.client_invoice_date || days!==existing.client_net_days){values.client_schedule_confirmed_at=date?new Date().toISOString():null;values.client_schedule_confirmed_by=date?admin.user.id:null}
         }
         const received=Object.hasOwn(values,'client_payment_received_on') ? values.client_payment_received_on : existing.client_payment_received_on
+        if(existing.payment_group==='pooled_lump_sum'){values.payment_terms='NET60';values.due_date=invoiceDueDate(values.invoice_date || existing.invoice_date,60)}
         const newPayoutDate=values.due_date && values.due_date!==existing.due_date
         const releasingPayment=['scheduled','paid'].includes(values.status)
         const removingFunds=existing.client_payment_received_on && Object.hasOwn(values,'client_payment_received_on') && !received && (existing.due_date || ['scheduled','paid'].includes(existing.status))
