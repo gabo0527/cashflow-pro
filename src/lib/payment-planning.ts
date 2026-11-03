@@ -20,7 +20,7 @@ export function validPaymentWindow(start:string,end:string) {
 }
 export interface PlanningInvoice {
   status:string;invoice_date:string;period_end?:string;due_date?:string|null;client_id?:string|null;
-  payment_basis?:string;client_payment_received_on?:string|null;client_invoice_date?:string|null;client_net_days?:number|null;
+  payment_group?:string;payment_basis?:string;client_payment_received_on?:string|null;client_invoice_date?:string|null;client_net_days?:number|null;
   billing_snapshot?:Partial<BillingPolicy>|null;contractor_invoice_lines?:{client_id?:string|null;project_id?:string|null}[]
 }
 export function assumedClientInvoiceDate(periodEnd:string) {
@@ -34,13 +34,15 @@ export function invoiceClientScope(invoice:PlanningInvoice) {
 export function paymentTiming(invoice:PlanningInvoice,policies:BillingPolicy[]) {
   const scope=invoiceClientScope(invoice)
   const policy=billingPolicy(policies,scope.clientId || '',invoice.billing_snapshot?.project_id)
-  const conditional=invoice.payment_basis==='client_payment' || policy.contractor_payment_basis==='client_payment'
-  const netDays=invoice.client_net_days ?? invoice.billing_snapshot?.net_days ?? policy.net_days
+  const pooled=invoice.payment_group==='pooled_lump_sum'
+  const conditional=!pooled && (invoice.payment_basis==='client_payment' || policy.contractor_payment_basis==='client_payment')
+  const netDays=pooled?60:invoice.client_net_days ?? invoice.billing_snapshot?.net_days ?? policy.net_days
   const unscheduledFunds=conditional && !!invoice.client_payment_received_on && !invoice.due_date
   const ready=unscheduledFunds && invoice.status==='approved'
-  let date:string|null=null,source:'payout'|'client_invoice'|'estimate'|'receipt'|'contractor_terms'|'review'='review',reason=''
+  let date:string|null=null,source:'payout'|'client_invoice'|'estimate'|'receipt'|'contractor_terms'|'pooled_net60'|'review'='review',reason=''
   try {
-    if(scope.mixed) reason='Invoice spans multiple clients. Review the client allocations before assigning one payment date.'
+    if(pooled){date=invoiceDueDate(invoice.invoice_date,60);source='pooled_net60'}
+    else if(scope.mixed) reason='Invoice spans multiple clients. Review the client allocations before assigning one payment date.'
     else if(!scope.clientId) reason='Assign a client or internal overhead before relying on a payment date.'
     else if(conditional && invoice.due_date){date=invoiceDueDate(invoice.due_date,0);source='payout'}
     else if(unscheduledFunds){date=invoiceDueDate(invoice.client_payment_received_on!,0);source='receipt'}
@@ -50,7 +52,7 @@ export function paymentTiming(invoice:PlanningInvoice,policies:BillingPolicy[]) 
   }catch{reason='Invoice date or payment terms need review.'}
   let earliest=date,latest=date
   if(date && source==='estimate'){const early=new Date(`${date}T12:00:00Z`),late=new Date(early);early.setUTCDate(early.getUTCDate()-5);late.setUTCDate(late.getUTCDate()+5);earliest=iso(early);latest=iso(late)}
-  return {date,earliest,latest,source,reason,netDays,conditional,ready,unscheduledFunds,clientId:scope.clientId,mixed:scope.mixed,estimated:source==='estimate',needsReview:source==='review',outstanding:isOutstanding(invoice)}
+  return {date,earliest,latest,source,reason,pooled,netDays,conditional,ready,unscheduledFunds,clientId:scope.clientId,mixed:scope.mixed,estimated:source==='estimate',needsReview:source==='review',outstanding:isOutstanding(invoice)}
 }
 export function inPaymentWindow(invoice:PlanningInvoice,policies:BillingPolicy[],start:string,end:string) {
   if(!isOutstanding(invoice) || !validPaymentWindow(start,end)) return false

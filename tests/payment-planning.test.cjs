@@ -43,3 +43,14 @@ test('payment windows span months and years and reject incomplete or reversed da
  assert.deepEqual(planning.paymentWindow('week','2026-11-03'),{start:'2026-11-02',end:'2026-11-08'})
  for(const dates of [['2026-11-30','2026-11-01'],['','2026-11-30'],['2026-02-30','2026-11-30']])assert.equal(planning.validPaymentWindow(...dates),false)
 })
+
+test('consolidated lump sums keep Net 60 without choosing one client schedule',()=>{
+ const invoice={...base,payment_group:'pooled_lump_sum',invoice_date:'2026-09-29',contractor_invoice_lines:[{client_id:'p1'}]}
+ const timing=planning.paymentTiming(invoice,policies)
+ assert.equal(timing.date,'2026-11-28');assert.equal(timing.source,'pooled_net60');assert.equal(timing.netDays,60);assert.equal(timing.conditional,false);assert.equal(timing.needsReview,false)
+ assert.equal(planning.inPaymentWindow(invoice,policies,'2026-11-01','2026-11-30'),true)
+ const pooled=load('src/lib/pooled-invoices.ts')
+ assert.equal(pooled.isLumpSumCostType('Lump Sum'),true);assert.equal(pooled.isLumpSumCostType('hourly'),false)
+ assert.equal(pooled.coversDateRange([{start:'2026-10-01',end:'2026-10-31'},{start:'2026-11-01',end:'2026-11-30'}],'2026-10-26','2026-11-25'),true)
+ assert.equal(pooled.coversDateRange([{start:'2026-10-01',end:'2026-10-31'},{start:'2026-11-02',end:'2026-11-30'}],'2026-10-26','2026-11-25'),false)
+})

@@ -124,3 +124,27 @@ preserved. Internal Mano CG overhead retains its own terms. Mixed or unidentifie
 client invoices go to **Schedule review** without assigning their entire amount
 to a guessed client payment date. Received but unscheduled funds stay visible until
 payout is scheduled, even when received before the selected window.
+
+## Consolidated lump-sum exception
+
+Gabriel directed that a lump-sum contractor's invoice covering multiple clients
+remain Net 60 in a separate **Lump sum · multiple clients** bucket. Its deadline
+is 60 calendar days from the contractor invoice's actual issue date. It does not
+inherit an individual client's Net 30/45 terms or require choosing one client's
+receipt date. The bucket defaults to the selected payment window; **Show all
+unpaid lump-sum periods** reveals the older backlog. A window count remains on
+the bucket tab. These amounts are excluded from the individual-client window.
+
+Migration 20261103175501 identified four eligible open invoices, corrected their
+legacy Net 30 defaults to Net 60, and retained previous dates/terms in
+`billing_snapshot.pooled_correction`. Amounts, issue/work dates, statuses and
+closed invoices are preserved. Other mixed-client invoices still require review.
+Database enforcement maintains Net 60, and allocation changes automatically
+classify eligible multi-client lump-sum invoices. The API verifies contractor
+cost type and assignments before accepting a combined invoice. Eligible portal
+users can select **All clients · lump sum · Net 60**; admin entry has a combined
+lump-sum checkbox. Actual allocations remain available on the invoice.
+
+Combined invoices carry their covered client/project IDs. Missing-invoice checks
+can recognize their coverage, including adjacent monthly invoices that jointly
+cover a client's 26th–25th work cycle, so they do not request duplicate invoices.

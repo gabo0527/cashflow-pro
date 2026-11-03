@@ -1,4 +1,5 @@
 'use client'
+import { isLumpSumCostType } from '@/lib/pooled-invoices'
 import { paymentWindow, paymentTiming, inPaymentWindow, validPaymentWindow, PaymentWindowPreset } from '@/lib/payment-planning'
 import { useBillingPolicies } from '@/hooks/useBillingPolicies'
 import { contractorPaymentLabel, invoiceDueDate, billingPolicy, lastClosedBillingPeriod } from '@/lib/billing-periods'
@@ -37,7 +38,7 @@ const invoiceStore = createInvoiceStore(supabase, false)
 
 interface ContractorInvoice {
   id: string; team_member_id: string; invoice_number: string; invoice_date: string
-  payment_basis?: string; client_payment_received_on?: string | null; client_payment_note?: string | null; due_date: string; period_start: string; period_end: string; total_amount: number
+  payment_group?: string; payment_basis?: string; client_payment_received_on?: string | null; client_payment_note?: string | null; due_date: string; period_start: string; period_end: string; total_amount: number
   client_invoice_date?: string | null; client_net_days?: number | null; billing_snapshot?: any; status: string; payment_terms: string; receipt_url: string | null; notes: string | null
   submitted_at: string; reviewed_at: string | null; paid_at: string | null
   client_id?: string | null
@@ -55,7 +56,7 @@ interface ContractorExpense {
 }
 interface TeamMember {
   id: string; name: string; email: string
-  status?: string
+  status?: string; cost_type?:string
   phone?: string; address?: string; city?: string; state?: string; zip?: string; country?: string
   bank_name?: string; routing_number?: string; account_number?: string; account_type?: string
   swift_code?: string; iban?: string; bank_address?: string; intermediary_bank?: string
@@ -352,7 +353,8 @@ export default function ContractorManagement() {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
-  const [invoiceView, setInvoiceView] = useState<'window' | 'review' | 'outstanding' | 'overdue' | 'history'>('window')
+  const [invoiceView, setInvoiceView] = useState<'window' | 'pooled' | 'review' | 'outstanding' | 'overdue' | 'history'>('window')
+  const [pooledAllPeriods,setPooledAllPeriods]=useState(false)
   const [paymentPreset,setPaymentPreset]=useState<PaymentWindowPreset>('month')
   const [paymentDates,setPaymentDates]=useState(()=>paymentWindow('month'))
   const paymentWindowValid=validPaymentWindow(paymentDates.start,paymentDates.end)
@@ -432,7 +434,7 @@ export default function ContractorManagement() {
   // Records land in the SAME tables the portal reads, status 'submitted' (same
   // as a contractor entry), tagged entered_by='admin', and fire the same
   // submission email the contractor would get from their own portal entry.
-  const emptyAdd = { team_member_id: '', client_id: '', project_id: '', invoice_number: '', period_start: '', period_end: '', date: new Date().toLocaleDateString('en-CA'), category: 'mixed', description: '', amount: '', payment_terms: 'Net 30', notes: '', is_billable: true, file: null as File | null }
+  const emptyAdd = { pooled_lump_sum:false, team_member_id: '', client_id: '', project_id: '', invoice_number: '', period_start: '', period_end: '', date: new Date().toLocaleDateString('en-CA'), category: 'mixed', description: '', amount: '', payment_terms: 'Net 30', notes: '', is_billable: true, file: null as File | null }
   const [addModal, setAddModal] = useState<'invoice' | 'expense' | null>(null)
   const {policies:billingPolicies,loading:billingLoading,error:billingError}=useBillingPolicies()
   const [addForm, setAddForm] = useState(emptyAdd)
@@ -464,7 +466,7 @@ export default function ContractorManagement() {
       const amount = Math.round(parseFloat(addForm.amount) * 100) / 100
       const { data: inv, error } = await invoiceStore.from('contractor_invoices').insert({
         team_member_id: addForm.team_member_id, invoice_number: addForm.invoice_number,
-        invoice_date: addForm.date, due_date: dueIso, billing_project_id: addForm.project_id || null,
+        payment_group:addForm.pooled_lump_sum?'pooled_lump_sum':'client',invoice_date: addForm.date, due_date: dueIso, billing_project_id: addForm.project_id || null,
         period_start: addForm.period_start, period_end: addForm.period_end,
         total_amount: amount, payment_terms: addForm.payment_terms,
         receipt_url: receiptUrl, notes: addForm.notes || null, status: 'submitted',
@@ -473,7 +475,7 @@ export default function ContractorManagement() {
         entered_by: 'admin',
       }).select('*, contractor_invoice_lines(*)').single()
       if (error || !inv) throw error || new Error('Insert failed')
-      if (addForm.client_id) {
+      if (addForm.client_id && !addForm.pooled_lump_sum) {
         await invoiceStore.from('contractor_invoice_lines').insert({
           invoice_id: inv.id, client_id: addForm.client_id, project_id: addForm.project_id || null,
           description: 'Invoice (entered by admin)', hours: 0, rate: 0, amount, allocation_pct: 100,
@@ -586,6 +588,8 @@ export default function ContractorManagement() {
     let r = [...invoices]
     if (invoiceView === 'history' && dateRange !== 'all') r = r.filter(inv => inv.period_start <= dateFilter.end && inv.period_end >= dateFilter.start)
     if (invoiceView !== 'history') r = r.filter(isOutstanding)
+    if (invoiceView === 'window' || invoiceView==='overdue' || invoiceView==='review') r=r.filter(inv=>inv.payment_group!=='pooled_lump_sum')
+    if (invoiceView === 'pooled') r=r.filter(inv=>inv.payment_group==='pooled_lump_sum' && (pooledAllPeriods || inPaymentWindow(inv,billingPolicies,paymentDates.start,paymentDates.end)))
     if (invoiceView === 'window') r = r.filter(inv=>inPaymentWindow(inv,billingPolicies,paymentDates.start,paymentDates.end))
     if (invoiceView === 'review') r = r.filter(inv=>paymentTiming(inv,billingPolicies).needsReview)
     if (invoiceView === 'overdue') r = r.filter(inv => {const timing=paymentTiming(inv,billingPolicies);return !!timing.latest && timing.latest<paymentDates.start && !timing.unscheduledFunds})
@@ -596,7 +600,7 @@ export default function ContractorManagement() {
     if (filterMember !== 'all') r = r.filter(inv => inv.team_member_id === filterMember)
     if (filterClient !== 'all') r = r.filter(inv => inv.client_id === filterClient || inv.contractor_invoice_lines?.some((l: any) => l.client_id === filterClient))
     return r.sort((a,b) => (paymentTiming(a,billingPolicies).date || '9999').localeCompare(paymentTiming(b,billingPolicies).date || '9999'))
-  }, [invoiceView, invoices, dateFilter, dateRange, billingPolicies, paymentDates.start, paymentDates.end, paymentStage, searchQuery, filterStatus, filterMember, filterClient, memberMap])
+  }, [invoiceView, invoices, dateFilter, dateRange, billingPolicies, paymentDates.start, paymentDates.end, pooledAllPeriods, paymentStage, searchQuery, filterStatus, filterMember, filterClient, memberMap])
 
   const filteredExpenses = useMemo(() => {
     // Drafts are private to contractors until they submit a report —
@@ -621,6 +625,7 @@ export default function ContractorManagement() {
   // ============ GROUPED DATA ============
   const invResolvers = useMemo(() => ({
     client: (inv: ContractorInvoice) => {
+      if(inv.payment_group==='pooled_lump_sum') return {id:'pooled_lump_sum',name:'Lump sum · multiple clients'}
       // Check invoice-level client_id first (set on creation or via edit)
       if (inv.client_id && clientMap[inv.client_id]) return { id: inv.client_id, name: clientMap[inv.client_id] }
       // Fall back to lines
@@ -1078,7 +1083,7 @@ export default function ContractorManagement() {
                 </div>
               </div>
               <span className="text-gray-600 text-sm truncate">{memberMap[inv.team_member_id] || '—'}</span>
-              <div className="text-xs vN" title={timing.source==='estimate'?`Planning range ${timing.earliest} – ${timing.latest}. Client invoice assumed at billing month-end; actual date can be entered in Edit.`:undefined}><span className="block font-semibold text-slate-700">{timing.date?fmtDate(timing.date):'Schedule review'}</span><span className="block text-[10px] text-slate-500">{timing.source==='estimate'?`Month-end · Net ${timing.netDays} · ±5 days`:timing.source==='client_invoice'?`Client invoice · Net ${timing.netDays}`:timing.source==='payout'?'Scheduled payout':timing.source==='receipt'?'Client funds received':timing.source==='review'?'Client allocation needed':'Contractor due date'}</span>{timing.conditional && <span className="block text-[10px] text-slate-500">{inv.client_payment_received_on?(inv.due_date?'Client paid · payout scheduled':inv.status==='approved'?'Client paid · ready to schedule':'Client paid · review approval'):'Awaiting client payment'}</span>}<span className="block text-[10px] text-gray-400">Work: {fmtDateS(inv.period_start)}–{fmtDateS(inv.period_end)}</span>{timing.needsReview && <button aria-label={`Review payment schedule for ${inv.invoice_number}`} onClick={()=>openEditInvoice(inv)} title={timing.reason || `Planning range ${timing.earliest} – ${timing.latest}. Assumes client invoice at billing month-end; confirm the actual date when available.`} className="text-[10px] text-amber-700 underline">{timing.source==='estimate'?'Confirm client invoice date':'Review schedule'}</button>}</div>
+              <div className="text-xs vN" title={timing.source==='estimate'?`Planning range ${timing.earliest} – ${timing.latest}. Client invoice assumed at billing month-end; actual date can be entered in Edit.`:undefined}><span className="block font-semibold text-slate-700">{timing.date?fmtDate(timing.date):'Schedule review'}</span><span className="block text-[10px] text-slate-500">{timing.source==='estimate'?`Month-end · Net ${timing.netDays} · ±5 days`:timing.source==='client_invoice'?`Client invoice · Net ${timing.netDays}`:timing.source==='pooled_net60'?'Combined lump sum · Net 60':timing.source==='payout'?'Scheduled payout':timing.source==='receipt'?'Client funds received':timing.source==='review'?'Client allocation needed':'Contractor due date'}</span>{timing.conditional && <span className="block text-[10px] text-slate-500">{inv.client_payment_received_on?(inv.due_date?'Client paid · payout scheduled':inv.status==='approved'?'Client paid · ready to schedule':'Client paid · review approval'):'Awaiting client payment'}</span>}<span className="block text-[10px] text-gray-400">Work: {fmtDateS(inv.period_start)}–{fmtDateS(inv.period_end)}</span>{timing.needsReview && <button aria-label={`Review payment schedule for ${inv.invoice_number}`} onClick={()=>openEditInvoice(inv)} title={timing.reason || `Planning range ${timing.earliest} – ${timing.latest}. Assumes client invoice at billing month-end; confirm the actual date when available.`} className="text-[10px] text-amber-700 underline">{timing.source==='estimate'?'Confirm client invoice date':'Review schedule'}</button>}</div>
               <span className="text-gray-900 text-sm font-medium text-right vN">{fmt$(inv.total_amount)}</span>
               <div title={historyText}><StatusDropdown status={inv.status} onChange={s => {
                 if (s === 'rejected') { setRejectModal({ id: inv.id, type: 'invoice', label: inv.invoice_number }); setRejectNotes('') }
@@ -1253,9 +1258,10 @@ export default function ContractorManagement() {
             <p className="text-xs text-slate-500 mt-3">Expected dates use the client invoice date plus its terms. Until confirmed, the client invoice is assumed sent at billing month-end, with a ±5-day planning range. Client funds received but not yet scheduled stay visible.</p>
           </section>
           <div className="flex flex-wrap gap-2" aria-label="Invoice queue">
-            {([{id:'window',label:'This payment window'},{id:'overdue',label:'Before this window'},{id:'review',label:'Schedule review'},{id:'outstanding',label:'All outstanding'},{id:'history',label:'Invoice history'}] as const).map(view => <button key={view.id} onClick={() => {setInvoiceView(view.id);setFilterStatus('all');setPaymentStage('all')}} aria-pressed={invoiceView===view.id} className={`rounded-lg border px-4 py-2 text-sm font-medium ${invoiceView===view.id ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-gray-200 text-gray-600'}`}>{view.label}</button>)}
+            {([{id:'window',label:'This payment window'},{id:'overdue',label:'Before this window'},{id:'pooled',label:'Lump sum · multiple clients'},{id:'review',label:'Schedule review'},{id:'outstanding',label:'All outstanding'},{id:'history',label:'Invoice history'}] as const).map(view => <button key={view.id} onClick={() => {setInvoiceView(view.id);setFilterStatus('all');setPaymentStage('all')}} aria-pressed={invoiceView===view.id} className={`rounded-lg border px-4 py-2 text-sm font-medium ${invoiceView===view.id ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-gray-200 text-gray-600'}`}>{view.label}{view.id==='pooled' && <span className="ml-2 text-xs">({invoices.filter(i=>i.payment_group==='pooled_lump_sum' && inPaymentWindow(i,billingPolicies,paymentDates.start,paymentDates.end)).length})</span>}</button>)}
           </div>
-          <p className="text-xs text-slate-500">{invoiceView==='window' ? `${paymentDates.start} – ${paymentDates.end} · totals below cover this payment window and available client funds; future invoices stay in All outstanding.` : invoiceView==='overdue' ? `Expected or scheduled before ${paymentDates.start}. Confirm receipt and payment records before acting on older balances.` : invoiceView==='review' ? 'Confirm missing client invoice dates and review invoices with multiple clients. Estimates do not confirm client payment.' : invoiceView === 'history' ? 'Review invoices by billing period, including paid and rejected invoices.' : 'All billing months · unpaid invoices stay visible until paid or rejected · earliest payment dates first'}</p>
+          <p className="text-xs text-slate-500">{invoiceView==='window' ? `${paymentDates.start} – ${paymentDates.end} · totals below cover this payment window and available client funds; future invoices stay in All outstanding. Combined lump sums have their own bucket.` : invoiceView==='pooled' ? 'Combined lump-sum invoices · Net 60 from the contractor invoice date · separate from individual client payment schedules.' : invoiceView==='overdue' ? `Expected or scheduled before ${paymentDates.start}. Confirm receipt and payment records before acting on older balances.` : invoiceView==='review' ? 'Confirm missing client invoice dates and review invoices with multiple clients. Estimates do not confirm client payment.' : invoiceView === 'history' ? 'Review invoices by billing period, including paid and rejected invoices.' : 'All billing months · unpaid invoices stay visible until paid or rejected · earliest payment dates first'}</p>
+          {invoiceView==='pooled' && <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={pooledAllPeriods} onChange={e=>setPooledAllPeriods(e.target.checked)}/>Show all unpaid lump-sum periods (otherwise this payment window)</label>}
           <div className="flex justify-end">
             <button onClick={() => openAdd('invoice')} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 vBtn">
               <Plus size={13} /> Add Invoice <span className="font-normal opacity-75">· on behalf of contractor</span>
@@ -1619,8 +1625,8 @@ export default function ContractorManagement() {
                 <div className="col-span-2 grid grid-cols-2 gap-4">
                   <label className="text-xs text-gray-500">Invoice date<input type="date" value={editForm.invoice_date || ''} onChange={e=>setEditForm(f=>({...f,invoice_date:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label>
                   {editInvoice.payment_basis==='client_payment' && <><label className="text-xs text-gray-500">Client invoice date (confirm actual date)<input type="date" value={editForm.client_invoice_date || ''} onChange={e=>setEditForm(f=>({...f,client_invoice_date:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label><label className="text-xs text-gray-500">Client payment terms · net days<input type="number" min={0} max={365} value={editForm.client_net_days ?? ''} onChange={e=>setEditForm(f=>({...f,client_net_days:Number(e.target.value)}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label><label className="text-xs text-gray-500">Client payment received on<input type="date" value={editForm.client_payment_received_on || ''} onChange={e=>setEditForm(f=>({...f,client_payment_received_on:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label><label className="text-xs text-gray-500">Client payment reference<input value={editForm.client_payment_note || ''} onChange={e=>setEditForm(f=>({...f,client_payment_note:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label></>}
-                  <label className="text-xs text-gray-500">Payment due date<input type="date" value={editForm.due_date || ''} onChange={e=>setEditForm(f=>({...f,due_date:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label>
-                  <label className="text-xs text-gray-500">Payment terms<input value={editForm.payment_terms || ''} onChange={e=>setEditForm(f=>({...f,payment_terms:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label>
+                  <label className="text-xs text-gray-500">Payment due date<input type="date" disabled={editInvoice.payment_group==='pooled_lump_sum'} value={editForm.due_date || ''} onChange={e=>setEditForm(f=>({...f,due_date:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label>
+                  <label className="text-xs text-gray-500">Payment terms<input disabled={editInvoice.payment_group==='pooled_lump_sum'} value={editForm.payment_terms || ''} onChange={e=>setEditForm(f=>({...f,payment_terms:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Period Start</label>
@@ -2152,6 +2158,7 @@ export default function ContractorManagement() {
               </div>
               {addModal === 'invoice' ? (
                 <>
+                  {isLumpSumCostType(teamMembers.find(m=>m.id===addForm.team_member_id)?.cost_type) && <label className="flex gap-2 text-sm text-slate-600"><input type="checkbox" checked={addForm.pooled_lump_sum} onChange={e=>setAddForm(f=>({...f,pooled_lump_sum:e.target.checked,client_id:'',project_id:'',payment_terms:e.target.checked?'Net 60':'Net 30'}))}/>Combined lump sum · multiple clients · Net 60</label>}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Invoice # *</label>
@@ -2175,14 +2182,14 @@ export default function ContractorManagement() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Client (optional)</label>
-                      <select value={addForm.client_id} onChange={e => { const clientId=e.target.value;const period=lastClosedBillingPeriod(new Date().toLocaleDateString('en-CA'),billingPolicy(billingPolicies,clientId).cycle_start_day);setAddForm(f => ({ ...f, client_id: clientId, project_id: '',period_start:period.start,period_end:period.end })) }} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30">
+                      <select disabled={addForm.pooled_lump_sum} value={addForm.client_id} onChange={e => { const clientId=e.target.value;const period=lastClosedBillingPeriod(new Date().toLocaleDateString('en-CA'),billingPolicy(billingPolicies,clientId).cycle_start_day);setAddForm(f => ({ ...f, client_id: clientId, project_id: '',period_start:period.start,period_end:period.end })) }} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30">
                         <option value="">—</option>
                         {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Contractor Payment Terms</label>
-                      <label className="block text-xs text-gray-500 mb-2">Invoice date<input type="date" value={addForm.date} onChange={e=>setAddForm(f=>({...f,date:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label>{addInvoicePolicy.contractor_payment_basis==='client_payment' && <p className="text-xs text-amber-700 mb-2">After client payment; schedule manually. Client terms are separately Net {addInvoicePolicy.net_days}.</p>}<select disabled={addInvoicePolicy.contractor_payment_basis==='client_payment'} value={addForm.payment_terms} onChange={e => setAddForm(f => ({ ...f, payment_terms: e.target.value }))} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30">
+                      <label className="block text-xs text-gray-500 mb-2">Invoice date<input type="date" value={addForm.date} onChange={e=>setAddForm(f=>({...f,date:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label>{addInvoicePolicy.contractor_payment_basis==='client_payment' && <p className="text-xs text-amber-700 mb-2">After client payment; schedule manually. Client terms are separately Net {addInvoicePolicy.net_days}.</p>}<select disabled={addForm.pooled_lump_sum || addInvoicePolicy.contractor_payment_basis==='client_payment'} value={addForm.payment_terms} onChange={e => setAddForm(f => ({ ...f, payment_terms: e.target.value }))} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30">
                         <option>Net 15</option><option>Net 30</option><option>Net 45</option><option>Net 60</option>
                       </select>
                     </div>

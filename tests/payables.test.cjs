@@ -7,7 +7,7 @@ const ts = require('typescript')
 function load(file,mocks={}) {
   const module={exports:{}}
   const source=ts.transpileModule(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText
-  vm.runInThisContext(`(function(require,module,exports){${source}\n})`)(n=>Object.hasOwn(mocks,n)?mocks[n]:n==='@/lib/payment-planning'?load('src/lib/payment-planning.ts',{'./billing-periods':load('src/lib/billing-periods.ts'),'./payables':load('src/lib/payables.ts')}):n==='@/hooks/useBillingPolicies'?{useBillingPolicies:()=>({policies:[],loading:false,error:''})}:['@/lib/billing-periods','./billing-periods'].includes(n)?load('src/lib/billing-periods.ts'):n==='@/lib/payables'?load('src/lib/payables.ts'):['@/lib/billing-policy-server','./billing-policy-server'].includes(n)?{readBillingPolicies:async()=>[]}:require(n),module,module.exports)
+  vm.runInThisContext(`(function(require,module,exports){${source}\n})`)(n=>Object.hasOwn(mocks,n)?mocks[n]:['@/lib/pooled-invoices','./pooled-invoices'].includes(n)?load('src/lib/pooled-invoices.ts'):n==='@/lib/payment-planning'?load('src/lib/payment-planning.ts',{'./billing-periods':load('src/lib/billing-periods.ts'),'./payables':load('src/lib/payables.ts')}):n==='@/hooks/useBillingPolicies'?{useBillingPolicies:()=>({policies:[],loading:false,error:''})}:['@/lib/billing-periods','./billing-periods'].includes(n)?load('src/lib/billing-periods.ts'):n==='@/lib/payables'?load('src/lib/payables.ts'):['@/lib/billing-policy-server','./billing-policy-server'].includes(n)?{readBillingPolicies:async()=>[]}:require(n),module,module.exports)
   return module.exports
 }
 const payables=load('src/lib/payables.ts')
@@ -96,7 +96,8 @@ test('real payables screen focuses on its payment window and keeps older invoice
   const today=payables.localToday(),month=today.slice(0,7),previous=payables.previousBillingMonth(today)
   const base={client_id:'overhead',invoice_date:previous.end,team_member_id:'shannon',total_amount:1000,payment_terms:'NET30',submitted_at:'2026-09-22T20:00:47Z',contractor_invoice_lines:[],period_start:previous.start,period_end:previous.end,due_date:previous.end}
   const nextMonth=new Date(today+'T12:00:00Z');nextMonth.setUTCMonth(nextMonth.getUTCMonth()+2,1)
-  const rows=[{...base,id:'current',invoice_number:'DUE-THIS-WINDOW',status:'approved',due_date:today},{...base,id:'future',invoice_number:'FUTURE-PAYMENT',status:'pending',due_date:nextMonth.toISOString().slice(0,10)},{...base,id:'old-approved',invoice_number:'OLD-APPROVED',status:'approved'},{...base,id:'old-scheduled',invoice_number:'OLD-SCHEDULED',status:'scheduled'},{...base,id:'paid',invoice_number:'PAID-CURRENT',status:'paid',period_start:`${month}-01`,period_end:today}]
+  const poolIssue=new Date(today+'T12:00:00Z');poolIssue.setUTCDate(poolIssue.getUTCDate()-60)
+  const rows=[{...base,id:'pool',invoice_number:'COMBINED-LS',status:'approved',payment_group:'pooled_lump_sum',invoice_date:poolIssue.toISOString().slice(0,10),contractor_invoice_lines:[{client_id:'overhead'},{client_id:'other'}]},{...base,id:'current',invoice_number:'DUE-THIS-WINDOW',status:'approved',due_date:today},{...base,id:'future',invoice_number:'FUTURE-PAYMENT',status:'pending',due_date:nextMonth.toISOString().slice(0,10)},{...base,id:'old-approved',invoice_number:'OLD-APPROVED',status:'approved'},{...base,id:'old-scheduled',invoice_number:'OLD-SCHEDULED',status:'scheduled'},{...base,id:'paid',invoice_number:'PAID-CURRENT',status:'paid',period_start:`${month}-01`,period_end:today}]
   const fixture={team_members:[{id:'shannon',name:'Shannon Rybecky',email:'shannon@example.test'}],clients:[{id:'overhead',name:'Mano CG'}],projects:[],contractor_expenses:[],contractor_invoice_status_events:[{id:'history',invoice_id:'old-approved',from_status:'pending',to_status:'approved',changed_at:'2026-11-03T15:00:00Z',actor_label:'kathia@manocg.com'}]}
   const db={auth:{getSession:async()=>({data:{session:{access_token:'test'}}})},from(table){const q={then(resolve){resolve({data:fixture[table]||[],error:null})}};for(const k of ['select','order','eq','range'])q[k]=()=>q;return q}}
   const oldFetch=global.fetch
@@ -108,6 +109,9 @@ test('real payables screen focuses on its payment window and keeps older invoice
     await act(async()=>{renderer=create(React.createElement(component));await new Promise(resolve=>setImmediate(resolve))})
     const text=()=>JSON.stringify(renderer.toJSON())
     assert.match(text(),/DUE-THIS-WINDOW/);assert.doesNotMatch(text(),/FUTURE-PAYMENT/);assert.doesNotMatch(text(),/OLD-APPROVED/);assert.doesNotMatch(text(),/PAID-CURRENT/)
+    assert.doesNotMatch(text(),/COMBINED-LS/)
+    await act(async()=>renderer.root.findAllByType('button').find(n=>n.children.includes('Lump sum · multiple clients')).props.onClick())
+    assert.match(text(),/COMBINED-LS/);assert.doesNotMatch(text(),/DUE-THIS-WINDOW/);assert.doesNotMatch(text(),/OLD-APPROVED/)
     await act(async()=>renderer.root.findAllByType('button').find(n=>n.children.includes('All outstanding')).props.onClick())
     assert.match(text(),/OLD-APPROVED/);assert.match(text(),/OLD-SCHEDULED/);assert.doesNotMatch(text(),/PAID-CURRENT/)
     assert.ok(renderer.root.findAll(n=>typeof n.props.title==='string'&&n.props.title.includes('kathia@manocg.com')).length)
