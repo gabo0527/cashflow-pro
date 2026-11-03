@@ -1,4 +1,5 @@
 'use client'
+import { createInvoiceStore } from '@/lib/invoice-client'
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react'
 import {
@@ -21,6 +22,8 @@ const supabase = createClient(
 )
 
 // ============ TYPES ============
+const invoiceStore = createInvoiceStore(supabase, true)
+
 interface TeamMember {
   id: string; name: string; email: string; cost_type?: string; cost_amount?: number; company_id?: string; onboarding_status?: string; entity_name?: string
   phone?: string; address?: string; city?: string; state?: string; zip?: string; country?: string
@@ -593,7 +596,7 @@ export default function ContractorPortal() {
       const { data: expData } = await supabase.from('contractor_expenses').select('*').eq('team_member_id', md.id).order('date', { ascending: false }).limit(50)
       setExpenses(expData || [])
 
-      const { data: invData } = await supabase.from('contractor_invoices').select('*, contractor_invoice_lines(*)').eq('team_member_id', md.id).order('invoice_date', { ascending: false }).limit(20)
+      const { data: invData } = await invoiceStore.from('contractor_invoices').select('*, contractor_invoice_lines(*)').eq('team_member_id', md.id).order('invoice_date', { ascending: false }).limit(20)
       setInvoices(invData || [])
 
       setStep('portal')
@@ -837,9 +840,9 @@ export default function ContractorPortal() {
       let receiptUrl: string | null = null
       if (invoiceFile) receiptUrl = await uploadFile(invoiceFile, 'invoices', member.id)
 
-      const { data: inv, error: ie } = await supabase.from('contractor_invoices').insert({
+      const { data: inv, error: ie } = await invoiceStore.from('contractor_invoices').insert({
         team_member_id: member.id, invoice_number: invoiceForm.invoice_number,
-        invoice_date: billingMonth.end, due_date: new Date(new Date(billingMonth.end).getTime() + 30 * 86400000).toISOString().split('T')[0],
+        invoice_date: billingMonth.end, due_date: new Date(new Date(billingMonth.end + 'T12:00:00Z').getTime() + Number(invoiceForm.payment_terms.match(/\d+/)?.[0] || 30) * 86400000).toISOString().split('T')[0],
         period_start: billingMonth.start, period_end: billingMonth.end,
         total_amount: Math.round((enteredAmount + includedExpensesTotal) * 100) / 100, payment_terms: invoiceForm.payment_terms, receipt_url: receiptUrl, notes: invoiceForm.notes || null, status: 'submitted',
         company_id: 'a1b2c3d4-0000-4000-a000-000000000001',
@@ -856,7 +859,8 @@ export default function ContractorPortal() {
           amount: totalHours > 0 ? (l.hours || 0) / totalHours * enteredAmount : 0,
           allocation_pct: l.allocation_pct
         }))
-        await supabase.from('contractor_invoice_lines').insert(lines)
+        const savedLines = await invoiceStore.from('contractor_invoice_lines').insert(lines)
+        if (savedLines.error) throw new Error('Invoice created, but allocations could not be saved. Contact your administrator before submitting again.')
       }
 
       // Attach included expense reports: generated line + report -> 'invoiced'.
@@ -882,7 +886,7 @@ export default function ContractorPortal() {
         body: JSON.stringify({ type: 'invoice', id: inv.id, status: 'submitted' })
       }).catch(err => console.warn('Invoice notification failed:', err))
       setShowInvoiceForm(false); setInvoiceForm({ invoice_number: '', payment_terms: 'NET30', notes: '', client_id: 'all', amount: '' }); setInvoiceFile(null); setInvoiceDistribution([])
-      const { data: invData } = await supabase.from('contractor_invoices').select('*, contractor_invoice_lines(*)').eq('team_member_id', member.id).order('invoice_date', { ascending: false }).limit(20)
+      const { data: invData } = await invoiceStore.from('contractor_invoices').select('*, contractor_invoice_lines(*)').eq('team_member_id', member.id).order('invoice_date', { ascending: false }).limit(20)
       setInvoices(invData || [])
     } catch (err: any) { setError(err.message || 'Failed to submit invoice') } finally { setSubmittingInvoice(false) }
   }
@@ -892,8 +896,8 @@ export default function ContractorPortal() {
     if (!confirm('Delete this invoice? This cannot be undone.')) return
     setError(null)
     try {
-      await supabase.from('contractor_invoice_lines').delete().eq('invoice_id', id)
-      await supabase.from('contractor_invoices').delete().eq('id', id)
+      const deleted = await invoiceStore.from('contractor_invoices').delete().eq('id', id)
+      if (deleted.error) throw new Error(deleted.error.message)
       setInvoices(prev => prev.filter(inv => inv.id !== id))
     } catch (err: any) { setError(err.message || 'Failed to delete') }
   }
@@ -908,7 +912,7 @@ export default function ContractorPortal() {
       try {
         const { data: timeData } = await supabase.from('time_entries').select('id, project_id, hours, billable_hours, description, date, created_at').eq('contractor_id', member.id).gte('date', historyRange.start).lte('date', historyRange.end).order('date', { ascending: false })
         const { data: expData } = await supabase.from('contractor_expenses').select('*').eq('team_member_id', member.id).neq('status', 'rejected').neq('status', 'draft').gte('date', historyRange.start).lte('date', historyRange.end).order('date', { ascending: false })
-        const { data: invData } = await supabase.from('contractor_invoices').select('*, contractor_invoice_lines(*)').eq('team_member_id', member.id).gte('period_start', historyRange.start).lte('period_start', historyRange.end).order('invoice_date', { ascending: false })
+        const { data: invData } = await invoiceStore.from('contractor_invoices').select('*, contractor_invoice_lines(*)').eq('team_member_id', member.id).gte('period_start', historyRange.start).lte('period_start', historyRange.end).order('invoice_date', { ascending: false })
         setHistoryTime(timeData || []); setHistoryExpenses(expData || []); setHistoryInvoices(invData || [])
       } catch (err) { console.error('History load error:', err) }
       finally { setHistoryLoading(false) }
@@ -997,7 +1001,7 @@ export default function ContractorPortal() {
         const { data: timeData } = await supabase.from('time_entries').select('id, project_id, hours, billable_hours, date, status').eq('contractor_id', member.id).gte('date', analyticsRange.start).lte('date', analyticsRange.end).order('date', { ascending: true })
         setAnalyticsTime((timeData || []).filter((e: any) => (e.status || 'submitted') !== 'draft'))
         // Invoices count in the period their billing period STARTS (KPI total always equals chart sum)
-        const { data: invData } = await supabase.from('contractor_invoices').select('id, invoice_date, total_amount, status, period_start, period_end, client_id, contractor_invoice_lines(*)').eq('team_member_id', member.id).gte('period_start', analyticsRange.start).lte('period_start', analyticsRange.end).order('period_start', { ascending: true })
+        const { data: invData } = await invoiceStore.from('contractor_invoices').select('id, invoice_date, total_amount, status, period_start, period_end, client_id, contractor_invoice_lines(*)').eq('team_member_id', member.id).gte('period_start', analyticsRange.start).lte('period_start', analyticsRange.end).order('period_start', { ascending: true })
         setAnalyticsInvoicesA(invData || [])
         // Expenses by expense date; rejected excluded from all sums
         const { data: expData } = await supabase.from('contractor_expenses').select('id, date, category, amount, status, client_id').eq('team_member_id', member.id).gte('date', analyticsRange.start).lte('date', analyticsRange.end).order('date', { ascending: true })

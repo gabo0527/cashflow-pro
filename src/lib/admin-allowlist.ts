@@ -17,9 +17,7 @@
 
 export const ADMIN_EMAILS: ReadonlyArray<string> = [
   'gabriel@manocg.com',
-  // Add Kathia + Rodrigo here when ready, e.g.:
-  // 'kathia@manocg.com',
-  // 'rodrigo@manocg.com',
+  'kathia@manocg.com',
 ]
 
 /**

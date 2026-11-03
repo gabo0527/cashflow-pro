@@ -185,7 +185,7 @@ function server(state = {}) {
   const db = {
     auth: {
       getUser: async (token) => ({
-        data: { user: state.badToken ? null : { id: 'verified-user' } },
+        data: { user: state.badToken ? null : { id: 'verified-user', email: state.nonAdmin ? 'other@manocg.com' : 'gabriel@manocg.com' } },
         error: state.badToken ? {} : null,
       }),
     },
@@ -220,6 +220,7 @@ function server(state = {}) {
   return loadTS('src/lib/commercial-server.ts', {
     '@/lib/contractor-auth': { getSupabaseAdmin: () => db },
     './commercial': commercial,
+    './admin-allowlist': loadTS('src/lib/admin-allowlist.ts'),
   })
 }
 const request = (token = 'valid-token') => ({
@@ -251,6 +252,7 @@ test('commercial access validates real auth and membership instead of caller-sup
     () => server({ role: 'viewer' }).commercialContext(request(), client, true),
     (e) => e.status === 403,
   )
+  await assert.rejects(() => server({ nonAdmin: true }).commercialContext(request(), client), (e) => e.status === 401)
   const denied = server({ wrongScope: true })
   const context = await denied.commercialContext(request(), client)
   await assert.rejects(

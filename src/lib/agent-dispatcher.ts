@@ -184,7 +184,8 @@ function extractParams(message: string): Record<string, any> {
 export async function executeAgent(
   baseUrl: string,
   intent: DetectedIntent,
-  companyId: string
+  companyId: string,
+  token?: string
 ): Promise<{ success: boolean; data: any; error?: string }> {
   try {
     const url = `${baseUrl}${intent.agent.endpoint}`
@@ -197,7 +198,7 @@ export async function executeAgent(
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(token ? {Authorization:`Bearer ${token}`} : {}) },
       body: JSON.stringify(body),
     })
 
@@ -425,12 +426,13 @@ export function formatAgentResponse(agentId: string, action: string, data: any):
 export async function tryAgentExecution(
   message: string,
   baseUrl: string,
-  companyId: string
+  companyId: string,
+  token?: string
 ): Promise<string | null> {
   const intent = detectAgentIntent(message)
   if (!intent) return null
 
-  const result = await executeAgent(baseUrl, intent, companyId)
+  const result = await executeAgent(baseUrl, intent, companyId, token)
 
   if (!result.success) {
     return `I tried to run the **${intent.agent.name}** agent, but it returned an error:\n\n> ${result.error}\n\nThis might be a configuration issue. Check the Vercel logs for details.`

@@ -8,6 +8,7 @@
  *        Claude (fallback) if OpenAI unavailable.
  */
 
+import { adminContext } from '@/lib/admin-context'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { aiStructured } from '@/lib/ai-router'
@@ -42,12 +43,13 @@ interface ValidationResult {
 
 // ─── Core Validation Logic ───────────────────────────────────────────────────
 
-async function validateInvoice(invoiceId: string): Promise<ValidationResult> {
+async function validateInvoice(invoiceId: string, companyId: string): Promise<ValidationResult> {
   // 1. Fetch the invoice with line items
   const { data: invoice, error: invErr } = await supabase
     .from('contractor_invoices')
     .select('*, contractor_invoice_lines(*)')
     .eq('id', invoiceId)
+    .eq('company_id', companyId)
     .single()
 
   if (invErr || !invoice) {
@@ -210,17 +212,19 @@ function calculateExpected(entries: any[], assignments: any[]): number {
 
 export async function POST(request: NextRequest) {
   try {
+    const ctx = await adminContext(request)
+    if (!ctx) return NextResponse.json({error:'Not authorized'},{status:401})
     const { invoiceId, invoiceIds, action } = await request.json()
 
     // Single invoice validation
     if (action === 'validate' && invoiceId) {
-      const result = await validateInvoice(invoiceId)
+      const result = await validateInvoice(invoiceId, ctx.companyId)
 
       // Auto-approve if clean
       if (result.auto_approved) {
         await supabase
           .from('contractor_invoices')
-          .update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: 'agent:invoice-validator' })
+          .update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: ctx.user.id })
           .eq('id', invoiceId)
       }
 
@@ -232,11 +236,11 @@ export async function POST(request: NextRequest) {
       const results: ValidationResult[] = []
       for (const id of invoiceIds) {
         try {
-          const result = await validateInvoice(id)
+          const result = await validateInvoice(id, ctx.companyId)
           if (result.auto_approved) {
             await supabase
               .from('contractor_invoices')
-              .update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: 'agent:invoice-validator' })
+              .update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: ctx.user.id })
               .eq('id', id)
           }
           results.push(result)
@@ -273,6 +277,7 @@ export async function POST(request: NextRequest) {
         .from('contractor_invoices')
         .select('id')
         .eq('status', 'submitted')
+        .eq('company_id', ctx.companyId)
 
       if (!pending?.length) {
         return NextResponse.json({ summary: { total: 0, auto_approved: 0, needs_review: 0, errors: 0 }, results: [] })
@@ -281,7 +286,7 @@ export async function POST(request: NextRequest) {
       // Recursive call with batch
       const batchReq = new NextRequest(request.url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ctx.token}` },
         body: JSON.stringify({ action: 'validate-batch', invoiceIds: pending.map(p => p.id) }),
       })
       return POST(batchReq)

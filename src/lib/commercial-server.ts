@@ -1,3 +1,4 @@
+import { isAdminEmail } from './admin-allowlist'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/contractor-auth'
 import { CommercialRole, canManageCommercial, validId } from './commercial'
@@ -21,7 +22,7 @@ export async function commercialContext(
     throw new CommercialError('Sign in to access commercial documents.', 401)
   const db = getSupabaseAdmin()
   const { data: auth, error: authError } = await db.auth.getUser(token)
-  if (authError || !auth.user)
+  if (authError || !auth.user || !isAdminEmail(auth.user.email))
     throw new CommercialError('Your session has expired.', 401)
   // Membership is stored separately from editable profiles/team records.
   const { data: client, error: clientError } = await db

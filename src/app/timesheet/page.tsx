@@ -1,4 +1,5 @@
 'use client'
+import { createInvoiceStore } from '@/lib/invoice-client'
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
@@ -17,6 +18,8 @@ const supabase = createClient(
 )
 
 // ============ TYPES ============
+const invoiceStore = createInvoiceStore(supabase, true)
+
 interface TeamMember { id: string; name: string; email: string; cost_type?: string; cost_amount?: number; company_id?: string }
 interface Assignment { project_id: string; project_name: string; client_id: string; client_name: string; payment_type: string; rate: number }
 interface RateCard { team_member_id: string; client_id: string; client_name: string; cost_type: string; cost_amount: number; rate: number }
@@ -343,12 +346,21 @@ export default function ContractorPortal() {
     return 'mixed'
   }, [rateCards, member])
 
+  useEffect(() => {
+    fetch('/api/contractor-auth/me').then(async response => {
+      if (!response.ok) { window.location.replace('/contractor-portal'); return }
+      const data = await response.json()
+      if (data.contractor?.email) { setEmail(data.contractor.email); await lookupEmail(data.contractor.email) }
+    }).catch(() => window.location.replace('/contractor-portal'))
+  }, [])
+
   // ============ LOOKUP EMAIL ============
-  const lookupEmail = async () => {
-    if (!email.trim()) { setError('Please enter your email'); return }
+  const lookupEmail = async (verifiedEmail?: string | unknown) => {
+    const lookupValue = typeof verifiedEmail === 'string' ? verifiedEmail : email
+    if (!lookupValue.trim()) { setError('Please enter your email'); return }
     setLoading(true); setError(null)
     try {
-      const { data: md, error: me } = await supabase.from('team_members').select('id, name, email, cost_type, cost_amount, company_id').eq('email', email.trim().toLowerCase()).eq('status', 'active').single()
+      const { data: md, error: me } = await supabase.from('team_members').select('id, name, email, cost_type, cost_amount, company_id').eq('email', lookupValue.trim().toLowerCase()).eq('status', 'active').single()
       if (me || !md) { setError('Email not found. Contact your administrator.'); setLoading(false); return }
 
       const { data: rcData } = await supabase.from('bill_rates').select('team_member_id, client_id, rate, cost_type, cost_amount').eq('team_member_id', md.id).eq('is_active', true)
@@ -408,7 +420,7 @@ export default function ContractorPortal() {
       const { data: expData } = await supabase.from('contractor_expenses').select('*').eq('team_member_id', md.id).order('date', { ascending: false }).limit(50)
       setExpenses(expData || [])
 
-      const { data: invData } = await supabase.from('contractor_invoices').select('*, contractor_invoice_lines(*)').eq('team_member_id', md.id).order('invoice_date', { ascending: false }).limit(20)
+      const { data: invData } = await invoiceStore.from('contractor_invoices').select('*, contractor_invoice_lines(*)').eq('team_member_id', md.id).order('invoice_date', { ascending: false }).limit(20)
       setInvoices(invData || [])
 
       setStep('portal')
@@ -575,7 +587,7 @@ export default function ContractorPortal() {
       let receiptUrl: string | null = null
       if (invoiceFile) receiptUrl = await uploadFile(invoiceFile, 'invoices', member.id)
 
-      const { data: inv, error: ie } = await supabase.from('contractor_invoices').insert({
+      const { data: inv, error: ie } = await invoiceStore.from('contractor_invoices').insert({
         team_member_id: member.id, invoice_number: invoiceForm.invoice_number,
         invoice_date: new Date().toISOString().split('T')[0], due_date: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
         period_start: billingMonth.start, period_end: billingMonth.end,
@@ -593,7 +605,8 @@ export default function ContractorPortal() {
           amount: totalHours > 0 ? (l.hours || 0) / totalHours * enteredAmount : 0,
           allocation_pct: l.allocation_pct
         }))
-        await supabase.from('contractor_invoice_lines').insert(lines)
+        const savedLines = await invoiceStore.from('contractor_invoice_lines').insert(lines)
+        if (savedLines.error) throw new Error('Invoice created, but allocations could not be saved. Contact your administrator before submitting again.')
       }
 
       // Notify — fire and forget, don't block UI
@@ -603,7 +616,7 @@ export default function ContractorPortal() {
         body: JSON.stringify({ type: 'invoice', id: inv.id, status: 'submitted' })
       }).catch(err => console.warn('Invoice notification failed:', err))
       setShowInvoiceForm(false); setInvoiceForm({ invoice_number: '', payment_terms: 'NET30', notes: '', client_id: 'all', amount: '' }); setInvoiceFile(null); setInvoiceDistribution([])
-      const { data: invData } = await supabase.from('contractor_invoices').select('*, contractor_invoice_lines(*)').eq('team_member_id', member.id).order('invoice_date', { ascending: false }).limit(20)
+      const { data: invData } = await invoiceStore.from('contractor_invoices').select('*, contractor_invoice_lines(*)').eq('team_member_id', member.id).order('invoice_date', { ascending: false }).limit(20)
       setInvoices(invData || [])
     } catch (err: any) { setError(err.message || 'Failed to submit invoice') } finally { setSubmittingInvoice(false) }
   }
@@ -613,8 +626,8 @@ export default function ContractorPortal() {
     if (!confirm('Delete this invoice? This cannot be undone.')) return
     setError(null)
     try {
-      await supabase.from('contractor_invoice_lines').delete().eq('invoice_id', id)
-      await supabase.from('contractor_invoices').delete().eq('id', id)
+      const deleted = await invoiceStore.from('contractor_invoices').delete().eq('id', id)
+      if (deleted.error) throw new Error(deleted.error.message)
       setInvoices(prev => prev.filter(inv => inv.id !== id))
     } catch (err: any) { setError(err.message || 'Failed to delete') }
   }
@@ -629,7 +642,7 @@ export default function ContractorPortal() {
       try {
         const { data: timeData } = await supabase.from('time_entries').select('id, project_id, hours, billable_hours, description, date, created_at').eq('contractor_id', member.id).gte('date', historyRange.start).lte('date', historyRange.end).order('date', { ascending: false })
         const { data: expData } = await supabase.from('contractor_expenses').select('*').eq('team_member_id', member.id).neq('status', 'rejected').gte('date', historyRange.start).lte('date', historyRange.end).order('date', { ascending: false })
-        const { data: invData } = await supabase.from('contractor_invoices').select('*, contractor_invoice_lines(*)').eq('team_member_id', member.id).lte('period_start', historyRange.end).gte('period_end', historyRange.start).order('invoice_date', { ascending: false })
+        const { data: invData } = await invoiceStore.from('contractor_invoices').select('*, contractor_invoice_lines(*)').eq('team_member_id', member.id).lte('period_start', historyRange.end).gte('period_end', historyRange.start).order('invoice_date', { ascending: false })
         setHistoryTime(timeData || []); setHistoryExpenses(expData || []); setHistoryInvoices(invData || [])
       } catch (err) { console.error('History load error:', err) }
       finally { setHistoryLoading(false) }
@@ -708,7 +721,7 @@ export default function ContractorPortal() {
       try {
         const { data: timeData } = await supabase.from('time_entries').select('id, project_id, hours, billable_hours, date').eq('contractor_id', member.id).gte('date', analyticsRange.start).lte('date', analyticsRange.end).order('date', { ascending: true })
         const { data: expData } = await supabase.from('contractor_expenses').select('id, date, category, amount, status, client_id').eq('team_member_id', member.id).gte('date', analyticsRange.start).lte('date', analyticsRange.end).order('date', { ascending: true })
-        const { data: invData } = await supabase.from('contractor_invoices').select('id, invoice_date, total_amount, status, period_start, period_end, contractor_invoice_lines(*)').eq('team_member_id', member.id).lte('period_start', analyticsRange.end).gte('period_end', analyticsRange.start).order('invoice_date', { ascending: true })
+        const { data: invData } = await invoiceStore.from('contractor_invoices').select('id, invoice_date, total_amount, status, period_start, period_end, contractor_invoice_lines(*)').eq('team_member_id', member.id).lte('period_start', analyticsRange.end).gte('period_end', analyticsRange.start).order('invoice_date', { ascending: true })
         setAnalyticsTime(timeData || []); setAnalyticsExpenses(expData || []); setAnalyticsInvoices(invData || [])
       } catch (err) { console.error('Analytics load error:', err) }
       finally { setAnalyticsLoading(false) }
