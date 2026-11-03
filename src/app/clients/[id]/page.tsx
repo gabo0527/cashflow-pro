@@ -27,6 +27,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import CommercialDocuments from '@/components/commercial/CommercialDocuments'
+import BillingPolicyEditor from '@/components/BillingPolicyEditor'
 import ClientWorkspaceHeader from '@/components/clients/ClientWorkspaceHeader'
 import ScopeContacts from '@/components/commercial/ScopeContacts'
 import { useSearchParams } from 'next/navigation'
@@ -307,6 +308,7 @@ export default function ClientDetailPage() {
 
         {tab === 'overview' && (
           <>
+            <BillingPolicyEditor clientId={clientId} />
             {/* ============ KPIs ============ */}
             <div className="ui-metrics grid grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="bg-white border border-slate-200/60 rounded-xl p-4 shadow-sm">

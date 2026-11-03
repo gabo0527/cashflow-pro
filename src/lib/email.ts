@@ -659,12 +659,13 @@ export async function sendEOMReminderEmail(data: EOMReminderEmailData) {
 }
 
 
-export async function sendMissingInvoiceReminder(data: { name: string; email: string; periodEnd: string; idempotencyKey: string }) {
+export async function sendMissingInvoiceReminder(data: { name: string; email: string; periodEnd: string; periodStart?: string; clientName?: string; idempotencyKey: string }) {
   const escape = (v: string) => v.replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]!))
   const month = new Date(`${data.periodEnd}T12:00:00Z`).toLocaleDateString('en-US',{timeZone:'UTC',month:'long',year:'numeric'})
+  const periodLabel=escape(`${data.clientName ? data.clientName+' · ' : ''}${data.periodStart || data.periodEnd} – ${data.periodEnd}`)
   const content = `<p style="color:#374151;line-height:1.7">Hi ${escape(data.name.split(' ')[0] || data.name)},</p>
     <h2 style="color:#111827">Your ${month} invoice is still needed</h2>
-    <p style="color:#374151;line-height:1.7">Our records do not show a submitted invoice covering ${month}. Monthly invoices are due on the last day of the month, and the three-business-day grace period has now passed.</p>
+    <p style="color:#374151;line-height:1.7">Our records do not show a submitted invoice covering ${periodLabel}. The billing period has closed, and the three-business-day grace period has now passed.</p>
     <p style="color:#374151;line-height:1.7">Please submit your invoice through Vantage so we can review it and prepare payment. If you did not provide services for this period, or already emailed your invoice, please reply so we can update our records.</p>
     ${ctaButton('Submit your invoice', `${APP_URL}/contractor-portal`)}`
   try {

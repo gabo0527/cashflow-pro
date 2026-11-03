@@ -44,8 +44,10 @@ export function thirdBusinessDayAfterMonth(periodEnd: string, holidays: string[]
 export function isOutstanding(invoice: { status: string }) {
   return ['submitted', 'pending', 'approved', 'scheduled'].includes(invoice.status)
 }
-export function payableBucket(invoice: { status: string; due_date?: string | null }, today = localToday()) {
+export function payableBucket(invoice: { status: string; due_date?: string | null; payment_basis?: string; client_payment_received_on?: string | null }, today = localToday()) {
   if (!isOutstanding(invoice)) return 'closed'
+  if(invoice.payment_basis==='client_payment' && !invoice.client_payment_received_on) return 'awaiting_client_payment'
+  if(invoice.payment_basis==='client_payment' && !invoice.due_date) return 'ready_to_schedule'
   if (!invoice.due_date) return 'missing_due_date'
   if (invoice.due_date < today) return 'overdue'
   const inSeven = new Date(`${today}T12:00:00Z`)

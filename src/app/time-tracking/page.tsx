@@ -2,6 +2,9 @@
 
 import PageHeader from '@/components/workspace/PageHeader'
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useBillingPolicies } from '@/hooks/useBillingPolicies'
+import { billingPolicy, billingPeriod, invoiceDueDate, lastClosedBillingPeriod } from '@/lib/billing-periods'
+import { localToday } from '@/lib/payables'
 import { 
   Search, Filter, Download, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
   Clock, Plus, Edit2, X, Check, Trash2, Calendar, Users, DollarSign,
@@ -280,7 +283,7 @@ function marginBadgeClass(pct: number): string {
 }
 
 // ============ CONSTANTS ============
-type DatePreset = 'this_week' | 'last_week' | 'mtd' | 'last_month' | 'qtd' | 'ytd' | 'custom'
+type DatePreset = 'billing_cycle' | 'this_week' | 'last_week' | 'mtd' | 'last_month' | 'qtd' | 'ytd' | 'custom'
 
 const DATE_PRESETS: { id: DatePreset; label: string }[] = [
   { id: 'this_week', label: 'This Week' },
@@ -688,11 +691,24 @@ function EditableDateCell({ date, onSave }: { date: string; onSave: (newDate: st
   )
 }
 
+// Load all dated entries; Supabase caps individual responses, including exports.
+async function loadTimeEntries(companyId: string) {
+  const data: any[]=[]
+  for(let offset=0;offset<50000;offset+=500) {
+    const page=await supabase.from('time_entries').select('*').eq('company_id',companyId).order('date',{ascending:false}).order('id').range(offset,offset+499)
+    if(page.error) throw new Error('Time entries could not be loaded completely. Please refresh.')
+    data.push(...(page.data || []))
+    if(!page.data || page.data.length<500) return {data,error:null}
+  }
+  throw new Error('Time history is too large to load completely. Contact your administrator.')
+}
+
 // ============ MAIN PAGE ============
 export default function TimeTrackingPage() {
   const [showResourceReport, setShowResourceReport] = useState(false)
   const [loading, setLoading] = useState(true)
   const [entries, setEntries] = useState<TimeEntry[]>([])
+  const [entryLoadError,setEntryLoadError]=useState('')
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [projectTerms, setProjectTerms] = useState<any[]>([])
@@ -701,6 +717,9 @@ export default function TimeTrackingPage() {
   const [billRates, setBillRates] = useState<any[]>([])
   const [companyId, setCompanyId] = useState<string | null>(null)
 
+  const {policies:billingPolicies,loading:billingLoading,error:billingError}=useBillingPolicies()
+  const [billingClosingMonth,setBillingClosingMonth]=useState(lastClosedBillingPeriod(localToday()).closingMonth)
+  const [statementInvoiceDate,setStatementInvoiceDate]=useState(localToday())
   const [datePreset, setDatePreset] = useState<DatePreset>('mtd')
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
@@ -738,7 +757,11 @@ export default function TimeTrackingPage() {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
   }, [])
 
-  const dateRange = useMemo(() => getDateRange(datePreset, customStartDate, customEndDate), [datePreset, customStartDate, customEndDate])
+  const billingClientId=selectedClient!=='all'?selectedClient:projects.find(p=>p.id===selectedProject)?.client_id || ''
+  const selectedBillingPolicy=billingPolicy(billingPolicies,billingClientId,selectedProject==='all'?null:selectedProject)
+  const cycleReady=!!billingClientId && !billingLoading && !billingError && (selectedProject!=='all' || !billingPolicies.some(p=>p.client_id===billingClientId && !!p.project_id))
+  const dateRange = useMemo(() => datePreset==='billing_cycle' && cycleReady ? billingPeriod(billingClosingMonth,selectedBillingPolicy.cycle_start_day) : getDateRange(datePreset==='billing_cycle'?'mtd':datePreset, customStartDate, customEndDate), [datePreset, customStartDate, customEndDate,cycleReady,billingClosingMonth,selectedBillingPolicy.cycle_start_day])
+  useEffect(()=>{if(datePreset==='billing_cycle' && !cycleReady) setDatePreset('mtd')},[datePreset,cycleReady])
   const priorPeriod = useMemo(() => getPriorPeriodRange(dateRange.start, dateRange.end), [dateRange])
   const priorMonthLabel = useMemo(() => new Date(priorPeriod.start + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }), [priorPeriod])
 
@@ -769,7 +792,7 @@ export default function TimeTrackingPage() {
           supabase.from('team_members').select('*').eq('company_id', profile.company_id),
           supabase.from('projects').select('*').eq('company_id', profile.company_id),
           supabase.from('clients').select('*').eq('company_id', profile.company_id),
-          supabase.from('time_entries').select('*').eq('company_id', profile.company_id).order('date', { ascending: false }),
+          loadTimeEntries(profile.company_id),
           supabase.from('team_project_assignments').select('*').eq('company_id', profile.company_id),
           supabase.from('bill_rates').select('*').eq('company_id', profile.company_id),
           supabase.from('project_terms').select('*').eq('company_id', profile.company_id),
@@ -864,7 +887,7 @@ export default function TimeTrackingPage() {
         setBillRates(billRatesRes.data || [])
         setEntries(transformedEntries)
         if (clientRes.data && clientRes.data.length > 0) setExpandedClients(new Set([clientRes.data[0].id]))
-      } catch (error) { console.error('Error loading data:', error) }
+      } catch (error) { console.error('Error loading data:', error);setEntryLoadError(error instanceof Error?error.message:'Time entries could not be loaded completely.') }
       finally { setLoading(false) }
     }
     loadData()
@@ -1632,7 +1655,7 @@ ${parts.join('')}
     })
 
     if (selScopes.length === 0) parts.push(`<p style="color:#94a3b8;font-size:12px;padding:20px 0">Select at least one scope to preview.</p>`)
-    return `<div class="stmt"><div class="head"><div>${MANO_LOGO}<div class="co">Mano CG LLC · Billing Statement</div></div><div class="meta">Client · <b>${esc(clientLabel)}</b><br>Period · <b>${formatDate(dateRange.start)} – ${formatDate(dateRange.end)}</b><br>Generated · ${generatedOn}</div></div><div class="title">Billing Statement</div><div class="title-sub">Billable hours by scope · reviewed before invoicing</div>${parts.join('')}<div class="grand"><span class="l">Total</span><span><span class="hrs">${grandHrs.toFixed(1)} hrs</span><span class="r">${fmt(grandAmt)}</span></span></div><div class="foot"><span>Mano CG LLC · vantagefp.co</span><span>Generated ${generatedOn}</span></div></div>`
+    return `<div class="stmt"><div class="head"><div>${MANO_LOGO}<div class="co">Mano CG LLC · Billing Statement</div></div><div class="meta">Client · <b>${esc(clientLabel)}</b><br>Period · <b>${formatDate(dateRange.start)} – ${formatDate(dateRange.end)}</b><br>Generated · ${generatedOn}</div></div><div class="title">Billing Statement</div><div class="title-sub">Billable hours by scope · reviewed before invoicing</div>${cycleReady?`<p style="margin-bottom:16px;font-size:12px">Client invoice date · ${esc(statementInvoiceDate)} · Net ${selectedBillingPolicy.net_days} from invoice date · Payment due ${invoiceDueDate(statementInvoiceDate,selectedBillingPolicy.net_days)}</p>`:""}${parts.join('')}<div class="grand"><span class="l">Total</span><span><span class="hrs">${grandHrs.toFixed(1)} hrs</span><span class="r">${fmt(grandAmt)}</span></span></div><div class="foot"><span>Mano CG LLC · vantagefp.co</span><span>Generated ${generatedOn}</span></div></div>`
   }
 
   const generateBillingStatement = () => {
@@ -1654,6 +1677,7 @@ ${parts.join('')}
   }
 
   if (loading) return <div className="flex items-center justify-center h-64"><RefreshCw className="w-6 h-6 text-blue-500 animate-spin" /></div>
+  if(entryLoadError) return <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-700">{entryLoadError}<button onClick={()=>window.location.reload()} className="block underline mt-3">Reload time tracking</button></div>
 
   return (
     <div className="space-y-5">
@@ -1689,7 +1713,7 @@ ${parts.join('')}
           {/* Date */}
           <div className="relative">
             <button onClick={() => setShowDatePicker(!showDatePicker)} className="flex items-center gap-2 px-3.5 py-2 bg-white border border-gray-200 hover:border-blue-300 rounded-xl text-sm font-medium text-gray-900 transition-colors">
-              <Calendar size={14} className="text-blue-600" />{DATE_PRESETS.find(p => p.id === datePreset)?.label}<ChevronDown size={14} className="text-gray-400" />
+              <Calendar size={14} className="text-blue-600" />{datePreset==='billing_cycle'?'Client billing period':DATE_PRESETS.find(p => p.id === datePreset)?.label}<ChevronDown size={14} className="text-gray-400" />
             </button>
             {showDatePicker && (
               <div className={`absolute top-full right-0 mt-2 w-56 p-2 bg-white border ${THEME.border} rounded-xl shadow-lg z-[100]`}>
@@ -1709,6 +1733,8 @@ ${parts.join('')}
               </div>
             )}
           </div>
+          <button disabled={!cycleReady} title="Choose a client, or one project if billing settings vary by project" onClick={()=>{setDatePreset('billing_cycle');setBillingClosingMonth(lastClosedBillingPeriod(localToday(),selectedBillingPolicy.cycle_start_day).closingMonth)}} className="px-3 py-2 border border-gray-200 rounded-xl text-sm disabled:opacity-40">Client billing period</button>
+          {datePreset==='billing_cycle' && <label className="text-xs text-gray-500">Period ending in<input aria-label="Billing closing month" type="month" value={billingClosingMonth} onChange={e=>e.target.value && setBillingClosingMonth(e.target.value)} className="block border rounded p-1" /></label>}
           {/* Pill selects */}
           <div className="relative">
             <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className={`appearance-none pl-3.5 pr-8 py-2 bg-white border rounded-xl text-sm hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-colors cursor-pointer ${selectedClient !== 'all' ? 'border-blue-400 text-gray-900' : 'border-gray-200 text-gray-700'}`}>
@@ -1726,6 +1752,8 @@ ${parts.join('')}
         <span className={`block mt-2 px-1 text-xs ${THEME.textMuted} tabular-nums`}>{formatDate(dateRange.start)} — {formatDate(dateRange.end)} · {selectedEmployeeIds===null?'All employees':`${selectedEmployeeIds.length} employees`} · {selectedProjectIds===null?'All projects':`${selectedProjectIds.length} projects`}</span>
       </div>
 
+      {billingError && <p role="alert" className="text-sm text-red-700">{billingError}</p>}
+      {cycleReady && <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 rounded-xl border border-slate-200 bg-white p-3"><span>Billing cycle: {selectedBillingPolicy.cycle_start_day===26?'26th–25th':'Calendar month'} · Client terms: Net {selectedBillingPolicy.net_days} from invoice date.</span><label>Client invoice date <input type="date" value={statementInvoiceDate} onChange={e=>e.target.value && setStatementInvoiceDate(e.target.value)} className="border rounded p-1" /></label><span>Client payment due: {invoiceDueDate(statementInvoiceDate,selectedBillingPolicy.net_days)}</span></div>}
       {/* KPI Cards — 3 operational metrics */}
       <div className="ui-metrics grid grid-cols-3 gap-3 relative z-10">
         <KPICard title="Actual Hours" value={kpis.totalActualHours} format="hours" trend={kpis.hoursTrend} trendLabel="vs prior" icon={<Clock size={15} />} accentColor="#2563eb" />

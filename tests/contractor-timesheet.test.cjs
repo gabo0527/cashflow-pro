@@ -13,7 +13,7 @@ function loadTS(file, mocks = {}) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React, esModuleInterop: true },
   }).outputText
   const module = { exports: {} }
-  const requireMock = name => Object.hasOwn(mocks, name) ? mocks[name] : name === '@/lib/invoice-client' ? loadTS('src/lib/invoice-client.ts') : name === '@/components/workspace/PageHeader' ? {__esModule:true,default:loadTS('src/components/workspace/PageHeader.tsx').default} : require(name)
+  const requireMock = name => Object.hasOwn(mocks, name) ? mocks[name] : name === '@/lib/billing-periods' ? loadTS('src/lib/billing-periods.ts') : name === '@/lib/payables' ? loadTS('src/lib/payables.ts') : name === '@/hooks/useBillingPolicies' ? {useBillingPolicies:()=>({policies:[],loading:false,error:''})} : name === '@/lib/invoice-client' ? loadTS('src/lib/invoice-client.ts') : name === '@/components/workspace/PageHeader' ? {__esModule:true,default:loadTS('src/components/workspace/PageHeader.tsx').default} : require(name)
   vm.runInThisContext(`(function(require,module,exports){${source}\n})`, { filename })(requireMock, module, module.exports)
   return module.exports
 }
@@ -222,6 +222,12 @@ test('real portal opens only the selected project/day, closes on Enter, and expa
     assert.equal(save().props.disabled, false)
     await act(async () => { hours()[0].props.onFocus() })
     assert.equal(notes()[0].props.value, 'Monday work')
+    await act(async()=>renderer.root.findAllByType('button').find(b=>b.findAllByType('span').some(s=>s.children.includes('Invoices'))).props.onClick())
+    await act(async()=>renderer.root.findAllByType('button').find(b=>b.children.some(c=>typeof c==='string' && c.includes('New invoice'))).props.onClick())
+    const clientSelect=renderer.root.findAllByType('select').find(s=>s.findAllByType('option').some(o=>o.props.value==='client-one'))
+    await act(async()=>clientSelect.props.onChange({target:{value:'client-one'}}))
+    assert.match(JSON.stringify(renderer.toJSON()),/One client per invoice/)
+    assert.ok(renderer.root.findAllByType('input').some(i=>i.props.type==='date'))
   } finally {
     if (renderer) act(() => renderer.unmount())
     global.fetch = originalFetch
@@ -253,7 +259,7 @@ test('actual Time Tracking Detailed view displays the correct daily descriptions
   }
   const supabase = { from(table) {
     const builder = { then(resolve) { return Promise.resolve({ data: fixture[table] || [], error: null }).then(resolve) } }
-    for (const method of ['select', 'eq', 'order', 'single']) builder[method] = () => builder
+    for (const method of ['select', 'eq', 'order', 'single', 'range']) builder[method] = () => builder
     return builder
   } }
   const icons = new Proxy({ __esModule: true }, { get: (target, name) => name === '__esModule' ? true : () => null })
@@ -297,7 +303,7 @@ test('contractor timesheet APIs reach their own session checks without an admin-
     '@supabase/auth-helpers-nextjs': { createMiddlewareClient() { adminChecks++; throw new Error('Should not check admin session for contractor APIs') } },
     '@/lib/admin-allowlist': { isAdminEmail: () => false },
   })
-  for (const pathname of ['/api/contractor-timesheets', '/api/timesheet-drafts']) {
+  for (const pathname of ['/api/contractor-timesheets', '/api/timesheet-drafts', '/api/billing-policies']) {
     const response = await middleware({ nextUrl: { pathname } })
     assert.equal(response.headers.get('x-middleware-next'), '1')
     assert.equal(response.headers.get('location'), null)

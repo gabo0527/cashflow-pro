@@ -31,6 +31,7 @@ const PUBLIC_PATHS = [
   '/api/contractor-timesheets',
   '/api/timesheet-drafts',
   '/api/contractor-invoices',
+  '/api/billing-policies',
   '/timesheet',
   '/favicon.ico',
   '/_next',
