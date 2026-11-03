@@ -9,6 +9,7 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react'
 import { X, ArrowLeft, Clock, Users, BarChart3, Edit2, AlertTriangle, Layers, Plus, Trash2, FileText } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import ScopeContacts from '@/components/commercial/ScopeContacts'
+import BillingPolicyEditor from '@/components/BillingPolicyEditor'
 import CommercialTerms from '@/components/commercial/CommercialTerms'
 import Link from 'next/link'
 import {
@@ -305,7 +306,7 @@ export default function ProjectDetailView({
 
           {/* ============ CONTRACT TERMS ============ */}
           {activeTab === 'terms' && (
-            <CommercialTerms project={project} phases={phases} onChanged={loadTerms} />
+            <div className="space-y-4">{project.client_id && <BillingPolicyEditor clientId={project.client_id} projectId={project.id} />}<CommercialTerms project={project} phases={phases} onChanged={loadTerms} /></div>
           )}
 
           {activeTab === 'contacts' && (project.client_id ? <ScopeContacts clientId={project.client_id} projects={[project]} scopeId={project.id} /> : <p className="text-slate-500 text-sm">Attach this scope to a client to manage its contacts.</p>)}

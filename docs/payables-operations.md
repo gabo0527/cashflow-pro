@@ -20,10 +20,10 @@ are excluded from missing-invoice flags, obligation creation and automatic
 reminders, including previously stored pending obligations. The outstanding
 payment queue still includes real unpaid invoices from all months.
 
-Active contractors whose start date precedes month-end are expected to submit an
-invoice. Employees are excluded. A non-draft, non-rejected invoice overlapping the
-month counts as received. This is a person/month check, not a check that every
-client allocation has been invoiced. Monthly exceptions require an admin's reason.
+Active contractors with work assignments in the billing period are expected to
+submit an invoice per client/project scope. Employees are excluded. Received
+invoices must cover that scope and its full period. Exceptions require an
+admin's reason. Unassigned contractors have one calendar-month obligation.
 
 Daily Vercel cron: `/api/cron/invoice-followups` at 14:00 UTC / 10:00 AST.
 The endpoint fails closed without `CRON_SECRET`. It requires the deployment's
@@ -48,11 +48,8 @@ derive the contractor and company from the signed session, never supplied IDs.
 
 1. Apply the additive `payables_operations_history_and_followups` migration.
 2. Deploy the authenticated invoice endpoint and both portal callsite updates.
-3. Apply `supabase/payables_access.sql` after verifying the deployment. It removes
-   permissive legacy invoice policies, leaving only the two verified admins able
-   to access invoice tables directly. Contractors use the scoped server endpoint.
-4. Test RLS as both admins and an unrelated account, plus status-history rollback
-   tests. Verify cron authorization without sending test mail to contractors.
+3. Invoice-table RLS tightening was declined; leave the existing policies alone.
+4. Verify cron authorization without sending test mail to contractors.
 
 This change hardens contractor invoice access. Other legacy tables, including
 timesheet and team-profile data, retain permissive policies that need a separate
@@ -64,3 +61,37 @@ tests/commercial-workspace.test.cjs tests/commercial-ui.test.cjs
 tests/workspace-interface.test.cjs`, TypeScript, Next production build, database
 rollback assertions, and a visual check of the actual component rendered with
 test data.
+
+## Independent billing cycle and client terms
+
+NovaInSite and Skanska use periods ending on the 25th (starting on the previous
+month's 26th), with client Net 45 from the actual client invoice date. Client
+settings and project overrides expose the cycle and net days separately. Changing
+Net 45 to Net 30 or Net 60 never changes the work-period boundaries. Project
+settings override the client default; issued invoices retain their snapshot.
+
+Time Tracking's **Client billing period** filter requires one client, or one
+project when that client has project overrides. The selected closing month drives
+entry loading, totals and exports by actual work date. Weekly time entry remains
+Monday–Sunday. The billing statement has a separate client invoice date and due
+date preview; QuickBooks-imported receivables retain their source invoice dates.
+
+Contractors select one client per invoice, and a project when overrides exist.
+Their reference hours use the configured period. Invoice issue date is explicit.
+For paid-when-paid policies, client net days do not become the contractor's
+payment deadline: the contractor payable has no due date until the administrator
+records client funds and schedules payment. The payment queue distinguishes
+**Awaiting client payment** and **Ready to schedule**. Record the client receipt
+in the invoice editor; scheduling or marking paid requires it.
+
+Follow-up obligations now use `contractor_billing_obligations`, scoped to each
+contractor/client (or project override) and closing month. Old obligations are
+retained; calendar-month exceptions and sent-reminder states are carried forward
+to avoid duplicate reminders. A received invoice must cover the full cycle and
+matching client/project. Only periods closing October 31, 2026 onward qualify;
+the custom cycle closing October 25 is excluded. No reminder is generated before
+its period closes, and the three-business-day grace follows that actual close.
+No emails are sent as part of deployment verification.
+
+The earlier invoice-table RLS tightening was declined and has not been applied.
+This deployment does not retry it or change those existing invoice policies.

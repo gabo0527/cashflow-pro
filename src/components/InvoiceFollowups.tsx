@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { INVOICE_FOLLOWUP_START_MONTH, previousBillingMonth, statusTimestamp } from '@/lib/payables'
+import { INVOICE_FOLLOWUP_START_MONTH, previousBillingMonth, statusTimestamp, localToday } from '@/lib/payables'
 
 export default function InvoiceFollowups({ request }: { request: (url: string, init?: RequestInit) => Promise<Response> }) {
   const [month,setMonth] = useState(previousBillingMonth().start.slice(0,7))
@@ -37,20 +37,20 @@ export default function InvoiceFollowups({ request }: { request: (url: string, i
     <div className="flex flex-wrap items-center justify-between gap-3">
       <button onClick={()=>setOpen(!open)} aria-expanded={open} className="text-left">
         <span className="text-sm font-semibold text-slate-900">Missing invoices <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">{loading ? '…' : missing.length}</span></span>
-        <span className="block text-xs text-slate-500 mt-1">From October 2026 · due at month-end · reminders after the third business day</span>
+        <span className="block text-xs text-slate-500 mt-1">Periods closing October 31, 2026 onward · reminders after three business days</span>
       </button>
       <div className="flex items-center gap-2">
-        <input aria-label="Invoice submission month" type="month" min={INVOICE_FOLLOWUP_START_MONTH.slice(0,7)} max={previousBillingMonth().start.slice(0,7)} value={month} onChange={e=>e.target.value >= INVOICE_FOLLOWUP_START_MONTH.slice(0,7) && setMonth(e.target.value)} className="rounded-lg border border-gray-200 bg-white p-2 text-sm" />
+        <input aria-label="Invoice submission month" type="month" min={INVOICE_FOLLOWUP_START_MONTH.slice(0,7)} max={localToday().slice(0,7)} value={month} onChange={e=>e.target.value >= INVOICE_FOLLOWUP_START_MONTH.slice(0,7) && setMonth(e.target.value)} className="rounded-lg border border-gray-200 bg-white p-2 text-sm" />
         <button onClick={()=>load()} disabled={loading} className="text-xs font-medium text-blue-700 disabled:opacity-50">Refresh</button>
         <button onClick={()=>setOpen(!open)} className="text-xs font-medium text-blue-700">{open?'Hide':'Review'}</button>
       </div>
     </div>
     {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
     {open && <div className="mt-4 space-y-2">
-      <p className="text-xs text-slate-500">Business days: Monday–Friday, excluding observed U.S. federal holidays and configured company holidays. A submitted invoice overlapping the billing month counts as received; this queue does not verify every client allocation.</p>
+      <p className="text-xs text-slate-500">Business days: Monday–Friday, excluding observed U.S. federal holidays and configured company holidays. Each client or project follows its billing cycle. Only closed periods appear; an invoice must cover that period and scope to count as received.</p>
       {!loading && !missing.length && <p className="text-sm text-emerald-700">No missing invoices for this month.</p>}
       {rows.filter(r=>!r.received).map(row=><div key={row.id} className="flex flex-wrap justify-between items-center gap-3 rounded-lg border border-gray-200 bg-white p-3">
-        <div><p className="text-sm font-medium text-slate-900">{row.name}</p><p className="text-xs text-slate-500">{row.email || 'Email missing'} · Grace through {row.grace_through}</p></div>
+        <div><p className="text-sm font-medium text-slate-900">{row.name}</p><p className="text-xs text-slate-500">{row.client_name} · {row.period_start} – {row.period_end} · {row.email || 'Email missing'} · Grace through {row.grace_through}</p></div>
         <div className="flex flex-wrap items-center gap-3">
           <span title={row.reminded_at ? `Reminder accepted by email provider: ${statusTimestamp(row.reminded_at)}` : row.error || row.exemption_note || undefined} className={`rounded-full px-2 py-1 text-xs font-medium ${!row.required?'bg-gray-100 text-gray-600':row.reminder_state==='failed' || row.reminder_state==='sending'?'bg-red-50 text-red-700':'bg-amber-100 text-amber-800'}`}>
             {!row.required ? 'Not required' : row.reminder_state==='sent' ? 'Reminder sent' : row.reminder_state==='failed' ? 'Email failed — review' : row.reminder_state==='sending' ? 'Delivery needs review' : row.overdue ? 'Missing · reminder pending' : 'Awaiting invoice · grace period'}

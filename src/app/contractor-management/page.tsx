@@ -1,4 +1,6 @@
 'use client'
+import { useBillingPolicies } from '@/hooks/useBillingPolicies'
+import { contractorPaymentLabel, invoiceDueDate, billingPolicy, lastClosedBillingPeriod } from '@/lib/billing-periods'
 import { createInvoiceStore } from '@/lib/invoice-client'
 
 import InvoiceFollowups from '@/components/InvoiceFollowups'
@@ -34,7 +36,7 @@ const invoiceStore = createInvoiceStore(supabase, false)
 
 interface ContractorInvoice {
   id: string; team_member_id: string; invoice_number: string; invoice_date: string
-  due_date: string; period_start: string; period_end: string; total_amount: number
+  payment_basis?: string; client_payment_received_on?: string | null; client_payment_note?: string | null; due_date: string; period_start: string; period_end: string; total_amount: number
   status: string; payment_terms: string; receipt_url: string | null; notes: string | null
   submitted_at: string; reviewed_at: string | null; paid_at: string | null
   client_id?: string | null
@@ -349,7 +351,7 @@ export default function ContractorManagement() {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
-  const [invoiceView, setInvoiceView] = useState<'outstanding' | 'overdue' | 'due_soon' | 'history'>('outstanding')
+  const [invoiceView, setInvoiceView] = useState<'outstanding' | 'overdue' | 'due_soon' | 'awaiting_client_payment' | 'ready_to_schedule' | 'history'>('outstanding')
   const [statusEvents, setStatusEvents] = useState<any[]>([])
   const [invoiceError, setInvoiceError] = useState('')
   const readStatusEvents = async () => {
@@ -427,7 +429,9 @@ export default function ContractorManagement() {
   // submission email the contractor would get from their own portal entry.
   const emptyAdd = { team_member_id: '', client_id: '', project_id: '', invoice_number: '', period_start: '', period_end: '', date: new Date().toLocaleDateString('en-CA'), category: 'mixed', description: '', amount: '', payment_terms: 'Net 30', notes: '', is_billable: true, file: null as File | null }
   const [addModal, setAddModal] = useState<'invoice' | 'expense' | null>(null)
+  const {policies:billingPolicies,loading:billingLoading,error:billingError}=useBillingPolicies()
   const [addForm, setAddForm] = useState(emptyAdd)
+  const addInvoicePolicy=billingPolicy(billingPolicies,addForm.client_id,addForm.project_id)
   const [addSaving, setAddSaving] = useState(false)
   const openAdd = (kind: 'invoice' | 'expense') => { setAddForm(emptyAdd); setAddModal(kind) }
 
@@ -449,15 +453,13 @@ export default function ContractorManagement() {
     }
     setAddSaving(true)
     try {
+      if(billingLoading || billingError) throw new Error(billingError || 'Wait for billing settings to load.')
       const receiptUrl = await uploadAddFile('inv')
-      const termDays = parseInt((addForm.payment_terms.match(/\d+/) || ['30'])[0], 10)
-      const [y, m, d] = addForm.period_end.split('-').map(Number)
-      const due = new Date(y, m - 1, d); due.setDate(due.getDate() + termDays)
-      const dueIso = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}-${String(due.getDate()).padStart(2, '0')}`
+      const dueIso = invoiceDueDate(addForm.date, parseInt(addForm.payment_terms.match(/\d+/)?.[0] || '30',10))
       const amount = Math.round(parseFloat(addForm.amount) * 100) / 100
       const { data: inv, error } = await invoiceStore.from('contractor_invoices').insert({
         team_member_id: addForm.team_member_id, invoice_number: addForm.invoice_number,
-        invoice_date: addForm.period_end, due_date: dueIso,
+        invoice_date: addForm.date, due_date: dueIso, billing_project_id: addForm.project_id || null,
         period_start: addForm.period_start, period_end: addForm.period_end,
         total_amount: amount, payment_terms: addForm.payment_terms,
         receipt_url: receiptUrl, notes: addForm.notes || null, status: 'submitted',
@@ -581,6 +583,7 @@ export default function ContractorManagement() {
     if (invoiceView !== 'history') r = r.filter(isOutstanding)
     if (invoiceView === 'overdue') r = r.filter(inv => payableBucket(inv) === 'overdue')
     if (invoiceView === 'due_soon') r = r.filter(inv => payableBucket(inv) === 'due_soon')
+    if (invoiceView === 'awaiting_client_payment' || invoiceView === 'ready_to_schedule') r = r.filter(inv=>payableBucket(inv)===invoiceView)
     if (searchQuery) { const q = searchQuery.toLowerCase(); r = r.filter(inv => inv.invoice_number.toLowerCase().includes(q) || (memberMap[inv.team_member_id] || '').toLowerCase().includes(q)) }
     if (filterStatus !== 'all') r = r.filter(inv => filterStatus === 'pending' ? ['submitted', 'pending'].includes(inv.status) : inv.status === filterStatus)
     if (filterMember !== 'all') r = r.filter(inv => inv.team_member_id === filterMember)
@@ -828,6 +831,9 @@ export default function ContractorManagement() {
       period_start: inv.period_start,
       period_end: inv.period_end,
       notes: inv.notes || '',
+      invoice_date: inv.invoice_date || '',
+      client_payment_received_on: inv.client_payment_received_on || '',
+      client_payment_note: inv.client_payment_note || '',
       due_date: inv.due_date || '',
       payment_terms: inv.payment_terms || '',
       client_id: inv.client_id || '',
@@ -853,6 +859,8 @@ export default function ContractorManagement() {
     setSaving(true)
     const updates = {
       invoice_number: editForm.invoice_number,
+      invoice_date: editForm.invoice_date,
+      ...(editInvoice.payment_basis==='client_payment' ? {client_payment_received_on:editForm.client_payment_received_on || null,client_payment_note:editForm.client_payment_note || null}:{}),
       total_amount: Number(editForm.total_amount),
       period_start: editForm.period_start,
       period_end: editForm.period_end,
@@ -1056,7 +1064,7 @@ export default function ContractorManagement() {
                 </div>
               </div>
               <span className="text-gray-600 text-sm truncate">{memberMap[inv.team_member_id] || '—'}</span>
-              <div className="text-xs vN"><span className={`block font-semibold ${bucket === 'overdue' ? 'text-red-700' : bucket === 'due_soon' ? 'text-amber-700' : 'text-gray-600'}`}>{inv.due_date ? fmtDate(inv.due_date) : 'Due date needed'}</span><span className="block text-[10px] text-gray-400">{bucket === 'overdue' ? 'Overdue · ' : bucket === 'due_soon' ? 'Due in 7 days · ' : ''}{fmtDateS(inv.period_start)}–{fmtDateS(inv.period_end)}</span></div>
+              <div className="text-xs vN"><span className={`block font-semibold ${bucket === 'overdue' ? 'text-red-700' : bucket === 'due_soon' ? 'text-amber-700' : 'text-gray-600'}`}>{contractorPaymentLabel(inv) || (inv.due_date ? fmtDate(inv.due_date) : 'Due date needed')}{inv.payment_basis==='client_payment' && inv.due_date && <span className="block text-xs">{fmtDate(inv.due_date)}</span>}</span><span className="block text-[10px] text-gray-400">{bucket === 'overdue' ? 'Overdue · ' : bucket === 'due_soon' ? 'Due in 7 days · ' : ''}{fmtDateS(inv.period_start)}–{fmtDateS(inv.period_end)}</span></div>
               <span className="text-gray-900 text-sm font-medium text-right vN">{fmt$(inv.total_amount)}</span>
               <div title={historyText}><StatusDropdown status={inv.status} onChange={s => {
                 if (s === 'rejected') { setRejectModal({ id: inv.id, type: 'invoice', label: inv.invoice_number }); setRejectNotes('') }
@@ -1222,7 +1230,7 @@ export default function ContractorManagement() {
           {invoiceError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{invoiceError}</p>}
           <InvoiceFollowups request={authedFetch} />
           <div className="flex flex-wrap gap-2" aria-label="Invoice queue">
-            {([{id:'outstanding',label:'All outstanding'},{id:'overdue',label:'Overdue'},{id:'due_soon',label:'Due in 7 days'},{id:'history',label:'Invoice history'}] as const).map(view => <button key={view.id} onClick={() => {setInvoiceView(view.id);setFilterStatus('all')}} aria-pressed={invoiceView===view.id} className={`rounded-lg border px-4 py-2 text-sm font-medium ${invoiceView===view.id ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-gray-200 text-gray-600'}`}>{view.label}</button>)}
+            {([{id:'outstanding',label:'All outstanding'},{id:'overdue',label:'Overdue'},{id:'due_soon',label:'Due in 7 days'},{id:'awaiting_client_payment',label:'Awaiting client payment'},{id:'ready_to_schedule',label:'Ready to schedule'},{id:'history',label:'Invoice history'}] as const).map(view => <button key={view.id} onClick={() => {setInvoiceView(view.id);setFilterStatus('all')}} aria-pressed={invoiceView===view.id} className={`rounded-lg border px-4 py-2 text-sm font-medium ${invoiceView===view.id ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-gray-200 text-gray-600'}`}>{view.label}</button>)}
           </div>
           <p className="text-xs text-slate-500">{invoiceView === 'history' ? 'Review invoices by billing period, including paid and rejected invoices.' : 'All billing months · unpaid invoices stay visible until paid or rejected · earliest due dates first'}</p>
           <div className="flex justify-end">
@@ -1584,6 +1592,8 @@ export default function ContractorManagement() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2 grid grid-cols-2 gap-4">
+                  <label className="text-xs text-gray-500">Invoice date<input type="date" value={editForm.invoice_date || ''} onChange={e=>setEditForm(f=>({...f,invoice_date:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label>
+                  {editInvoice.payment_basis==='client_payment' && <><label className="text-xs text-gray-500">Client payment received on<input type="date" value={editForm.client_payment_received_on || ''} onChange={e=>setEditForm(f=>({...f,client_payment_received_on:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label><label className="text-xs text-gray-500">Client payment reference<input value={editForm.client_payment_note || ''} onChange={e=>setEditForm(f=>({...f,client_payment_note:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label></>}
                   <label className="text-xs text-gray-500">Payment due date<input type="date" value={editForm.due_date || ''} onChange={e=>setEditForm(f=>({...f,due_date:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label>
                   <label className="text-xs text-gray-500">Payment terms<input value={editForm.payment_terms || ''} onChange={e=>setEditForm(f=>({...f,payment_terms:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label>
                 </div>
@@ -2140,18 +2150,19 @@ export default function ContractorManagement() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Client (optional)</label>
-                      <select value={addForm.client_id} onChange={e => setAddForm(f => ({ ...f, client_id: e.target.value, project_id: '' }))} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30">
+                      <select value={addForm.client_id} onChange={e => { const clientId=e.target.value;const period=lastClosedBillingPeriod(new Date().toLocaleDateString('en-CA'),billingPolicy(billingPolicies,clientId).cycle_start_day);setAddForm(f => ({ ...f, client_id: clientId, project_id: '',period_start:period.start,period_end:period.end })) }} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30">
                         <option value="">—</option>
                         {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Payment Terms</label>
-                      <select value={addForm.payment_terms} onChange={e => setAddForm(f => ({ ...f, payment_terms: e.target.value }))} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Contractor Payment Terms</label>
+                      <label className="block text-xs text-gray-500 mb-2">Invoice date<input type="date" value={addForm.date} onChange={e=>setAddForm(f=>({...f,date:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label>{addInvoicePolicy.contractor_payment_basis==='client_payment' && <p className="text-xs text-amber-700 mb-2">After client payment; schedule manually. Client terms are separately Net {addInvoicePolicy.net_days}.</p>}<select disabled={addInvoicePolicy.contractor_payment_basis==='client_payment'} value={addForm.payment_terms} onChange={e => setAddForm(f => ({ ...f, payment_terms: e.target.value }))} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30">
                         <option>Net 15</option><option>Net 30</option><option>Net 45</option><option>Net 60</option>
                       </select>
                     </div>
                   </div>
+                  <div><label className="block text-xs font-medium text-gray-500 mb-1">Project (optional)</label><select value={addForm.project_id} onChange={e=>{const projectId=e.target.value;const period=lastClosedBillingPeriod(new Date().toLocaleDateString('en-CA'),billingPolicy(billingPolicies,addForm.client_id,projectId).cycle_start_day);setAddForm(f=>({...f,project_id:projectId,period_start:period.start,period_end:period.end}))}} className="w-full border border-gray-200 rounded-lg p-2 text-sm"><option value="">All client projects</option>{projects.filter(p=>p.client_id===addForm.client_id).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><p className="text-xs text-gray-500 mt-1">Default cycle: {addInvoicePolicy.cycle_start_day===26?'26th–25th':'Calendar month'}. For an existing invoice, transcribe its original dates above.</p>{billingError && <p role="alert" className="text-red-700 text-xs">{billingError}</p>}</div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
                     <input value={addForm.notes} onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))} placeholder="e.g. received via email Jul 26" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />

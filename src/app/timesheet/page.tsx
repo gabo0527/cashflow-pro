@@ -9,6 +9,9 @@ import {
   ArrowRight, CircleDot, Briefcase, Timer, CreditCard, Hash, History,
   LayoutDashboard, TrendingUp, Menu
 } from 'lucide-react'
+import { useBillingPolicies } from '@/hooks/useBillingPolicies'
+import { billingPolicy, billingPeriod, lastClosedBillingPeriod, invoiceDueDate } from '@/lib/billing-periods'
+import { localToday } from '@/lib/payables'
 import { createClient } from '@supabase/supabase-js'
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart } from 'recharts'
 
@@ -271,7 +274,10 @@ export default function ContractorPortal() {
   // Invoices
   const [invoices, setInvoices] = useState<ContractorInvoice[]>([])
   const [showInvoiceForm, setShowInvoiceForm] = useState(false)
-  const [invoiceMonth, setInvoiceMonth] = useState(new Date())
+  const { policies: billingPolicies, loading: billingLoading, error: billingError } = useBillingPolicies(true, !!member)
+  const [invoiceProject, setInvoiceProject] = useState('')
+  const [invoiceIssuedOn, setInvoiceIssuedOn] = useState(localToday())
+  const [invoiceMonth, setInvoiceMonth] = useState(new Date(lastClosedBillingPeriod(localToday()).end + 'T12:00:00'))
   const [invoiceForm, setInvoiceForm] = useState({ invoice_number: '', payment_terms: 'NET30', notes: '', client_id: 'all', amount: '' })
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null)
   const [invoiceDistribution, setInvoiceDistribution] = useState<InvoiceLine[]>([])
@@ -301,7 +307,10 @@ export default function ContractorPortal() {
   const [invoiceChartMode, setInvoiceChartMode] = useState<'total' | 'byClient'>('total')
 
   const week = useMemo(() => getWeekRange(weekDate), [weekDate])
-  const billingMonth = useMemo(() => getMonthRange(invoiceMonth), [invoiceMonth])
+  const invoicePolicy = billingPolicy(billingPolicies, invoiceForm.client_id, invoiceProject)
+  const billingMonth = useMemo(() => billingPeriod(`${invoiceMonth.getFullYear()}-${String(invoiceMonth.getMonth()+1).padStart(2,'0')}`, invoicePolicy.cycle_start_day), [invoiceMonth, invoicePolicy.cycle_start_day])
+  const chooseInvoiceClient = (clientId: string) => { setInvoiceForm(p=>({...p,client_id:clientId,amount:''})); setInvoiceProject(''); const policy=billingPolicy(billingPolicies,clientId); setInvoiceMonth(new Date(lastClosedBillingPeriod(localToday(),policy.cycle_start_day).end+'T12:00:00')) }
+  const needsInvoiceProject = billingPolicies.some(p=>p.client_id===invoiceForm.client_id && !!p.project_id)
 
   const assignmentsByClient = useMemo(() => {
     const grouped: Record<string, { clientName: string; projects: Assignment[] }> = {}
@@ -569,11 +578,11 @@ export default function ContractorPortal() {
     })
 
     if (invoiceForm.client_id && invoiceForm.client_id !== 'all') {
-      setInvoiceDistribution(lines.filter(l => l.client_id === invoiceForm.client_id))
+      const selected=lines.filter(l => l.client_id === invoiceForm.client_id && (!invoiceProject || l.project_id===invoiceProject)); const selectedHours=selected.reduce((sum,l)=>sum+(l.hours || 0),0); setInvoiceDistribution(selected.map(l=>({...l,allocation_pct:selectedHours>0?Math.round((l.hours || 0)/selectedHours*100):0})))
     } else {
       setInvoiceDistribution(lines)
     }
-  }, [member, assignments, billingMonth.start, billingMonth.end, invoiceForm.client_id])
+  }, [member, assignments, billingMonth.start, billingMonth.end, invoiceForm.client_id, invoiceProject])
 
   useEffect(() => { if (showInvoiceForm) calculateDistribution() }, [showInvoiceForm, calculateDistribution])
 
@@ -581,6 +590,8 @@ export default function ContractorPortal() {
   const submitInvoice = async () => {
     if (!member) return; setSubmittingInvoice(true); setError(null)
     try {
+      if (billingLoading || billingError) throw new Error(billingError || 'Wait for billing settings to load.')
+      if (!invoiceForm.client_id || invoiceForm.client_id==='all' || needsInvoiceProject && !invoiceProject) throw new Error('Choose the client and project for this invoice.')
       const enteredAmount = parseFloat(invoiceForm.amount || '0')
       if (enteredAmount <= 0) { setError('Please enter a valid amount'); setSubmittingInvoice(false); return }
 
@@ -589,8 +600,8 @@ export default function ContractorPortal() {
 
       const { data: inv, error: ie } = await invoiceStore.from('contractor_invoices').insert({
         team_member_id: member.id, invoice_number: invoiceForm.invoice_number,
-        invoice_date: new Date().toISOString().split('T')[0], due_date: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-        period_start: billingMonth.start, period_end: billingMonth.end,
+        invoice_date: invoiceIssuedOn, due_date: invoicePolicy.contractor_payment_basis==='client_payment' ? null : invoiceDueDate(invoiceIssuedOn, Number(invoiceForm.payment_terms.match(/\d+/)?.[0] || 30)),
+        period_start: billingMonth.start, period_end: billingMonth.end, billing_project_id: invoiceProject || null,
         total_amount: enteredAmount, payment_terms: invoiceForm.payment_terms, receipt_url: receiptUrl, notes: invoiceForm.notes || null, status: 'submitted',
         client_id: invoiceForm.client_id && invoiceForm.client_id !== 'all' ? invoiceForm.client_id : null
       }).select().single()
@@ -1180,8 +1191,8 @@ export default function ContractorPortal() {
             {!showInvoiceForm && (
               <button onClick={() => { 
                 const defaultClient = contractorType === 'pure_ls' ? 'all' : ''
-                const defaultAmount = contractorType === 'pure_ls' && member?.cost_amount ? String(member.cost_amount) : ''
-                setInvoiceForm(p => ({ ...p, client_id: defaultClient, amount: defaultAmount }))
+                const defaultAmount = ''
+                setInvoiceForm(p => ({ ...p, client_id: defaultClient, amount: defaultAmount })); setInvoiceProject(''); setInvoiceIssuedOn(localToday())
                 setShowInvoiceForm(true) 
               }} className={`w-full ${T.btnPrimary} py-3 rounded-xl text-[15px]`}>
                 <Plus size={15} /> New Invoice
@@ -1205,21 +1216,15 @@ export default function ContractorPortal() {
                       <input type="text" placeholder="INV-2026-001" value={invoiceForm.invoice_number} onChange={e => setInvoiceForm(p => ({ ...p, invoice_number: e.target.value }))} className={`${T.input} pl-9`} />
                     </div>
                   </div>
-                  {contractorType === 'pure_ls' ? (
-                    <div>
-                      <label className={T.label}>Invoice For</label>
-                      <div className={`${T.input} bg-gray-100 text-gray-500 cursor-default`}>All Clients (distributed by effort)</div>
-                    </div>
-                  ) : (
-                    <div>
-                      <label className={T.label}>Invoice For</label>
-                      <select value={invoiceForm.client_id} onChange={e => setInvoiceForm(p => ({ ...p, client_id: e.target.value }))} className={T.select}>
-                        <option value="">Select a client</option>
-                        {Object.entries(assignmentsByClient).map(([cid, { clientName }]) => <option key={cid} value={cid}>{clientName}</option>)}
-                      </select>
-                      {contractorType === 'mixed' && <p className="text-[11px] text-gray-400 mt-1.5">Submit a separate invoice for each client.</p>}
-                    </div>
-                  )}
+                  <div>
+                    <label className={T.label}>Invoice For</label>
+                    <select value={invoiceForm.client_id} onChange={e => chooseInvoiceClient(e.target.value)} className={T.select}>
+                      <option value="all">Select a client</option>
+                      {Object.entries(assignmentsByClient).map(([cid, { clientName }]) => <option key={cid} value={cid}>{clientName}</option>)}
+                    </select>
+                    <p className="text-[11px] text-gray-400 mt-1.5">One client per invoice. Enter the amount for this client and period.</p>
+                    {needsInvoiceProject && <select aria-label="Invoice project" value={invoiceProject} onChange={e=>{const projectId=e.target.value;setInvoiceProject(projectId);setInvoiceMonth(new Date(lastClosedBillingPeriod(localToday(),billingPolicy(billingPolicies,invoiceForm.client_id,projectId).cycle_start_day).end+'T12:00:00'))}} className={T.select}><option value="">Select a project</option>{assignments.filter(a=>a.client_id===invoiceForm.client_id).map(a=><option key={a.project_id} value={a.project_id}>{a.project_name}</option>)}</select>}
+                  </div>
                 </div>
 
                 {/* Row 2 */}
@@ -1227,9 +1232,9 @@ export default function ContractorPortal() {
                   <div>
                     <label className={T.label}>Billing Period</label>
                     <div className="inline-flex items-center gap-0 bg-white border border-gray-200 rounded-xl overflow-hidden w-full shadow-sm">
-                      <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() - 1); setInvoiceMonth(d) }} className="p-2.5 text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-all duration-200 border-r border-gray-200"><ChevronLeft size={14} /></button>
+                      <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() - 1,1); setInvoiceMonth(d) }} className="p-2.5 text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-all duration-200 border-r border-gray-200"><ChevronLeft size={14} /></button>
                       <span className="text-gray-900 text-sm font-medium flex-1 text-center py-2">{billingMonth.label}</span>
-                      <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() + 1); setInvoiceMonth(d) }} className="p-2.5 text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-all duration-200 border-l border-gray-200"><ChevronRight size={14} /></button>
+                      <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() + 1,1); setInvoiceMonth(d) }} className="p-2.5 text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-all duration-200 border-l border-gray-200"><ChevronRight size={14} /></button>
                     </div>
                   </div>
                   <div>
@@ -1241,6 +1246,11 @@ export default function ContractorPortal() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <label className={T.label}>Invoice date<input type="date" value={invoiceIssuedOn} onChange={e=>setInvoiceIssuedOn(e.target.value)} className={T.input}/></label>
+                  <div className="text-xs text-gray-500">{invoicePolicy.contractor_payment_basis==='client_payment'?'Payment after client funds are received; your administrator schedules payout.':`Contractor terms: ${invoiceForm.payment_terms} from invoice date.`}<span className="block mt-1">Client terms: Net {invoicePolicy.net_days} from the client invoice date.</span></div>
+                </div>
+                {billingError && <p role="alert" className="text-sm text-red-700">{billingError}</p>}
                 {/* Distribution Reference */}
                 {invoiceDistribution.length > 0 ? (
                   <div className="mb-4">
@@ -1269,7 +1279,7 @@ export default function ContractorPortal() {
                       </table>
                     </div>
                   </div>
-                ) : (contractorType !== 'pure_ls' && !invoiceForm.client_id) ? (
+                ) : (!invoiceForm.client_id || invoiceForm.client_id==='all' || needsInvoiceProject && !invoiceProject) || billingLoading || !!billingError ? (
                   <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-xl text-center text-gray-400 text-sm">Select a client above to see your timesheet hours.</div>
                 ) : null}
 
@@ -1283,7 +1293,7 @@ export default function ContractorPortal() {
                   <textarea rows={2} placeholder="Any additional notes..." value={invoiceForm.notes} onChange={e => setInvoiceForm(p => ({ ...p, notes: e.target.value }))} className={`${T.input} resize-none`} />
                 </div>
 
-                <button onClick={submitInvoice} disabled={submittingInvoice || !invoiceForm.invoice_number || parseFloat(invoiceForm.amount || '0') <= 0 || (contractorType !== 'pure_ls' && !invoiceForm.client_id)} className={`w-full ${T.btnPrimary} py-3`}>
+                <button onClick={submitInvoice} disabled={submittingInvoice || !invoiceForm.invoice_number || parseFloat(invoiceForm.amount || '0') <= 0 || (!invoiceForm.client_id || invoiceForm.client_id==='all' || needsInvoiceProject && !invoiceProject) || billingLoading || !!billingError} className={`w-full ${T.btnPrimary} py-3`}>
                   {submittingInvoice ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <><Send size={16} /> Submit Invoice</>}
                 </button>
               </div>
@@ -1662,7 +1672,7 @@ export default function ContractorPortal() {
                           const clientName = inv.client_id
                             ? (assignmentsByClient[inv.client_id]?.clientName || lines[0]?.description?.split(' - ')[0] || 'Unknown')
                             : (lines[0]?.description?.split(' - ')[0] || 'General')
-                          const billingMonthLabel = new Date(inv.period_start + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                          const billingMonthLabel = `${inv.period_start} – ${inv.period_end}`
                           const clientColor = inv.client_id ? (clientColorMap[inv.client_id] || '#6b7280') : '#6b7280'
                           const receiptUrl = inv.receipt_url
                             ? supabase.storage.from('contractor-uploads').getPublicUrl(inv.receipt_url).data.publicUrl

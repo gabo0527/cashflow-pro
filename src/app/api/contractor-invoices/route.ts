@@ -1,3 +1,6 @@
+import { billingPolicy, billingPeriod, invoiceDueDate } from '@/lib/billing-periods'
+import { readBillingPolicies } from '@/lib/billing-policy-server'
+import { localToday } from '@/lib/payables'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { adminContext } from '@/lib/admin-context'
@@ -5,7 +8,7 @@ import { getSupabaseAdmin, readSessionFromCookie } from '@/lib/contractor-auth'
 
 export const dynamic = 'force-dynamic'
 const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
-const invoiceFields = ['team_member_id','invoice_number','invoice_date','due_date','period_start','period_end','total_amount','payment_terms','receipt_url','notes','status','client_id','entered_by']
+const invoiceFields = ['team_member_id','invoice_number','invoice_date','due_date','period_start','period_end','total_amount','payment_terms','receipt_url','notes','status','client_id','entered_by','client_payment_received_on','client_payment_note']
 const lineFields = ['invoice_id','client_id','project_id','description','hours','rate','amount','allocation_pct']
 const fail = (error: string, status = 400) => NextResponse.json({ error }, { status })
 
@@ -56,7 +59,7 @@ export async function POST(request: Request) {
       const values: Record<string, any> = {}
       for (const field of isLine ? lineFields : invoiceFields) if (Object.hasOwn(input,field)) values[field] = input[field]
       for (const field of ['hours','rate','amount','allocation_pct','total_amount']) if (values[field] != null && (!Number.isFinite(Number(values[field])) || Number(values[field]) < 0)) throw new Error('Amounts and hours must be valid positive numbers.')
-      for (const field of ['period_start','period_end','invoice_date','due_date']) if (values[field] != null && (!/^\d{4}-\d{2}-\d{2}$/.test(values[field]) || new Date(`${values[field]}T12:00:00Z`).toISOString().slice(0,10) !== values[field])) throw new Error('Choose valid invoice dates.')
+      for (const field of ['period_start','period_end','invoice_date','due_date','client_payment_received_on']) if (values[field] != null && (!/^\d{4}-\d{2}-\d{2}$/.test(values[field]) || new Date(`${values[field]}T12:00:00Z`).toISOString().slice(0,10) !== values[field])) throw new Error('Choose valid invoice dates.')
       if (values.period_start && values.period_end && values.period_start > values.period_end) throw new Error('The billing period end must follow its start.')
       if (values.status && !['submitted','pending','approved','scheduled','paid','rejected'].includes(values.status)) throw new Error('Invalid invoice status.')
       if (memberId && isLine && !allowedInvoiceIds.includes(values.invoice_id)) throw new Error('This invoice is not available for editing.')
@@ -78,6 +81,46 @@ export async function POST(request: Request) {
         if (memberId) { values.team_member_id = memberId; values.status = 'submitted'; values.entered_by = 'contractor' }
         if (!uuid(values.team_member_id) || !String(values.invoice_number || '').trim() || !values.period_start || !values.period_end || !(Number(values.total_amount) > 0)) throw new Error('Invoice number, period, contractor and amount are required.')
       }
+      if (!isLine && body.operation === 'insert') {
+        const policies=await readBillingPolicies(service,companyId!)
+        if(memberId && !uuid(values.client_id)) throw new Error('Choose a client for this invoice.')
+        let projectId=input.billing_project_id || null
+        if(projectId && !uuid(projectId)) throw new Error('Choose a valid project.')
+        if(projectId && !memberId) { const {data:project}=await service.from('projects').select('id').eq('id',projectId).eq('company_id',companyId).eq('client_id',values.client_id).single(); if(!project) throw new Error('Choose a project for this client.') }
+        if(memberId) {
+          const {data:assignments,error}=await service.from('team_project_assignments').select('project_id').eq('team_member_id',values.team_member_id)
+          if(error) throw new Error('Project assignments could not be verified.')
+          const {data:projects,error:projectError}=await service.from('projects').select('id,client_id').eq('company_id',companyId).eq('client_id',values.client_id).in('id',(assignments || []).map(a=>a.project_id))
+          if(projectError || !projects?.length || projectId && !projects.some(p=>p.id===projectId)) throw new Error('Choose an assigned client and project.')
+          if(!projectId && policies.some(p=>p.client_id===values.client_id && p.project_id && projects.some(s=>s.id===p.project_id))) throw new Error('Choose a project because this client has project-specific billing settings.')
+        }
+        const policy=billingPolicy(policies,values.client_id,projectId)
+        if(memberId) {
+          const period=billingPeriod(values.period_end.slice(0,7),policy.cycle_start_day)
+          if(values.period_start!==period.start || values.period_end!==period.end) throw new Error('Invoice dates must match the configured billing period.')
+        }
+        values.invoice_date=values.invoice_date || localToday()
+        values.payment_basis=policy.contractor_payment_basis
+        values.billing_snapshot={...policy,project_id:projectId,captured_at:new Date().toISOString()}
+        if(policy.contractor_payment_basis==='client_payment') {
+          values.payment_terms='After client payment; schedule manually'; values.due_date=null
+          if(admin && values.client_payment_received_on) {values.client_payment_recorded_at=new Date().toISOString();values.client_payment_recorded_by=admin.user.id}
+          if(['paid','scheduled'].includes(values.status) && !values.client_payment_received_on) throw new Error('Record receipt of client payment before scheduling or marking this contractor invoice paid.')
+        }
+        else if(memberId) values.due_date=invoiceDueDate(values.invoice_date,Number(String(values.payment_terms).match(/\d+/)?.[0] || 30))
+      }
+      if(!isLine && body.operation==='update') {
+        const {data:existing,error}=await service.from('contractor_invoices').select('payment_basis,status,due_date,client_payment_received_on,client_payment_recorded_at').eq('id',id).eq('company_id',companyId).single()
+        if(error || !existing) throw new Error('Invoice not found.')
+        if(Object.hasOwn(values,'client_payment_received_on') && values.client_payment_received_on!==existing.client_payment_received_on) {
+          if(!admin) throw new Error('Only an administrator can record client payment.')
+          values.client_payment_recorded_at=values.client_payment_received_on ? new Date().toISOString() : null
+          values.client_payment_recorded_by=values.client_payment_received_on ? admin.user.id : null
+        }
+        const received=Object.hasOwn(values,'client_payment_received_on') ? values.client_payment_received_on : existing.client_payment_received_on
+        if(existing.payment_basis==='client_payment' && !received && ((Object.hasOwn(values,'due_date')?values.due_date:existing.due_date) || ['scheduled','paid'].includes(values.status || existing.status))) throw new Error('Record receipt of client payment before scheduling or marking this contractor invoice paid.')
+      }
+      if(memberId) {delete values.client_payment_received_on;delete values.client_payment_note}
       return values
     }
     let query: any

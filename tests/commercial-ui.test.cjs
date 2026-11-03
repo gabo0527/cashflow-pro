@@ -20,7 +20,7 @@ function load(file, mocks = {}) {
   vm.runInThisContext(`(function(require,module,exports){${source}\n})`, {
     filename,
   })(
-    (name) => (Object.hasOwn(mocks, name) ? mocks[name] : name === "@/components/workspace/PageHeader" ? {__esModule:true,default:load("src/components/workspace/PageHeader.tsx").default} : require(name)),
+    (name) => (Object.hasOwn(mocks, name) ? mocks[name] : name === "@/hooks/useBillingPolicies" ? {useBillingPolicies:()=>({policies:[],loading:false,error:""})} : name === "@/lib/billing-periods" ? load("src/lib/billing-periods.ts") : name === "@/lib/payables" ? load("src/lib/payables.ts") : name === "@/components/workspace/PageHeader" ? {__esModule:true,default:load("src/components/workspace/PageHeader.tsx").default} : require(name)),
     module,
     module.exports,
   );
@@ -303,7 +303,7 @@ test("time tracking combines three employees, five projects and a custom date ra
           }).then(resolve);
         },
       };
-      for (const method of ["select", "eq", "order", "single"])
+      for (const method of ["select", "eq", "order", "single", "range"])
         builder[method] = () => builder;
       return builder;
     },
@@ -318,6 +318,7 @@ test("time tracking combines three employees, five projects and a custom date ra
     { get: (target, name) => (name === "__esModule" ? true : () => null) },
   );
   const Page = load("src/app/time-tracking/page.tsx", {
+    "@/hooks/useBillingPolicies": {useBillingPolicies:()=>({policies:[{client_id:"client",project_id:null,cycle_start_day:26,net_days:45,contractor_payment_basis:"client_payment"}],loading:false,error:""})},
     "@/components/time-tracking/ResourceReportBuilder": { __esModule: true, default: () => null },
     "@supabase/supabase-js": { createClient: () => supabase },
     "@/lib/supabase": {
@@ -401,6 +402,13 @@ test("time tracking combines three employees, five projects and a custom date ra
     assert.equal(employeeSections.length, 3);
     for (const section of employeeSections)
       assert.equal(section.props.badge, "5.0 hrs");
+    const clientSelect=renderer.root.findAllByType("select").find(s=>s.findAllByType("option").some(o=>o.props.value==="client"));
+    await act(async()=>clientSelect.props.onChange({target:{value:"client"}}));
+    await act(async()=>button("Client billing period").props.onClick());
+    await act(async()=>renderer.root.findByProps({"aria-label":"Billing closing month"}).props.onChange({target:{value:"2026-10"}}));
+    assert.match(text(renderer.toJSON()),/26th–25th/);assert.match(text(renderer.toJSON()),/Net 45/);
+    assert.match(text(renderer.toJSON()),/Sep 26/);assert.match(text(renderer.toJSON()),/Oct 25/);
+
   } finally {
     await act(async () => renderer?.unmount());
     global.Date = OriginalDate;

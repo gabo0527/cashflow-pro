@@ -7,10 +7,11 @@ const ts = require('typescript')
 function load(file,mocks={}) {
   const module={exports:{}}
   const source=ts.transpileModule(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText
-  vm.runInThisContext(`(function(require,module,exports){${source}\n})`)(n=>Object.hasOwn(mocks,n)?mocks[n]:require(n),module,module.exports)
+  vm.runInThisContext(`(function(require,module,exports){${source}\n})`)(n=>Object.hasOwn(mocks,n)?mocks[n]:n==='@/hooks/useBillingPolicies'?{useBillingPolicies:()=>({policies:[],loading:false,error:''})}:['@/lib/billing-periods','./billing-periods'].includes(n)?load('src/lib/billing-periods.ts'):n==='@/lib/payables'?load('src/lib/payables.ts'):['@/lib/billing-policy-server','./billing-policy-server'].includes(n)?{readBillingPolicies:async()=>[]}:require(n),module,module.exports)
   return module.exports
 }
 const payables=load('src/lib/payables.ts')
+const billing=load('src/lib/billing-periods.ts')
 test('grace period crosses weekends, observed holidays and year boundaries',()=>{
   assert.equal(payables.thirdBusinessDayAfterMonth('2026-10-31'),'2026-11-04')
   assert.equal(payables.thirdBusinessDayAfterMonth('2026-08-31'),'2026-09-03')
@@ -81,7 +82,7 @@ test('parallel reminder runners can only claim each monthly reminder once',async
   const old=process.env.CRON_SECRET;process.env.CRON_SECRET='test-secret'
   let state='pending',sent=0
   const row={id:'obligation',name:'Alex',email:'alex@example.com',period_start:'2026-10-01',period_end:'2026-10-31',required:true,received:false,overdue:true}
-  const db={from(table){let patch,claimed=false;const q={select(){return q},gte(){return q},eq(k,v){if(k==='reminder_state'&&v==='pending')claimed=true;return q},update(p){patch=p;return q},async maybeSingle(){if(state!=='pending')return {data:null};state=patch.reminder_state;return {data:{id:row.id}}},then(resolve){if(patch){state=patch.reminder_state;resolve({error:null})}else resolve({data:table==='commercial_access'?[{company_id:'company'}]:[{period_start:'2026-09-01'}],error:null})}};return q}}
+  const db={from(table){let patch,claimed=false;const q={select(){return q},gte(){return q},eq(k,v){if(k==='reminder_state'&&v==='pending')claimed=true;return q},update(p){patch=p;return q},async maybeSingle(){if(state!=='pending')return {data:null};state=patch.reminder_state;return {data:{id:row.id}}},then(resolve){if(patch){state=patch.reminder_state;resolve({error:null})}else resolve({data:table==='commercial_access'?[{company_id:'company'}]:[{closing_month:'2026-09-01'}],error:null})}};return q}}
   const route=load('src/app/api/cron/invoice-followups/route.ts',{'next/server':next,'@/lib/contractor-auth':{getSupabaseAdmin:()=>db},'@/lib/invoice-obligations':{invoiceObligations:async(db,company,month)=>{assert.ok(month>='2026-10-01');return [{...row,reminder_state:state}]}},'@/lib/payables':payables,'@/lib/email':{sendMissingInvoiceReminder:async()=>{sent++;return {success:true,id:'email'}}}})
   try {
     const request={headers:new Headers({authorization:'Bearer test-secret'})}
