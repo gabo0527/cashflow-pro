@@ -1,4 +1,5 @@
 'use client'
+import { paymentWindow, paymentTiming, inPaymentWindow, validPaymentWindow, PaymentWindowPreset } from '@/lib/payment-planning'
 import { useBillingPolicies } from '@/hooks/useBillingPolicies'
 import { contractorPaymentLabel, invoiceDueDate, billingPolicy, lastClosedBillingPeriod } from '@/lib/billing-periods'
 import { createInvoiceStore } from '@/lib/invoice-client'
@@ -37,7 +38,7 @@ const invoiceStore = createInvoiceStore(supabase, false)
 interface ContractorInvoice {
   id: string; team_member_id: string; invoice_number: string; invoice_date: string
   payment_basis?: string; client_payment_received_on?: string | null; client_payment_note?: string | null; due_date: string; period_start: string; period_end: string; total_amount: number
-  status: string; payment_terms: string; receipt_url: string | null; notes: string | null
+  client_invoice_date?: string | null; client_net_days?: number | null; billing_snapshot?: any; status: string; payment_terms: string; receipt_url: string | null; notes: string | null
   submitted_at: string; reviewed_at: string | null; paid_at: string | null
   client_id?: string | null
   contractor_invoice_lines: InvoiceLine[]
@@ -351,7 +352,10 @@ export default function ContractorManagement() {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
-  const [invoiceView, setInvoiceView] = useState<'outstanding' | 'overdue' | 'due_soon' | 'awaiting_client_payment' | 'ready_to_schedule' | 'history'>('outstanding')
+  const [invoiceView, setInvoiceView] = useState<'window' | 'review' | 'outstanding' | 'overdue' | 'history'>('window')
+  const [paymentPreset,setPaymentPreset]=useState<PaymentWindowPreset>('month')
+  const [paymentDates,setPaymentDates]=useState(()=>paymentWindow('month'))
+  const paymentWindowValid=validPaymentWindow(paymentDates.start,paymentDates.end)
   const [statusEvents, setStatusEvents] = useState<any[]>([])
   const [invoiceError, setInvoiceError] = useState('')
   const readStatusEvents = async () => {
@@ -364,6 +368,7 @@ export default function ContractorManagement() {
     }
     return {data:null,error:{message:'Status history is too large to load.'}}
   }
+  const [paymentStage,setPaymentStage]=useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterMember, setFilterMember] = useState('all')
   const [filterClient, setFilterClient] = useState('all')
@@ -542,8 +547,8 @@ export default function ContractorManagement() {
     setRefDate(d)
   }
 
-  const hasActiveFilters = filterStatus !== 'all' || filterMember !== 'all' || filterClient !== 'all' || searchQuery !== ''
-  const clearFilters = () => { setSearchQuery(''); setFilterStatus('all'); setFilterMember('all'); setFilterClient('all') }
+  const hasActiveFilters = paymentStage!=='all' || filterStatus !== 'all' || filterMember !== 'all' || filterClient !== 'all' || searchQuery !== ''
+  const clearFilters = () => { setPaymentStage('all');setSearchQuery(''); setFilterStatus('all'); setFilterMember('all'); setFilterClient('all') }
 
   // ============ LOAD DATA ============
   useEffect(() => {
@@ -581,15 +586,17 @@ export default function ContractorManagement() {
     let r = [...invoices]
     if (invoiceView === 'history' && dateRange !== 'all') r = r.filter(inv => inv.period_start <= dateFilter.end && inv.period_end >= dateFilter.start)
     if (invoiceView !== 'history') r = r.filter(isOutstanding)
-    if (invoiceView === 'overdue') r = r.filter(inv => payableBucket(inv) === 'overdue')
-    if (invoiceView === 'due_soon') r = r.filter(inv => payableBucket(inv) === 'due_soon')
-    if (invoiceView === 'awaiting_client_payment' || invoiceView === 'ready_to_schedule') r = r.filter(inv=>payableBucket(inv)===invoiceView)
+    if (invoiceView === 'window') r = r.filter(inv=>inPaymentWindow(inv,billingPolicies,paymentDates.start,paymentDates.end))
+    if (invoiceView === 'review') r = r.filter(inv=>paymentTiming(inv,billingPolicies).needsReview)
+    if (invoiceView === 'overdue') r = r.filter(inv => {const timing=paymentTiming(inv,billingPolicies);return !!timing.latest && timing.latest<paymentDates.start && !timing.unscheduledFunds})
+    if (paymentStage === 'awaiting_client_payment') r = r.filter(inv=>{const t=paymentTiming(inv,billingPolicies);return t.conditional && !inv.client_payment_received_on && !t.mixed})
+    if (paymentStage === 'ready_to_schedule') r = r.filter(inv=>{const t=paymentTiming(inv,billingPolicies);return t.ready && !t.mixed && !!t.clientId})
     if (searchQuery) { const q = searchQuery.toLowerCase(); r = r.filter(inv => inv.invoice_number.toLowerCase().includes(q) || (memberMap[inv.team_member_id] || '').toLowerCase().includes(q)) }
     if (filterStatus !== 'all') r = r.filter(inv => filterStatus === 'pending' ? ['submitted', 'pending'].includes(inv.status) : inv.status === filterStatus)
     if (filterMember !== 'all') r = r.filter(inv => inv.team_member_id === filterMember)
     if (filterClient !== 'all') r = r.filter(inv => inv.client_id === filterClient || inv.contractor_invoice_lines?.some((l: any) => l.client_id === filterClient))
-    return r.sort((a,b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'))
-  }, [invoiceView, invoices, dateFilter, dateRange, searchQuery, filterStatus, filterMember, filterClient, memberMap])
+    return r.sort((a,b) => (paymentTiming(a,billingPolicies).date || '9999').localeCompare(paymentTiming(b,billingPolicies).date || '9999'))
+  }, [invoiceView, invoices, dateFilter, dateRange, billingPolicies, paymentDates.start, paymentDates.end, paymentStage, searchQuery, filterStatus, filterMember, filterClient, memberMap])
 
   const filteredExpenses = useMemo(() => {
     // Drafts are private to contractors until they submit a report —
@@ -644,14 +651,18 @@ export default function ContractorManagement() {
     const a = filteredInvoices.filter(i => i.status === 'approved')
     const s = filteredInvoices.filter(i => i.status === 'scheduled')
     const d = filteredInvoices.filter(i => i.status === 'paid')
+    const waiting=filteredInvoices.filter(i=>{const t=paymentTiming(i,billingPolicies);return t.conditional && !i.client_payment_received_on})
+    const ready=filteredInvoices.filter(i=>paymentTiming(i,billingPolicies).ready)
     return {
+      awaitingFundsCount:waiting.length,awaitingFundsAmt:waiting.reduce((sum,i)=>sum+i.total_amount,0),
+      readyCount:ready.length,readyAmt:ready.reduce((sum,i)=>sum+i.total_amount,0),
       total: filteredInvoices.reduce((s, i) => s + i.total_amount, 0),
       pendingCount: p.length, pendingAmt: p.reduce((s, i) => s + i.total_amount, 0),
       approvedAmt: a.reduce((s, i) => s + i.total_amount, 0), approvedCount: a.length,
       scheduledAmt: s.reduce((s2, i) => s2 + i.total_amount, 0), scheduledCount: s.length,
       paidAmt: d.reduce((s, i) => s + i.total_amount, 0),
     }
-  }, [filteredInvoices])
+  }, [filteredInvoices,billingPolicies])
 
   const expMetrics = useMemo(() => {
     const p = filteredExpenses.filter(e => e.status === 'pending')
@@ -832,6 +843,8 @@ export default function ContractorManagement() {
       period_end: inv.period_end,
       notes: inv.notes || '',
       invoice_date: inv.invoice_date || '',
+      client_invoice_date: inv.client_invoice_date || '',
+      client_net_days: inv.client_net_days ?? inv.billing_snapshot?.net_days ?? billingPolicy(billingPolicies,inv.client_id || inv.contractor_invoice_lines?.[0]?.client_id || '').net_days,
       client_payment_received_on: inv.client_payment_received_on || '',
       client_payment_note: inv.client_payment_note || '',
       due_date: inv.due_date || '',
@@ -860,7 +873,7 @@ export default function ContractorManagement() {
     const updates = {
       invoice_number: editForm.invoice_number,
       invoice_date: editForm.invoice_date,
-      ...(editInvoice.payment_basis==='client_payment' ? {client_payment_received_on:editForm.client_payment_received_on || null,client_payment_note:editForm.client_payment_note || null}:{}),
+      ...(editInvoice.payment_basis==='client_payment' ? {client_payment_received_on:editForm.client_payment_received_on || null,client_payment_note:editForm.client_payment_note || null,client_invoice_date:editForm.client_invoice_date || null,client_net_days:editForm.client_net_days}:{}),
       total_amount: Number(editForm.total_amount),
       period_start: editForm.period_start,
       period_end: editForm.period_end,
@@ -1034,12 +1047,12 @@ export default function ContractorManagement() {
   }
 
   // ============ INVOICE ROW GRID ============
-  const invGrid = 'grid-cols-[minmax(180px,1fr)_130px_110px_100px_130px_100px]'
+  const invGrid = 'grid-cols-[minmax(180px,1fr)_130px_160px_100px_130px_100px]'
 
   const renderInvoiceRows = (items: ContractorInvoice[]) => (
     <>
       <div className={`grid ${invGrid} min-w-[850px] gap-2 px-5 py-2 border-b border-gray-200 bg-gray-50`}>
-        {['Invoice', 'Contractor', 'Due / Period', 'Amount', 'Status', 'Actions'].map(h => (
+        {['Invoice', 'Contractor', 'Payment / Work period', 'Amount', 'Status', 'Actions'].map(h => (
           <span key={h} className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase ${h === 'Amount' ? 'text-right' : ''}`}>{h}</span>
         ))}
       </div>
@@ -1048,6 +1061,7 @@ export default function ContractorManagement() {
         const events = statusEvents.filter(e => e.invoice_id === inv.id)
         const historyText = events.length ? events.map(e => `${e.from_status ? `${STATUS_CFG[e.from_status]?.label || e.from_status} → ` : ''}${STATUS_CFG[e.to_status]?.label || e.to_status} · ${statusTimestamp(e.changed_at)} · ${e.actor_label}`).join('\n') : 'Status tracking begins with this update. Earlier transitions were not recorded.'
         const bucket = payableBucket(inv)
+        const timing=paymentTiming(inv,billingPolicies)
         const isExp = expandedInvoice === inv.id
         const canReject = !['paid', 'rejected'].includes(inv.status)
         const isRejected = inv.status === 'rejected'
@@ -1064,7 +1078,7 @@ export default function ContractorManagement() {
                 </div>
               </div>
               <span className="text-gray-600 text-sm truncate">{memberMap[inv.team_member_id] || '—'}</span>
-              <div className="text-xs vN"><span className={`block font-semibold ${bucket === 'overdue' ? 'text-red-700' : bucket === 'due_soon' ? 'text-amber-700' : 'text-gray-600'}`}>{contractorPaymentLabel(inv) || (inv.due_date ? fmtDate(inv.due_date) : 'Due date needed')}{inv.payment_basis==='client_payment' && inv.due_date && <span className="block text-xs">{fmtDate(inv.due_date)}</span>}</span><span className="block text-[10px] text-gray-400">{bucket === 'overdue' ? 'Overdue · ' : bucket === 'due_soon' ? 'Due in 7 days · ' : ''}{fmtDateS(inv.period_start)}–{fmtDateS(inv.period_end)}</span></div>
+              <div className="text-xs vN" title={timing.source==='estimate'?`Planning range ${timing.earliest} – ${timing.latest}. Client invoice assumed at billing month-end; actual date can be entered in Edit.`:undefined}><span className="block font-semibold text-slate-700">{timing.date?fmtDate(timing.date):'Schedule review'}</span><span className="block text-[10px] text-slate-500">{timing.source==='estimate'?`Month-end · Net ${timing.netDays} · ±5 days`:timing.source==='client_invoice'?`Client invoice · Net ${timing.netDays}`:timing.source==='payout'?'Scheduled payout':timing.source==='receipt'?'Client funds received':timing.source==='review'?'Client allocation needed':'Contractor due date'}</span>{timing.conditional && <span className="block text-[10px] text-slate-500">{inv.client_payment_received_on?(inv.due_date?'Client paid · payout scheduled':inv.status==='approved'?'Client paid · ready to schedule':'Client paid · review approval'):'Awaiting client payment'}</span>}<span className="block text-[10px] text-gray-400">Work: {fmtDateS(inv.period_start)}–{fmtDateS(inv.period_end)}</span>{timing.needsReview && <button aria-label={`Review payment schedule for ${inv.invoice_number}`} onClick={()=>openEditInvoice(inv)} title={timing.reason || `Planning range ${timing.earliest} – ${timing.latest}. Assumes client invoice at billing month-end; confirm the actual date when available.`} className="text-[10px] text-amber-700 underline">{timing.source==='estimate'?'Confirm client invoice date':'Review schedule'}</button>}</div>
               <span className="text-gray-900 text-sm font-medium text-right vN">{fmt$(inv.total_amount)}</span>
               <div title={historyText}><StatusDropdown status={inv.status} onChange={s => {
                 if (s === 'rejected') { setRejectModal({ id: inv.id, type: 'invoice', label: inv.invoice_number }); setRejectNotes('') }
@@ -1096,6 +1110,7 @@ export default function ContractorManagement() {
             {isExp && <div className="border-t border-gray-200 bg-slate-50 px-6 py-3">
               <p className="text-xs font-semibold text-slate-700 mb-2">Status history · Puerto Rico time</p>
               <p className="text-xs text-slate-500">Original submission: {statusTimestamp(inv.submitted_at)}</p>
+              {inv.billing_snapshot?.schedule_correction && <p className="text-xs text-slate-500 mt-1">Payment schedule reviewed {statusTimestamp(inv.billing_snapshot.schedule_correction.changed_at)}. Previous terms: {inv.billing_snapshot.schedule_correction.previous_terms || 'Not recorded'}; previous due date: {inv.billing_snapshot.schedule_correction.previous_due_date || 'None'}. Now follows client funds and manual payout scheduling; scheduled commitments were retained.</p>}
               {!events.length && <p className="text-xs text-slate-500 mt-1">Earlier status transitions were not recorded. New changes will appear here.</p>}
               {events.map(e => <p key={e.id} className="text-xs text-slate-600 mt-1">{e.from_status ? `${STATUS_CFG[e.from_status]?.label || e.from_status} → ` : ''}{STATUS_CFG[e.to_status]?.label || e.to_status} · {statusTimestamp(e.changed_at)} · {e.actor_label}{e.note ? ` · ${e.note}` : ''}</p>)}
             </div>}
@@ -1228,21 +1243,29 @@ export default function ContractorManagement() {
       {activeTab === 'invoices' && (
         <div className="space-y-4">
           {invoiceError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{invoiceError}</p>}
-          <InvoiceFollowups request={authedFetch} />
+
+          <section aria-label="Payment window" className="rounded-xl border border-blue-200 bg-blue-50/40 p-4">
+            <div className="flex flex-wrap items-end gap-3"><div className="flex-1 min-w-[180px]"><h2 className="text-sm font-semibold text-slate-900">What needs attention this period?</h2><p className="mt-1 text-xs text-slate-500">Client payment dates and scheduled payouts · billing month shown for context.</p></div>
+            <label className="text-xs text-slate-500">Payment window<select aria-label="Payment window preset" value={paymentPreset} onChange={e=>{const preset=e.target.value as PaymentWindowPreset;setPaymentPreset(preset);if(preset!=='custom')setPaymentDates(paymentWindow(preset));setInvoiceView('window')}} className="block rounded-lg border border-gray-200 bg-white p-2 mt-1 text-sm"><option value="month">This month</option><option value="week">This week</option><option value="month_end">Month-end / opening week</option><option value="next_30">Next 30 days</option><option value="custom">Custom dates</option></select></label>
+            <label className="text-xs text-slate-500">From<input aria-label="Payment window start" type="date" value={paymentDates.start} onChange={e=>{setPaymentPreset('custom');setPaymentDates(d=>({...d,start:e.target.value}));setInvoiceView('window')}} className="block rounded-lg border border-gray-200 bg-white p-2 mt-1 text-sm" /></label>
+            <label className="text-xs text-slate-500">Through<input aria-label="Payment window end" type="date" value={paymentDates.end} onChange={e=>{setPaymentPreset('custom');setPaymentDates(d=>({...d,end:e.target.value}));setInvoiceView('window')}} className="block rounded-lg border border-gray-200 bg-white p-2 mt-1 text-sm" /></label></div>
+            {!paymentWindowValid && <p role="alert" className="text-sm text-red-700 mt-2">Choose valid dates with the end on or after the start.</p>}
+            <p className="text-xs text-slate-500 mt-3">Expected dates use the client invoice date plus its terms. Until confirmed, the client invoice is assumed sent at billing month-end, with a ±5-day planning range. Client funds received but not yet scheduled stay visible.</p>
+          </section>
           <div className="flex flex-wrap gap-2" aria-label="Invoice queue">
-            {([{id:'outstanding',label:'All outstanding'},{id:'overdue',label:'Overdue'},{id:'due_soon',label:'Due in 7 days'},{id:'awaiting_client_payment',label:'Awaiting client payment'},{id:'ready_to_schedule',label:'Ready to schedule'},{id:'history',label:'Invoice history'}] as const).map(view => <button key={view.id} onClick={() => {setInvoiceView(view.id);setFilterStatus('all')}} aria-pressed={invoiceView===view.id} className={`rounded-lg border px-4 py-2 text-sm font-medium ${invoiceView===view.id ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-gray-200 text-gray-600'}`}>{view.label}</button>)}
+            {([{id:'window',label:'This payment window'},{id:'overdue',label:'Before this window'},{id:'review',label:'Schedule review'},{id:'outstanding',label:'All outstanding'},{id:'history',label:'Invoice history'}] as const).map(view => <button key={view.id} onClick={() => {setInvoiceView(view.id);setFilterStatus('all');setPaymentStage('all')}} aria-pressed={invoiceView===view.id} className={`rounded-lg border px-4 py-2 text-sm font-medium ${invoiceView===view.id ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-gray-200 text-gray-600'}`}>{view.label}</button>)}
           </div>
-          <p className="text-xs text-slate-500">{invoiceView === 'history' ? 'Review invoices by billing period, including paid and rejected invoices.' : 'All billing months · unpaid invoices stay visible until paid or rejected · earliest due dates first'}</p>
+          <p className="text-xs text-slate-500">{invoiceView==='window' ? `${paymentDates.start} – ${paymentDates.end} · totals below cover this payment window and available client funds; future invoices stay in All outstanding.` : invoiceView==='overdue' ? `Expected or scheduled before ${paymentDates.start}. Confirm receipt and payment records before acting on older balances.` : invoiceView==='review' ? 'Confirm missing client invoice dates and review invoices with multiple clients. Estimates do not confirm client payment.' : invoiceView === 'history' ? 'Review invoices by billing period, including paid and rejected invoices.' : 'All billing months · unpaid invoices stay visible until paid or rejected · earliest payment dates first'}</p>
           <div className="flex justify-end">
             <button onClick={() => openAdd('invoice')} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 vBtn">
               <Plus size={13} /> Add Invoice <span className="font-normal opacity-75">· on behalf of contractor</span>
             </button>
           </div>
           <div className="ui-metrics grid grid-cols-2 xl:grid-cols-4 gap-3">
-            <MetricCard label="Total AP" value={fmt$(invMetrics.total)} icon={DollarSign} accentColor="#2563eb" sub={`${filteredInvoices.length} invoices`} />
-            <MetricCard label="Pending" value={fmt$(invMetrics.pendingAmt)} icon={Clock} accentColor="#d97706" sub={`${invMetrics.pendingCount} awaiting`} highlight={invMetrics.pendingCount > 0} />
-            <MetricCard label="Approved" value={fmt$(invMetrics.approvedAmt)} icon={CheckCircle} accentColor="#3b82f6" sub={`${invMetrics.approvedCount} approved`} />
-            <MetricCard label="Scheduled" value={fmt$(invMetrics.scheduledAmt)} icon={Calendar} accentColor="#8b5cf6" sub={`${invMetrics.scheduledCount} queued`} />
+            <MetricCard label={invoiceView==='window'?'This payment window':'Selected invoices'} value={fmt$(invMetrics.total)} icon={DollarSign} accentColor="#2563eb" sub={`${filteredInvoices.length} invoices`} />
+            <MetricCard label={invoiceView==='window'?'Needs approval':'Pending'} value={fmt$(invMetrics.pendingAmt)} icon={Clock} accentColor="#d97706" sub={`${invMetrics.pendingCount} awaiting`} highlight={invMetrics.pendingCount > 0} />
+            <MetricCard label={invoiceView==='window'?'Awaiting client funds':'Approved'} value={fmt$(invoiceView==='window'?invMetrics.awaitingFundsAmt:invMetrics.approvedAmt)} icon={CheckCircle} accentColor="#3b82f6" sub={invoiceView==='window'?`${invMetrics.awaitingFundsCount} awaiting receipt`:`${invMetrics.approvedCount} approved`} />
+            <MetricCard label={invoiceView==='window'?'Ready to schedule':'Scheduled'} value={fmt$(invoiceView==='window'?invMetrics.readyAmt:invMetrics.scheduledAmt)} icon={Calendar} accentColor="#8b5cf6" sub={invoiceView==='window'?`${invMetrics.readyCount} approved; client paid`:`${invMetrics.scheduledCount} queued`} />
           </div>
 
           {invMetrics.pendingCount > 0 && (
@@ -1267,6 +1290,7 @@ export default function ContractorManagement() {
                   <input type="text" placeholder="Search invoices..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                 </div>
+                <select aria-label="Payment stage" value={paymentStage} onChange={e=>setPaymentStage(e.target.value)} className={selClass(paymentStage!=='all')}><option value="all">All payment stages</option><option value="awaiting_client_payment">Awaiting client funds</option><option value="ready_to_schedule">Ready to schedule</option></select>
                 <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={selClass(filterStatus !== 'all')}>
                   <option value="all">All Statuses</option>
                   <option value="pending">Pending</option><option value="approved">Approved</option>
@@ -1323,6 +1347,7 @@ export default function ContractorManagement() {
               <p className="text-xs text-gray-400 mt-1">Invoices appear here when contractors submit them through the Contractor Portal</p>
             </div>
           )}
+          <details className="rounded-xl border border-slate-200 bg-white p-4"><summary className="cursor-pointer text-sm font-medium text-slate-600">Invoice submission follow-ups · separate from payment dates</summary><div className="mt-3"><InvoiceFollowups request={authedFetch} /></div></details>
         </div>
       )}
 
@@ -1593,7 +1618,7 @@ export default function ContractorManagement() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2 grid grid-cols-2 gap-4">
                   <label className="text-xs text-gray-500">Invoice date<input type="date" value={editForm.invoice_date || ''} onChange={e=>setEditForm(f=>({...f,invoice_date:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label>
-                  {editInvoice.payment_basis==='client_payment' && <><label className="text-xs text-gray-500">Client payment received on<input type="date" value={editForm.client_payment_received_on || ''} onChange={e=>setEditForm(f=>({...f,client_payment_received_on:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label><label className="text-xs text-gray-500">Client payment reference<input value={editForm.client_payment_note || ''} onChange={e=>setEditForm(f=>({...f,client_payment_note:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label></>}
+                  {editInvoice.payment_basis==='client_payment' && <><label className="text-xs text-gray-500">Client invoice date (confirm actual date)<input type="date" value={editForm.client_invoice_date || ''} onChange={e=>setEditForm(f=>({...f,client_invoice_date:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label><label className="text-xs text-gray-500">Client payment terms · net days<input type="number" min={0} max={365} value={editForm.client_net_days ?? ''} onChange={e=>setEditForm(f=>({...f,client_net_days:Number(e.target.value)}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label><label className="text-xs text-gray-500">Client payment received on<input type="date" value={editForm.client_payment_received_on || ''} onChange={e=>setEditForm(f=>({...f,client_payment_received_on:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label><label className="text-xs text-gray-500">Client payment reference<input value={editForm.client_payment_note || ''} onChange={e=>setEditForm(f=>({...f,client_payment_note:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label></>}
                   <label className="text-xs text-gray-500">Payment due date<input type="date" value={editForm.due_date || ''} onChange={e=>setEditForm(f=>({...f,due_date:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label>
                   <label className="text-xs text-gray-500">Payment terms<input value={editForm.payment_terms || ''} onChange={e=>setEditForm(f=>({...f,payment_terms:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label>
                 </div>

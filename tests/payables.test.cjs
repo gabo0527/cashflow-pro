@@ -7,7 +7,7 @@ const ts = require('typescript')
 function load(file,mocks={}) {
   const module={exports:{}}
   const source=ts.transpileModule(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText
-  vm.runInThisContext(`(function(require,module,exports){${source}\n})`)(n=>Object.hasOwn(mocks,n)?mocks[n]:n==='@/hooks/useBillingPolicies'?{useBillingPolicies:()=>({policies:[],loading:false,error:''})}:['@/lib/billing-periods','./billing-periods'].includes(n)?load('src/lib/billing-periods.ts'):n==='@/lib/payables'?load('src/lib/payables.ts'):['@/lib/billing-policy-server','./billing-policy-server'].includes(n)?{readBillingPolicies:async()=>[]}:require(n),module,module.exports)
+  vm.runInThisContext(`(function(require,module,exports){${source}\n})`)(n=>Object.hasOwn(mocks,n)?mocks[n]:n==='@/lib/payment-planning'?load('src/lib/payment-planning.ts',{'./billing-periods':load('src/lib/billing-periods.ts'),'./payables':load('src/lib/payables.ts')}):n==='@/hooks/useBillingPolicies'?{useBillingPolicies:()=>({policies:[],loading:false,error:''})}:['@/lib/billing-periods','./billing-periods'].includes(n)?load('src/lib/billing-periods.ts'):n==='@/lib/payables'?load('src/lib/payables.ts'):['@/lib/billing-policy-server','./billing-policy-server'].includes(n)?{readBillingPolicies:async()=>[]}:require(n),module,module.exports)
   return module.exports
 }
 const payables=load('src/lib/payables.ts')
@@ -91,12 +91,13 @@ test('parallel reminder runners can only claim each monthly reminder once',async
     await route.GET(request);assert.equal(sent,1)
   } finally {if(old===undefined)delete process.env.CRON_SECRET;else process.env.CRON_SECRET=old}
 })
-test('real payables screen keeps old approved/scheduled invoices visible and exposes the actor history',async()=>{
+test('real payables screen focuses on its payment window and keeps older invoices in explicit views',async()=>{
   const React=require('react'),{create,act}=require('react-test-renderer')
   const today=payables.localToday(),month=today.slice(0,7),previous=payables.previousBillingMonth(today)
-  const base={team_member_id:'shannon',total_amount:1000,payment_terms:'NET30',submitted_at:'2026-09-22T20:00:47Z',contractor_invoice_lines:[],period_start:previous.start,period_end:previous.end,due_date:previous.end}
-  const rows=[{...base,id:'old-approved',invoice_number:'OLD-APPROVED',status:'approved'},{...base,id:'old-scheduled',invoice_number:'OLD-SCHEDULED',status:'scheduled'},{...base,id:'paid',invoice_number:'PAID-CURRENT',status:'paid',period_start:`${month}-01`,period_end:today}]
-  const fixture={team_members:[{id:'shannon',name:'Shannon Rybecky',email:'shannon@example.test'}],clients:[],projects:[],contractor_expenses:[],contractor_invoice_status_events:[{id:'history',invoice_id:'old-approved',from_status:'pending',to_status:'approved',changed_at:'2026-11-03T15:00:00Z',actor_label:'kathia@manocg.com'}]}
+  const base={client_id:'overhead',invoice_date:previous.end,team_member_id:'shannon',total_amount:1000,payment_terms:'NET30',submitted_at:'2026-09-22T20:00:47Z',contractor_invoice_lines:[],period_start:previous.start,period_end:previous.end,due_date:previous.end}
+  const nextMonth=new Date(today+'T12:00:00Z');nextMonth.setUTCMonth(nextMonth.getUTCMonth()+2,1)
+  const rows=[{...base,id:'current',invoice_number:'DUE-THIS-WINDOW',status:'approved',due_date:today},{...base,id:'future',invoice_number:'FUTURE-PAYMENT',status:'pending',due_date:nextMonth.toISOString().slice(0,10)},{...base,id:'old-approved',invoice_number:'OLD-APPROVED',status:'approved'},{...base,id:'old-scheduled',invoice_number:'OLD-SCHEDULED',status:'scheduled'},{...base,id:'paid',invoice_number:'PAID-CURRENT',status:'paid',period_start:`${month}-01`,period_end:today}]
+  const fixture={team_members:[{id:'shannon',name:'Shannon Rybecky',email:'shannon@example.test'}],clients:[{id:'overhead',name:'Mano CG'}],projects:[],contractor_expenses:[],contractor_invoice_status_events:[{id:'history',invoice_id:'old-approved',from_status:'pending',to_status:'approved',changed_at:'2026-11-03T15:00:00Z',actor_label:'kathia@manocg.com'}]}
   const db={auth:{getSession:async()=>({data:{session:{access_token:'test'}}})},from(table){const q={then(resolve){resolve({data:fixture[table]||[],error:null})}};for(const k of ['select','order','eq','range'])q[k]=()=>q;return q}}
   const oldFetch=global.fetch
   global.fetch=async(url)=>({ok:true,json:async()=>url==='/api/contractor-invoices'?{data:rows}:url.startsWith('/api/invoice-followups')?{rows:[]}:{reports:[]}})
@@ -106,17 +107,21 @@ test('real payables screen keeps old approved/scheduled invoices visible and exp
   try {
     await act(async()=>{renderer=create(React.createElement(component));await new Promise(resolve=>setImmediate(resolve))})
     const text=()=>JSON.stringify(renderer.toJSON())
+    assert.match(text(),/DUE-THIS-WINDOW/);assert.doesNotMatch(text(),/FUTURE-PAYMENT/);assert.doesNotMatch(text(),/OLD-APPROVED/);assert.doesNotMatch(text(),/PAID-CURRENT/)
+    await act(async()=>renderer.root.findAllByType('button').find(n=>n.children.includes('All outstanding')).props.onClick())
     assert.match(text(),/OLD-APPROVED/);assert.match(text(),/OLD-SCHEDULED/);assert.doesNotMatch(text(),/PAID-CURRENT/)
     assert.ok(renderer.root.findAll(n=>typeof n.props.title==='string'&&n.props.title.includes('kathia@manocg.com')).length)
     await act(async()=>renderer.root.findByProps({'aria-label':'View status history for OLD-APPROVED'}).props.onClick())
     assert.match(text(),/Status history · Puerto Rico time/)
     if(process.env.PAYABLES_PREVIEW_PATH){
+      await act(async()=>renderer.root.findAllByType('button').find(n=>n.children.includes('This payment window')).props.onClick())
       const dom=require('react-dom/server')
       const element=n=>typeof n==='string'?n:n===null?null:Array.isArray(n)?n.map(element):React.createElement(n.type,Object.fromEntries(Object.entries(n.props||{}).filter(([k,v])=>typeof v!=='function')), ...(n.children||[]).map(element))
       const css=fs.readdirSync(path.join(__dirname,'../.next/static/css')).filter(n=>n.endsWith('.css')).map(n=>fs.readFileSync(path.join(__dirname,'../.next/static/css',n),'utf8')).join('\n')
       fs.writeFileSync(process.env.PAYABLES_PREVIEW_PATH,`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body class="v-app" style="background:#f4f6f8;padding:28px"><main class="workspace-page" style="max-width:1200px;min-width:0;width:100%;margin:auto">${dom.renderToStaticMarkup(element(renderer.toJSON()))}</main></body></html>`)
+      await act(async()=>renderer.root.findAllByType('button').find(n=>n.children.includes('All outstanding')).props.onClick())
     }
-    await act(async()=>renderer.root.findAllByType('button').find(n=>n.children.includes('Overdue')).props.onClick())
+    await act(async()=>renderer.root.findAllByType('button').find(n=>n.children.includes('Before this window')).props.onClick())
     assert.match(text(),/OLD-APPROVED/);assert.match(text(),/OLD-SCHEDULED/)
     await act(async()=>renderer.root.findAllByType('button').find(n=>n.children.includes('Invoice history')).props.onClick())
     assert.match(text(),/PAID-CURRENT/);assert.doesNotMatch(text(),/OLD-SCHEDULED/)
