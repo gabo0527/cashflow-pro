@@ -95,3 +95,32 @@ No emails are sent as part of deployment verification.
 
 The earlier invoice-table RLS tightening was declined and has not been applied.
 This deployment does not retry it or change those existing invoice policies.
+
+## Payment windows and corrected legacy defaults
+
+The default AP screen is the current **payment month**, using client payment
+schedule dates rather than service-month overlap. Presets include this week,
+this month, month-end/opening week, next 30 dates and custom cross-month ranges.
+Metrics and bulk approval use only the displayed selection. Prior expected dates,
+all outstanding invoices and schedule review are explicit separate views.
+Submission follow-ups live below the payment queue and have separate dates.
+
+Gabriel authorized month-end client invoice issuance as the planning assumption,
+with a ±5-day range. September GOOGL (Net 60) therefore centers on November 29;
+October Point One/CADC (Net 30) centers on November 30. October GOOGL centers on
+December 30 and stays out of the November view. Forecast ranges overlap a window
+when any date in the range intersects it. Actual client invoice dates entered by
+an admin replace this assumption and remove the issuance-date tolerance. Net days
+are frozen on each invoice and can be corrected separately from the work period.
+Forecasts never record client receipt or release a contractor payment.
+
+Existing open, single-client external invoices have been reviewed against client
+terms. Fixed deadlines generated from legacy contractor Net 30 defaults become
+conditional on client funds. Existing scheduled payout dates are preserved.
+Previous due date, terms, client, payment basis, authorization and correction time
+remain in `billing_snapshot.schedule_correction` and appear in expanded history.
+Paid/rejected records, invoice issue dates, work dates, amounts and statuses are
+preserved. Internal Mano CG overhead retains its own terms. Mixed or unidentified
+client invoices go to **Schedule review** without assigning their entire amount
+to a guessed client payment date. Received but unscheduled funds stay visible until
+payout is scheduled, even when received before the selected window.

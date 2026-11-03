@@ -76,3 +76,18 @@ test('admin cannot mark conditional invoices paid until client payment is record
  assert.equal((await route.POST(req({status:'paid',client_payment_received_on:'2026-11-30'}))).status,200)
  assert.equal(f.saved.client_payment_recorded_by,'admin');assert.ok(f.saved.client_payment_recorded_at)
 })
+
+test('confirming the client invoice date records its own actor without changing the contractor issue or work dates',async()=>{
+ const f=invoiceFixture();f.contractor_invoices=[{id:ids.invoice,company_id:'company',payment_basis:'client_payment',status:'approved',due_date:null,client_payment_received_on:null,client_invoice_date:null,client_net_days:45}]
+ const route=invoiceRoute(f,false)
+ const result=await route.POST({json:async()=>({table:'contractor_invoices',operation:'update',filters:[{op:'eq',column:'id',value:ids.invoice}],values:{client_invoice_date:'2026-11-30',client_net_days:60}})})
+ assert.equal(result.status,200);assert.equal(f.saved.client_invoice_date,'2026-11-30');assert.equal(f.saved.client_net_days,60);assert.equal(f.saved.client_schedule_confirmed_by,'admin');assert.ok(f.saved.client_schedule_confirmed_at)
+ assert.equal(f.saved.invoice_date,undefined);assert.equal(f.saved.period_start,undefined);assert.equal(f.saved.client_payment_received_on,undefined)
+})
+test('contractors cannot inject a confirmed client schedule through invoice submission',async()=>{
+ const f=invoiceFixture(),route=invoiceRoute(f)
+ const values={...newInvoice,client_invoice_date:'2026-01-01',client_net_days:0,client_payment_received_on:'2026-01-01'}
+ const result=await route.POST({json:async()=>({portal:true,table:'contractor_invoices',operation:'insert',values})})
+ assert.equal(result.status,200)
+ assert.equal(f.saved[0].client_invoice_date,undefined);assert.equal(f.saved[0].client_net_days,45);assert.equal(f.saved[0].client_payment_received_on,undefined)
+})

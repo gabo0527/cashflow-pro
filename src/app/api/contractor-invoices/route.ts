@@ -8,7 +8,7 @@ import { getSupabaseAdmin, readSessionFromCookie } from '@/lib/contractor-auth'
 
 export const dynamic = 'force-dynamic'
 const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
-const invoiceFields = ['team_member_id','invoice_number','invoice_date','due_date','period_start','period_end','total_amount','payment_terms','receipt_url','notes','status','client_id','entered_by','client_payment_received_on','client_payment_note']
+const invoiceFields = ['team_member_id','invoice_number','invoice_date','due_date','period_start','period_end','total_amount','payment_terms','receipt_url','notes','status','client_id','entered_by','client_payment_received_on','client_payment_note','client_invoice_date','client_net_days']
 const lineFields = ['invoice_id','client_id','project_id','description','hours','rate','amount','allocation_pct']
 const fail = (error: string, status = 400) => NextResponse.json({ error }, { status })
 
@@ -58,8 +58,10 @@ export async function POST(request: Request) {
       if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid invoice data.')
       const values: Record<string, any> = {}
       for (const field of isLine ? lineFields : invoiceFields) if (Object.hasOwn(input,field)) values[field] = input[field]
+      if(memberId && !isLine) for(const field of ['client_invoice_date','client_net_days','client_payment_received_on','client_payment_note']) delete values[field]
+      if(values.client_net_days!=null && (!Number.isInteger(values.client_net_days) || values.client_net_days<0 || values.client_net_days>365)) throw new Error('Client net days must be a whole number between 0 and 365.')
       for (const field of ['hours','rate','amount','allocation_pct','total_amount']) if (values[field] != null && (!Number.isFinite(Number(values[field])) || Number(values[field]) < 0)) throw new Error('Amounts and hours must be valid positive numbers.')
-      for (const field of ['period_start','period_end','invoice_date','due_date','client_payment_received_on']) if (values[field] != null && (!/^\d{4}-\d{2}-\d{2}$/.test(values[field]) || new Date(`${values[field]}T12:00:00Z`).toISOString().slice(0,10) !== values[field])) throw new Error('Choose valid invoice dates.')
+      for (const field of ['period_start','period_end','invoice_date','due_date','client_payment_received_on','client_invoice_date']) if (values[field] != null && (!/^\d{4}-\d{2}-\d{2}$/.test(values[field]) || new Date(`${values[field]}T12:00:00Z`).toISOString().slice(0,10) !== values[field])) throw new Error('Choose valid invoice dates.')
       if (values.period_start && values.period_end && values.period_start > values.period_end) throw new Error('The billing period end must follow its start.')
       if (values.status && !['submitted','pending','approved','scheduled','paid','rejected'].includes(values.status)) throw new Error('Invalid invoice status.')
       if (memberId && isLine && !allowedInvoiceIds.includes(values.invoice_id)) throw new Error('This invoice is not available for editing.')
@@ -101,6 +103,8 @@ export async function POST(request: Request) {
         }
         values.invoice_date=values.invoice_date || localToday()
         values.payment_basis=policy.contractor_payment_basis
+        values.client_net_days=values.client_net_days ?? policy.net_days
+        if(admin && values.client_invoice_date){values.client_schedule_confirmed_at=new Date().toISOString();values.client_schedule_confirmed_by=admin.user.id}
         values.billing_snapshot={...policy,project_id:projectId,captured_at:new Date().toISOString()}
         if(policy.contractor_payment_basis==='client_payment') {
           values.payment_terms='After client payment; schedule manually'; values.due_date=null
@@ -110,15 +114,25 @@ export async function POST(request: Request) {
         else if(memberId) values.due_date=invoiceDueDate(values.invoice_date,Number(String(values.payment_terms).match(/\d+/)?.[0] || 30))
       }
       if(!isLine && body.operation==='update') {
-        const {data:existing,error}=await service.from('contractor_invoices').select('payment_basis,status,due_date,client_payment_received_on,client_payment_recorded_at').eq('id',id).eq('company_id',companyId).single()
+        const {data:existing,error}=await service.from('contractor_invoices').select('payment_basis,status,due_date,client_payment_received_on,client_payment_recorded_at,client_invoice_date,client_net_days').eq('id',id).eq('company_id',companyId).single()
         if(error || !existing) throw new Error('Invoice not found.')
         if(Object.hasOwn(values,'client_payment_received_on') && values.client_payment_received_on!==existing.client_payment_received_on) {
           if(!admin) throw new Error('Only an administrator can record client payment.')
           values.client_payment_recorded_at=values.client_payment_received_on ? new Date().toISOString() : null
           values.client_payment_recorded_by=values.client_payment_received_on ? admin.user.id : null
         }
+        if(Object.hasOwn(values,'client_invoice_date') || Object.hasOwn(values,'client_net_days')) {
+          if(!admin) throw new Error('Only an administrator can confirm the client invoice schedule.')
+          const date=Object.hasOwn(values,'client_invoice_date')?values.client_invoice_date:existing.client_invoice_date
+          const days=Object.hasOwn(values,'client_net_days')?values.client_net_days:existing.client_net_days
+          if(date && (days==null || !Number.isInteger(days))) throw new Error('Confirm the client net days with its invoice date.')
+          if(date!==existing.client_invoice_date || days!==existing.client_net_days){values.client_schedule_confirmed_at=date?new Date().toISOString():null;values.client_schedule_confirmed_by=date?admin.user.id:null}
+        }
         const received=Object.hasOwn(values,'client_payment_received_on') ? values.client_payment_received_on : existing.client_payment_received_on
-        if(existing.payment_basis==='client_payment' && !received && ((Object.hasOwn(values,'due_date')?values.due_date:existing.due_date) || ['scheduled','paid'].includes(values.status || existing.status))) throw new Error('Record receipt of client payment before scheduling or marking this contractor invoice paid.')
+        const newPayoutDate=values.due_date && values.due_date!==existing.due_date
+        const releasingPayment=['scheduled','paid'].includes(values.status)
+        const removingFunds=existing.client_payment_received_on && Object.hasOwn(values,'client_payment_received_on') && !received && (existing.due_date || ['scheduled','paid'].includes(existing.status))
+        if(existing.payment_basis==='client_payment' && !received && (newPayoutDate || releasingPayment || removingFunds)) throw new Error('Record receipt of client payment before scheduling or marking this contractor invoice paid.')
       }
       if(memberId) {delete values.client_payment_received_on;delete values.client_payment_note}
       return values
