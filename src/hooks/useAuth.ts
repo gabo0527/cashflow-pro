@@ -7,6 +7,7 @@
 
 'use client'
 
+import { isAdminEmail } from '@/lib/admin-allowlist'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
@@ -78,6 +79,8 @@ export function useAuth(): UseAuthReturn {
           router.push('/login')
           return
         }
+
+        if (!isAdminEmail(user.email)) { router.replace('/contractor-portal'); return }
 
         // 2. Get profile with company_id
         const { data: profile, error: profileError } = await supabase

@@ -1,4 +1,5 @@
 // src/app/api/ai/chat/route.ts
+import { adminContext } from '@/lib/admin-context'
 import { NextRequest, NextResponse } from 'next/server'
 import { aiRequest } from '@/lib/ai-router'
 import { composeEmail } from '@/lib/email-compose'
@@ -45,8 +46,11 @@ Do NOT say you cannot execute agents. You CAN. They run automatically when the u
 
 export async function POST(request: NextRequest) {
   try {
+    const ctx = await adminContext(request)
+    if (!ctx) return NextResponse.json({error:'Not authorized'},{status:401})
     const body = await request.json()
-    const { messages, systemPrompt, dataContext, companyId } = body
+    const { messages, systemPrompt, dataContext } = body
+    const companyId = ctx.companyId
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: 'Messages array is required' }, { status: 400 })
@@ -62,7 +66,7 @@ export async function POST(request: NextRequest) {
       const host = request.headers.get('host') || 'localhost:3000'
       const baseUrl = `${protocol}://${host}`
 
-      const agentResponse = await tryAgentExecution(lastMessage, baseUrl, companyId)
+      const agentResponse = await tryAgentExecution(lastMessage, baseUrl, companyId, ctx.token)
 
       if (agentResponse) {
         const intent = detectAgentIntent(lastMessage)

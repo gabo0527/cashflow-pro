@@ -12,10 +12,10 @@ import { sendEOMReminderEmail, type EOMReminderEmailData } from "@/lib/email"
 // Verify cron secret to prevent unauthorized triggers
 function verifyCron(request: Request): boolean {
   const authHeader = request.headers.get("authorization")
-  if (authHeader === `Bearer ${process.env.CRON_SECRET}`) return true
+  if (process.env.CRON_SECRET && authHeader === `Bearer ${process.env.CRON_SECRET}`) return true
   // Also allow manual trigger from admin with API key
   const url = new URL(request.url)
-  if (url.searchParams.get("key") === process.env.CRON_SECRET) return true
+  if (process.env.CRON_SECRET && url.searchParams.get("key") === process.env.CRON_SECRET) return true
   return false
 }
 
@@ -42,7 +42,7 @@ export async function GET(request: Request) {
     const monthName = now.toLocaleDateString("en-US", { month: "long", year: "numeric" })
 
     // First day of next month = invoice due date
-    const nextMonth = new Date(targetYear, targetMonth + 1, 1)
+    const nextMonth = new Date(targetYear, targetMonth + 1, 0)
     const dueDate = nextMonth.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
 
     // Period for time entries: first and last day of target month
@@ -102,7 +102,7 @@ export async function GET(request: Request) {
           project_id,
           projects!project_id (name)
         `)
-        .eq("team_member_id", contractor.id)
+        .eq("contractor_id", contractor.id)
         .gte("date", periodStart)
         .lte("date", periodEnd)
 

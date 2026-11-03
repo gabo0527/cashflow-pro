@@ -1101,9 +1101,10 @@ export default function SageAssistantPage() {
   const callAgent = async (agent: string, action: string): Promise<AgentResult> => {
     try {
       const endpoint = `/api/agents/${agent}`
+      const { data: authData } = await supabase.auth.getSession()
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authData.session?.access_token || ''}` },
         body: JSON.stringify({ action, companyId })
       })
       if (!res.ok) throw new Error(`Agent ${agent} returned ${res.status}`)
@@ -1232,8 +1233,9 @@ AI Summary: ${d.summary || result.summary}`
         })
       }
 
+      const { data: chatAuth } = await supabase.auth.getSession()
       const response = await fetch("/api/ai/chat", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${chatAuth.session?.access_token || ''}` },
         body: JSON.stringify({ messages: newMessages.map(m => ({ role: m.role, content: m.content })), systemPrompt: SYSTEM_PROMPT, dataContext })
       })
       if (!response.ok) throw new Error("Failed to get AI response")

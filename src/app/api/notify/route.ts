@@ -5,6 +5,8 @@
 // ============================================================
 
 import { NextResponse } from "next/server"
+import { adminContext } from '@/lib/admin-context'
+import { getSupabaseAdmin, readSessionFromCookie } from '@/lib/contractor-auth'
 import {
   notifyInvoiceStatusChange,
   notifyExpenseStatusChange,
@@ -19,6 +21,15 @@ export async function POST(request: Request) {
 
     if (!type || !id || !status) {
       return NextResponse.json({ error: "Missing type, id, or status" }, { status: 400 })
+    }
+
+    const admin = await adminContext(request)
+    const session = admin ? null : await readSessionFromCookie()
+    if (!admin && !session) return NextResponse.json({error:'Sign in to continue.'},{status:401})
+    if (type === 'invoice' || type === 'expense') {
+      const db = admin?.db || getSupabaseAdmin()
+      const {data:record,error} = await db.from(type === 'invoice' ? 'contractor_invoices' : 'contractor_expenses').select('status,company_id,team_member_id').eq('id',id).single()
+      if (error || !record || record.status !== status || admin && record.company_id !== admin.companyId || session && (record.team_member_id !== session.contractorId || status !== 'submitted')) return NextResponse.json({error:'This notification is not authorized.'},{status:403})
     }
 
     let result

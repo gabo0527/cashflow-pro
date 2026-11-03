@@ -21,14 +21,14 @@ export const PERMISSION_MATRIX: Record<PermissionRole, PermissionConfig> = {
     description: 'Full access, can delete company',
     color: 'text-purple-400',
     access: ['dashboard','cash_flow','invoices','expenses','expense_management','time_tracking','team','projects','clients','reports','forecast','sage','settings'],
-    routes: ['/dashboard','/cash-flow','/invoices','/expenses','/expense-management','/time-tracking','/team','/projects','/clients','/reports','/forecast','/ai-assistant','/settings'],
+    routes: ['/dashboard','/cash-flow','/invoices','/expenses','/expense-management','/time-tracking','/team','/projects','/clients','/reports','/forecast','/ai-assistant','/settings','/contractor-management'],
   },
   admin: {
     label: 'Admin',
     description: 'Full access except billing & delete',
     color: 'text-emerald-400',
     access: ['dashboard','cash_flow','invoices','expenses','expense_management','time_tracking','team','projects','clients','reports','forecast','sage','settings'],
-    routes: ['/dashboard','/cash-flow','/invoices','/expenses','/expense-management','/time-tracking','/team','/projects','/clients','/reports','/forecast','/ai-assistant','/settings'],
+    routes: ['/dashboard','/cash-flow','/invoices','/expenses','/expense-management','/time-tracking','/team','/projects','/clients','/reports','/forecast','/ai-assistant','/settings','/contractor-management'],
   },
   member: {
     label: 'Member',

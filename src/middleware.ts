@@ -30,13 +30,14 @@ const PUBLIC_PATHS = [
   // Supabase session must not redirect their JSON requests to portal HTML.
   '/api/contractor-timesheets',
   '/api/timesheet-drafts',
+  '/api/contractor-invoices',
   '/timesheet',
   '/favicon.ico',
   '/_next',
 ]
 
 function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATHS.some((path) => pathname.startsWith(path))
+  return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(path + '/'))
 }
 
 export async function middleware(req: NextRequest) {
@@ -52,16 +53,16 @@ export async function middleware(req: NextRequest) {
   const supabase = createMiddlewareClient({ req, res })
 
   // Get the current session (if any)
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { user } } = await supabase.auth.getUser()
 
   // No session = unauthenticated user, let them through to login
   // (The pages themselves redirect to /login if needed)
-  if (!session) {
+  if (!user) {
     return res
   }
 
   // Session exists — check if user is in admin allowlist
-  const email = session.user?.email
+  const email = user.email
   if (!isAdminEmail(email)) {
     // Not an admin — redirect to contractor portal
     // Note: we don't sign them out here (would require setting cookies)

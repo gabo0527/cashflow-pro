@@ -6,6 +6,7 @@ import Sidebar from "./Sidebar";
 import IdleLogout from "@/components/IdleLogout";
 import Header from "./Header";
 import ChatPanel from "@/components/ai/ChatPanel";
+import { isAdminEmail } from '@/lib/admin-allowlist';
 import VantageLogo from "@/components/brand/VantageLogo";
 import { cn } from "@/lib/utils";
 import {
@@ -128,6 +129,11 @@ export default function AppShell({ children }: AppShellProps) {
           return;
         }
 
+        if (!isAdminEmail(user.email)) {
+          await signOut();
+          router.replace('/contractor-portal');
+          return;
+        }
         setUser(user);
 
         const { profile } = await getCurrentProfile();

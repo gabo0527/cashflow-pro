@@ -1,5 +1,8 @@
 'use client'
+import { createInvoiceStore } from '@/lib/invoice-client'
 
+import InvoiceFollowups from '@/components/InvoiceFollowups'
+import { isOutstanding, payableBucket, statusTimestamp } from '@/lib/payables'
 import PageHeader from '@/components/workspace/PageHeader'
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
@@ -27,6 +30,8 @@ const THEME = {
 }
 
 // ============ TYPES ============
+const invoiceStore = createInvoiceStore(supabase, false)
+
 interface ContractorInvoice {
   id: string; team_member_id: string; invoice_number: string; invoice_date: string
   due_date: string; period_start: string; period_end: string; total_amount: number
@@ -235,7 +240,7 @@ function GroupAccordion({ node, depth, collapsed, onToggle, renderItems }: {
   const statusColor = cfg ? { bg: cfg.bg, text: cfg.text, border: cfg.border } : null
 
   return (
-    <div className={`bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm ${indent ? 'ml-4 mt-2' : ''}`}>
+    <div className={`bg-white border border-gray-200 rounded-xl overflow-x-auto shadow-sm ${indent ? 'ml-4 mt-2' : ''}`}>
       <button onClick={() => onToggle(node.key)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors">
         <div className="flex items-center gap-3">
           {isOpen ? <ChevronDown size={15} className="text-gray-400" /> : <ChevronRight size={15} className="text-gray-400" />}
@@ -344,6 +349,19 @@ export default function ContractorManagement() {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
+  const [invoiceView, setInvoiceView] = useState<'outstanding' | 'overdue' | 'due_soon' | 'history'>('outstanding')
+  const [statusEvents, setStatusEvents] = useState<any[]>([])
+  const [invoiceError, setInvoiceError] = useState('')
+  const readStatusEvents = async () => {
+    const all: any[] = []
+    for (let offset=0;offset<20000;offset+=500) {
+      const result = await supabase.from('contractor_invoice_status_events').select('*').order('changed_at', { ascending: true }).order('id').range(offset,offset+499)
+      if (result.error) return {data:null,error:result.error}
+      all.push(...(result.data || []))
+      if (!result.data || result.data.length<500) return {data:all,error:null}
+    }
+    return {data:null,error:{message:'Status history is too large to load.'}}
+  }
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterMember, setFilterMember] = useState('all')
   const [filterClient, setFilterClient] = useState('all')
@@ -353,7 +371,7 @@ export default function ContractorManagement() {
   const [refDate, setRefDate] = useState(new Date())
 
   // Grouping
-  const [invGroupDims, setInvGroupDims] = useState<GroupDimension[]>(['client'])
+  const [invGroupDims, setInvGroupDims] = useState<GroupDimension[]>(['none'])
   const [expGroupDims, setExpGroupDims] = useState<GroupDimension[]>(['client'])
 
   // Accordion collapse state
@@ -437,7 +455,7 @@ export default function ContractorManagement() {
       const due = new Date(y, m - 1, d); due.setDate(due.getDate() + termDays)
       const dueIso = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}-${String(due.getDate()).padStart(2, '0')}`
       const amount = Math.round(parseFloat(addForm.amount) * 100) / 100
-      const { data: inv, error } = await supabase.from('contractor_invoices').insert({
+      const { data: inv, error } = await invoiceStore.from('contractor_invoices').insert({
         team_member_id: addForm.team_member_id, invoice_number: addForm.invoice_number,
         invoice_date: addForm.period_end, due_date: dueIso,
         period_start: addForm.period_start, period_end: addForm.period_end,
@@ -449,7 +467,7 @@ export default function ContractorManagement() {
       }).select('*, contractor_invoice_lines(*)').single()
       if (error || !inv) throw error || new Error('Insert failed')
       if (addForm.client_id) {
-        await supabase.from('contractor_invoice_lines').insert({
+        await invoiceStore.from('contractor_invoice_lines').insert({
           invoice_id: inv.id, client_id: addForm.client_id, project_id: addForm.project_id || null,
           description: 'Invoice (entered by admin)', hours: 0, rate: 0, amount, allocation_pct: 100,
         })
@@ -483,10 +501,11 @@ export default function ContractorManagement() {
   }
 
   // Fire-and-forget notification
-  const sendNotification = (type: 'invoice' | 'expense', id: string, status: string, notes?: string, paidDate?: string, paymentMethod?: string) => {
+  const sendNotification = async (type: 'invoice' | 'expense', id: string, status: string, notes?: string, paidDate?: string, paymentMethod?: string) => {
+    const { data: authData } = await supabase.auth.getSession()
     fetch('/api/notify', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authData.session?.access_token || ''}` },
       body: JSON.stringify({ type, id, status, notes, paidDate, paymentMethod }),
     }).catch(err => console.warn('Notification failed (non-blocking):', err))
   }
@@ -529,13 +548,17 @@ export default function ContractorManagement() {
     const load = async () => {
       setLoading(true)
       const [invRes, expRes, teamRes, clientRes, projRes] = await Promise.all([
-        supabase.from('contractor_invoices').select('*, contractor_invoice_lines(*)').order('submitted_at', { ascending: false }),
+        invoiceStore.from('contractor_invoices').select('*, contractor_invoice_lines(*)').order('submitted_at', { ascending: false }),
         supabase.from('contractor_expenses').select('*').order('date', { ascending: false }),
         supabase.from('team_members').select('id, name, email, status, phone, address, city, state, zip, country, bank_name, routing_number, account_number, account_type, swift_code, iban, bank_address, intermediary_bank, nda_url, mspa_url, psa_schedule_url, w9_url, w8ben_url, w8bene_url, nda_expires, mspa_expires, psa_expires, onboarding_status').order('name'),
         supabase.from('clients').select('id, name'),
         supabase.from('projects').select('id, name, client_id'),
       ])
+      if (invRes.error) setInvoiceError(invRes.error.message)
       setInvoices(invRes.data || [])
+      const { data: events, error: eventError } = await readStatusEvents()
+      if (eventError) setInvoiceError('Status history could not be loaded. Refresh before changing invoices.')
+      setStatusEvents(events || [])
       const rawExp = expRes.data || []; const cl = clientRes.data || []
       setExpenses(rawExp.map((e: any) => ({
         ...e,
@@ -554,14 +577,16 @@ export default function ContractorManagement() {
   // ============ FILTERED DATA ============
   const filteredInvoices = useMemo(() => {
     let r = [...invoices]
-    if (dateRange !== 'all') r = r.filter(inv => inv.period_start >= dateFilter.start && inv.period_start <= dateFilter.end)
+    if (invoiceView === 'history' && dateRange !== 'all') r = r.filter(inv => inv.period_start <= dateFilter.end && inv.period_end >= dateFilter.start)
+    if (invoiceView !== 'history') r = r.filter(isOutstanding)
+    if (invoiceView === 'overdue') r = r.filter(inv => payableBucket(inv) === 'overdue')
+    if (invoiceView === 'due_soon') r = r.filter(inv => payableBucket(inv) === 'due_soon')
     if (searchQuery) { const q = searchQuery.toLowerCase(); r = r.filter(inv => inv.invoice_number.toLowerCase().includes(q) || (memberMap[inv.team_member_id] || '').toLowerCase().includes(q)) }
-    if (filterStatus === 'all') r = r.filter(inv => inv.status !== 'rejected')
-    else if (filterStatus !== 'all') r = r.filter(inv => filterStatus === 'pending' ? ['submitted', 'pending'].includes(inv.status) : inv.status === filterStatus)
+    if (filterStatus !== 'all') r = r.filter(inv => filterStatus === 'pending' ? ['submitted', 'pending'].includes(inv.status) : inv.status === filterStatus)
     if (filterMember !== 'all') r = r.filter(inv => inv.team_member_id === filterMember)
-    if (filterClient !== 'all') r = r.filter(inv => inv.contractor_invoice_lines?.some((l: any) => l.client_id === filterClient))
-    return r
-  }, [invoices, dateFilter, dateRange, searchQuery, filterStatus, filterMember, filterClient, memberMap])
+    if (filterClient !== 'all') r = r.filter(inv => inv.client_id === filterClient || inv.contractor_invoice_lines?.some((l: any) => l.client_id === filterClient))
+    return r.sort((a,b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'))
+  }, [invoiceView, invoices, dateFilter, dateRange, searchQuery, filterStatus, filterMember, filterClient, memberMap])
 
   const filteredExpenses = useMemo(() => {
     // Drafts are private to contractors until they submit a report —
@@ -640,17 +665,23 @@ export default function ContractorManagement() {
   }, [filteredExpenses])
 
   // ============ ACTIONS ============
-  const changeInvStatus = async (id: string, status: string, notes?: string) => {
-    setProcessing(id)
-    const updates: any = { status, reviewed_at: new Date().toISOString() }
-    if (status === 'paid') updates.paid_at = new Date().toISOString()
+  const changeInvStatus = async (id: string, status: string, notes?: string, bulk = false) => {
+    if (!bulk) setProcessing(id)
+    setInvoiceError('')
+    const current = invoices.find(i => i.id === id)
+    const updates: any = { status }
     if (notes) updates.notes = notes
-    const { error } = await supabase.from('contractor_invoices').update(updates).eq('id', id)
-    if (!error) {
-      setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, ...updates } : inv))
-      sendNotification('invoice', id, status, notes, status === 'paid' ? new Date().toISOString() : undefined, status === 'paid' ? 'ACH' : undefined)
+    const { data, error } = await invoiceStore.from('contractor_invoices').update(updates).eq('id', id).eq('status', current?.status || '').select().single()
+    if (error) setInvoiceError(error.message)
+    else {
+      setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, ...data } : inv))
+      const history = await readStatusEvents()
+      if (history.error) setInvoiceError('Status saved, but its history could not be refreshed.')
+      else setStatusEvents(history.data || [])
+      sendNotification('invoice', id, status, notes, data.paid_at || undefined)
     }
-    setProcessing(null)
+    if (!bulk) setProcessing(null)
+    return !error
   }
 
   const changeExpStatus = async (id: string, status: string, notes?: string) => {
@@ -671,15 +702,9 @@ export default function ContractorManagement() {
   }
 
   const bulkApproveInv = async () => {
-    const pend = filteredInvoices.filter(i => ['submitted', 'pending'].includes(i.status)); setProcessing('bulk')
-    for (const inv of pend) {
-      const u = { status: 'approved', reviewed_at: new Date().toISOString() }
-      const { error } = await supabase.from('contractor_invoices').update(u).eq('id', inv.id)
-      if (!error) {
-        setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, ...u } : i))
-        sendNotification('invoice', inv.id, 'approved')
-      }
-    }
+    const pending = filteredInvoices.filter(i => ['submitted', 'pending'].includes(i.status))
+    setProcessing('bulk')
+    for (const inv of pending) { if (!await changeInvStatus(inv.id, 'approved', undefined, true)) break }
     setProcessing(null)
   }
 
@@ -803,6 +828,8 @@ export default function ContractorManagement() {
       period_start: inv.period_start,
       period_end: inv.period_end,
       notes: inv.notes || '',
+      due_date: inv.due_date || '',
+      payment_terms: inv.payment_terms || '',
       client_id: inv.client_id || '',
     })
   }
@@ -830,13 +857,15 @@ export default function ContractorManagement() {
       period_start: editForm.period_start,
       period_end: editForm.period_end,
       notes: editForm.notes || null,
+      due_date: editForm.due_date || null,
+      payment_terms: editForm.payment_terms || '',
       client_id: editForm.client_id || null,
     }
-    const { error } = await supabase.from('contractor_invoices').update(updates).eq('id', editInvoice.id)
+    const { error } = await invoiceStore.from('contractor_invoices').update(updates).eq('id', editInvoice.id)
     if (!error) {
       setInvoices(prev => prev.map(inv => inv.id === editInvoice.id ? { ...inv, ...updates } : inv))
       setEditInvoice(null)
-    }
+    } else setInvoiceError(error.message)
     setSaving(false)
   }
 
@@ -865,7 +894,7 @@ export default function ContractorManagement() {
     if (!deleteConfirm) return
     setProcessing(deleteConfirm.id)
     const table = deleteConfirm.type === 'invoice' ? 'contractor_invoices' : 'contractor_expenses'
-    const { error } = await supabase.from(table).delete().eq('id', deleteConfirm.id)
+    const { error } = await (deleteConfirm.type === 'invoice' ? invoiceStore : supabase).from(table).delete().eq('id', deleteConfirm.id)
     if (!error) {
       if (deleteConfirm.type === 'invoice') setInvoices(prev => prev.filter(i => i.id !== deleteConfirm.id))
       else setExpenses(prev => prev.filter(e => e.id !== deleteConfirm.id))
@@ -899,7 +928,7 @@ export default function ContractorManagement() {
       supabase.from('bill_rates').select('id', { count: 'exact', head: true }).eq('team_member_id', member.id),
       supabase.from('team_project_assignments').select('id', { count: 'exact', head: true }).eq('team_member_id', member.id),
       supabase.from('contractor_expenses').select('id', { count: 'exact', head: true }).eq('team_member_id', member.id),
-      supabase.from('contractor_invoices').select('id', { count: 'exact', head: true }).eq('team_member_id', member.id),
+      invoiceStore.from('contractor_invoices').select('id', { count: 'exact', head: true }).eq('team_member_id', member.id),
       supabase.from('time_entries').select('id', { count: 'exact', head: true }).eq('team_member_id', member.id),
     ])
     setDeleteCounts({
@@ -997,22 +1026,25 @@ export default function ContractorManagement() {
   }
 
   // ============ INVOICE ROW GRID ============
-  const invGrid = 'grid-cols-[1fr_120px_90px_100px_120px_130px]'
+  const invGrid = 'grid-cols-[minmax(180px,1fr)_130px_110px_100px_130px_100px]'
 
   const renderInvoiceRows = (items: ContractorInvoice[]) => (
     <>
-      <div className={`grid ${invGrid} gap-2 px-5 py-2 border-b border-gray-200 bg-gray-50`}>
-        {['Invoice', 'Contractor', 'Period', 'Amount', 'Status', 'Actions'].map(h => (
+      <div className={`grid ${invGrid} min-w-[850px] gap-2 px-5 py-2 border-b border-gray-200 bg-gray-50`}>
+        {['Invoice', 'Contractor', 'Due / Period', 'Amount', 'Status', 'Actions'].map(h => (
           <span key={h} className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase ${h === 'Amount' ? 'text-right' : ''}`}>{h}</span>
         ))}
       </div>
       {items.map(inv => {
         const lines = inv.contractor_invoice_lines || []
+        const events = statusEvents.filter(e => e.invoice_id === inv.id)
+        const historyText = events.length ? events.map(e => `${e.from_status ? `${STATUS_CFG[e.from_status]?.label || e.from_status} → ` : ''}${STATUS_CFG[e.to_status]?.label || e.to_status} · ${statusTimestamp(e.changed_at)} · ${e.actor_label}`).join('\n') : 'Status tracking begins with this update. Earlier transitions were not recorded.'
+        const bucket = payableBucket(inv)
         const isExp = expandedInvoice === inv.id
         const canReject = !['paid', 'rejected'].includes(inv.status)
         const isRejected = inv.status === 'rejected'
         return (
-          <div key={inv.id} className="border-b border-gray-100 last:border-0">
+          <div key={inv.id} className="min-w-[850px] border-b border-gray-100 last:border-0">
             <div className={`grid ${invGrid} gap-2 px-5 py-3 items-center ${THEME.cardHover} transition-colors ${getRowBorder(inv.status)}`}>
               <div className="flex items-center gap-2 min-w-0">
                 <button onClick={() => setExpandedInvoice(isExp ? null : inv.id)} className="text-gray-400 hover:text-gray-700 vBtn shrink-0">
@@ -1024,12 +1056,12 @@ export default function ContractorManagement() {
                 </div>
               </div>
               <span className="text-gray-600 text-sm truncate">{memberMap[inv.team_member_id] || '—'}</span>
-              <span className="text-gray-400 text-xs vN">{fmtDateS(inv.period_start)} – {fmtDateS(inv.period_end)}</span>
+              <div className="text-xs vN"><span className={`block font-semibold ${bucket === 'overdue' ? 'text-red-700' : bucket === 'due_soon' ? 'text-amber-700' : 'text-gray-600'}`}>{inv.due_date ? fmtDate(inv.due_date) : 'Due date needed'}</span><span className="block text-[10px] text-gray-400">{bucket === 'overdue' ? 'Overdue · ' : bucket === 'due_soon' ? 'Due in 7 days · ' : ''}{fmtDateS(inv.period_start)}–{fmtDateS(inv.period_end)}</span></div>
               <span className="text-gray-900 text-sm font-medium text-right vN">{fmt$(inv.total_amount)}</span>
-              <StatusDropdown status={inv.status} onChange={s => {
+              <div title={historyText}><StatusDropdown status={inv.status} onChange={s => {
                 if (s === 'rejected') { setRejectModal({ id: inv.id, type: 'invoice', label: inv.invoice_number }); setRejectNotes('') }
                 else changeInvStatus(inv.id, s)
-              }} disabled={processing === inv.id} />
+              }} disabled={processing !== null} /><button onClick={() => setExpandedInvoice(isExp ? null : inv.id)} className="block mt-1 text-[10px] text-blue-700" aria-label={`View status history for ${inv.invoice_number}`}>Status history</button></div>
               <div className="flex items-center gap-1.5">
                 <button onClick={() => openEditInvoice(inv)} className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 vBtn" title="Edit">
                   <Edit2 size={13} />
@@ -1053,6 +1085,12 @@ export default function ContractorManagement() {
                 )}
               </div>
             </div>
+            {isExp && <div className="border-t border-gray-200 bg-slate-50 px-6 py-3">
+              <p className="text-xs font-semibold text-slate-700 mb-2">Status history · Puerto Rico time</p>
+              <p className="text-xs text-slate-500">Original submission: {statusTimestamp(inv.submitted_at)}</p>
+              {!events.length && <p className="text-xs text-slate-500 mt-1">Earlier status transitions were not recorded. New changes will appear here.</p>}
+              {events.map(e => <p key={e.id} className="text-xs text-slate-600 mt-1">{e.from_status ? `${STATUS_CFG[e.from_status]?.label || e.from_status} → ` : ''}{STATUS_CFG[e.to_status]?.label || e.to_status} · {statusTimestamp(e.changed_at)} · {e.actor_label}{e.note ? ` · ${e.note}` : ''}</p>)}
+            </div>}
             {isExp && lines.length > 0 && (
               <div className="ui-ledger bg-gray-50 px-6 py-3 border-t border-gray-200">
                 <p className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase mb-2`}>Line Items</p>
@@ -1181,6 +1219,12 @@ export default function ContractorManagement() {
       {/* ===================== AP INVOICES ===================== */}
       {activeTab === 'invoices' && (
         <div className="space-y-4">
+          {invoiceError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{invoiceError}</p>}
+          <InvoiceFollowups request={authedFetch} />
+          <div className="flex flex-wrap gap-2" aria-label="Invoice queue">
+            {([{id:'outstanding',label:'All outstanding'},{id:'overdue',label:'Overdue'},{id:'due_soon',label:'Due in 7 days'},{id:'history',label:'Invoice history'}] as const).map(view => <button key={view.id} onClick={() => {setInvoiceView(view.id);setFilterStatus('all')}} aria-pressed={invoiceView===view.id} className={`rounded-lg border px-4 py-2 text-sm font-medium ${invoiceView===view.id ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-gray-200 text-gray-600'}`}>{view.label}</button>)}
+          </div>
+          <p className="text-xs text-slate-500">{invoiceView === 'history' ? 'Review invoices by billing period, including paid and rejected invoices.' : 'All billing months · unpaid invoices stay visible until paid or rejected · earliest due dates first'}</p>
           <div className="flex justify-end">
             <button onClick={() => openAdd('invoice')} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 vBtn">
               <Plus size={13} /> Add Invoice <span className="font-normal opacity-75">· on behalf of contractor</span>
@@ -1230,7 +1274,7 @@ export default function ContractorManagement() {
                 </select>
                 {hasActiveFilters && <button onClick={clearFilters} className="px-2.5 py-2 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 vBtn flex items-center gap-1"><X size={12} /> Clear</button>}
               </div>
-              <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <div className={`${invoiceView !== 'history' ? 'hidden' : 'flex'} flex-wrap items-center gap-2 min-w-0`}>
                 <div className="flex items-center gap-0.5 p-0.5 bg-gray-100 rounded-lg border border-gray-200">
                   {(['month', 'quarter', 'year', 'all'] as const).map(r => (
                     <button key={r} onClick={() => setDateRange(r)}
@@ -1255,7 +1299,7 @@ export default function ContractorManagement() {
           {filteredInvoices.length > 0 ? (
             <div className="space-y-3">
               {isNoGroup(invGroupDims) ? (
-                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto shadow-sm">
                   {renderInvoiceRows(filteredInvoices)}
                 </div>
               ) : (
@@ -1267,7 +1311,7 @@ export default function ContractorManagement() {
           ) : (
             <div className="bg-white border border-gray-200 rounded-xl text-center py-12">
               <FileText size={32} className="mx-auto mb-3 text-gray-300" />
-              <p className="text-sm text-gray-500 font-medium">No invoices for {dateFilter.label}</p>
+              <p className="text-sm text-gray-500 font-medium">No invoices {invoiceView === 'history' ? `for ${dateFilter.label}` : 'in this queue'}</p>
               <p className="text-xs text-gray-400 mt-1">Invoices appear here when contractors submit them through the Contractor Portal</p>
             </div>
           )}
@@ -1539,6 +1583,10 @@ export default function ContractorManagement() {
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2 grid grid-cols-2 gap-4">
+                  <label className="text-xs text-gray-500">Payment due date<input type="date" value={editForm.due_date || ''} onChange={e=>setEditForm(f=>({...f,due_date:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label>
+                  <label className="text-xs text-gray-500">Payment terms<input value={editForm.payment_terms || ''} onChange={e=>setEditForm(f=>({...f,payment_terms:e.target.value}))} className="block w-full rounded border border-gray-200 p-2 mt-1" /></label>
+                </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Period Start</label>
                   <input type="date" value={editForm.period_start || ''} onChange={e => setEditForm(f => ({ ...f, period_start: e.target.value }))}
