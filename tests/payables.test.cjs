@@ -169,6 +169,13 @@ test('real payables screen focuses on its payment window and keeps older invoice
   const poolIssue=new Date(today+'T12:00:00Z');poolIssue.setUTCDate(poolIssue.getUTCDate()-60)
   const rows=[{...base,id:'pool',invoice_number:'COMBINED-LS',status:'approved',payment_group:'pooled_lump_sum',invoice_date:poolIssue.toISOString().slice(0,10),contractor_invoice_lines:[{client_id:'overhead'},{client_id:'other'}]},{...base,id:'current',invoice_number:'DUE-THIS-WINDOW',status:'approved',due_date:today},{...base,id:'future',invoice_number:'FUTURE-PAYMENT',status:'pending',due_date:nextMonth.toISOString().slice(0,10)},{...base,id:'old-approved',invoice_number:'OLD-APPROVED',status:'approved'},{...base,id:'old-scheduled',invoice_number:'OLD-SCHEDULED',status:'scheduled'},{...base,id:'paid',invoice_number:'PAID-CURRENT',status:'paid',period_start:`${month}-01`,period_end:today}]
   const fixture={team_members:[{id:'shannon',name:'Shannon Rybecky',email:'shannon@example.test'}],clients:[{id:'overhead',name:'Mano CG'}],projects:[],contractor_expenses:[],contractor_invoice_status_events:[{id:'history',invoice_id:'old-approved',from_status:'pending',to_status:'approved',changed_at:'2026-11-03T15:00:00Z',actor_label:'kathia@manocg.com'}]}
+  rows.push(
+    {...base,id:'old-paid',invoice_number:'PAID-HISTORICAL',status:'paid'},
+    {...base,id:'old-rejected',invoice_number:'REJECTED-HISTORICAL',status:'rejected'},
+    {...base,id:'other-paid',team_member_id:'other',invoice_number:'PAID-OTHER-CONTRACTOR',status:'paid'},
+    {...base,id:'other-client',client_id:'other',invoice_number:'PAID-OTHER-CLIENT',status:'paid'},
+    {...base,id:'pooled-paid',invoice_number:'PAID-COMBINED',status:'paid',payment_group:'pooled_lump_sum'}
+  )
   const db={auth:{getSession:async()=>({data:{session:{access_token:'test'}}})},from(table){const q={then(resolve){resolve({data:fixture[table]||[],error:null})}};for(const k of ['select','order','eq','range'])q[k]=()=>q;return q}}
   const oldFetch=global.fetch
   global.fetch=async(url)=>({ok:true,json:async()=>url==='/api/contractor-invoices'?{data:rows}:url.startsWith('/api/invoice-followups')?{rows:[]}:{reports:[]}})
@@ -199,6 +206,48 @@ test('real payables screen focuses on its payment window and keeps older invoice
     assert.match(text(),/OLD-APPROVED/);assert.match(text(),/OLD-SCHEDULED/)
     await act(async()=>renderer.root.findAllByType('button').find(n=>n.children.includes('Invoice history')).props.onClick())
     assert.match(text(),/PAID-CURRENT/);assert.doesNotMatch(text(),/OLD-SCHEDULED/)
+    // Reproduce the screenshot from every unpaid queue. Paid and Rejected must
+    // enter history, reveal older billing periods, and retain explicit filters.
+    const button=label=>renderer.root.findAllByType('button').find(n=>n.children.includes(label))
+    const select=label=>renderer.root.findByProps({'aria-label':label})
+    for(const queue of ['This payment window','Before this window','Lump sum · multiple clients','Schedule review','All outstanding']) {
+      await act(async()=>button('Month').props.onClick())
+      await act(async()=>button(queue).props.onClick())
+      await act(async()=>{
+        select('Invoice contractor').props.onChange({target:{value:'shannon'}})
+        select('Invoice client').props.onChange({target:{value:'overhead'}})
+        select('Payment stage').props.onChange({target:{value:'ready_to_schedule'}})
+        renderer.root.findByProps({placeholder:'Search invoices...'}).props.onChange({target:{value:'PAID-'}})
+      })
+      await act(async()=>select('Invoice status').props.onChange({target:{value:'paid'}}))
+      assert.equal(button('Invoice history').props['aria-pressed'],true)
+      assert.equal(select('Invoice status').props.value,'paid')
+      assert.equal(select('Payment stage').props.value,'all')
+      assert.equal(select('Invoice contractor').props.value,'shannon')
+      assert.equal(select('Invoice client').props.value,'overhead')
+      assert.equal(renderer.root.findByProps({placeholder:'Search invoices...'}).props.value,'PAID-')
+      assert.match(text(),/PAID-HISTORICAL/);assert.match(text(),/PAID-CURRENT/);assert.match(text(),/PAID-COMBINED/)
+      assert.doesNotMatch(text(),/PAID-OTHER-CONTRACTOR|PAID-OTHER-CLIENT|REJECTED-HISTORICAL|OLD-APPROVED/)
+      assert.match(text(),/Invoice history · All Time/)
+      // Once in history, explicitly chosen periods still apply.
+      await act(async()=>button('Month').props.onClick())
+      assert.match(text(),/PAID-CURRENT/);assert.doesNotMatch(text(),/PAID-HISTORICAL/)
+      await act(async()=>button(queue).props.onClick())
+      await act(async()=>renderer.root.findByProps({placeholder:'Search invoices...'}).props.onChange({target:{value:''}}))
+      await act(async()=>select('Invoice status').props.onChange({target:{value:'rejected'}}))
+      assert.equal(button('Invoice history').props['aria-pressed'],true)
+      assert.match(text(),/REJECTED-HISTORICAL/);assert.doesNotMatch(text(),/PAID-HISTORICAL/)
+    }
+    // Editing any payment window control returns to an unpaid queue without
+    // carrying an impossible closed-status filter back into it.
+    for(const label of ['Payment window preset','Payment window start','Payment window end']) {
+      await act(async()=>select('Invoice status').props.onChange({target:{value:'paid'}}))
+      const control=select(label)
+      await act(async()=>control.props.onChange({target:{value:label==='Payment window preset'?'month':control.props.value}}))
+      assert.equal(button('This payment window').props['aria-pressed'],true)
+      assert.equal(select('Invoice status').props.value,'all')
+      assert.doesNotMatch(text(),/PAID-CURRENT|PAID-HISTORICAL/)
+    }
   }finally{if(renderer)await act(async()=>renderer.unmount());global.fetch=oldFetch}
 })
 

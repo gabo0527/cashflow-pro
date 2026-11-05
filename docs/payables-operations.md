@@ -160,3 +160,9 @@ the status history identify the actual administrator. Contractors cannot change
 reviewed statuses or record client receipts; company scoping, validation, and
 concurrent status checks remain in force. The combined lump-sum Net 60 rule is
 unchanged.
+
+Selecting Paid or Rejected in any unpaid queue opens Invoice history across all
+billing periods. Search, contractor, and client filters are retained; an open
+payment-stage filter is cleared. Inside history, an explicitly chosen billing
+period still applies. Returning through a payment-window date control clears
+the closed-status filter so the outstanding queue cannot become contradictory.

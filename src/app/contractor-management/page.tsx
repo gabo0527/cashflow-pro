@@ -552,6 +552,22 @@ export default function ContractorManagement() {
   const hasActiveFilters = paymentStage!=='all' || filterStatus !== 'all' || filterMember !== 'all' || filterClient !== 'all' || searchQuery !== ''
   const clearFilters = () => { setPaymentStage('all');setSearchQuery(''); setFilterStatus('all'); setFilterMember('all'); setFilterClient('all') }
 
+  const changeInvoiceStatusFilter = (status: string) => {
+    setFilterStatus(status)
+    if (status === 'paid' || status === 'rejected') {
+      // Closed invoices live in history, never in an outstanding payment queue.
+      // On entry, discard the hidden history period and open-payment stage.
+      if (invoiceView !== 'history') setDateRange('all')
+      setInvoiceView('history')
+      setPaymentStage('all')
+    }
+  }
+
+  const openPaymentWindow = () => {
+    setInvoiceView('window')
+    if (filterStatus === 'paid' || filterStatus === 'rejected') setFilterStatus('all')
+  }
+
   // ============ LOAD DATA ============
   useEffect(() => {
     const load = async () => {
@@ -1251,16 +1267,16 @@ export default function ContractorManagement() {
 
           <section aria-label="Payment window" className="rounded-xl border border-blue-200 bg-blue-50/40 p-4">
             <div className="flex flex-wrap items-end gap-3"><div className="flex-1 min-w-[180px]"><h2 className="text-sm font-semibold text-slate-900">What needs attention this period?</h2><p className="mt-1 text-xs text-slate-500">Client payment dates and scheduled payouts · billing month shown for context.</p></div>
-            <label className="text-xs text-slate-500">Payment window<select aria-label="Payment window preset" value={paymentPreset} onChange={e=>{const preset=e.target.value as PaymentWindowPreset;setPaymentPreset(preset);if(preset!=='custom')setPaymentDates(paymentWindow(preset));setInvoiceView('window')}} className="block rounded-lg border border-gray-200 bg-white p-2 mt-1 text-sm"><option value="month">This month</option><option value="week">This week</option><option value="month_end">Month-end / opening week</option><option value="next_30">Next 30 days</option><option value="custom">Custom dates</option></select></label>
-            <label className="text-xs text-slate-500">From<input aria-label="Payment window start" type="date" value={paymentDates.start} onChange={e=>{setPaymentPreset('custom');setPaymentDates(d=>({...d,start:e.target.value}));setInvoiceView('window')}} className="block rounded-lg border border-gray-200 bg-white p-2 mt-1 text-sm" /></label>
-            <label className="text-xs text-slate-500">Through<input aria-label="Payment window end" type="date" value={paymentDates.end} onChange={e=>{setPaymentPreset('custom');setPaymentDates(d=>({...d,end:e.target.value}));setInvoiceView('window')}} className="block rounded-lg border border-gray-200 bg-white p-2 mt-1 text-sm" /></label></div>
+            <label className="text-xs text-slate-500">Payment window<select aria-label="Payment window preset" value={paymentPreset} onChange={e=>{const preset=e.target.value as PaymentWindowPreset;setPaymentPreset(preset);if(preset!=='custom')setPaymentDates(paymentWindow(preset));openPaymentWindow()}} className="block rounded-lg border border-gray-200 bg-white p-2 mt-1 text-sm"><option value="month">This month</option><option value="week">This week</option><option value="month_end">Month-end / opening week</option><option value="next_30">Next 30 days</option><option value="custom">Custom dates</option></select></label>
+            <label className="text-xs text-slate-500">From<input aria-label="Payment window start" type="date" value={paymentDates.start} onChange={e=>{setPaymentPreset('custom');setPaymentDates(d=>({...d,start:e.target.value}));openPaymentWindow()}} className="block rounded-lg border border-gray-200 bg-white p-2 mt-1 text-sm" /></label>
+            <label className="text-xs text-slate-500">Through<input aria-label="Payment window end" type="date" value={paymentDates.end} onChange={e=>{setPaymentPreset('custom');setPaymentDates(d=>({...d,end:e.target.value}));openPaymentWindow()}} className="block rounded-lg border border-gray-200 bg-white p-2 mt-1 text-sm" /></label></div>
             {!paymentWindowValid && <p role="alert" className="text-sm text-red-700 mt-2">Choose valid dates with the end on or after the start.</p>}
             <p className="text-xs text-slate-500 mt-3">Expected dates use the client invoice date plus its terms. Until confirmed, the client invoice is assumed sent at billing month-end, with a ±5-day planning range. Client funds received but not yet scheduled stay visible.</p>
           </section>
           <div className="flex flex-wrap gap-2" aria-label="Invoice queue">
             {([{id:'window',label:'This payment window'},{id:'overdue',label:'Before this window'},{id:'pooled',label:'Lump sum · multiple clients'},{id:'review',label:'Schedule review'},{id:'outstanding',label:'All outstanding'},{id:'history',label:'Invoice history'}] as const).map(view => <button key={view.id} onClick={() => {setInvoiceView(view.id);setFilterStatus('all');setPaymentStage('all')}} aria-pressed={invoiceView===view.id} className={`rounded-lg border px-4 py-2 text-sm font-medium ${invoiceView===view.id ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-gray-200 text-gray-600'}`}>{view.label}{view.id==='pooled' && <span className="ml-2 text-xs">({invoices.filter(i=>i.payment_group==='pooled_lump_sum' && inPaymentWindow(i,billingPolicies,paymentDates.start,paymentDates.end)).length})</span>}</button>)}
           </div>
-          <p className="text-xs text-slate-500">{invoiceView==='window' ? `${paymentDates.start} – ${paymentDates.end} · totals below cover this payment window and available client funds; future invoices stay in All outstanding. Combined lump sums have their own bucket.` : invoiceView==='pooled' ? 'Combined lump-sum invoices · Net 60 from the contractor invoice date · separate from individual client payment schedules.' : invoiceView==='overdue' ? `Expected or scheduled before ${paymentDates.start}. Confirm receipt and payment records before acting on older balances.` : invoiceView==='review' ? 'Confirm missing client invoice dates and review invoices with multiple clients. Estimates do not confirm client payment.' : invoiceView === 'history' ? 'Review invoices by billing period, including paid and rejected invoices.' : 'All billing months · unpaid invoices stay visible until paid or rejected · earliest payment dates first'}</p>
+          <p className="text-xs text-slate-500">{invoiceView==='window' ? `${paymentDates.start} – ${paymentDates.end} · totals below cover this payment window and available client funds; future invoices stay in All outstanding. Combined lump sums have their own bucket.` : invoiceView==='pooled' ? 'Combined lump-sum invoices · Net 60 from the contractor invoice date · separate from individual client payment schedules.' : invoiceView==='overdue' ? `Expected or scheduled before ${paymentDates.start}. Confirm receipt and payment records before acting on older balances.` : invoiceView==='review' ? 'Confirm missing client invoice dates and review invoices with multiple clients. Estimates do not confirm client payment.' : invoiceView === 'history' ? `Invoice history · ${dateFilter.label} · includes paid and rejected invoices. Use the billing-period controls below to narrow the history.` : 'All billing months · unpaid invoices stay visible until paid or rejected · earliest payment dates first'}</p>
           {invoiceView==='pooled' && <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={pooledAllPeriods} onChange={e=>setPooledAllPeriods(e.target.checked)}/>Show all unpaid lump-sum periods (otherwise this payment window)</label>}
           <div className="flex justify-end">
             <button onClick={() => openAdd('invoice')} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 vBtn">
@@ -1297,16 +1313,16 @@ export default function ContractorManagement() {
                     className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
                 </div>
                 <select aria-label="Payment stage" value={paymentStage} onChange={e=>setPaymentStage(e.target.value)} className={selClass(paymentStage!=='all')}><option value="all">All payment stages</option><option value="awaiting_client_payment">Awaiting client funds</option><option value="ready_to_schedule">Ready to schedule</option></select>
-                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={selClass(filterStatus !== 'all')}>
+                <select aria-label="Invoice status" value={filterStatus} onChange={e => changeInvoiceStatusFilter(e.target.value)} className={selClass(filterStatus !== 'all')}>
                   <option value="all">All Statuses</option>
                   <option value="pending">Pending</option><option value="approved">Approved</option>
                   <option value="scheduled">Scheduled</option><option value="paid">Paid</option><option value="rejected">Rejected</option>
                 </select>
-                <select value={filterMember} onChange={e => setFilterMember(e.target.value)} className={selClass(filterMember !== 'all')}>
+                <select aria-label="Invoice contractor" value={filterMember} onChange={e => setFilterMember(e.target.value)} className={selClass(filterMember !== 'all')}>
                   <option value="all">All Contractors</option>
                   {teamMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
-                <select value={filterClient} onChange={e => setFilterClient(e.target.value)} className={selClass(filterClient !== 'all')}>
+                <select aria-label="Invoice client" value={filterClient} onChange={e => setFilterClient(e.target.value)} className={selClass(filterClient !== 'all')}>
                   <option value="all">All Clients</option>
                   {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -1350,7 +1366,7 @@ export default function ContractorManagement() {
             <div className="bg-white border border-gray-200 rounded-xl text-center py-12">
               <FileText size={32} className="mx-auto mb-3 text-gray-300" />
               <p className="text-sm text-gray-500 font-medium">No invoices {invoiceView === 'history' ? `for ${dateFilter.label}` : 'in this queue'}</p>
-              <p className="text-xs text-gray-400 mt-1">Invoices appear here when contractors submit them through the Contractor Portal</p>
+              <p className="text-xs text-gray-400 mt-1">Try clearing filters or choosing another period or invoice view.</p>
             </div>
           )}
           <details className="rounded-xl border border-slate-200 bg-white p-4"><summary className="cursor-pointer text-sm font-medium text-slate-600">Invoice submission follow-ups · separate from payment dates</summary><div className="mt-3"><InvoiceFollowups request={authedFetch} /></div></details>
