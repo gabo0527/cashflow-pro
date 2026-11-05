@@ -69,10 +69,12 @@ test('portal rejects a calendar-month range for a client configured for 26th–2
  const result=await route.POST({json:async()=>({portal:true,table:'contractor_invoices',operation:'insert',values:{...newInvoice,period_start:'2026-11-01',period_end:'2026-11-30'}})})
  assert.equal(result.status,400);assert.equal(f.saved,undefined)
 })
-test('admin cannot mark conditional invoices paid until client payment is recorded',async()=>{
+test('admin can record a contractor payment independently and explicitly record a client receipt',async()=>{
  const f=invoiceFixture();f.contractor_invoices=[{id:ids.invoice,company_id:'company',payment_basis:'client_payment',status:'approved',due_date:null,client_payment_received_on:null}]
  const route=invoiceRoute(f,false),req=values=>({json:async()=>({table:'contractor_invoices',operation:'update',filters:[{op:'eq',column:'id',value:ids.invoice}],values})})
- assert.equal((await route.POST(req({status:'paid'}))).status,400)
+ assert.equal((await route.POST(req({status:'paid'}))).status,200)
+ assert.equal(f.saved.client_payment_received_on,undefined)
+ assert.equal(f.saved.client_payment_recorded_at,undefined)
  assert.equal((await route.POST(req({status:'paid',client_payment_received_on:'2026-11-30'}))).status,200)
  assert.equal(f.saved.client_payment_recorded_by,'admin');assert.ok(f.saved.client_payment_recorded_at)
 })

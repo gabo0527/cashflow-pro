@@ -71,6 +71,76 @@ test('portal users cannot approve or mark their own invoices paid',async()=>{
   const response=await route.POST({json:async()=>({portal:true,table:'contractor_invoices',operation:'update',values:{status:'paid'},filters:[{op:'eq',column:'id',value:'11111111-1111-4111-8111-111111111111'}]})})
   assert.equal(response.status,403)
 })
+
+// Exercise the actual endpoint: client receipt data must never gate a verified
+// admin's bookkeeping or be fabricated when a contractor is marked paid.
+function adminInvoiceRoute({existing={},missing=false,authorized=true}={}) {
+  const writes=[],filters=[],clients=[]
+  const row={payment_basis:'client_payment',payment_group:'standard',status:'approved',due_date:null,client_payment_received_on:null,invoice_date:'2026-03-31',...existing}
+  const db={from(table){
+    let operation='select',values
+    const q={
+      select(){return q},eq(k,v){filters.push([table,k,v]);return q},
+      update(v){operation='update';values=v;writes.push({table,operation,values});return q},
+      insert(v){operation='insert';values=v;writes.push({table,operation,values});return q},
+      single:async()=>({data:missing?null:row,error:null}),
+      then(resolve){resolve({data:operation==='select'?[]:[{...row,...(Array.isArray(values)?values[0]:values)}],error:null})},
+    };return q
+  }}
+  const route=load('src/app/api/contractor-invoices/route.ts',{
+    'next/server':next,
+    '@/lib/admin-context':{adminContext:async()=>authorized?{db,companyId:'company',user:{id:'admin-id'},token:'verified-token'}:null},
+    '@/lib/contractor-auth':{readSessionFromCookie:async()=>null},
+    '@supabase/supabase-js':{createClient:(url,key,options)=>{clients.push(options);return db}},
+    '@/lib/billing-policy-server':{readBillingPolicies:async()=>[{client_id:'client',project_id:null,cycle_start_day:1,net_days:30,contractor_payment_basis:'client_payment'}]},
+  })
+  const request=(values,operation='update',extra={})=>route.POST({json:async()=>({table:'contractor_invoices',operation,values,filters:operation==='update'?[{op:'eq',column:'id',value:'11111111-1111-4111-8111-111111111111'},{op:'eq',column:'status',value:row.status}]:[],...extra})})
+  return {request,writes,filters,clients}
+}
+for(const status of ['paid','scheduled','approved','pending','rejected']) test(`verified admin can set ${status} without a client receipt`,async()=>{
+  const {request,writes,filters,clients}=adminInvoiceRoute()
+  const response=await request({status})
+  assert.equal(response.status,200)
+  assert.equal(writes[0].values.status,status)
+  assert.equal(response.body.data[0].client_payment_received_on,null)
+  assert.equal(Object.hasOwn(writes[0].values,'client_payment_recorded_at'),false)
+  assert.ok(filters.some(([table,key,value])=>table==='contractor_invoices'&&key==='company_id'&&value==='company'))
+  assert.ok(filters.some(([,key,value])=>key==='status'&&value==='approved'))
+  assert.equal(clients[0].global.headers.Authorization,'Bearer verified-token')
+})
+test('verified admin can set a payout date before entering the client receipt',async()=>{
+  const {request,writes}=adminInvoiceRoute()
+  assert.equal((await request({due_date:'2026-04-30'})).status,200)
+  assert.deepEqual(writes[0].values,{due_date:'2026-04-30'})
+})
+test('verified admin can correct a client receipt on an already paid invoice',async()=>{
+  const {request,writes}=adminInvoiceRoute({existing:{status:'paid',due_date:'2026-04-30',client_payment_received_on:'2026-04-29'}})
+  assert.equal((await request({client_payment_received_on:null})).status,200)
+  assert.deepEqual(writes[0].values,{client_payment_received_on:null,client_payment_recorded_at:null,client_payment_recorded_by:null})
+})
+test('verified admin can enter an invoice already paid without manufacturing a client receipt',async()=>{
+  const {request,writes}=adminInvoiceRoute()
+  const response=await request({team_member_id:'22222222-2222-4222-8222-222222222222',client_id:'client',invoice_number:'HISTORICAL',period_start:'2026-03-01',period_end:'2026-03-31',invoice_date:'2026-03-31',total_amount:500,status:'paid'},'insert')
+  assert.equal(response.status,200)
+  assert.equal(writes[0].values[0].status,'paid')
+  assert.equal(writes[0].values[0].payment_basis,'client_payment')
+  assert.equal(Object.hasOwn(writes[0].values[0],'client_payment_received_on'),false)
+})
+test('admin privilege cannot be supplied by the caller',async()=>{
+  const {request,writes}=adminInvoiceRoute({authorized:false})
+  assert.equal((await request({status:'paid'},'update',{admin:true,role:'owner'})).status,401)
+  assert.equal(writes.length,0)
+})
+test('admin edits retain company isolation and data validation',async()=>{
+  const missing=adminInvoiceRoute({missing:true})
+  assert.equal((await missing.request({status:'paid'})).status,400)
+  assert.equal(missing.writes.length,0)
+  for(const values of [{status:'invalid'},{total_amount:-1},{due_date:'2026-02-30'}]){
+    const {request,writes}=adminInvoiceRoute()
+    assert.equal((await request(values)).status,400)
+    assert.equal(writes.length,0)
+  }
+})
 test('cron rejects an absent secret, including a forged Bearer undefined value',async()=>{
   const old=process.env.CRON_SECRET;delete process.env.CRON_SECRET
   try {
