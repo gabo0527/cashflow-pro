@@ -148,3 +148,15 @@ lump-sum checkbox. Actual allocations remain available on the invoice.
 Combined invoices carry their covered client/project IDs. Missing-invoice checks
 can recognize their coverage, including adjacent monthly invoices that jointly
 cover a client's 26th–25th work cycle, so they do not request duplicate invoices.
+
+## Administrator payment corrections
+
+Verified owners and admins may update any invoice status, schedule a payout, or
+correct client receipt details within their company without first entering a
+client receipt date. This supports historical bookkeeping and payments made
+before client funds arrive. Marking a contractor paid never fabricates a client
+receipt. The admin JWT continues to reach the database so status timestamps and
+the status history identify the actual administrator. Contractors cannot change
+reviewed statuses or record client receipts; company scoping, validation, and
+concurrent status checks remain in force. The combined lump-sum Net 60 rule is
+unchanged.

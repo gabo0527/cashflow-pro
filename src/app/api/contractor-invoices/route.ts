@@ -117,7 +117,9 @@ export async function POST(request: Request) {
         if(policy.contractor_payment_basis==='client_payment') {
           values.payment_terms='After client payment; schedule manually'; values.due_date=null
           if(admin && values.client_payment_received_on) {values.client_payment_recorded_at=new Date().toISOString();values.client_payment_recorded_by=admin.user.id}
-          if(['paid','scheduled'].includes(values.status) && !values.client_payment_received_on) throw new Error('Record receipt of client payment before scheduling or marking this contractor invoice paid.')
+          // Verified administrators can record historical payments independently
+          // of client receipts. Never infer a client receipt from a payout.
+          if(!admin && ['paid','scheduled'].includes(values.status) && !values.client_payment_received_on) throw new Error('Record receipt of client payment before scheduling or marking this contractor invoice paid.')
         }
         else if(memberId) values.due_date=invoiceDueDate(values.invoice_date,Number(String(values.payment_terms).match(/\d+/)?.[0] || 30))
       }
@@ -141,7 +143,7 @@ export async function POST(request: Request) {
         const newPayoutDate=values.due_date && values.due_date!==existing.due_date
         const releasingPayment=['scheduled','paid'].includes(values.status)
         const removingFunds=existing.client_payment_received_on && Object.hasOwn(values,'client_payment_received_on') && !received && (existing.due_date || ['scheduled','paid'].includes(existing.status))
-        if(existing.payment_basis==='client_payment' && !received && (newPayoutDate || releasingPayment || removingFunds)) throw new Error('Record receipt of client payment before scheduling or marking this contractor invoice paid.')
+        if(!admin && existing.payment_basis==='client_payment' && !received && (newPayoutDate || releasingPayment || removingFunds)) throw new Error('Record receipt of client payment before scheduling or marking this contractor invoice paid.')
       }
       if(memberId) {delete values.client_payment_received_on;delete values.client_payment_note}
       return values
