@@ -1,5 +1,6 @@
 // This boundary deliberately projects submission data into an hours-only report.
 export interface ResourceSubmission {
+  id?: string;
   date: string;
   hours: number;
   team_member_id: string;

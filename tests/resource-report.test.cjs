@@ -60,7 +60,7 @@ test('summary API projects away financial fields and ignores unknown output keys
 test('builder applies project and resource choices and preserves edited summaries when drafting other rows', async () => {
   const React = require('react'), { create, act } = require('react-test-renderer');
   let requests = [];
-  const handler = load('src/components/time-tracking/ResourceReportBuilder.tsx', {
+  const handler = load('src/components/time-tracking/AdvancedResourceReportBuilder.tsx', {
     '@/lib/resource-report': lib,
     '@/lib/supabase': {supabase:{auth:{getSession:async()=>({data:{session:{access_token:'token'}}})}}},
     'lucide-react': {Download:()=>null,RefreshCw:()=>null,X:()=>null},
