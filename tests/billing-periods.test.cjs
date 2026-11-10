@@ -31,7 +31,7 @@ test('waiting for client funds is distinct from an overdue or unscheduled payabl
  assert.equal(payables.payableBucket({...invoice,client_payment_received_on:'2026-11-02'},'2026-11-03'),'ready_to_schedule')
  assert.equal(payables.payableBucket({...invoice,client_payment_received_on:'2026-11-02',due_date:'2026-11-01'},'2026-11-03'),'overdue')
 })
-function fixtureDB(fixture){return {from(table){let patch,filters=[],operation='read';const q={select(){return q},eq(k,v){filters.push([k,v]);return q},gte(){return q},lte(){return q},in(){return q},order(){return q},limit(){return q},update(p){patch=p;operation='update';return q},insert(p){patch=p;operation='insert';return q},upsert(p){patch=p;operation='upsert';return q},single(){const r=result();return Promise.resolve({...r,data:Array.isArray(r.data)?r.data[0] || null:r.data})},then(resolve){resolve(result())}};function result(){let data=fixture[table] || [];if(operation==='upsert'){for(const row of patch)if(!data.some(d=>d.team_member_id===row.team_member_id && d.client_id===row.client_id && d.project_id===row.project_id && d.closing_month===row.closing_month))data.push({id:`obligation-${data.length}`,required:true,reminder_state:'pending',...row});fixture[table]=data}if(operation==='insert'){fixture.saved=patch;return {data:patch,error:null}}if(operation==='update'){fixture.saved=patch;return {data:[patch],error:null}}data=data.filter(row=>filters.every(([k,v])=>row[k]===v));return {data,error:null}}return q}}}
+function fixtureDB(fixture){return {from(table){let patch,filters=[],inFilters=[],operation='read';const q={select(){return q},eq(k,v){filters.push([k,v]);return q},gte(){return q},lte(){return q},in(k,v){inFilters.push([k,v]);return q},order(){return q},limit(){return q},update(p){patch=p;operation='update';return q},insert(p){patch=p;operation='insert';return q},upsert(p){patch=p;operation='upsert';return q},single(){const r=result();return Promise.resolve({...r,data:Array.isArray(r.data)?r.data[0] || null:r.data})},then(resolve){resolve(result())}};function result(){let data=fixture[table] || [];if(operation==='upsert'){for(const row of patch)if(!data.some(d=>d.team_member_id===row.team_member_id && d.client_id===row.client_id && d.project_id===row.project_id && d.closing_month===row.closing_month))data.push({id:`obligation-${data.length}`,required:true,reminder_state:'pending',...row});fixture[table]=data}if(operation==='insert'){fixture.saved=patch;return {data:patch,error:null}}if(operation==='update'){fixture.saved=patch;return {data:[patch],error:null}}data=data.filter(row=>filters.every(([k,v])=>row[k]===v)&&inFilters.every(([k,v])=>v.includes(row[k])));return {data,error:null}}return q}}}
 function obligations(today,fixture,policies=[policy]){return load('src/lib/invoice-obligations.ts',{'./contractor-auth':{},'./payables':{...payables,localToday:()=>today},'./billing-periods':billing,'./billing-policy-server':{readBillingPolicies:async()=>policies}}).invoiceObligations(fixtureDB(fixture),'company',today.slice(0,7)+'-01')}
 function followupFixture(){return {team_members:[{id:'member',company_id:'company',status:'active',employment_type:'contractor',name:'Alex',email:'alex@example.test'}],team_project_assignments:[{team_member_id:'member',project_id:'project',company_id:'company',is_active:true}],projects:[{id:'project',client_id:'client',company_id:'company',name:'Work',status:'active'}],clients:[{id:'client',name:'NovaInSite',company_id:'company'}],contractor_billing_obligations:[]}}
 test('custom October 25 periods precede cutoff; November 25 periods wait until they close',async()=>{
@@ -57,7 +57,7 @@ test('calendar October 31 remains eligible and existing sent reminders are retai
 const next={NextResponse:{json:(body,options={})=>({body,status:options.status||200})}}
 const ids={member:'11111111-1111-4111-8111-111111111111',client:'22222222-2222-4222-8222-222222222222',invoice:'33333333-3333-4333-8333-333333333333'}
 function invoiceRoute(f,portal=true){const db=fixtureDB(f);return load('src/app/api/contractor-invoices/route.ts',{'next/server':next,'@supabase/supabase-js':{createClient:()=>db},'@/lib/admin-context':{adminContext:async()=>({db,companyId:'company',token:'test',user:{id:'admin'}})},'@/lib/contractor-auth':{getSupabaseAdmin:()=>db,readSessionFromCookie:async()=>({contractorId:ids.member,email:'alex@example.test'})},'@/lib/billing-periods':billing,'@/lib/billing-policy-server':{readBillingPolicies:async()=>[{...policy,client_id:ids.client}]},'@/lib/payables':payables})}
-function invoiceFixture(){return {team_members:[{id:ids.member,email:'alex@example.test',status:'active',company_id:'company'}],clients:[{id:ids.client,company_id:'company'}],projects:[{id:'project',client_id:ids.client,company_id:'company'}],team_project_assignments:[{team_member_id:ids.member,project_id:'project'}]}}
+function invoiceFixture(){return {team_members:[{id:ids.member,email:'alex@example.test',status:'active',company_id:'company'}],clients:[{id:ids.client,company_id:'company'}],projects:[{id:'project',client_id:ids.client,company_id:'company',status:'active',is_active:true}],team_project_assignments:[{team_member_id:ids.member,project_id:'project',is_active:true}]}}
 const newInvoice={team_member_id:ids.member,client_id:ids.client,invoice_number:'TEST',invoice_date:'2026-11-30',period_start:'2026-10-26',period_end:'2026-11-25',total_amount:100,payment_terms:'NET45',due_date:'2027-01-14'}
 test('portal submission snapshots policy, preserves issue date, and does not impose client Net 45 on contractor payout',async()=>{
  const f=invoiceFixture(),route=invoiceRoute(f)
@@ -96,7 +96,7 @@ test('contractors cannot inject a confirmed client schedule through invoice subm
 
 test('eligible lump-sum contractors can submit one combined calendar-month Net 60 invoice',async()=>{
  const f=invoiceFixture();f.team_members[0].cost_type='lump_sum';f.team_project_assignments[0].company_id='company'
- f.projects.push({id:'second-project',client_id:'second-client',company_id:'company'});f.team_project_assignments.push({team_member_id:ids.member,project_id:'second-project',company_id:'company'})
+ f.projects.push({id:'second-project',client_id:'second-client',company_id:'company',status:'active',is_active:true});f.team_project_assignments.push({team_member_id:ids.member,project_id:'second-project',company_id:'company',is_active:true})
  const route=invoiceRoute(f),values={...newInvoice,payment_group:'pooled_lump_sum',client_id:null,period_start:'2026-11-01',period_end:'2026-11-30'}
  const result=await route.POST({json:async()=>({portal:true,table:'contractor_invoices',operation:'insert',values})})
  assert.equal(result.status,200);assert.equal(f.saved[0].payment_terms,'NET60');assert.equal(f.saved[0].due_date,'2027-01-29');assert.equal(f.saved[0].client_id,null);assert.equal(f.saved[0].billing_snapshot.pooled_client_ids.length,2)
@@ -117,4 +117,23 @@ test('invoice month follows the close, independent of issue and payment dates',(
  assert.equal(billing.invoiceBillingMonth({period_start:'2026-12-26',period_end:'2027-01-25'}),'2027-01')
  assert.equal(billing.invoiceBillingMonth({invoice_date:'2026-09-30'}),'2026-09')
  assert.equal(billing.billingMonthLabel(''),'Billing month unavailable')
+})
+
+test('invoice submissions reject an unselected project and a disabled assignment',async()=>{
+ const management='44444444-4444-4444-8444-444444444444'
+ const f=invoiceFixture();f.projects.push({id:management,client_id:ids.client,company_id:'company',status:'active',is_active:true})
+ let result=await invoiceRoute(f).POST({json:async()=>({portal:true,table:'contractor_invoices',operation:'insert',values:{...newInvoice,billing_project_id:management}})})
+ assert.equal(result.status,400);assert.match(result.body.error,/assigned/)
+ f.team_project_assignments[0].is_active=false
+ result=await invoiceRoute(f).POST({json:async()=>({portal:true,table:'contractor_invoices',operation:'insert',values:newInvoice})})
+ assert.equal(result.status,400);assert.match(result.body.error,/assigned/)
+})
+
+test('invoice allocations cannot bypass the selected projects',async()=>{
+ const unselected='44444444-4444-4444-8444-444444444444',f=invoiceFixture()
+ f.contractor_invoices=[{id:ids.invoice,team_member_id:ids.member,company_id:'company',client_id:ids.client,status:'submitted'}]
+ f.projects.push({id:unselected,client_id:ids.client,company_id:'company',status:'active',is_active:true})
+ const values={invoice_id:ids.invoice,client_id:ids.client,project_id:unselected,amount:100}
+ const result=await invoiceRoute(f).POST({json:async()=>({portal:true,table:'contractor_invoice_lines',operation:'insert',values})})
+ assert.equal(result.status,400);assert.match(result.body.error,/assigned projects/)
 })

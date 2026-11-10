@@ -1,4 +1,6 @@
 'use client'
+
+import { explicitContractorProjects } from '@/lib/contractor-project-access'
 import { createInvoiceStore } from '@/lib/invoice-client'
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react'
@@ -558,43 +560,21 @@ export default function ContractorPortal() {
       const ratesByClient: Record<string, { rate: number; cost_type: string }> = {}
       ;(rcData || []).forEach((r: any) => { ratesByClient[r.client_id] = { rate: r.rate || 0, cost_type: r.cost_type || 'hourly' } })
 
-      const { data: pa } = await supabase.from('team_project_assignments').select('project_id, payment_type, rate, bill_rate').eq('team_member_id', md.id)
-      const { data: projects } = await supabase.from('projects').select('id, name, client_id, company_id').eq('status', 'active')
-      const pMap: Record<string, any> = {}; (projects || []).forEach((p: any) => { pMap[p.id] = p })
+      const { data: pa, error: assignmentError } = await supabase.from('team_project_assignments').select('project_id, payment_type, rate, bill_rate, company_id, is_active').eq('team_member_id', md.id)
+      const { data: projects, error: projectError } = await supabase.from('projects').select('id, name, client_id, company_id, status, is_active').eq('status', 'active')
+      if (assignmentError || projectError) throw new Error('Project assignments could not be loaded. Please retry.')
 
-      let assigns: Assignment[] = []
-
-      // Source 1: Explicit project assignments
-      if (pa && pa.length > 0) {
-        assigns = pa.map((a: any) => {
-          const p = pMap[a.project_id]
-          const clientRate = p?.client_id ? ratesByClient[p.client_id] : null
-          return {
-            project_id: a.project_id, project_name: p?.name || 'Unknown',
-            client_id: p?.client_id || '', client_name: p?.client_id ? cMap[p.client_id] || '' : '',
-            payment_type: clientRate?.cost_type === 'hourly' ? 'tm' : (a.payment_type || 'tm'),
-            rate: clientRate?.rate || a.bill_rate || a.rate || 0
-          }
-        }).filter((a: Assignment) => a.project_name !== 'Unknown')
-      }
-
-      // Source 2: Bill-rate implied — only for clients with NO explicit project assignments
-      // If a client has specific projects selected in the rate card, respect that selection
-      const assignedProjectIds = new Set(assigns.map(a => a.project_id))
-      const clientsWithExplicitAssignments = new Set(assigns.map(a => a.client_id).filter(Boolean))
-      const rateImplied = (projects || [])
-        .filter((p: any) => 
-          ratesByClient[p.client_id] && 
-          !assignedProjectIds.has(p.id) && 
-          !clientsWithExplicitAssignments.has(p.client_id) // Skip clients that already have specific project picks
-        )
-        .map((p: any) => ({
+      const permittedProjects = explicitContractorProjects(projects || [], pa || [], md.company_id)
+      const assigns: Assignment[] = permittedProjects.map(p => {
+        const a = (pa || []).find((a: any) => a.project_id === p.id)!
+        const clientRate = ratesByClient[p.client_id]
+        return {
           project_id: p.id, project_name: p.name, client_id: p.client_id,
           client_name: cMap[p.client_id] || '',
-          payment_type: ratesByClient[p.client_id].cost_type === 'hourly' ? 'tm' : 'lump_sum',
-          rate: ratesByClient[p.client_id].rate
-        }))
-      assigns = [...assigns, ...rateImplied]
+          payment_type: clientRate?.cost_type === 'hourly' ? 'tm' : (a.payment_type || 'tm'),
+          rate: clientRate?.rate || a.bill_rate || a.rate || 0,
+        }
+      })
 
       if (!md.company_id && projects && projects.length > 0) {
         const projectWithCompany = projects.find((p: any) => p.company_id)
@@ -795,9 +775,10 @@ export default function ContractorPortal() {
     const { data: me } = await supabase.from('time_entries').select('project_id, hours').eq('contractor_id', member.id).gte('date', billingMonth.start).lte('date', billingMonth.end)
     if (!me || me.length === 0) { setInvoiceDistribution([]); return }
 
-    const totalH = me.reduce((s: number, e: any) => s + (e.hours || 0), 0)
+    const assignedEntries = me.filter((e: any) => assignments.some(a => a.project_id === e.project_id))
+    const totalH = assignedEntries.reduce((s: number, e: any) => s + (e.hours || 0), 0)
     const byProject: Record<string, number> = {}
-    me.forEach((e: any) => { byProject[e.project_id] = (byProject[e.project_id] || 0) + (e.hours || 0) })
+    assignedEntries.forEach((e: any) => { byProject[e.project_id] = (byProject[e.project_id] || 0) + (e.hours || 0) })
 
     const lines: InvoiceLine[] = Object.entries(byProject).map(([pid, hours]) => {
       const a = assignments.find(a => a.project_id === pid)

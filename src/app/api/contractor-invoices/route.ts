@@ -79,6 +79,20 @@ export async function POST(request: Request) {
         const { data } = await service.from('projects').select('id,client_id').eq('id',values.project_id).eq('company_id',companyId).single()
         if (!data || values.client_id && data.client_id !== values.client_id) throw new Error('Choose a project for this client.')
       }
+      if (memberId && isLine && body.operation === 'insert') {
+        const { data: invoice } = await service.from('contractor_invoices').select('client_id')
+          .eq('id',values.invoice_id).eq('team_member_id',memberId).eq('company_id',companyId).single()
+        const { data: assignments, error } = await service.from('team_project_assignments').select('project_id')
+          .eq('company_id',companyId).eq('team_member_id',memberId).eq('is_active',true)
+        const { data: projects, error: projectError } = await service.from('projects').select('id,client_id')
+          .eq('company_id',companyId).eq('status','active').eq('is_active',true).eq('client_id',values.client_id)
+          .in('id',(assignments || []).map(a=>a.project_id))
+        if (!invoice || error || projectError || !projects?.length ||
+          invoice.client_id && invoice.client_id !== values.client_id ||
+          values.project_id && !projects.some(p=>p.id === values.project_id)) {
+          throw new Error('Invoice allocations must use your assigned projects for this client.')
+        }
+      }
       if (!isLine && body.operation === 'insert') {
         values.company_id = companyId
         if (memberId) { values.team_member_id = memberId; values.status = 'submitted'; values.entered_by = 'contractor' }
@@ -98,9 +112,9 @@ export async function POST(request: Request) {
         if(projectId && !uuid(projectId)) throw new Error('Choose a valid project.')
         if(projectId && !memberId) { const {data:project}=await service.from('projects').select('id').eq('id',projectId).eq('company_id',companyId).eq('client_id',values.client_id).single(); if(!project) throw new Error('Choose a project for this client.') }
         if(memberId) {
-          const {data:assignments,error}=await service.from('team_project_assignments').select('project_id').eq('team_member_id',values.team_member_id)
+          const {data:assignments,error}=await service.from('team_project_assignments').select('project_id').eq('is_active',true).eq('team_member_id',values.team_member_id)
           if(error) throw new Error('Project assignments could not be verified.')
-          const {data:projects,error:projectError}=await service.from('projects').select('id,client_id').eq('company_id',companyId).eq('client_id',values.client_id).in('id',(assignments || []).map(a=>a.project_id))
+          const {data:projects,error:projectError}=await service.from('projects').select('id,client_id').eq('status','active').eq('is_active',true).eq('company_id',companyId).eq('client_id',values.client_id).in('id',(assignments || []).map(a=>a.project_id))
           if(projectError || !projects?.length || projectId && !projects.some(p=>p.id===projectId)) throw new Error('Choose an assigned client and project.')
           if(!projectId && policies.some(p=>p.client_id===values.client_id && p.project_id && projects.some(s=>s.id===p.project_id))) throw new Error('Choose a project because this client has project-specific billing settings.')
         }
