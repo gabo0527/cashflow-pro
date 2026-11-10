@@ -63,3 +63,15 @@ export function buildProjectTimesheetReport(options: {
   const originals=included.filter(({entry:e})=>options.detailScope==='period'||e.date>=currentWeek.start).map(({entry:e,key})=>({key,date:e.date,hours:Number(e.hours),resourceId:e.team_member_id,resource:e.team_member_name,project:e.project_name,client:e.client_name,description:e.notes})).sort((a,b)=>a.resource.localeCompare(b.resource)||a.date.localeCompare(b.date)||a.key.localeCompare(b.key))
   return {title:options.title,project:options.project,client:options.client,from,through,currentWeek,weeks,hours,summaries:currentRows,originals,sections:options.sections,excludedCount:matching.length-included.length,detailStart:options.detailScope==='period'?from:currentWeek.start,...(options.budget&&options.resources.length>0&&options.resources.every(r=>options.selectedResources.includes(r.id))?{budget:{...options.budget}}:{})}
 }
+
+// A preset defines the complete window. Custom ranges keep both chosen bounds;
+// only a current week/month preset is shortened to today.
+export function timesheetWindow(mode:'week'|'month'|'range',values:{week:string;month:string;from:string;to:string},today:string) {
+  if(mode==='range'){
+    if(!reportPeriod('week',values.from)||!reportPeriod('week',values.to)||values.from>values.to||values.to>today||shiftDate(values.from,366)<values.to)return null
+    return {start:values.from,end:values.to}
+  }
+  const period=reportPeriod(mode,mode==='week'?values.week:values.month)
+  if(!period||period.start>today)return null
+  return {start:period.start,end:period.end>today?today:period.end}
+}
