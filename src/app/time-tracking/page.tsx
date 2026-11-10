@@ -66,6 +66,9 @@ interface Project {
   client_id: string
   bill_rate?: number
   budget_type?: string
+  budget?: number
+  start_date?: string
+  end_date?: string
 }
 
 interface Client {
@@ -1684,11 +1687,14 @@ ${parts.join('')}
       <ToastContainer toasts={toasts} onDismiss={id => setToasts(prev => prev.filter(t => t.id !== id))} />
 
       {showResourceReport && <ResourceReportBuilder
-        entries={entries.map((e): ResourceSubmission => ({ date: e.date, hours: e.hours, team_member_id: e.team_member_id, team_member_name: e.team_member_name, project_id: e.project_id, project_name: e.project_name, client_name: e.client_name, notes: e.notes }))}
+        entries={entries.map((e): ResourceSubmission => ({ id: e.id, date: e.date, hours: e.hours, team_member_id: e.team_member_id, team_member_name: e.team_member_name, project_id: e.project_id, project_name: e.project_name, client_name: e.client_name, notes: e.notes }))}
         projects={projects.map(p => ({ id: p.id, label: p.name }))}
         resources={teamMembers.map(m => ({ id: m.id, label: m.name }))}
         initialProjects={selectedProjectIds ?? projects.filter(p => selectedClient === 'all' || p.client_id === selectedClient).map(p => p.id)}
         initialResources={selectedEmployeeIds ?? teamMembers.map(m => m.id)}
+        projectResources={assignments.filter(a => (a as any).is_active !== false).map(a => ({project_id:a.project_id,team_member_id:a.team_member_id}))}
+        budgetReferences={projects.flatMap(p => getProjectPhases(p,projectTerms).filter(ph=>ph.terms==='tm_nte' && Number(ph.nte_amount)>0).map(ph=>({projectId:p.id,start:ph.effective_start,end:ph.effective_end,amount:Number(ph.nte_amount),cadence:ph.budget_cadence || 'monthly'})))}
+        budgetSources={commercialPricedEntries.map(e=>({projectId:e.project_id,date:e.date,hours:e.billable_hours,rate:e.bill_rate,billable:e.is_billable}))}
         budgetEntries={entries.map(e => ({ resourceId: e.team_member_id, date: e.date, projectId: e.project_id, hours: e.hours, rate: e.bill_rate, billable: e.is_billable }))}
         budgetProjects={projects.map(p => ({ id: p.id, name: p.name, clientId: p.client_id, client: clients.find(c => c.id === p.client_id)?.name || '' }))}
         logo={MANO_LOGO}
