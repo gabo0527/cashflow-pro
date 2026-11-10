@@ -13,7 +13,7 @@ function loadTS(file, mocks = {}) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React, esModuleInterop: true },
   }).outputText
   const module = { exports: {} }
-  const requireMock = name => Object.hasOwn(mocks, name) ? mocks[name] : name === '@/lib/billing-periods' ? loadTS('src/lib/billing-periods.ts') : name === '@/lib/payables' ? loadTS('src/lib/payables.ts') : name === '@/hooks/useBillingPolicies' ? {useBillingPolicies:()=>({policies:[],loading:false,error:''})} : name === '@/lib/invoice-client' ? loadTS('src/lib/invoice-client.ts') : name === '@/components/workspace/PageHeader' ? {__esModule:true,default:loadTS('src/components/workspace/PageHeader.tsx').default} : require(name)
+  const requireMock = name => Object.hasOwn(mocks, name) ? mocks[name] : name === '@/lib/contractor-project-access' ? loadTS('src/lib/contractor-project-access.ts') : name === '@/lib/billing-periods' ? loadTS('src/lib/billing-periods.ts') : name === '@/lib/payables' ? loadTS('src/lib/payables.ts') : name === '@/hooks/useBillingPolicies' ? {useBillingPolicies:()=>({policies:[],loading:false,error:''})} : name === '@/lib/invoice-client' ? loadTS('src/lib/invoice-client.ts') : name === '@/components/workspace/PageHeader' ? {__esModule:true,default:loadTS('src/components/workspace/PageHeader.tsx').default} : require(name)
   vm.runInThisContext(`(function(require,module,exports){${source}\n})`, { filename })(requireMock, module, module.exports)
   return module.exports
 }
@@ -173,10 +173,13 @@ test('real portal opens only the selected project/day, closes on Enter, and expa
     team_members: { id: 'fixture-contractor', name: 'Test Contractor', email: 'test@example.test', company_id: 'company', status: 'active', onboarding_status: 'completed' },
     clients: [{ id: 'client-one', name: 'Client One' }, { id: 'client-two', name: 'Client Two' }],
     bill_rates: [{ client_id: 'client-one', cost_type: 'hourly', rate: 125 }, { client_id: 'client-two', cost_type: 'hourly', rate: 100 }],
-    projects: [{ id: projectId, name: 'Project One', client_id: 'client-one', company_id: 'company' }, { id: 'project-two', name: 'Project Two', client_id: 'client-two', company_id: 'company' }],
-    team_project_assignments: [{ project_id: projectId, payment_type: 'tm' }, { project_id: 'project-two', payment_type: 'tm' }],
+    projects: [{ id: projectId, name: 'Project One', client_id: 'client-one', company_id: 'company', status: 'active', is_active: true }, { id: 'project-two', name: 'Project Two', client_id: 'client-two', company_id: 'company', status: 'active', is_active: true }],
+    team_project_assignments: [{ company_id: 'company', is_active: true, project_id: projectId, payment_type: 'tm' }, { company_id: 'company', is_active: true, project_id: 'project-two', payment_type: 'tm' }],
     time_entries: rows,
   }
+  fixture.clients.push({id:'unassigned-client',name:'Unassigned Client'})
+  fixture.bill_rates.push({client_id:'unassigned-client',cost_type:'hourly',rate:100})
+  fixture.projects.push({id:'management',name:'Unselected Management',client_id:'client-one',company_id:'company',status:'active',is_active:true},{id:'unassigned',name:'Unassigned Project',client_id:'unassigned-client',company_id:'company',status:'active',is_active:true})
   const supabase = { from(table) {
     const builder = { then(resolve) { return Promise.resolve({ data: fixture[table] || [], error: null }).then(resolve) } }
     for (const method of ['select', 'eq', 'gte', 'lte', 'order', 'limit', 'single']) builder[method] = () => builder
@@ -196,6 +199,7 @@ test('real portal opens only the selected project/day, closes on Enter, and expa
   let renderer
   try {
     await act(async () => { renderer = create(React.createElement(Page)); await new Promise(resolve => setImmediate(resolve)) })
+    assert.doesNotMatch(JSON.stringify(renderer.toJSON()),/Unselected Management|Unassigned Project/)
     const notes = () => renderer.root.findAll(node => node.type === 'textarea' && node.props.className === 'cp-note')
     const hours = () => renderer.root.findAll(node => node.type === 'input' && node.props.className?.includes('cp-cell'))
     assert.equal(notes().length, 0)
@@ -225,6 +229,7 @@ test('real portal opens only the selected project/day, closes on Enter, and expa
     assert.equal(notes()[0].props.value, 'Monday work')
     await act(async()=>renderer.root.findAllByType('button').find(b=>b.findAllByType('span').some(s=>s.children.includes('Invoices'))).props.onClick())
     await act(async()=>renderer.root.findAllByType('button').find(b=>b.children.some(c=>typeof c==='string' && c.includes('New invoice'))).props.onClick())
+    assert.ok(!renderer.root.findAllByType('option').some(o=>o.props.value==='unassigned-client'))
     const clientSelect=renderer.root.findAllByType('select').find(s=>s.findAllByType('option').some(o=>o.props.value==='client-one'))
     await act(async()=>clientSelect.props.onChange({target:{value:'client-one'}}))
     assert.match(JSON.stringify(renderer.toJSON()),/One client per invoice/)

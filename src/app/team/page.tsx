@@ -312,6 +312,9 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
   const [isSaving, setIsSaving] = useState(false)
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set())
   const [loadingAssignments, setLoadingAssignments] = useState(false)
+  const [assignmentError, setAssignmentError] = useState("")
+  const [saveError, setSaveError] = useState("")
+  const [loadedAssignmentKey, setLoadedAssignmentKey] = useState("")
 
   // Get projects for selected client
   const clientProjects = useMemo(() => 
@@ -319,30 +322,30 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
     [projects, form.client_id]
   )
 
-  // Load existing project assignments when editing or client changes
+  // Ignore stale responses when switching member/client or reopening the modal.
   useEffect(() => {
-    const loadAssignments = async () => {
-      if (!form.team_member_id || !form.client_id || !companyId) { setSelectedProjects(new Set()); return }
-      setLoadingAssignments(true)
+    let cancelled = false
+    setSelectedProjects(new Set()); setLoadedAssignmentKey(''); setAssignmentError(''); setSaveError('')
+    if (!isOpen || !form.team_member_id || !form.client_id || !companyId) return
+    const key = `${form.team_member_id}:${form.client_id}`
+    setLoadingAssignments(true)
+    const load = async () => {
       try {
-        const clientProjectIds = projects.filter(p => p.client_id === form.client_id).map(p => p.id)
-        if (clientProjectIds.length === 0) { setSelectedProjects(new Set()); return }
-        const { data } = await supabase.from("team_project_assignments")
-          .select("project_id")
-          .eq("team_member_id", form.team_member_id)
-          .eq("company_id", companyId)
-          .in("project_id", clientProjectIds)
-        if (data && data.length > 0) {
-          setSelectedProjects(new Set(data.map((d: any) => d.project_id)))
-        } else {
-          // No assignments yet — default to all projects for this client
-          setSelectedProjects(new Set(clientProjectIds))
+        const ids = projects.filter(p => p.client_id === form.client_id && p.status === 'active').map(p => p.id)
+        const result = ids.length ? await supabase.from('team_project_assignments').select('project_id,is_active')
+          .eq('team_member_id',form.team_member_id).eq('company_id',companyId).in('project_id',ids) : {data:[],error:null}
+        if (result.error) throw result.error
+        if (!cancelled) {
+          setSelectedProjects(new Set((result.data || []).filter((a: any) => a.is_active !== false).map((a: any) => a.project_id)))
+          setLoadedAssignmentKey(key)
         }
-      } catch (e) { console.error("Error loading assignments:", e) }
-      finally { setLoadingAssignments(false) }
+      } catch {
+        if (!cancelled) setAssignmentError('Project selections could not be loaded. Reopen this rate card to retry.')
+      } finally { if (!cancelled) setLoadingAssignments(false) }
     }
-    if (form.client_id && form.team_member_id) loadAssignments()
-  }, [form.client_id, form.team_member_id, companyId])
+    load()
+    return () => { cancelled = true }
+  }, [isOpen, form.client_id, form.team_member_id, companyId, projects])
 
   useEffect(() => {
     if (editingRate) {
@@ -383,11 +386,13 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
 
   const handleSave = async () => {
     const hasRevenue = form.revenue_type === "hourly" ? !!form.rate : !!form.revenue_amount
-    if (!form.team_member_id || !form.client_id || !hasRevenue) return
+    if (!form.team_member_id || !form.client_id || !hasRevenue || loadingAssignments || assignmentError || loadedAssignmentKey !== `${form.team_member_id}:${form.client_id}`) return
+    setSaveError("")
     setIsSaving(true)
     try {
       await onSave({
         team_member_id: form.team_member_id, client_id: form.client_id,
+        project_ids: Array.from(selectedProjects),
         rate: form.revenue_type === "hourly" ? (parseFloat(form.rate) || 0) : 0,
         is_active: true, notes: form.notes || null,
         cost_type: form.customCost ? form.cost_type : "hourly",
@@ -399,31 +404,8 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
         end_date: form.end_date || null,
       })
 
-      // Save project assignments
-      if (companyId && selectedProjects.size > 0) {
-        // Delete existing assignments for this member + client's projects
-        const clientProjectIds = projects.filter(p => p.client_id === form.client_id).map(p => p.id)
-        if (clientProjectIds.length > 0) {
-          await supabase.from("team_project_assignments")
-            .delete()
-            .eq("team_member_id", form.team_member_id)
-            .eq("company_id", companyId)
-            .in("project_id", clientProjectIds)
-        }
-        // Insert selected assignments
-        const rows = Array.from(selectedProjects).map(pid => ({
-          company_id: companyId,
-          team_member_id: form.team_member_id,
-          project_id: pid,
-          service: "General",
-          payment_type: "tm",
-        }))
-        if (rows.length > 0) {
-          await supabase.from("team_project_assignments").insert(rows)
-        }
-      }
       onClose()
-    } finally { setIsSaving(false) }
+    } catch (error: any) { setSaveError(error.message || "Rate card could not be saved.") } finally { setIsSaving(false) }
   }
 
   if (!isOpen) return null
@@ -436,6 +418,7 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
           <button onClick={onClose} className="vBtn p-2 hover:bg-gray-100 rounded-lg"><X size={20} className={THEME.textMuted} /></button>
         </div>
         <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+          {(assignmentError || saveError) && <p role="alert" className="text-sm text-red-600">{assignmentError || saveError}</p>}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={`block text-xs ${THEME.textMuted} mb-1`}>Team Member *</label>
@@ -473,7 +456,7 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
           {form.client_id && form.team_member_id && clientProjects.length > 0 && (
             <div className="p-4 rounded-lg border border-blue-200 bg-blue-50 rounded-xl">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-blue-600">PROJECT ACCESS &mdash; Timesheet Visibility</p>
+                <p className="text-xs font-semibold text-blue-600">PROJECT ACCESS — Timesheets and invoices</p>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setSelectedProjects(new Set(clientProjects.map(p => p.id)))}
                     className="text-[10px] text-blue-600 hover:text-blue-500">All</button>
@@ -500,7 +483,7 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
                   ))}
                 </div>
               )}
-              <p className="text-[10px] text-gray-400 mt-2">{selectedProjects.size} of {clientProjects.length} projects &mdash; member will only see selected projects in timesheet</p>
+              <p className="text-[10px] text-gray-400 mt-2">{selectedProjects.size} of {clientProjects.length} projects — only selected projects are available for timesheets and invoices</p>
             </div>
           )}
 
@@ -623,7 +606,7 @@ function RateCardModal({ isOpen, onClose, onSave, editingRate, teamMembers, clie
         </div>
         <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${THEME.border} bg-gray-50`}>
           <button onClick={onClose} className={`vBtn px-4 py-2.5 text-sm font-medium text-gray-400 hover:text-gray-900 rounded-lg hover:bg-gray-50`}>Cancel</button>
-          <button onClick={handleSave} disabled={!form.team_member_id||!form.client_id||(form.revenue_type === "hourly" ? !form.rate : !form.revenue_amount)||isSaving}
+          <button onClick={handleSave} disabled={!form.team_member_id||!form.client_id||(form.revenue_type === "hourly" ? !form.rate : !form.revenue_amount)||isSaving||loadingAssignments||!!assignmentError||loadedAssignmentKey !== `${form.team_member_id}:${form.client_id}`}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium vBtn vPri bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:shadow-none">
             {isSaving && <RefreshCw size={14} className="animate-spin" />}{editingRate ? "Save Changes" : "Add Rate"}
           </button>
@@ -1205,22 +1188,18 @@ export default function TeamPage() {
     try {
       const memberName = teamMembers.find(m => m.id === data.team_member_id)?.name
       const clientName = clients.find(c => c.id === data.client_id)?.name
-      if (editingRate) {
-        const { error } = await supabase.from("bill_rates").update({
-          rate: data.rate, notes: data.notes,
-          cost_type: data.cost_type, cost_amount: data.cost_amount, baseline_hours: data.baseline_hours,
-          revenue_type: data.revenue_type, revenue_amount: data.revenue_amount,
-          start_date: data.start_date, end_date: data.end_date,
-        }).eq("id", editingRate.id)
-        if (error) throw error
-        setBillRates(prev => prev.map(r => r.id === editingRate.id ? { ...r, ...data, team_member_name: memberName, client_name: clientName } : r))
-        addToast("success", "Rate card updated")
-      } else {
-        const { data: newRate, error } = await supabase.from("bill_rates").insert({ company_id: companyId, ...data }).select().single()
-        if (error) throw error
-        setBillRates(prev => [...prev, { ...newRate, team_member_name: memberName, client_name: clientName }])
-        addToast("success", "Rate card added")
-      }
+      const { project_ids, ...rate } = data
+      const { data: sessionData } = await supabase.auth.getSession()
+      if (!sessionData.session) throw new Error('Sign in again before saving.')
+      const response = await fetch('/api/rate-cards', {
+        method: 'POST', headers: { 'Content-Type':'application/json', Authorization:`Bearer ${sessionData.session.access_token}` },
+        body: JSON.stringify({ id: editingRate?.id || null, rate, project_ids }),
+      })
+      const result = await response.json()
+      if (!response.ok || !result.rate) throw new Error(result.error || 'Rate card and project selections were not saved.')
+      const saved = { ...result.rate, team_member_name: memberName, client_name: clientName }
+      setBillRates(prev => editingRate ? prev.map(r => r.id === editingRate.id ? saved : r) : [...prev, saved])
+      addToast('success', 'Rate card and project selections saved')
       setEditingRate(null)
     } catch (error: any) { addToast("error", `Failed to save: ${error.message}`); throw error }
   }

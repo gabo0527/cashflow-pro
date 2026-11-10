@@ -5,9 +5,9 @@ export async function pooledInvoiceEligibility(db:any,companyId:string,memberId:
   let fixed=isLumpSumCostType(member.cost_type)
   if(!fixed){const {data:rates,error}=await db.from('bill_rates').select('cost_type').eq('team_member_id',memberId).eq('is_active',true);if(error)throw new Error('Contractor terms could not be verified.');fixed=!!rates?.length && rates.every((r:any)=>isLumpSumCostType(r.cost_type))}
   if(!fixed) throw new Error('Combined Net 60 invoices are available only for lump-sum contractors.')
-  const {data:assignments,error:assignmentError}=await db.from('team_project_assignments').select('project_id').eq('team_member_id',memberId).eq('company_id',companyId)
+  const {data:assignments,error:assignmentError}=await db.from('team_project_assignments').select('project_id').eq('is_active',true).eq('team_member_id',memberId).eq('company_id',companyId)
   if(assignmentError) throw new Error('Project assignments could not be verified.')
-  const {data:projects,error:projectError}=await db.from('projects').select('id,client_id').eq('company_id',companyId).in('id',(assignments || []).map((a:any)=>a.project_id))
+  const {data:projects,error:projectError}=await db.from('projects').select('id,client_id').eq('status','active').eq('is_active',true).eq('company_id',companyId).in('id',(assignments || []).map((a:any)=>a.project_id))
   const clientIds=Array.from(new Set<string>((projects || []).map((p:any)=>p.client_id).filter(Boolean)))
   if(projectError || clientIds.length<2) throw new Error('A combined invoice must cover at least two assigned clients.')
   return {clientIds,projectIds:(projects || []).map((p:any)=>p.id)}

@@ -13,10 +13,10 @@ export async function GET(request: Request) {
     const db=getSupabaseAdmin()
     const {data:member,error}=await db.from('team_members').select('id,company_id').eq('id',session.contractorId).eq('email',session.email).eq('status','active').single()
     if(error || !member) return NextResponse.json({error:'Account inactive.'},{status:403})
-    const {data:assignments,error:assignmentError}=await db.from('team_project_assignments').select('project_id').eq('team_member_id',member.id)
+    const {data:assignments,error:assignmentError}=await db.from('team_project_assignments').select('project_id').eq('is_active',true).eq('team_member_id',member.id)
     if(assignmentError) throw assignmentError
     const ids=(assignments || []).map(a=>a.project_id)
-    const {data:projects,error:projectError}=await db.from('projects').select('id,client_id').eq('company_id',member.company_id).in('id',ids)
+    const {data:projects,error:projectError}=await db.from('projects').select('id,client_id').eq('status','active').eq('is_active',true).eq('company_id',member.company_id).in('id',ids)
     if(projectError) throw projectError
     const policies=await readBillingPolicies(db,member.company_id)
     return NextResponse.json({policies:policies.filter(p=>(projects || []).some(s=>s.client_id===p.client_id && (!p.project_id || s.id===p.project_id)))})
