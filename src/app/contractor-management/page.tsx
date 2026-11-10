@@ -2,7 +2,7 @@
 import { isLumpSumCostType } from '@/lib/pooled-invoices'
 import { paymentWindow, paymentTiming, inPaymentWindow, validPaymentWindow, PaymentWindowPreset } from '@/lib/payment-planning'
 import { useBillingPolicies } from '@/hooks/useBillingPolicies'
-import { contractorPaymentLabel, invoiceDueDate, billingPolicy, lastClosedBillingPeriod } from '@/lib/billing-periods'
+import { contractorPaymentLabel, invoiceDueDate, billingPolicy, lastClosedBillingPeriod, invoiceBillingMonth, billingMonthLabel } from '@/lib/billing-periods'
 import { createInvoiceStore } from '@/lib/invoice-client'
 
 import InvoiceFollowups from '@/components/InvoiceFollowups'
@@ -353,7 +353,7 @@ export default function ContractorManagement() {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
-  const [invoiceView, setInvoiceView] = useState<'window' | 'pooled' | 'review' | 'outstanding' | 'overdue' | 'history'>('window')
+  const [invoiceView, setInvoiceView] = useState<'window' | 'pooled' | 'review' | 'outstanding' | 'overdue' | 'history'>('history')
   const [pooledAllPeriods,setPooledAllPeriods]=useState(false)
   const [paymentPreset,setPaymentPreset]=useState<PaymentWindowPreset>('month')
   const [paymentDates,setPaymentDates]=useState(()=>paymentWindow('month'))
@@ -378,6 +378,7 @@ export default function ContractorManagement() {
   // Date range
   const [dateRange, setDateRange] = useState<'month' | 'quarter' | 'year' | 'all'>('month')
   const [refDate, setRefDate] = useState(new Date())
+  const [invoiceRefDate, setInvoiceRefDate] = useState(() => new Date(lastClosedBillingPeriod(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' })).end + 'T12:00:00'))
 
   // Grouping
   const [invGroupDims, setInvGroupDims] = useState<GroupDimension[]>(['none'])
@@ -528,7 +529,7 @@ export default function ContractorManagement() {
 
   // Date range
   const dateFilter = useMemo(() => {
-    const d = refDate
+    const d = activeTab === 'invoices' ? invoiceRefDate : refDate
     if (dateRange === 'month') {
       const s = new Date(d.getFullYear(), d.getMonth(), 1); const e = new Date(d.getFullYear(), d.getMonth() + 1, 0)
       return { start: s.toISOString().split('T')[0], end: e.toISOString().split('T')[0], label: d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) }
@@ -539,14 +540,15 @@ export default function ContractorManagement() {
     }
     if (dateRange === 'year') return { start: `${d.getFullYear()}-01-01`, end: `${d.getFullYear()}-12-31`, label: `${d.getFullYear()}` }
     return { start: '2020-01-01', end: '2099-12-31', label: 'All Time' }
-  }, [dateRange, refDate])
+  }, [dateRange, refDate, invoiceRefDate, activeTab])
 
   const navigateDate = (dir: -1 | 1) => {
-    const d = new Date(refDate)
-    if (dateRange === 'month') d.setMonth(d.getMonth() + dir)
-    else if (dateRange === 'quarter') d.setMonth(d.getMonth() + dir * 3)
+    const d = new Date(activeTab === 'invoices' ? invoiceRefDate : refDate)
+    if (dateRange === 'month') d.setMonth(d.getMonth() + dir, 1)
+    else if (dateRange === 'quarter') d.setMonth(d.getMonth() + dir * 3, 1)
     else if (dateRange === 'year') d.setFullYear(d.getFullYear() + dir)
-    setRefDate(d)
+    if (activeTab === 'invoices') setInvoiceRefDate(d)
+    else setRefDate(d)
   }
 
   const hasActiveFilters = paymentStage!=='all' || filterStatus !== 'all' || filterMember !== 'all' || filterClient !== 'all' || searchQuery !== ''
@@ -602,20 +604,22 @@ export default function ContractorManagement() {
   // ============ FILTERED DATA ============
   const filteredInvoices = useMemo(() => {
     let r = [...invoices]
-    if (invoiceView === 'history' && dateRange !== 'all') r = r.filter(inv => inv.period_start <= dateFilter.end && inv.period_end >= dateFilter.start)
+    if (invoiceView === 'history' && dateRange !== 'all') r = r.filter(inv => invoiceBillingMonth(inv) >= dateFilter.start.slice(0,7) && invoiceBillingMonth(inv) <= dateFilter.end.slice(0,7))
     if (invoiceView !== 'history') r = r.filter(isOutstanding)
     if (invoiceView === 'window' || invoiceView==='overdue' || invoiceView==='review') r=r.filter(inv=>inv.payment_group!=='pooled_lump_sum')
     if (invoiceView === 'pooled') r=r.filter(inv=>inv.payment_group==='pooled_lump_sum' && (pooledAllPeriods || inPaymentWindow(inv,billingPolicies,paymentDates.start,paymentDates.end)))
     if (invoiceView === 'window') r = r.filter(inv=>inPaymentWindow(inv,billingPolicies,paymentDates.start,paymentDates.end))
     if (invoiceView === 'review') r = r.filter(inv=>paymentTiming(inv,billingPolicies).needsReview)
     if (invoiceView === 'overdue') r = r.filter(inv => {const timing=paymentTiming(inv,billingPolicies);return !!timing.latest && timing.latest<paymentDates.start && !timing.unscheduledFunds})
-    if (paymentStage === 'awaiting_client_payment') r = r.filter(inv=>{const t=paymentTiming(inv,billingPolicies);return t.conditional && !inv.client_payment_received_on && !t.mixed})
-    if (paymentStage === 'ready_to_schedule') r = r.filter(inv=>{const t=paymentTiming(inv,billingPolicies);return t.ready && !t.mixed && !!t.clientId})
+    if (paymentStage === 'awaiting_client_payment') r = r.filter(inv=>{const t=paymentTiming(inv,billingPolicies);return isOutstanding(inv) && t.conditional && !inv.client_payment_received_on && !t.mixed})
+    if (paymentStage === 'ready_to_schedule') r = r.filter(inv=>{const t=paymentTiming(inv,billingPolicies);return isOutstanding(inv) && t.ready && !t.mixed && !!t.clientId})
     if (searchQuery) { const q = searchQuery.toLowerCase(); r = r.filter(inv => inv.invoice_number.toLowerCase().includes(q) || (memberMap[inv.team_member_id] || '').toLowerCase().includes(q)) }
     if (filterStatus !== 'all') r = r.filter(inv => filterStatus === 'pending' ? ['submitted', 'pending'].includes(inv.status) : inv.status === filterStatus)
     if (filterMember !== 'all') r = r.filter(inv => inv.team_member_id === filterMember)
     if (filterClient !== 'all') r = r.filter(inv => inv.client_id === filterClient || inv.contractor_invoice_lines?.some((l: any) => l.client_id === filterClient))
-    return r.sort((a,b) => (paymentTiming(a,billingPolicies).date || '9999').localeCompare(paymentTiming(b,billingPolicies).date || '9999'))
+    return invoiceView === 'history'
+      ? r.sort((a,b) => invoiceBillingMonth(b).localeCompare(invoiceBillingMonth(a)) || (b.submitted_at || '').localeCompare(a.submitted_at || ''))
+      : r.sort((a,b) => (paymentTiming(a,billingPolicies).date || '9999').localeCompare(paymentTiming(b,billingPolicies).date || '9999'))
   }, [invoiceView, invoices, dateFilter, dateRange, billingPolicies, paymentDates.start, paymentDates.end, pooledAllPeriods, paymentStage, searchQuery, filterStatus, filterMember, filterClient, memberMap])
 
   const filteredExpenses = useMemo(() => {
@@ -1073,7 +1077,7 @@ export default function ContractorManagement() {
   const renderInvoiceRows = (items: ContractorInvoice[]) => (
     <>
       <div className={`grid ${invGrid} min-w-[850px] gap-2 px-5 py-2 border-b border-gray-200 bg-gray-50`}>
-        {['Invoice', 'Contractor', 'Payment / Work period', 'Amount', 'Status', 'Actions'].map(h => (
+        {['Invoice', 'Contractor', invoiceView === 'history' ? 'Billing month / Work dates' : 'Payment / Work period', 'Amount', 'Status', 'Actions'].map(h => (
           <span key={h} className={`vLbl text-[10px] ${THEME.textDim} font-bold uppercase ${h === 'Amount' ? 'text-right' : ''}`}>{h}</span>
         ))}
       </div>
@@ -1099,7 +1103,9 @@ export default function ContractorManagement() {
                 </div>
               </div>
               <span className="text-gray-600 text-sm truncate">{memberMap[inv.team_member_id] || '—'}</span>
-              <div className="text-xs vN" title={timing.source==='estimate'?`Planning range ${timing.earliest} – ${timing.latest}. Client invoice assumed at billing month-end; actual date can be entered in Edit.`:undefined}><span className="block font-semibold text-slate-700">{timing.date?fmtDate(timing.date):'Schedule review'}</span><span className="block text-[10px] text-slate-500">{timing.source==='estimate'?`Month-end · Net ${timing.netDays} · ±5 days`:timing.source==='client_invoice'?`Client invoice · Net ${timing.netDays}`:timing.source==='pooled_net60'?'Combined lump sum · Net 60':timing.source==='payout'?'Scheduled payout':timing.source==='receipt'?'Client funds received':timing.source==='review'?'Client allocation needed':'Contractor due date'}</span>{timing.conditional && <span className="block text-[10px] text-slate-500">{inv.client_payment_received_on?(inv.due_date?'Client paid · payout scheduled':inv.status==='approved'?'Client paid · ready to schedule':'Client paid · review approval'):'Awaiting client payment'}</span>}<span className="block text-[10px] text-gray-400">Work: {fmtDateS(inv.period_start)}–{fmtDateS(inv.period_end)}</span>{timing.needsReview && <button aria-label={`Review payment schedule for ${inv.invoice_number}`} onClick={()=>openEditInvoice(inv)} title={timing.reason || `Planning range ${timing.earliest} – ${timing.latest}. Assumes client invoice at billing month-end; confirm the actual date when available.`} className="text-[10px] text-amber-700 underline">{timing.source==='estimate'?'Confirm client invoice date':'Review schedule'}</button>}</div>
+              {invoiceView === 'history' ? <div className="text-xs vN"><span className="block font-semibold text-slate-700">{billingMonthLabel(invoiceBillingMonth(inv))}</span><span className="block text-gray-500 mt-1">Work: {fmtDateS(inv.period_start)}–{fmtDateS(inv.period_end)}</span>{inv.payment_group === 'pooled_lump_sum' && <span className="block text-gray-500 mt-1">Combined lump sum · Net 60</span>}</div> : (
+              <div className="text-xs vN" title={timing.source==='estimate'?`Planning range ${timing.earliest} – ${timing.latest}. Client invoice assumed at billing month-end; actual date can be entered in Edit.`:undefined}><span className="block font-semibold text-slate-700">{timing.date?fmtDate(timing.date):'Schedule review'}</span><span className="block text-[10px] text-slate-500">{timing.source==='estimate'?`Estimated client receipt · Net ${timing.netDays} · ±5 days`:timing.source==='client_invoice'?`Expected client receipt · Net ${timing.netDays}`:timing.source==='pooled_net60'?'Combined lump sum · Net 60':timing.source==='payout'?'Scheduled payout':timing.source==='receipt'?'Client funds received':timing.source==='review'?'Client allocation needed':'Contractor due date'}</span>{timing.conditional && <span className="block text-[10px] text-slate-500">{inv.client_payment_received_on?(inv.due_date?'Client paid · payout scheduled':inv.status==='approved'?'Client paid · ready to schedule':'Client paid · review approval'):'Awaiting client payment'}</span>}<span className="block text-[10px] text-gray-400">Work: {fmtDateS(inv.period_start)}–{fmtDateS(inv.period_end)}</span>{timing.needsReview && <button aria-label={`Review payment schedule for ${inv.invoice_number}`} onClick={()=>openEditInvoice(inv)} title={timing.reason || `Planning range ${timing.earliest} – ${timing.latest}. Assumes client invoice at billing month-end; confirm the actual date when available.`} className="text-[10px] text-amber-700 underline">{timing.source==='estimate'?'Confirm client invoice date':'Review schedule'}</button>}</div>)}
+
               <span className="text-gray-900 text-sm font-medium text-right vN">{fmt$(inv.total_amount)}</span>
               <div title={historyText}><StatusDropdown status={inv.status} onChange={s => {
                 if (s === 'rejected') { setRejectModal({ id: inv.id, type: 'invoice', label: inv.invoice_number }); setRejectNotes('') }
@@ -1265,8 +1271,13 @@ export default function ContractorManagement() {
         <div className="space-y-4">
           {invoiceError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{invoiceError}</p>}
 
+          <div className="flex flex-wrap gap-2" aria-label="Invoice workspace">
+            <button aria-pressed={invoiceView === 'history'} onClick={() => {setInvoiceView('history');setPaymentStage('all');setFilterStatus('all')}} className={`rounded-lg border px-4 py-2 text-sm font-medium ${invoiceView === 'history' ? 'bg-slate-900 text-white' : 'bg-white text-gray-600'}`}>Invoices</button>
+            <button aria-pressed={invoiceView !== 'history'} onClick={openPaymentWindow} className={`rounded-lg border px-4 py-2 text-sm font-medium ${invoiceView !== 'history' ? 'bg-slate-900 text-white' : 'bg-white text-gray-600'}`}>Payment planning</button>
+          </div>
+          {invoiceView !== 'history' && <>
           <section aria-label="Payment window" className="rounded-xl border border-blue-200 bg-blue-50/40 p-4">
-            <div className="flex flex-wrap items-end gap-3"><div className="flex-1 min-w-[180px]"><h2 className="text-sm font-semibold text-slate-900">What needs attention this period?</h2><p className="mt-1 text-xs text-slate-500">Client payment dates and scheduled payouts · billing month shown for context.</p></div>
+            <div className="flex flex-wrap items-end gap-3"><div className="flex-1 min-w-[180px]"><h2 className="text-sm font-semibold text-slate-900">Payment planning</h2><p className="mt-1 text-xs text-slate-500">Expected client receipts and contractor payouts · estimates are labeled below.</p></div>
             <label className="text-xs text-slate-500">Payment window<select aria-label="Payment window preset" value={paymentPreset} onChange={e=>{const preset=e.target.value as PaymentWindowPreset;setPaymentPreset(preset);if(preset!=='custom')setPaymentDates(paymentWindow(preset));openPaymentWindow()}} className="block rounded-lg border border-gray-200 bg-white p-2 mt-1 text-sm"><option value="month">This month</option><option value="week">This week</option><option value="month_end">Month-end / opening week</option><option value="next_30">Next 30 days</option><option value="custom">Custom dates</option></select></label>
             <label className="text-xs text-slate-500">From<input aria-label="Payment window start" type="date" value={paymentDates.start} onChange={e=>{setPaymentPreset('custom');setPaymentDates(d=>({...d,start:e.target.value}));openPaymentWindow()}} className="block rounded-lg border border-gray-200 bg-white p-2 mt-1 text-sm" /></label>
             <label className="text-xs text-slate-500">Through<input aria-label="Payment window end" type="date" value={paymentDates.end} onChange={e=>{setPaymentPreset('custom');setPaymentDates(d=>({...d,end:e.target.value}));openPaymentWindow()}} className="block rounded-lg border border-gray-200 bg-white p-2 mt-1 text-sm" /></label></div>
@@ -1274,10 +1285,35 @@ export default function ContractorManagement() {
             <p className="text-xs text-slate-500 mt-3">Expected dates use the client invoice date plus its terms. Until confirmed, the client invoice is assumed sent at billing month-end, with a ±5-day planning range. Client funds received but not yet scheduled stay visible.</p>
           </section>
           <div className="flex flex-wrap gap-2" aria-label="Invoice queue">
-            {([{id:'window',label:'This payment window'},{id:'overdue',label:'Before this window'},{id:'pooled',label:'Lump sum · multiple clients'},{id:'review',label:'Schedule review'},{id:'outstanding',label:'All outstanding'},{id:'history',label:'Invoice history'}] as const).map(view => <button key={view.id} onClick={() => {setInvoiceView(view.id);setFilterStatus('all');setPaymentStage('all')}} aria-pressed={invoiceView===view.id} className={`rounded-lg border px-4 py-2 text-sm font-medium ${invoiceView===view.id ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-gray-200 text-gray-600'}`}>{view.label}{view.id==='pooled' && <span className="ml-2 text-xs">({invoices.filter(i=>i.payment_group==='pooled_lump_sum' && inPaymentWindow(i,billingPolicies,paymentDates.start,paymentDates.end)).length})</span>}</button>)}
+            {([{id:'window',label:'This payment window'},{id:'overdue',label:'Before this window'},{id:'pooled',label:'Lump sum · multiple clients'},{id:'review',label:'Schedule review'},{id:'outstanding',label:'All outstanding'}] as const).map(view => <button key={view.id} onClick={() => {setInvoiceView(view.id);setFilterStatus('all');setPaymentStage('all')}} aria-pressed={invoiceView===view.id} className={`rounded-lg border px-4 py-2 text-sm font-medium ${invoiceView===view.id ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-gray-200 text-gray-600'}`}>{view.label}{view.id==='pooled' && <span className="ml-2 text-xs">({invoices.filter(i=>i.payment_group==='pooled_lump_sum' && inPaymentWindow(i,billingPolicies,paymentDates.start,paymentDates.end)).length})</span>}</button>)}
           </div>
-          <p className="text-xs text-slate-500">{invoiceView==='window' ? `${paymentDates.start} – ${paymentDates.end} · totals below cover this payment window and available client funds; future invoices stay in All outstanding. Combined lump sums have their own bucket.` : invoiceView==='pooled' ? 'Combined lump-sum invoices · Net 60 from the contractor invoice date · separate from individual client payment schedules.' : invoiceView==='overdue' ? `Expected or scheduled before ${paymentDates.start}. Confirm receipt and payment records before acting on older balances.` : invoiceView==='review' ? 'Confirm missing client invoice dates and review invoices with multiple clients. Estimates do not confirm client payment.' : invoiceView === 'history' ? `Invoice history · ${dateFilter.label} · includes paid and rejected invoices. Use the billing-period controls below to narrow the history.` : 'All billing months · unpaid invoices stay visible until paid or rejected · earliest payment dates first'}</p>
+          </>}
+          <p className="text-xs text-slate-500">{invoiceView==='window' ? `${paymentDates.start} – ${paymentDates.end} · totals below cover this payment window and available client funds; future invoices stay in All outstanding. Combined lump sums have their own bucket.` : invoiceView==='pooled' ? 'Combined lump-sum invoices · Net 60 from the contractor invoice date · separate from individual client payment schedules.' : invoiceView==='overdue' ? `Expected or scheduled before ${paymentDates.start}. Confirm receipt and payment records before acting on older balances.` : invoiceView==='review' ? 'Confirm missing client invoice dates and review invoices with multiple clients. Estimates do not confirm client payment.' : invoiceView === 'history' ? `Invoices · ${dateFilter.label} · all statuses available, including paid and rejected. Billing month follows the work period’s closing month.` : 'All billing months · unpaid invoices stay visible until paid or rejected · earliest payment dates first'}</p>
           {invoiceView==='pooled' && <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={pooledAllPeriods} onChange={e=>setPooledAllPeriods(e.target.checked)}/>Show all unpaid lump-sum periods (otherwise this payment window)</label>}
+              <div className={`${invoiceView !== 'history' ? 'hidden' : 'flex'} flex-wrap items-center gap-2 min-w-0`}>
+                <span className="text-xs text-slate-500">Billing month</span>
+                <div className="flex items-center gap-0.5 p-0.5 bg-gray-100 rounded-lg border border-gray-200">
+                  {(['month', 'quarter', 'year', 'all'] as const).map(r => (
+                    <button key={r} onClick={() => setDateRange(r)}
+                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${dateRange === r ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}>
+                      {r === 'all' ? 'All months' : r.charAt(0).toUpperCase() + r.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                {dateRange === 'month' && <input aria-label="Review billing month" type="month" value={`${invoiceRefDate.getFullYear()}-${String(invoiceRefDate.getMonth()+1).padStart(2,'0')}`} onChange={e => {if (/^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value)) setInvoiceRefDate(new Date(e.target.value + '-01T12:00:00'))}} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm" />}
+                {dateRange !== 'all' && (
+                  <div className="flex items-center gap-1">
+                    <button aria-label="Previous billing period" onClick={() => navigateDate(-1)} className="p-1.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-500"><ChevronLeft size={14} /></button>
+                    <span className="text-gray-900 text-sm font-medium px-3 py-1.5 bg-white border border-gray-200 rounded-lg min-w-[120px] text-center vN">{dateFilter.label}</span>
+                    <button aria-label="Next billing period" onClick={() => navigateDate(1)} className="p-1.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-500"><ChevronRight size={14} /></button>
+                  </div>
+                )}
+              </div>
+          {invoiceView === 'history' && <div className="flex flex-wrap items-center gap-2" aria-label="Invoice review shortcuts">
+            <span className="text-xs text-slate-500">Across all billing months and contractors:</span>
+            <button onClick={() => {clearFilters();setDateRange('all');setFilterStatus('pending')}} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">Needs approval ({invoices.filter(i => ['submitted','pending'].includes(i.status)).length})</button>
+            <button onClick={() => {clearFilters();setDateRange('all');setPaymentStage('ready_to_schedule')}} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">Ready to schedule ({invoices.filter(i => isOutstanding(i) && paymentTiming(i,billingPolicies).ready && !paymentTiming(i,billingPolicies).mixed && !!paymentTiming(i,billingPolicies).clientId).length})</button>
+          </div>}
           <div className="flex justify-end">
             <button onClick={() => openAdd('invoice')} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 vBtn">
               <Plus size={13} /> Add Invoice <span className="font-normal opacity-75">· on behalf of contractor</span>
@@ -1328,23 +1364,7 @@ export default function ContractorManagement() {
                 </select>
                 {hasActiveFilters && <button onClick={clearFilters} className="px-2.5 py-2 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 vBtn flex items-center gap-1"><X size={12} /> Clear</button>}
               </div>
-              <div className={`${invoiceView !== 'history' ? 'hidden' : 'flex'} flex-wrap items-center gap-2 min-w-0`}>
-                <div className="flex items-center gap-0.5 p-0.5 bg-gray-100 rounded-lg border border-gray-200">
-                  {(['month', 'quarter', 'year', 'all'] as const).map(r => (
-                    <button key={r} onClick={() => setDateRange(r)}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${dateRange === r ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}>
-                      {r === 'all' ? 'All' : r.charAt(0).toUpperCase() + r.slice(1)}
-                    </button>
-                  ))}
-                </div>
-                {dateRange !== 'all' && (
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => navigateDate(-1)} className="p-1.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-500"><ChevronLeft size={14} /></button>
-                    <span className="text-gray-900 text-sm font-medium px-3 py-1.5 bg-white border border-gray-200 rounded-lg min-w-[120px] text-center vN">{dateFilter.label}</span>
-                    <button onClick={() => navigateDate(1)} className="p-1.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-500"><ChevronRight size={14} /></button>
-                  </div>
-                )}
-              </div>
+
             </div>
             <GroupBySelector dimensions={invGroupDims} onChange={d => { setInvGroupDims(d); setCollapsed(new Set()) }} />
           </div>
@@ -1369,7 +1389,7 @@ export default function ContractorManagement() {
               <p className="text-xs text-gray-400 mt-1">Try clearing filters or choosing another period or invoice view.</p>
             </div>
           )}
-          <details className="rounded-xl border border-slate-200 bg-white p-4"><summary className="cursor-pointer text-sm font-medium text-slate-600">Invoice submission follow-ups · separate from payment dates</summary><div className="mt-3"><InvoiceFollowups request={authedFetch} /></div></details>
+          <details className="rounded-xl border border-slate-200 bg-white p-4"><summary className="cursor-pointer text-sm font-medium text-slate-600">Missing invoices & submission follow-ups · separate from payment planning</summary><div className="mt-3"><InvoiceFollowups request={authedFetch} /></div></details>
         </div>
       )}
 

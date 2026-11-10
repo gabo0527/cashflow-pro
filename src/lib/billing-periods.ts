@@ -8,6 +8,15 @@ export interface BillingPolicy {
   effective_start: string
 }
 const iso = (date: Date) => date.toISOString().slice(0,10)
+// Billing months follow the closing month, including work that starts earlier.
+// Existing invoice dates stay intact; payment dates never determine this label.
+export function invoiceBillingMonth(invoice: { period_end?: string | null; period_start?: string | null; invoice_date?: string | null }) {
+  return (invoice.period_end || invoice.period_start || invoice.invoice_date || '').slice(0,7)
+}
+export function billingMonthLabel(month: string) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return 'Billing month unavailable'
+  return new Date(`${month}-01T12:00:00Z`).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+}
 export function billingPeriod(closingMonth: string, startDay: 1 | 26 = 1) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(closingMonth)) throw new Error('Choose a valid billing month.')
   const [year,month] = closingMonth.split('-').map(Number)
