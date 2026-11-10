@@ -46,3 +46,35 @@ test('one client PDF keeps project pages distinct and rejects a mixed-client rep
  await assert.rejects(()=>exporter.createClientTimesheetPDF([a,{...b,client:'AMB'}],summaries,assets),/one client/);await assert.rejects(()=>exporter.createClientTimesheetPDF([],{},assets),/at least one project/);
  if(process.env.CLIENT_REPORT_PREVIEW){fs.mkdirSync(path.dirname(process.env.CLIENT_REPORT_PREVIEW),{recursive:true});fs.writeFileSync(process.env.CLIENT_REPORT_PREVIEW,bytes)}
 });
+
+test('date windows use exact inclusive bounds, independent month presets, and explicit validation',()=>{
+ const values={week:'2026-10-28',month:'2026-09',from:'2026-09-10',to:'2026-09-20'},today='2026-11-10';
+ assert.deepEqual(lib.timesheetWindow('range',values,today),{start:'2026-09-10',end:'2026-09-20'});
+ assert.deepEqual(lib.timesheetWindow('month',values,today),{start:'2026-09-01',end:'2026-09-30'});
+ assert.deepEqual(lib.timesheetWindow('week',values,today),{start:'2026-10-26',end:'2026-11-01'});
+ assert.deepEqual(lib.timesheetWindow('month',{...values,month:'2026-11'},today),{start:'2026-11-01',end:today});
+ for(const bad of [{from:'2026-09-20',to:'2026-09-10'},{from:'',to:'2026-09-20'},{from:'2026-02-30',to:'2026-09-20'},{from:'2026-09-01',to:'2026-11-11'},{from:'2024-01-01',to:'2026-09-20'}])assert.equal(lib.timesheetWindow('range',{...values,...bad},today),null);
+ assert.equal(lib.timesheetWindow('month',{...values,month:'2026-12'},today),null);
+ const window=lib.timesheetWindow('range',{...values,from:'2026-09-30',to:'2026-10-01'},today),r=lib.buildProjectTimesheetReport({...options,from:window.start,through:window.end});
+ assert.equal(r.hours[0].total,11);assert.deepEqual(r.originals.map(e=>e.date),['2026-09-30','2026-10-01']);assert.equal(r.weeks.length,1);assert.equal(r.weeks[0].start,window.start);assert.equal(r.weeks[0].end,window.end);
+});
+
+test('date-range controls expose both boundaries; Month resets to that month and invalid windows block export',async()=>{
+ const React=require('react'),{create,act}=require('react-test-renderer');
+ const builder=load('src/components/time-tracking/ProjectTimesheetReportBuilder.tsx',{'@/lib/resource-report':base,'@/lib/project-timesheet-report':lib,'@/lib/supabase':{supabase:{}},'lucide-react':{Download:()=>null,RefreshCw:()=>null,X:()=>null}}).default;
+ let tree;await act(async()=>{tree=create(React.createElement(builder,{entries,projects:[{id:'p',label:'Remington'}],resources,initialProjects:['p'],initialResources:['a','b','c'],logo:'<svg></svg>',onClose(){},onAdvanced(){}}),{createNodeMock:()=>({showModal(){}})})});
+ try{
+ const byLabel=label=>tree.root.findByProps({'aria-label':label}),text=node=>node.children.map(c=>typeof c==='string'?c:text(c)).join(''),download=()=>tree.root.findAllByType('button').find(b=>b.children.includes('Download PDF'));
+ assert.equal(tree.root.findAllByProps({'aria-label':'Hours from'}).length,0);
+ await act(async()=>byLabel('Report period').props.onChange({target:{value:'range'}}));
+ await act(async()=>byLabel('Report from').props.onChange({target:{value:'2026-09-01'}}));await act(async()=>byLabel('Report to').props.onChange({target:{value:'2026-09-30'}}));
+ assert.match(text(byLabel('Report date coverage')),/Sep 1, 2026 – Sep 30, 2026/);assert.match(text(tree.root.findByProps({'aria-live':'polite'})),/3 hours in period/);
+ await act(async()=>byLabel('Original entries').props.onChange({target:{value:'period'}}));assert.equal(tree.root.findAllByType('textarea').length,1);
+ await act(async()=>byLabel('Report period').props.onChange({target:{value:'month'}}));await act(async()=>byLabel('Report month').props.onChange({target:{value:'2026-10'}}));
+ assert.match(text(byLabel('Report date coverage')),/Oct 1, 2026 – Oct 31, 2026/);assert.match(text(tree.root.findByProps({'aria-live':'polite'})),/23 hours in period/);
+ await act(async()=>byLabel('Report period').props.onChange({target:{value:'range'}}));assert.equal(byLabel('Report from').props.value,'2026-10-01');assert.equal(byLabel('Report to').props.value,'2026-10-31');
+ await act(async()=>byLabel('Report to').props.onChange({target:{value:'2026-10-01'}}));assert.match(text(tree.root.findByProps({'aria-live':'polite'})),/8 hours in period/);
+ await act(async()=>byLabel('Report from').props.onChange({target:{value:'2026-10-02'}}));assert.equal(download().props.disabled,true);assert.equal(tree.root.findAllByProps({'aria-label':'Report date coverage'}).length,0);assert.equal(tree.root.findAllByProps({'aria-label':'Weekly hours'}).length,0);
+ await act(async()=>byLabel('Report to').props.onChange({target:{value:'2999-01-01'}}));assert.equal(download().props.disabled,true);
+ }finally{await act(async()=>tree.unmount())}
+});
