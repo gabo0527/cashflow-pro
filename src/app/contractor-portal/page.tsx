@@ -10,7 +10,7 @@ import {
   LayoutDashboard, TrendingUp, Menu, Shield, MapPin, Phone
 } from 'lucide-react'
 import { useBillingPolicies } from '@/hooks/useBillingPolicies'
-import { billingPolicy, billingPeriod, lastClosedBillingPeriod, invoiceDueDate } from '@/lib/billing-periods'
+import { billingPolicy, billingPeriod, lastClosedBillingPeriod, invoiceDueDate, invoiceBillingMonth, billingMonthLabel } from '@/lib/billing-periods'
 import { localToday } from '@/lib/payables'
 import { createClient } from '@supabase/supabase-js'
 import OnboardingWizard from './OnboardingWizard'
@@ -925,7 +925,7 @@ export default function ContractorPortal() {
       try {
         const { data: timeData } = await supabase.from('time_entries').select('id, project_id, hours, billable_hours, description, date, created_at').eq('contractor_id', member.id).gte('date', historyRange.start).lte('date', historyRange.end).order('date', { ascending: false })
         const { data: expData } = await supabase.from('contractor_expenses').select('*').eq('team_member_id', member.id).neq('status', 'rejected').neq('status', 'draft').gte('date', historyRange.start).lte('date', historyRange.end).order('date', { ascending: false })
-        const { data: invData } = await invoiceStore.from('contractor_invoices').select('*, contractor_invoice_lines(*)').eq('team_member_id', member.id).lte('period_start', historyRange.end).gte('period_end', historyRange.start).order('invoice_date', { ascending: false })
+        const { data: invData } = await invoiceStore.from('contractor_invoices').select('*, contractor_invoice_lines(*)').eq('team_member_id', member.id).lte('period_end', historyRange.end).gte('period_end', historyRange.start).order('invoice_date', { ascending: false })
         setHistoryTime(timeData || []); setHistoryExpenses(expData || []); setHistoryInvoices(invData || [])
       } catch (err) { console.error('History load error:', err) }
       finally { setHistoryLoading(false) }
@@ -1013,8 +1013,8 @@ export default function ContractorPortal() {
         // Submitted hours only — drafts live in timesheet_drafts and never appear here
         const { data: timeData } = await supabase.from('time_entries').select('id, project_id, hours, billable_hours, date, status').eq('contractor_id', member.id).gte('date', analyticsRange.start).lte('date', analyticsRange.end).order('date', { ascending: true })
         setAnalyticsTime((timeData || []).filter((e: any) => (e.status || 'submitted') !== 'draft'))
-        // Invoices count in the period their billing period STARTS (KPI total always equals chart sum)
-        const { data: invData } = await invoiceStore.from('contractor_invoices').select('id, invoice_date, total_amount, status, period_start, period_end, client_id, contractor_invoice_lines(*)').eq('team_member_id', member.id).gte('period_start', analyticsRange.start).lte('period_start', analyticsRange.end).order('period_start', { ascending: true })
+        // Invoice analytics follow the billing closing month, independently of issue/payment dates.
+        const { data: invData } = await invoiceStore.from('contractor_invoices').select('id, invoice_date, total_amount, status, period_start, period_end, client_id, contractor_invoice_lines(*)').eq('team_member_id', member.id).gte('period_end', analyticsRange.start).lte('period_end', analyticsRange.end).order('period_end', { ascending: true })
         setAnalyticsInvoicesA(invData || [])
         // Expenses by expense date; rejected excluded from all sums
         const { data: expData } = await supabase.from('contractor_expenses').select('id, date, category, amount, status, client_id').eq('team_member_id', member.id).gte('date', analyticsRange.start).lte('date', analyticsRange.end).order('date', { ascending: true })
@@ -1122,7 +1122,7 @@ export default function ContractorPortal() {
     if (analyticsInvoicesA.length === 0) return [] as { key: string; label: string; total: number; clients: Record<string, number> }[]
     const buckets: Record<string, { label: string; total: number; clients: Record<string, number> }> = {}
     analyticsInvoicesA.forEach((inv: any) => {
-      const d = new Date((inv.period_start || inv.invoice_date) + 'T00:00:00')
+      const d = new Date(invoiceBillingMonth(inv) + '-01T12:00:00')
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       const label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
       if (!buckets[key]) buckets[key] = { label, total: 0, clients: {} }
@@ -1697,12 +1697,9 @@ export default function ContractorPortal() {
                 {/* Row 2 */}
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div>
-                    <label className={T.label}>Billing Period</label>
-                    <div className="inline-flex items-center gap-0 bg-white border border-gray-200 rounded overflow-hidden w-full">
-                      <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() - 1,1); setInvoiceMonth(d) }} className="p-2.5 text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-colors border-r border-gray-200"><ChevronLeft size={14} /></button>
-                      <span className="text-gray-900 text-[13px] font-medium flex-1 text-center py-2">{billingMonth.label}</span>
-                      <button onClick={() => { const d = new Date(invoiceMonth); d.setMonth(d.getMonth() + 1,1); setInvoiceMonth(d) }} className="p-2.5 text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-colors border-l border-gray-200"><ChevronRight size={14} /></button>
-                    </div>
+                    <label className={T.label} htmlFor="invoice-billing-month">Billing month</label>
+                    <input id="invoice-billing-month" aria-label="Invoice billing month" type="month" required value={billingMonth.closingMonth} onChange={e => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value)) setInvoiceMonth(new Date(e.target.value + '-01T12:00:00')) }} className={T.input} />
+                    <p className="text-xs text-gray-500 mt-2">Work dates: {billingMonth.label} · calculated from this client's settings.</p>
                   </div>
                   <div>
                     <label className={T.label}>Invoice Amount</label>
@@ -1721,7 +1718,7 @@ export default function ContractorPortal() {
                 {/* Distribution Reference */}
                 {invoiceDistribution.length > 0 ? (
                   <div className="mb-4">
-                    <p className={`${T.label} mb-2`}>Timesheet Reference — {billingMonth.label}</p>
+                    <p className={`${T.label} mb-2`}>Timesheet reference — {billingMonthLabel(billingMonth.closingMonth)}</p>
                     <div className="bg-gray-50 border border-gray-200 rounded overflow-hidden">
                       <table className="w-full text-[13px]">
                         <thead><tr className="text-gray-400 text-[10px] uppercase tracking-[0.04em]">
@@ -1791,7 +1788,7 @@ export default function ContractorPortal() {
               // Build month→client grouping
               const byMonth: Record<string, { monthLabel: string; total: number; clients: { key: string; clientName: string; color: string; invoices: ContractorInvoice[] }[] }> = {}
               invoices.forEach(inv => {
-                const d = new Date((inv.period_start || inv.invoice_date) + 'T00:00:00')
+                const d = new Date(invoiceBillingMonth(inv) + '-01T12:00:00')
                 const monthKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
                 const monthLabel = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
                 const clientName = inv.payment_group==='pooled_lump_sum'?'Lump sum · multiple clients':inv.client_id ? (assignmentsByClient[inv.client_id]?.clientName || 'Unknown') : 'General'
@@ -1807,7 +1804,7 @@ export default function ContractorPortal() {
               // Shared invoice card render
               const InvCard = ({ inv, color }: { inv: ContractorInvoice; color: string }) => {
                 const lines = inv.contractor_invoice_lines || (inv as any).lines || []
-                const bMonth = new Date(inv.period_start + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                const bMonth = billingMonthLabel(invoiceBillingMonth(inv))
                 const receiptUrl = inv.receipt_url ? supabase.storage.from('contractor-uploads').getPublicUrl(inv.receipt_url).data.publicUrl : null
                 return (
                   <div className={`${T.cardHover} overflow-hidden`} style={{ borderLeft: `3px solid ${color}` }}>

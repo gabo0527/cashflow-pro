@@ -190,6 +190,7 @@ test('real portal opens only the selected project/day, closes on Enter, and expa
     '@supabase/supabase-js': { createClient: () => supabase },
     './OnboardingWizard': () => null, './ExpensesTab': () => null,
     '@/components/IdleLogout': () => null, '@/lib/timesheet-daily': daily,
+    '@/hooks/useBillingPolicies': {useBillingPolicies:()=>({policies:[{client_id:'client-two',project_id:null,cycle_start_day:26,net_days:45,contractor_payment_basis:'client_payment',effective_start:'2020-01-01'}],loading:false,error:''})},
     'lucide-react': icons, recharts: icons,
   }).default
   let renderer
@@ -228,6 +229,18 @@ test('real portal opens only the selected project/day, closes on Enter, and expa
     await act(async()=>clientSelect.props.onChange({target:{value:'client-one'}}))
     assert.match(JSON.stringify(renderer.toJSON()),/One client per invoice/)
     assert.ok(renderer.root.findAllByType('input').some(i=>i.props.type==='date'))
+    const monthInput=()=>renderer.root.findByProps({'aria-label':'Invoice billing month'})
+    assert.equal(monthInput().props.type,'month')
+    await act(async()=>monthInput().props.onChange({target:{value:'2026-09'}}))
+    assert.match(JSON.stringify(renderer.toJSON()),/2026-09-01 – 2026-09-30/)
+    await act(async()=>clientSelect.props.onChange({target:{value:'client-two'}}))
+    await act(async()=>monthInput().props.onChange({target:{value:'2026-09'}}))
+    assert.equal(monthInput().props.value,'2026-09')
+    assert.match(JSON.stringify(renderer.toJSON()),/2026-08-26 – 2026-09-25/)
+    assert.match(JSON.stringify(renderer.toJSON()),/September 2026/)
+    await act(async()=>monthInput().props.onChange({target:{value:''}}))
+    assert.equal(monthInput().props.value,'2026-09')
+
   } finally {
     if (renderer) act(() => renderer.unmount())
     global.fetch = originalFetch

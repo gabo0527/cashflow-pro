@@ -1,10 +1,9 @@
 # Contractor invoice operations
 
-The default queue includes submitted, pending, approved and scheduled contractor
-invoices across every billing month. Due date controls the queue ordering.
-Overdue means payment due before today's Puerto Rico date. Due in seven days
-includes today. Invoice history uses billing-period overlap and can include paid
-and rejected invoices. Submission due at month-end is separate from payment due.
+The default Invoices view shows the last closed billing month and includes all
+statuses, including paid and rejected. Month assignment follows the work period's
+closing month. Payment planning separately includes outstanding invoices and sorts
+by payment date. Submission follow-ups remain separate from payment timing.
 
 Status events are captured transactionally by the database. New events preserve
 the previous status, next status, database timestamp and actor. Existing
@@ -98,8 +97,9 @@ This deployment does not retry it or change those existing invoice policies.
 
 ## Payment windows and corrected legacy defaults
 
-The default AP screen is the current **payment month**, using client payment
-schedule dates rather than service-month overlap. Presets include this week,
+The Payment planning tab opens the current **payment month**, using client payment
+schedule dates rather than service-month overlap. Invoices opens separately by
+billing month. Presets include this week,
 this month, month-end/opening week, next 30 dates and custom cross-month ranges.
 Metrics and bulk approval use only the displayed selection. Prior expected dates,
 all outstanding invoices and schedule review are explicit separate views.
@@ -166,3 +166,24 @@ billing periods. Search, contractor, and client filters are retained; an open
 payment-stage filter is cleared. Inside history, an explicitly chosen billing
 period still applies. Returning through a payment-window date control clears
 the closed-status filter so the outstanding queue cannot become contradictory.
+
+
+## Invoice review by billing month
+
+Invoices is now the default admin view, initially showing the last closed calendar
+month with all statuses available. Its month picker and All months option filter
+by the work period's closing month, including custom 26th–25th cycles. Paid,
+rejected and combined lump-sum invoices remain in this view. Rows emphasize the
+billing month and actual work dates. Needs approval and Ready to schedule shortcuts
+explicitly cover all months and contractors; they clear other filters when opened.
+Payment planning has its own tab and date controls, retaining the existing forecast,
+client-funds, scheduled-payment and lump-sum Net 60 rules. Changing payment dates
+cannot silently change the invoice review month. Missing-invoice follow-ups remain
+separate below the list.
+
+Contractors select a client and billing month, with a project only where existing
+project overrides require it. Work dates are calculated from the configured cycle
+and displayed below the month input. Invoice issue date remains independent.
+Portal invoice cards, month groups, history and invoice analytics consistently use
+the closing month instead of the start month. Existing source dates and amounts
+are not rewritten; no database migration is required.

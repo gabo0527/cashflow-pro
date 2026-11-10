@@ -106,3 +106,15 @@ test('an hourly contractor cannot designate an invoice as the lump-sum Net 60 ex
  const result=await invoiceRoute(f).POST({json:async()=>({portal:true,table:'contractor_invoices',operation:'insert',values:{...newInvoice,payment_group:'pooled_lump_sum',client_id:null}})})
  assert.equal(result.status,400);assert.equal(f.saved,undefined)
 })
+
+
+test('invoice month follows the close, independent of issue and payment dates',()=>{
+ for(const end of ['2026-09-25','2026-09-30']) {
+  const invoice={period_start:'2026-08-31',period_end:end,invoice_date:'2026-10-02',due_date:'2026-12-01'}
+  assert.equal(billing.invoiceBillingMonth(invoice),'2026-09')
+  assert.equal(billing.billingMonthLabel(billing.invoiceBillingMonth(invoice)),'September 2026')
+ }
+ assert.equal(billing.invoiceBillingMonth({period_start:'2026-12-26',period_end:'2027-01-25'}),'2027-01')
+ assert.equal(billing.invoiceBillingMonth({invoice_date:'2026-09-30'}),'2026-09')
+ assert.equal(billing.billingMonthLabel(''),'Billing month unavailable')
+})
